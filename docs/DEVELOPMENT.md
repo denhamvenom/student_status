@@ -52,11 +52,29 @@ Invitation layout checks: `bun scripts/parent-invites-browser-check.mjs` against
 
 ## Withdrawal and travel development milestone
 
-Live routes: `/withdrawals` for Coach/Travel Lead review, `/drivers` for driver management, event detail for transport and student withdrawal requests, finance for categorized charges and source balances, `/permissions` (Coach/Travel) and `/forms` (parent) for the read-only draft. New optional fields preserve existing development records. Backend submit stays disabled regardless of permission-version text. Actual cash/check payouts remain a separate unfinished workflow.
+Live routes: `/withdrawals` for Coach/Travel Lead review, `/drivers` for driver management, event detail for transport and student withdrawal requests, `/events/:eventId/rooming` for student room selection or adult room operations, `/finances` for categorized charges and source balances, `/attendance` for the Coach-only attendance workspace, and `/permissions` (Coach/Travel) and `/forms` (parent) for the read-only permission draft. The event detail includes Coach/Travel Lead signup review, waitlist promotion, capacity, and requirement operations. The finance area places **Record money returned** and **Transfer fundraising credit** beside payment recording for a Coach or a Travel Lead with the separate financial-edit grant. A money-return entry records an external cash/check refund already made from unallocated personal payments; the app does not send money. Fundraising credits cannot be paid out to a family. Transfers record same-season movement to another active student and automatically apply credit to that student's outstanding charges. New optional fields preserve existing development records. Permission submission stays disabled regardless of permission-version text.
 
 New allocation entries record the originating payment/fundraiser ID. Legacy source inference only accepts an unambiguous source; otherwise stop for financial review. Do not reset or reseed existing records to work around this. Approved-withdrawal reenrollment is blocked until an intentional new-fee flow exists.
 
 Synthetic browser verification added one clearly named test driver and vehicle assignment, adult/trailer settings, and a fictional extra charge that consumed the existing synthetic credit. No real payments occurred. Independent travel was toggled and restored. Do not rerun bootstrap seed. See REVIEW.md for verification boundaries and DEVELOPMENT_CHECKLIST.md for remaining work.
+
+## Fictional operations rehearsal
+
+`developmentRehearsal:ensure` is an owner-invoked internal mutation for the approved development deployment. It inserts two fictional, unlinked students, an overnight approval event with one pending signup and one waitlisted signup, and clearly labeled synthetic personal payments and fundraising credits. It checks the exact development deployment URL, the active Coach email supplied by the operator, and Coach ownership of the active season. An audit marker makes a repeat invocation return the same fixture; if reserved records have changed or exist without the marker, it stops for manual review. It never creates sign-in accounts or links a parent. Run it only after reviewing the selected development deployment and synchronizing this code there. Replace the placeholder with the authorized development Coach's email; do not paste that address into repository files:
+
+```powershell
+bunx convex run --deployment dev developmentRehearsal:ensure '{"expectedCoachEmail":"<COACH_EMAIL>"}'
+```
+
+The command returns identifiers for the fictional students and event; do not paste them into repository files. Do not run the fixture against production or rerun the original bootstrap seed. The fixture is a development aid, not a reset or a complete end-to-end rehearsal. With a real, authorized Coach session in the development app, review `/events`, the event's `/events/:eventId` operations panel, `/events/:eventId/rooming`, `/withdrawals`, `/finances`, and Coach `/attendance`. Use only fictional amounts and descriptions. Student and parent UI actions require their own authorized linked accounts; the fixture's students deliberately have no login identity.
+
+The backend multi-role tests use mocked Convex identities and fictional `example.invalid` accounts. They exercise signup, approval, room release, withdrawal return and reallocation, payout recording, fundraising transfer, and role and family-link boundaries without touching the development database:
+
+```powershell
+bunx vitest run convex/operationsRehearsal.test.ts convex/developmentRehearsal.test.ts
+```
+
+Passing those tests does not prove real Google sign-in, multi-account browser behavior, or the live Coach workflow. Record live UI rehearsal results separately in review notes, including which routes and roles were exercised and any gaps encountered.
 
 ## Timeclock workspace
 

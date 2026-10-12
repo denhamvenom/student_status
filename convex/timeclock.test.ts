@@ -29,7 +29,7 @@ async function fixture() {
     const base = { seasonId: season, state: "open" as const, scheduledStart: start, scheduledEnd: start + 2 * 60 * 60_000, effectiveEnd: start + 2 * 60 * 60_000, extensionMs: 0, revision: 1, openedAt: start, openedBy: coach, needsReview: false };
     const sessionA = await ctx.db.insert("timeclockSessions", { ...base, occurrenceId: a });
     const sessionB = await ctx.db.insert("timeclockSessions", { ...base, occurrenceId: b });
-    return { authCoach, authMentor, authStudent, student, student2, sessionA, sessionB };
+    return { authCoach, authMentor, authStudent, season, student, student2, sessionA, sessionB };
   });
   return { t, ids, coach: t.withIdentity({ subject: `${ids.authCoach}|test` }), mentor: t.withIdentity({ subject: `${ids.authMentor}|test` }), student: t.withIdentity({ subject: `${ids.authStudent}|test` }) };
 }
@@ -81,6 +81,23 @@ describe("timeclock transactions", () => {
     if (!summary) throw new Error("Expected summary");
     expect(summary.scheduledMs).toBe(60 * 60_000);
     expect(summary.qualifies).toBe(false);
+  });
+
+  it("refuses corrections and success-key replays after the session season is archived", async () => {
+    const f = await fixture();
+    const now = Date.now();
+    await f.t.run(ctx => ctx.db.patch(f.ids.sessionA, { state: "closed", closedAt: now }));
+    const args = { sessionId: f.ids.sessionA, studentId: f.ids.student, kind: "add" as const, inAt: now - 5 * 60_000, outAt: now - 4 * 60_000, reason: "Rehearsal correction", key: "archived-correction-01" };
+    expect((await f.coach.mutation(api.timeclock.correctInterval, args)).ok).toBe(true);
+    await f.t.run(async ctx => {
+      await ctx.db.patch(f.ids.season, { status: "archived", endsAt: now });
+      const coach = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", f.ids.authCoach)).unique();
+      await ctx.db.insert("seasons", { name: "Next Synthetic Season", year: 2027, status: "active", startsAt: now + 1, permissionVersion: "test", createdBy: coach!._id });
+    });
+    expect(await f.coach.mutation(api.timeclock.correctInterval, args)).toMatchObject({ ok: false, code: "INVALID_SESSION" });
+    expect(await f.coach.mutation(api.timeclock.correctInterval, { ...args, key: "archived-correction-02" })).toMatchObject({ ok: false, code: "INVALID_SESSION" });
+    const rows = await f.t.run(ctx => ctx.db.query("timeclockCorrections").withIndex("by_sessionId_and_studentId", q => q.eq("sessionId", f.ids.sessionA).eq("studentId", f.ids.student)).take(10));
+    expect(rows).toHaveLength(1);
   });
 
   it("rejects an entire group when one expected state is stale", async () => {

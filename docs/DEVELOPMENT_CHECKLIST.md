@@ -194,13 +194,11 @@ These are repeating steps for each future milestone, not unfinished tasks in the
 
 ## Current evidence and next step
 
-The latest Timeclock backend foundation and reactive-status follow-up passed 77 automated tests, strict types, lint, both frontend builds and both Cloudflare packaging dry-runs. Astra reviewed the source. Development sync and repeated Calendar polling succeeded. Real Google sign-in passed for Mentor at Timeclock and Coach at Student Status; previous Student/Parent roles remain unchanged. This is a backend/scaffold milestone, not a complete Timeclock interface or production release.
+The October 12 fictional rehearsal passed 97 automated tests, lint, strict types and build. Live Coach, Student and Parent checks verified approval/manual promotion, waitlist withdrawal with reactive parent updates, fictional personal payout/fundraising transfer, room finalization, vehicle capacity, and Timeclock automatic closure plus an audited correction preserving the original. See [the rehearsal report](REHEARSAL_2026-10-12.md) for the exact coverage and fixes.
 
-**Next step:** The separate Timeclock chat can build its frontend from the reviewed branch using [the backend handoff](TIMECLOCK_BACKEND_HANDOFF.md). This integration chat retains all shared backend/deployment ownership. In Student Status, finish attendance reporting/name review, event/signup/room-management workflows, permission-wording approval and a complete fictional-trip rehearsal. Cash/check payout recording, fundraising transfers, real consent/signatures and health-export permissions remain unfinished.
+**Next step:** Complete the family attendance screen, then finish live paid-withdrawal/room-invitation and Travel/Mentor journeys with authorized accounts, including independent-device conflicts. Permission wording still needs Coach approval before real signatures. Real consent, health-export permissions, rollover/retention and production readiness remain separate unfinished work.
 
-Earlier withdrawal/travel/draft work passed 32 tests and live Coach checks; full multi-account withdrawal/trip rehearsal remains pending. Parent-invitation multi-account testing remains valid. See [the plan](PLAN.md), [review evidence](REVIEW.md), and [confirmed finance and consent decisions](FINANCE_AND_CONSENT_DECISIONS.md). Draft PRs remain stacked; no main merge or production deployment is authorized.
-
-Latest publication: [draft PR 5](https://github.com/denhamvenom/student_status/pull/5), `feature/timeclock-backend`, implementation checkpoint `c39c7f7`. The complete frontend handoff includes the exact commit to branch from.
+Current development publication is [draft PR #7](https://github.com/denhamvenom/student_status/pull/7), `feature/student-status-operations`, stacked on `feature/timeclock-backend`. The separate Timeclock frontend is draft PR #6. This integration owner retains shared backend/deployment ownership. No main merge or production deployment is authorized.
 
 ## Operations milestone checkpoint — October 12, 2026
 
@@ -211,7 +209,11 @@ Agreed decisions: chronological waitlist order with manual Coach/Travel promotio
 - [x] Source-preserving payout records, fundraising transfers and readable history.
 - [x] Astra final review; 90 tests across 15 suites; lint, types, builds and packaging checks; development sync.
 - [x] Smoke-check live Coach attendance/name review, payout/transfer forms and event/room workspace after browser connectivity recovered; event/finance phone layouts have no horizontal overflow.
-- [ ] Rehearse complete live multi-role mutations, attendance correction with closed sessions and a complete fictional trip.
+- [x] Rehearse live Coach/Student/Parent waitlist withdrawal and reactive family status.
+- [x] Rehearse a closed Timeclock session and audited correction while retaining original evidence.
+- [x] Rehearse fictional Coach payout/transfer, room assignment/finalization and transport capacity.
+- [x] Add integrated role/finance/withdrawal tests and guarded fictional fixture creation.
+- [ ] Finish live paid-withdrawal, student room-invitation, Travel/Mentor and independent-device journeys; automated coverage is not live acceptance.
 - [x] Publish and verify implementation checkpoint `d33c701` on `feature/student-status-operations`, draft [PR #7](https://github.com/denhamvenom/student_status/pull/7), based on `feature/timeclock-backend`.
 
 Work runs in isolated `student-status-operations` / `feature/student-status-operations`. Timeclock frontend owns its separate worktree and `apps/timeclock`; one Student Status owner integrates shared backend and schema changes. Production, real signatures, automatic deletion and main merges remain outside this authorization.

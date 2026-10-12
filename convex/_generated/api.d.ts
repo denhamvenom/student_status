@@ -16,6 +16,7 @@ import type * as bootstrap from "../bootstrap.js";
 import type * as calendar from "../calendar.js";
 import type * as calendarState from "../calendarState.js";
 import type * as crons from "../crons.js";
+import type * as developmentRehearsal from "../developmentRehearsal.js";
 import type * as eventOperations from "../eventOperations.js";
 import type * as finance from "../finance.js";
 import type * as financeOperations from "../financeOperations.js";
@@ -52,6 +53,7 @@ declare const fullApi: ApiFromModules<{
   calendar: typeof calendar;
   calendarState: typeof calendarState;
   crons: typeof crons;
+  developmentRehearsal: typeof developmentRehearsal;
   eventOperations: typeof eventOperations;
   finance: typeof finance;
   financeOperations: typeof financeOperations;
