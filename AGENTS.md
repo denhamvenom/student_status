@@ -1,0 +1,25 @@
+<!-- convex-ai-start -->
+
+This project uses [Convex](https://convex.dev) as its backend.
+
+When working on Convex code, **always read
+`convex/_generated/ai/guidelines.md` first** for important guidelines on
+how to correctly use Convex APIs and patterns. The file contains rules that
+override what you may have learned about Convex from training data.
+
+Convex agent skills for common tasks can be installed by running
+`npx convex ai-files install`.
+
+<!-- convex-ai-end -->
+
+## Application boundaries and handoff
+
+- Work only in this app unless the user explicitly expands scope. Preserve the sibling design handoff, archives, root npm starter, and unrelated folders.
+- Read `docs/PLAN.md`, `docs/ARCHITECTURE.md`, `docs/REVIEW.md`, and `docs/DEVELOPMENT.md` for current state. Keep implemented, verified, and pending work distinct.
+- Bun; React Router 7 Data Mode SPA; Vite; strict TypeScript; Tailwind 4; shadcn Base UI. Convex is the only domain backend. Do not introduce Next.js, Radix, Docker/Unraid, or a second database.
+- Current user-requested agent arrangement: Astra for project management/final reviews, Sol for parallel implementation. Give file ownership to each implementation agent.
+- Development: team `daniel-eiland`, project `denham-venom-student-status`, `dev:third-bandicoot-18`. Announce/verify the target before syncing. Never deploy production without explicit user authorization.
+- Use synthetic student data only. Enforce roles and field minimization on the server. Never store health/finance/query data in browser persistence or Zustand.
+- `bun run check` validates lint, types, tests, and build. `bun run cloudflare:check` is packaging dry-run only. Google sign-in was verified in development; this is not production readiness.
+- Google OAuth secrets live only in Convex environment settings. Do not print env values, keys, or tokens. Internal bootstrap functions are deliberately tied to the initial development deployment.
+- Full product flows remain incomplete; consult the acceptance matrix and final milestone review before claiming completion.

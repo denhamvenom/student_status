@@ -1,0 +1,6 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "denham-venom-student-status",
+  "compatibility_date": "2026-10-11",
+  "assets": { "directory": "./dist", "not_found_handling": "single-page-application" }
+}

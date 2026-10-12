@@ -1,0 +1,56 @@
+# Dependencies and build output (commit bun.lock)
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# Secrets: only the deliberately blank template belongs in Git
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+*.pem
+*.key
+*.p12
+*.pfx
+.auth-keys.json
+client_secret*.json
+service-account*.json
+credentials.json
+
+# Local backend/hosting state; keep convex/_generated API types tracked
+.convex/
+.wrangler/
+
+# Tests, logs, temporary output and potentially sensitive exports
+coverage/
+test-results/
+playwright-report/
+blob-report/
+*.log
+logs/
+tmp/
+temp/
+exports/
+backups/
+private-data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Locally downloaded agent skills/caches (keep project instructions tracked)
+.agents/
+.claude/
+.codex/
+skills-lock.json
+
+# Workstation/editor files
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+~$*
