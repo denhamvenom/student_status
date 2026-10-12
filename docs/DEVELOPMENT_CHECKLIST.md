@@ -244,3 +244,12 @@ Timeclock parallel handoff: frontend owner reports Astra review, 34 synthetic in
 - [ ] Append design-conformance instructions to existing AGENTS.md and publish reviewed design checkpoints under the existing development workflow.
 
 No backend work, Timeclock changes, real consent, production deployment or main merge is included in this design task. Newer features without an exact prototype screen inherit its typography, colors, spacing, layout patterns and component states; do not invent a separate visual style.
+
+## Representative design review — Coach Readiness
+
+- [x] Coach authorized one representative screen, then review before wider rollout.
+- [x] Prepare Coach Readiness at 390px and 1440px in both themes, with explicit existing-data limitations.
+- [x] Validate four visual comparisons, navigation/event selection/keyboard behavior, Astra review, lint/types, 101 tests and build. See [the representative review](READINESS_DESIGN_REVIEW.md).
+- [ ] Obtain Coach approval before applying this design to other screens.
+
+This branch excludes paused backend drafts and earlier broad frontend drafts. No backend, Timeclock or production changes are authorized.

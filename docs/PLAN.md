@@ -188,3 +188,7 @@ Implemented Coach structured-name review and per-session attendance/correction U
 ## Fictional rehearsal follow-up — October 12, 2026
 
 See [the rehearsal report](REHEARSAL_2026-10-12.md) for the current evidence, superseding earlier pending statements for the live closed-session correction and Coach financial/room/transport checks. Coach, Student and Parent live journeys passed within the documented scope. Fixed duplicate React sibling keys and financial draft leakage between students, preserved payment/charge retry keys, clarified waitlist withdrawal wording, and denied attendance correction writes to archived seasons. Added guarded fictional fixtures and integrated multi-role tests. Full root checks passed 97 tests across 17 suites, lint, strict types and build. Remaining live Travel/Mentor, independent-device, paid-withdrawal and room-invitation journeys are explicitly open; family Attendance still needs implementation. No real records, real signatures or production release.
+
+## Representative design review
+
+Coach authorized one screen before broader corrections. The isolated Coach Readiness candidate uses the existing backend with screen-scoped presentation. All four viewport/theme comparisons, Astra review and local checks are recorded in [READINESS_DESIGN_REVIEW.md](READINESS_DESIGN_REVIEW.md). Coach acceptance is pending; other screens, paused backend drafts and production remain outside this step.
