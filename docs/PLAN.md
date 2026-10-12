@@ -156,3 +156,7 @@ Scope: reviewed full/partial/no-return withdrawal decisions, source-preserving r
 
 
 Verification: 32 backend tests, lint, strict TypeScript and build pass; Astra final source review accepted after fixing stale approvals, archived-event review, bounded-history rollback, old withdrawal bypasses and reenrollment capacity. Development synced to third-bandicoot-18. Live Coach browser checks verified driver/vehicle/settings/independent travel, categorized extra charge with automatic credit application, empty withdrawal queue, and draft form. Source provenance is explicit for new allocations; ambiguous old allocations fail closed for financial review. Approved-withdrawal reenrollment remains blocked until a deliberate new-fee workflow is built. Full multi-account withdrawal rehearsal remains pending. See REVIEW.md and DEVELOPMENT_CHECKLIST.md.
+
+## Timeclock coordination October 12
+
+[Timeclock coordination handoff](TIMECLOCK_COORDINATION.md) records verified current entities, a proposed additive multi-app layout, shared attendance/calendar/auth contracts, single-backend ownership and unresolved policies. Planning only; no Timeclock implementation, schema/folder/account changes or deployment. The Timeclock chat must agree the contract before implementation.
