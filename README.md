@@ -12,6 +12,7 @@ For disconnected UI review, use http://localhost:5173/?review=student. Other rol
 
 The original standalone prototype is preserved in `demo/`. See [repository workflow](docs/REPOSITORY.md) for GitHub Pages and production-deployment boundaries.
 
+- [Plain-language development checklist](docs/DEVELOPMENT_CHECKLIST.md)
 - [Plan and acceptance matrix](docs/PLAN.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Parent invitations](docs/PARENT_INVITATIONS.md)

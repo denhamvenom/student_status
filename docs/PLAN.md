@@ -141,3 +141,7 @@ Live additional-account Google OAuth invitation acceptance was subsequently rehe
 ### Live invitation rehearsal completed
 
 The real two-account Google OAuth rehearsal passed in development: student join/Coach approval, invitation creation, paused-new-invitation behavior, wrong-account rejection, matching-parent acceptance through Google redirect, one-time replay rejection, reactive Coach revocation and restoration. The fictional student and parent link remain for further testing; new invitations were restored to enabled. Refer to REVIEW.md. Test-account addresses and invitation tokens are excluded from GitHub.
+
+## Human-readable progress guide
+
+See [Development checklist](DEVELOPMENT_CHECKLIST.md) for verified completed work, remaining workflows and user decisions organized into the expected development phases. Keep it current with milestone evidence; it supplements this technical acceptance plan and does not authorize new work or production deployment.
