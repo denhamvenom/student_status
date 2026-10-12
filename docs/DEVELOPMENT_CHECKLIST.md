@@ -212,7 +212,7 @@ Agreed decisions: chronological waitlist order with manual Coach/Travel promotio
 - [x] Astra final review; 90 tests across 15 suites; lint, types, builds and packaging checks; development sync.
 - [x] Smoke-check live Coach attendance/name review, payout/transfer forms and event/room workspace after browser connectivity recovered; event/finance phone layouts have no horizontal overflow.
 - [ ] Rehearse complete live multi-role mutations, attendance correction with closed sessions and a complete fictional trip.
-- [ ] Publish and verify the reviewed GitHub checkpoint (integration owner records the commit/PR).
+- [x] Publish and verify implementation checkpoint `d33c701` on `feature/student-status-operations`, draft [PR #7](https://github.com/denhamvenom/student_status/pull/7), based on `feature/timeclock-backend`.
 
 Work runs in isolated `student-status-operations` / `feature/student-status-operations`. Timeclock frontend owns its separate worktree and `apps/timeclock`; one Student Status owner integrates shared backend and schema changes. Production, real signatures, automatic deletion and main merges remain outside this authorization.
 

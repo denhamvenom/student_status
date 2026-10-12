@@ -176,7 +176,7 @@ Agreed decisions: chronological waitlist order with manual Coach/Travel promotio
 - [x] Coach structured-name review and Timeclock attendance/correction screens.
 - [x] Event approval, ordered waitlist, requirements and rooming workflows.
 - [x] Source-preserving payout records, fundraising transfers and readable history.
-- [ ] Astra final review, tests, browser checks, development sync and GitHub checkpoint.
+- [x] Astra final review, 90 automated tests, Coach browser smoke checks, development sync and GitHub checkpoint `d33c701` / draft PR #7. Full multi-role rehearsal remains pending.
 
 Work runs in isolated `student-status-operations` / `feature/student-status-operations`. Timeclock frontend owns its separate worktree and `apps/timeclock`; one Student Status owner integrates shared backend and schema changes. Production, real signatures, automatic deletion and main merges remain outside this authorization.
 
