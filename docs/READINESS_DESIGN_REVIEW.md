@@ -11,7 +11,7 @@ Reference: immutable Claude Design prototype, Coach / readiness, 390px phone and
 - [x] Verify both event selections, grouped navigation, Settings round-trip, theme changes, More dismissal with Escape and focus return. No domain mutation submitted.
 - [x] Lint, strict types, 101 tests across 18 files and build pass. Tests required an unsandboxed rerun after the known Windows temporary-file failure. Existing large-bundle warning remains.
 - [x] Astra source and phone-dark image review accepted after fixing aggregate event readiness, preserving all Coach navigation destinations and guarding FIRST controls with event applicability.
-- [ ] Publish reviewed development checkpoint.
+- [x] Publish and verify checkpoint `ed69bbb` in draft [PR #9](https://github.com/denhamvenom/student_status/pull/9), stacked on the audit-report branch. No merge or deployment.
 - [ ] Coach visual approval before expanding scope.
 
 ## Data and workflow differences

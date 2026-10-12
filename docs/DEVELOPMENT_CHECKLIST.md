@@ -253,3 +253,5 @@ No backend work, Timeclock changes, real consent, production deployment or main 
 - [ ] Obtain Coach approval before applying this design to other screens.
 
 This branch excludes paused backend drafts and earlier broad frontend drafts. No backend, Timeclock or production changes are authorized.
+
+Representative Readiness checkpoint `ed69bbb` is published and verified in draft [PR #9](https://github.com/denhamvenom/student_status/pull/9). Coach review remains pending.
