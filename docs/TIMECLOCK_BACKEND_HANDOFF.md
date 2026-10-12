@@ -107,11 +107,25 @@ Development synchronization succeeded with the rate-limiter component. The actua
 
 ## Published frontend baseline
 
-Implementation checkpoint: `c39c7f77d0c30fe784cb8bfcd313d4cbaea6b425`, published on `feature/timeclock-backend`. [Draft PR 5](https://github.com/denhamvenom/student_status/pull/5) targets `docs/timeclock-coordination`. Branch frontend implementation from this exact implementation commit (the subsequent documentation-only checkpoint adds this publication record):
+Implementation checkpoint: `c39c7f77d0c30fe784cb8bfcd313d4cbaea6b425`, published on `feature/timeclock-backend`. [Draft PR 5](https://github.com/denhamvenom/student_status/pull/5) targets `docs/timeclock-coordination`. This initial checkpoint predates the reactive clock-status follow-up below. For a new frontend worktree, fetch and use the latest published backend branch; record its resolved commit. For an existing frontend branch, merge the published backend update without resetting frontend work:
 
 ```sh
 git fetch origin
-git worktree add -b feature/timeclock-frontend ../student-status-timeclock-ui c39c7f77d0c30fe784cb8bfcd313d4cbaea6b425
+git worktree add -b feature/timeclock-frontend ../student-status-timeclock-ui origin/feature/timeclock-backend
 ```
 
 Use a different unique branch/directory if those already exist. Never reset an existing frontend branch. Read this handoff and AGENTS.md first; limit frontend edits to apps/timeclock and coordinate shared changes. Copy only the public endpoint into its ignored workspace .env.local, run locked install and dev:timeclock. Do not run a backend watcher or deployment. Root shared backend is already synchronized in development. The existing real Mentor tester works; existing synthetic roster names still need Coach review before Timeclock clocking. Test fixtures are self-contained in convex/*.test.ts and must not be imported into the live database automatically. Do not rerun bootstrap:seedSynthetic against populated development data.
+
+## Frontend coordination follow-up
+
+The foundation's Timeclock Vite server was stopped after its sign-in rehearsal. Its exact command line and port were verified before stopping; port 5174 was released to the isolated frontend worktree. Student Status on port 5173 was preserved. The integration checkout must not restart the Timeclock frontend while the frontend chat owns that port.
+
+Existing synthetic roster name review remains a Coach action, not an inferred migration. The Coach can read `timeclockRoster.namesForReview({})`, compare structured first/last fields against an explicit source, then call `reviewNames({studentId,firstName,lastName,reason})`. Missing fields must remain unreviewed until confirmed; do not split legalName automatically. The original seed's source code provides explicit fictional fixture construction for its two generated students, but any separately joined profile still requires its own confirmation. The public operator roster excludes all unreviewed entries and reports their count. A name-review screen is not part of this backend/scaffold milestone. Automated tests supply explicitly structured fictional names; do not run the old live seed against populated data.
+
+### Reactive per-student clock state
+
+`api.timeclockRoster.clockStatus({sessionId: Id<"timeclockSessions">})` is the live operational subscription for the selected event. It returns `{sessionId, state: "open"|"closed"|"cancelled", revision, students: [{studentId, status: "in"|"out"|"no_activity", activeSessionId: Id<"timeclockSessions">|null, activeIntervalId: Id<"timeclockIntervals">|null, hasConflict: boolean}]}`. Join these rows by studentId to `timeclockRoster.list`; preserve that roster's server-provided display order. No names, email, health, finance or correction reasons are returned here.
+
+Only active Coach/Mentor operators can subscribe. The selected session must belong to the active season, and only active students with reviewed structured names appear. `in` means a consistent open lock/interval in the selected open session. `out` means original selected-session activity exists but the student is not currently in that session. `no_activity` means no original interval in that selected session. A student may be `out` or `no_activity` while `hasConflict` is true because the active interval is in another event. Closed/invalid pointers are not projected as active. Query state updates reactively across devices when intervals, locks or sessions change.
+
+This subscription supplies operational button state, not corrected historical attendance. Coach corrections remain in the summary/evidence APIs. It uses persisted server state without reading the wall clock: while a scheduled close is delayed, disable elapsed-event controls using the session effectiveEnd; authoritative mutations still settle/reject expiration. Always use a fresh previewGroup before a command and explicit PIN confirmation for transfer; subscription state does not authorize a silent transfer. The existing 500-record roster bound applies.

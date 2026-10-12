@@ -126,12 +126,13 @@ This checklist is the plain-language progress guide. The phases below show the r
 - [x] Restrict operations to active Coaches/Mentors; keep attendance corrections Coach-only.
 - [x] Add reviewed first/last-name fields, minimized roster display and a Coach review API without guessing old names.
 - [x] Implement individual/group clocking, explicit PIN transfers, duplicate protection and one open interval per student.
+- [x] Provide live per-student IN/OUT/no-activity state and other-event conflicts to the Timeclock frontend.
 - [x] Implement half-hour extensions, exact server auto-close, schedule changes and cancellations with retained history.
 - [x] Derive attendance from one uninterrupted scheduled hour; keep early/extended time separate.
 - [x] Add append-only Coach correction and evidence APIs; preserve legacy boolean evidence.
 - [x] Connect the dedicated read-only Calendar identity and verify deployed minute polling.
 - [x] Verify Google Mentor sign-in at the Timeclock origin and preserve prior Student/Parent roles.
-- [x] Pass 73 automated tests, root/workspace checks and both Cloudflare packaging dry-runs; obtain Astra source review.
+- [x] Pass 77 automated tests, root/workspace checks and both Cloudflare packaging dry-runs; obtain Astra source review.
 - [ ] Build the complete Timeclock frontend, including cross-tab console coordination and PIN-protected controls.
 - [ ] Complete Coach structured-name review for existing roster records before real clocking.
 - [ ] Build Student Status attendance summaries and correction/admin screens.
@@ -187,7 +188,7 @@ These are repeating steps for each future milestone, not unfinished tasks in the
 
 ## Current evidence and next step
 
-The latest Timeclock backend foundation passed 73 automated tests, strict types, lint, both frontend builds and both Cloudflare packaging dry-runs. Astra reviewed the source. Development sync and repeated Calendar polling succeeded. Real Google sign-in passed for Mentor at Timeclock and Coach at Student Status; previous Student/Parent roles remain unchanged. This is a backend/scaffold milestone, not a complete Timeclock interface or production release.
+The latest Timeclock backend foundation and reactive-status follow-up passed 77 automated tests, strict types, lint, both frontend builds and both Cloudflare packaging dry-runs. Astra reviewed the source. Development sync and repeated Calendar polling succeeded. Real Google sign-in passed for Mentor at Timeclock and Coach at Student Status; previous Student/Parent roles remain unchanged. This is a backend/scaffold milestone, not a complete Timeclock interface or production release.
 
 **Next step:** The separate Timeclock chat can build its frontend from the reviewed branch using [the backend handoff](TIMECLOCK_BACKEND_HANDOFF.md). This integration chat retains all shared backend/deployment ownership. In Student Status, finish attendance reporting/name review, event/signup/room-management workflows, permission-wording approval and a complete fictional-trip rehearsal. Cash/check payout recording, fundraising transfers, real consent/signatures and health-export permissions remain unfinished.
 

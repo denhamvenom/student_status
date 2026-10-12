@@ -41,6 +41,52 @@ export const list = query({
   },
 });
 
+export const clockStatus = query({
+  args: { sessionId: v.id("timeclockSessions") },
+  returns: v.object({
+    sessionId: v.id("timeclockSessions"),
+    state: v.union(v.literal("open"), v.literal("closed"), v.literal("cancelled")),
+    revision: v.number(),
+    students: v.array(v.object({
+      studentId: v.id("students"),
+      status: v.union(v.literal("in"), v.literal("out"), v.literal("no_activity")),
+      activeSessionId: v.union(v.id("timeclockSessions"), v.null()),
+      activeIntervalId: v.union(v.id("timeclockIntervals"), v.null()),
+      hasConflict: v.boolean(),
+    })),
+  }),
+  handler: async (ctx, args) => {
+    const user = await viewer(ctx);
+    if (user.role !== "coach" && user.role !== "mentor") throw new Error("Timeclock operator access required.");
+    const season = await activeSeason(ctx);
+    const session = await ctx.db.get(args.sessionId);
+    if (!session || session.seasonId !== season._id) throw new Error("Timeclock session unavailable in active season.");
+    const all = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(501);
+    if (all.length > 500) throw new Error("Roster exceeds the supported 500-record season; narrow the roster before operating.");
+    const reviewed = all.filter(s => s.active && s.structuredNameReviewed && s.firstName?.trim() && s.lastName?.trim());
+    const students = await Promise.all(reviewed.map(async student => {
+      const [lock, selectedHistory] = await Promise.all([
+        ctx.db.query("timeclockStudentLocks").withIndex("by_studentId", q => q.eq("studentId", student._id)).unique(),
+        ctx.db.query("timeclockIntervals").withIndex("by_sessionId_and_studentId", q => q.eq("sessionId", session._id).eq("studentId", student._id)).first(),
+      ]);
+      let activeSessionId = null;
+      let activeIntervalId = null;
+      if (lock?.sessionId && lock.intervalId) {
+        const [activeSession, activeInterval] = await Promise.all([ctx.db.get(lock.sessionId), ctx.db.get(lock.intervalId)]);
+        if (activeSession?.state === "open" && activeSession.seasonId === season._id && activeInterval?.outAt === undefined && activeInterval?.studentId === student._id && activeInterval?.sessionId === activeSession._id) {
+          activeSessionId = activeSession._id;
+          activeIntervalId = activeInterval._id;
+        }
+      }
+      // Console status reflects original operational visits. Corrections affect
+      // Coach attendance summaries, not the current clock button state.
+      const inSelected = session.state === "open" && activeSessionId === session._id;
+      return { studentId: student._id, status: inSelected ? "in" as const : selectedHistory ? "out" as const : "no_activity" as const, activeSessionId, activeIntervalId, hasConflict: activeSessionId !== null && activeSessionId !== session._id };
+    }));
+    return { sessionId: session._id, state: session.state, revision: session.revision, students };
+  },
+});
+
 export const namesForReview = query({
   args: {},
   returns: v.array(v.object({ studentId: v.id("students"), legalName: v.string(), firstName: v.union(v.string(), v.null()), lastName: v.union(v.string(), v.null()), reviewed: v.boolean() })),

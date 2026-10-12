@@ -92,3 +92,9 @@ Real Mentor Google OAuth returned to localhost:5174. Access was denied before pr
 Bounds remain 100 students per atomic command/event, 100 open sessions in today selection, and 500-record roster/selection/history scans. Full clock interface, Coach name review UI, attendance reporting, legacy import and production readiness remain pending. Secrets, account addresses and student records were excluded from committed artifacts. Main and production remain unchanged.
 
 Publication: implementation `c39c7f77d0c30fe784cb8bfcd313d4cbaea6b425` is pushed on `feature/timeclock-backend`, with [draft PR 5](https://github.com/denhamvenom/student_status/pull/5) targeting `docs/timeclock-coordination`. The exact frontend branch baseline and ownership are in TIMECLOCK_BACKEND_HANDOFF.md. All earlier draft PRs, main/demo and production remain unchanged.
+
+### Reactive clock status follow-up
+
+Frontend integration identified the missing live roster-status subscription. Added `timeclockRoster.clockStatus({sessionId})` with active-season/role/reviewed-name checks and minimal operational state plus other-event conflict pointers. No private fields or schema changes. Astra reviewed the source and transition/denial tests. Root check passed 77 tests across 12 suites, lint, strict types and build. The foundation port5174 server was identified and stopped; Student Status5173 was preserved. Coach structured-name review remains an explicitly documented owner action. See the handoff for exact return type and status semantics.
+
+Development sync of the reactive-status query succeeded on third-bandicoot-18. The final additional operational-versus-corrected-attendance test brought the passing suite to 77; strict types passed again. No schema, frontend or production changes.
