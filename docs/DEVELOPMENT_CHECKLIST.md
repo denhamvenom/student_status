@@ -69,7 +69,8 @@ This checklist is the plain-language progress guide. The phases below show the r
 
 **Decisions needed before completing this phase:**
 
-- [ ] Confirm the treatment of unpaid main event/travel balances and paid extra fees after withdrawal.
+- [x] Agree that unpaid main event/travel balances remain owed unless the approver explicitly cancels them; paid extras are included in the eligible return amount.
+- [ ] Build the explicit unpaid main-fee cancellation choice and record the decision.
 - [x] Agree that returned funds automatically pay other outstanding charges in their assigned order.
 - [x] Agree to distinguish personal payments from fundraising credits; fundraising credits can transfer to students, carry over or move into the team account. Family cash/check payouts of fundraising credit are not authorized.
 - [ ] Define who can authorize fundraising transfers and any recipient restrictions.
@@ -86,7 +87,7 @@ This checklist is the plain-language progress guide. The phases below show the r
 - [x] Agree to name Denham Springs High School and FIRST Team 8044, Denham Venom.
 - [x] Agree that permission-form wording includes authorization for minor first aid as appropriate.
 - [ ] Approve the final permission wording and responsibilities.
-- [ ] Confirm who reviews and approves the final wording and medication-administration policy.
+- [x] Agree that the Coach approves the final permission wording and medication-administration policy before real signatures.
 - [x] Agree on Pain, Allergy and Cold categories, each with Allow / Contact me first / Do not allow; nothing preselected.
 - [ ] Define which products/ingredients and exceptions each medication category covers.
 - [ ] Build the parent form and signature process, separate from account linking.
@@ -175,6 +176,6 @@ These are repeating steps for each future milestone, not unfinished tasks in the
 
 The latest code milestone passed 19 backend tests, 13 browser checks, typechecking, lint and build. The later real Google-account rehearsal also passed. Astra accepted the invitation milestone for synthetic development. These results do not certify the unfinished product for production.
 
-**Recommended next step:** Clarify the remaining fee edge cases in Phase 3, then implement withdrawals and financial returns as one complete workflow. Draft permission wording and independent event/travel tasks can proceed in parallel. See [confirmed finance and consent decisions](FINANCE_AND_CONSENT_DECISIONS.md).
+**Recommended next step:** Implement the now-defined withdrawal and internal-return workflow. Draft permission wording for Coach approval and independent event/travel tasks can proceed in parallel. Fundraising-transfer permissions must be settled before enabling those separate actions. See [confirmed finance and consent decisions](FINANCE_AND_CONSENT_DECISIONS.md).
 
 For technical detail, see [the implementation plan](PLAN.md), [review evidence](REVIEW.md), and [parent invitation workflow](PARENT_INVITATIONS.md). GitHub currently has [setup PR 1](https://github.com/denhamvenom/student_status/pull/1) and [parent invitations PR 2](https://github.com/denhamvenom/student_status/pull/2), both drafts; this checklist does not authorize their merge.

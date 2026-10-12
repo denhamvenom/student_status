@@ -17,14 +17,11 @@ The decision screen must show how much has already been paid, distinguish the fe
 
 A return here moves money within the student's account. It does not mean a check or cash was given to the family. Actual payouts remain a separate financial-area action restricted to authorized financial staff.
 
-Two fee details are awaiting clarification:
-
-- Whether an unpaid main event/travel balance is cancelled or remains owed after approved withdrawal.
-- Whether paid extra fees join the main payment in the full/partial return decision or require a separate disposition.
+Confirmed fee treatment: unpaid main event/travel balances remain owed unless the approver explicitly cancels them. The approval screen must offer an explicit cancellation choice, defaulting to keeping that balance owed, and log any cancellation. Paid extra fees join the main payment in the amount eligible for full or partial return; only their unpaid portion is automatically cancelled.
 
 ## Automatic application of returned funds
 
-Returned funds automatically apply to other outstanding charges in the assigned priority order. Any remainder stays in the student's available funds. The withdrawn event must not immediately take back the returned credit; the unresolved unpaid main-fee rule must be settled before implementing that interaction.
+Returned funds automatically apply to other outstanding charges in the assigned priority order. Any remainder stays in the student's available funds. For this return-and-reallocation operation, exclude charges belonging to the withdrawn event so they do not immediately take back the returned credit. Any retained unpaid main event/travel balance remains a separate outstanding obligation; returning a paid amount does not silently cancel that debt.
 
 Preserve the money's original source throughout return and reallocation. For example, returning a fundraising allocation must not turn it into a personal-payment balance eligible for cash payout.
 
@@ -44,7 +41,7 @@ No cash/check payout of fundraising credits to a family has been authorized. Pre
 
 Use these organization names in the form: **Denham Springs High School** and **FIRST Team 8044, Denham Venom**.
 
-The permission wording must state that signing permits minor first aid as appropriate. This is a content requirement; final wording and the responsible approver remain pending. It does not remove the separate medication choices or authorize a real signature before the full consent workflow is approved.
+The permission wording must state that signing permits minor first aid as appropriate. This is a content requirement; the Coach is the confirmed final approver, and the exact wording remains pending. It does not remove the separate medication choices or authorize a real signature before the full consent workflow is approved.
 
 Confirmed medication categories:
 
@@ -52,7 +49,7 @@ Confirmed medication categories:
 - Allergy Medication.
 - Cold Medication.
 
-Each category offers **Allow**, **Contact me first**, or **Do not allow**, with nothing preselected. The products/ingredients covered, exceptions and administration policy remain to be finalized with the wording approver.
+Each category offers **Allow**, **Contact me first**, or **Do not allow**, with nothing preselected. The products/ingredients covered, exceptions and administration policy remain to be finalized and approved by the Coach before real signatures are enabled.
 
 ## Retention
 
