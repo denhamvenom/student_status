@@ -104,3 +104,14 @@ Technical limits fail closed: 100 students per atomic command and simultaneously
 Astra accepted source for synthetic development after reported blockers were fixed. Sol implemented core and Calendar/auth in parallel; root integrated scaffold, roster, dependencies and configuration. Root check passed: lint, strict types, 73 tests across 12 files, and Student Status build. Workspace lint/types/build and both Wrangler dry-runs passed. Existing Student Status bundle-size advisory remains. Tests cover roles/minimization, PIN throttling, idempotency, simultaneous cross-event clocking, all-or-nothing groups/transfers, exact late closure, stale jobs, half-hour extension, schedule revision/cancellation, all-day concurrency, 60-minute boundaries/DST, append-only corrections, OAuth allowlist, Calendar HTTP410 recovery and generation fencing. They are automated synthetic tests, not a complete live multi-device UI rehearsal.
 
 Development synchronization succeeded with the rate-limiter component. The actual scheduled Calendar refresh was observed successful after synchronization. Actual Google sign-in returned to localhost:5174, initially denied the unprovisioned account, and reactively showed Connected as Mentor after verified development provisioning. Read-only database inspection confirmed existing Coach/Student/Parent roles stayed unchanged. Existing Student Status Coach pages remained usable against the updated backend; a fresh Coach Google OAuth round trip also passed at localhost:5173 after the auth change. No production operation, main merge, real student import, or full Timeclock interface was performed.
+
+## Published frontend baseline
+
+Implementation checkpoint: `c39c7f77d0c30fe784cb8bfcd313d4cbaea6b425`, published on `feature/timeclock-backend`. [Draft PR 5](https://github.com/denhamvenom/student_status/pull/5) targets `docs/timeclock-coordination`. Branch frontend implementation from this exact implementation commit (the subsequent documentation-only checkpoint adds this publication record):
+
+```sh
+git fetch origin
+git worktree add -b feature/timeclock-frontend ../student-status-timeclock-ui c39c7f77d0c30fe784cb8bfcd313d4cbaea6b425
+```
+
+Use a different unique branch/directory if those already exist. Never reset an existing frontend branch. Read this handoff and AGENTS.md first; limit frontend edits to apps/timeclock and coordinate shared changes. Copy only the public endpoint into its ignored workspace .env.local, run locked install and dev:timeclock. Do not run a backend watcher or deployment. Root shared backend is already synchronized in development. The existing real Mentor tester works; existing synthetic roster names still need Coach review before Timeclock clocking. Test fixtures are self-contained in convex/*.test.ts and must not be imported into the live database automatically. Do not rerun bootstrap:seedSynthetic against populated development data.
