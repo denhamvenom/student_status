@@ -62,20 +62,21 @@ export const approveJoin = mutation({
 });
 
 export const createEvent = mutation({
-  args: { name: v.string(), type: v.union(v.literal("Competition"), v.literal("Outreach"), v.literal("Team")), startsAt: v.number(), endsAt: v.number(), destination: v.string(), travel: v.string(), overnight: v.boolean(), roomingEnabled: v.boolean(), roomDeadline: v.optional(v.number()), feeCents: v.number(), signupMode: v.union(v.literal("assigned"), v.literal("open"), v.literal("approval")), assignmentScope: v.optional(v.union(v.literal("selected"), v.literal("travelTeam"))), assignedStudentIds: v.optional(v.array(v.id("students"))), capacity: v.optional(v.number()), signupClosesAt: v.optional(v.number()), allowWithdrawal: v.boolean(), permissionRequired: v.boolean(), firstRequired: v.boolean(), requirements: v.array(v.object({ key: v.string(), label: v.string(), instructions: v.optional(v.string()), url: v.optional(v.string()), dueAt: v.optional(v.number()) })) }, returns: v.id("events"),
+  args: { name: v.string(), type: v.union(v.literal("Competition"), v.literal("Outreach"), v.literal("Team")), startsAt: v.number(), endsAt: v.number(), destination: v.string(), travel: v.string(), overnight: v.boolean(), roomingEnabled: v.boolean(), roomDeadline: v.optional(v.number()), feeCents: v.number(), signupMode: v.union(v.literal("assigned"), v.literal("open"), v.literal("approval")), assignmentScope: v.optional(v.union(v.literal("selected"), v.literal("travelTeam"), v.literal("wholeTeam"))), assignedStudentIds: v.optional(v.array(v.id("students"))), capacity: v.optional(v.number()), signupClosesAt: v.optional(v.number()), allowWithdrawal: v.boolean(), permissionRequired: v.boolean(), firstRequired: v.boolean(), requirements: v.array(v.object({ key: v.string(), label: v.string(), instructions: v.optional(v.string()), url: v.optional(v.string()), dueAt: v.optional(v.number()) })) }, returns: v.id("events"),
   handler: async (ctx, args) => {
     const user = await viewer(ctx);
     if (user.role !== "coach" && !user.travelLead) throw new Error("Event creation denied.");
     const season = await activeSeason(ctx);
     if (!args.name.trim() || args.endsAt < args.startsAt || !Number.isSafeInteger(args.feeCents) || args.feeCents < 0 || args.capacity !== undefined && (!Number.isSafeInteger(args.capacity) || args.capacity < 1)) throw new Error("Invalid event details.");
     if (args.signupMode !== "assigned" && (args.assignmentScope || args.assignedStudentIds?.length)) throw new Error("Only assigned events may preselect students.");
-    if (args.assignmentScope === "travelTeam" && user.role !== "coach") throw new Error("Travel Team assignment is coach only.");
+    if ((args.assignmentScope === "travelTeam" || args.assignmentScope === "wholeTeam") && user.role !== "coach") throw new Error("Team category assignment is coach only.");
+    if ((args.assignmentScope === "travelTeam" || args.assignmentScope === "wholeTeam") && args.assignedStudentIds !== undefined) throw new Error("Team categories cannot include selected student IDs.");
     const { requirements, assignedStudentIds, ...eventFields } = args;
     let assigned = [...new Set(assignedStudentIds ?? [])];
-    if (args.assignmentScope === "travelTeam") {
+    if (args.assignmentScope === "travelTeam" || args.assignmentScope === "wholeTeam") {
       const students = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(501);
       if (students.length > 500) throw new Error("Roster is too large for automatic assignment.");
-      assigned = students.filter(x => x.active && x.travelTeam).map(x => x._id);
+      assigned = students.filter(x => x.active && (args.assignmentScope === "wholeTeam" || x.travelTeam)).map(x => x._id);
     }
     if (assigned.length > 100) throw new Error("Assign at most 100 students when creating an event.");
     if (args.capacity !== undefined && assigned.length > args.capacity) throw new Error("Assigned students exceed event capacity.");

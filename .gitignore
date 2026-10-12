@@ -54,3 +54,6 @@ Desktop.ini
 *.swp
 *.swo
 ~$*
+
+# Immutable local design handoff; obtain from owner-provided archive.
+/design-reference/

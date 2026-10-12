@@ -173,6 +173,8 @@ See [the concrete frontend handoff](TIMECLOCK_BACKEND_HANDOFF.md). Current Stude
 - [ ] Finish all required workflows and replace unfinished placeholder screens.
 - [ ] Review access restrictions across every role and sensitive operation.
 - [ ] Test complete student, parent, Coach, Travel Lead and Mentor journeys on phone and desktop.
+- [ ] Compare every completed role view against the preserved original design prototype: navigation, layout, typography, purple/gold branding, logos, spacing, controls and interaction states on phone/desktop and light/dark themes.
+- [ ] Record intentional design differences, correct unintended visual regressions, and obtain Coach review of the polished interface before launch.
 - [ ] Address remaining usability, accessibility, loading/error handling and performance issues.
 - [ ] Review current limits on financial-history entries, invitations and parent links against expected team usage; expand them safely where needed.
 - [ ] Establish monitoring, backup/restore testing and a rollback procedure.
@@ -196,7 +198,7 @@ These are repeating steps for each future milestone, not unfinished tasks in the
 
 The October 12 fictional rehearsal and later follow-up passed 101 automated tests across 18 files, lint, strict types and build. Live Coach, Student and Parent checks verified approval/manual promotion, waitlist withdrawal with reactive parent updates, fictional personal payout/fundraising transfer, room finalization, vehicle capacity, and Timeclock automatic closure plus an audited correction preserving the original. Later ordinary Mentor and Travel Lead checks verified limited navigation, read-only finance and a saved transport adjustment. See [the rehearsal report](REHEARSAL_2026-10-12.md) for the exact coverage and fixes.
 
-**Next step:** Complete the family attendance screen, then finish live paid-withdrawal, student room-invitation and broader Travel/Mentor journeys, including PIN-protected Timeclock actions and independent-device conflicts. Permission wording still needs Coach approval before real signatures. Real consent, health-export permissions, rollover/retention and production readiness remain separate unfinished work.
+**Current priority:** Audit design drift against Design_Comparison.zip and obtain Coach approval of the drift report before frontend corrections. Product development and rehearsals remain paused; unfinished family Attendance and Who’s Going changes are preserved locally. Permission wording still needs Coach approval before real signatures. Real consent, health-export permissions, rollover/retention and production readiness remain separate unfinished work.
 
 Current development publication is [draft PR #7](https://github.com/denhamvenom/student_status/pull/7), `feature/student-status-operations`, stacked on `feature/timeclock-backend`. The separate Timeclock frontend is draft PR #6. This integration owner retains shared backend/deployment ownership. No main merge or production deployment is authorized.
 
@@ -227,3 +229,17 @@ Timeclock parallel handoff: frontend owner reports Astra review, 34 synthetic in
 - [x] Load Travel Lead event, transport and room controls; save fictional additional-adult demand from zero to one and back, observing four seats for three riders and then four seats for two riders.
 - [x] Rerun the full local check outside the Windows sandbox after its known Vitest temporary-file failure: 101 tests in 18 files, lint, types and build pass.
 - [ ] Rehearse paid withdrawal, student room invitation, PIN-protected Timeclock actions and independent-device conflict handling live.
+
+## Design alignment audit — current priority
+
+- [x] Agree that features added after the prototype must follow its overall design system and look and feel, while preserving approved product requirements.
+- [ ] Preserve unfinished local development in a reviewed local restore checkpoint; do not publish it as completed work.
+- [ ] Extract and inventory the read-only design reference; identify its version and reference conflicts.
+- [ ] Compare all available role/screens at 390px and 1440px in light and dark themes; distinguish inspected, blocked and unimplemented states.
+- [ ] Produce design-drift-report.md with proposed fixes, added-feature styling guidance and backend dependencies.
+- [ ] Obtain Coach approval of the report before making design corrections.
+- [ ] Implement approved shared labels, tokens/components and screen corrections; preserve backend and access rules.
+- [ ] Recompare corrected screens, document intentional differences and obtain final visual review.
+- [ ] Append design-conformance instructions to existing AGENTS.md and publish reviewed design checkpoints under the existing development workflow.
+
+No backend work, Timeclock changes, real consent, production deployment or main merge is included in this design task. Newer features without an exact prototype screen inherit its typography, colors, spacing, layout patterns and component states; do not invent a separate visual style.
