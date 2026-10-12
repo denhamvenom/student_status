@@ -26,7 +26,7 @@ Configuration synchronizes backend code to the selected **development** deployme
 
 After configuration use `start.ps1 -Mode Dev`. The launcher requires `dev:` or `local:` and rejects conflicting/key-based overrides. Do not use it for production. The app requires Google authentication plus a server-provisioned role; a Google login alone never makes someone Coach.
 
-Google OAuth is configured in `student-status-511411` under `frc8044@gmail.com`, external **Testing** mode. That account is the authorized test user and first development Coach. Origin: `http://localhost:5173`; callback: `https://third-bandicoot-18.convex.site/api/auth/callback/google`. The client ID/secret and signing keys are stored in Convex environment variables, not app source. A real sign-in round trip was verified October 12, 2026.
+Google OAuth is configured in `student-status-511411` under the authorized development Google account, external **Testing** mode. That account is the authorized test user and first development Coach. Origin: `http://localhost:5173`; callback: `https://third-bandicoot-18.convex.site/api/auth/callback/google`. The client ID/secret and signing keys are stored in Convex environment variables, not app source. A real sign-in round trip was verified October 12, 2026.
 
 The development database contains a `2026–27 Development` season, two fictional students, one Synthetic Regional, and a $1 synthetic ledger verification entry. No real student records were imported. The account itself is a real authorized developer identity. `bootstrap:firstCoach` and `bootstrap:seedSynthetic` are internal, development-URL-bound setup functions; do not rerun the seed against populated data. `scripts/setup-dev-auth.mjs` refuses to rotate existing signing keys.
 
@@ -48,3 +48,12 @@ Student Parents and Coach Join Requests now include parent invitations; see [wor
 Google OAuth remains in Testing mode. Two owner-controlled test accounts were added for a successful real student/parent invitation rehearsal. The resulting student profile is fictional; account addresses and invitation tokens are deliberately excluded from repository documentation. See REVIEW.md for evidence.
 
 Invitation layout checks: `bun scripts/parent-invites-browser-check.mjs` against the running frontend. It writes synthetic screenshots/results to ignored test-results/. Use /parents?review=student, /enroll?review=coach, and /invite-parent?review=parent for read-only fixture screens. If sandboxed Vitest fails on temporary-file ENOENT errors, rerun outside the sandbox; do not weaken tests or suppress failures.
+
+
+## Withdrawal and travel development milestone
+
+Live routes: `/withdrawals` for Coach/Travel Lead review, `/drivers` for driver management, event detail for transport and student withdrawal requests, finance for categorized charges and source balances, `/permissions` (Coach/Travel) and `/forms` (parent) for the read-only draft. New optional fields preserve existing development records. Backend submit stays disabled regardless of permission-version text. Actual cash/check payouts remain a separate unfinished workflow.
+
+New allocation entries record the originating payment/fundraiser ID. Legacy source inference only accepts an unambiguous source; otherwise stop for financial review. Do not reset or reseed existing records to work around this. Approved-withdrawal reenrollment is blocked until an intentional new-fee flow exists.
+
+Synthetic browser verification added one clearly named test driver and vehicle assignment, adult/trailer settings, and a fictional extra charge that consumed the existing synthetic credit. No real payments occurred. Independent travel was toggled and restored. Do not rerun bootstrap seed. See REVIEW.md for verification boundaries and DEVELOPMENT_CHECKLIST.md for remaining work.

@@ -21,6 +21,8 @@ import type * as parentInvites from "../parentInvites.js";
 import type * as participation from "../participation.js";
 import type * as permissions from "../permissions.js";
 import type * as rooms from "../rooms.js";
+import type * as travel from "../travel.js";
+import type * as withdrawals from "../withdrawals.js";
 
 import type {
   ApiFromModules,
@@ -42,6 +44,8 @@ declare const fullApi: ApiFromModules<{
   participation: typeof participation;
   permissions: typeof permissions;
   rooms: typeof rooms;
+  travel: typeof travel;
+  withdrawals: typeof withdrawals;
 }>;
 
 /**

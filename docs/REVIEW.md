@@ -64,3 +64,19 @@ Completed against development deployment third-bandicoot-18, using two explicitl
 - Coach restored the link with an audit reason and re-enabled new invitations. The parent financial view returned for the fictional student.
 
 This closes the live multi-account OAuth acceptance evidence gap. Seven-day elapsed-time expiry, unrelated-student direct API denial and multiple-link combinations remain covered by automated backend tests rather than this browser rehearsal. No real student/health/financial records were used, no financial entries or signed permission/medication consents were created, and no production deployment occurred. The synthetic profile and restored test link remain available for further testing; the join code expires after 24 hours. Google grants were limited to basic identity information.
+
+
+## October 12 withdrawal travel and draft milestone
+
+Astra coordinated shared contracts and reviewed the implementation; Sol owners implemented withdrawals, travel, and permission drafting in parallel. Root integrated shared schema, financial/readiness projections and live routes. Source accepted for synthetic development after review findings were fixed.
+
+- `bun run check`: lint, strict TypeScript, 32 backend tests across five suites, and build passed. Existing Vite chunk-size advisory remains; route code splitting is launch-performance work.
+- Backend cases cover full/partial/retained/denied withdrawal decisions, paid extras, unpaid-main cancellation choice, preserved money sources, priority reallocation, duplicate/conflicting decisions, stale preview rejection, archived events, room cleanup, bounded-history atomic rollback, old bypass rejection and reenrollment restriction.
+- Travel tests cover role scoping, passenger capacity excluding drivers, bus/adult/independent travelers, tow requirements, unavailable drivers, active-season checks and write limits. Mentor overall readiness includes transport without exposing operational details.
+- Permission tests prove even a non-draft season version cannot enable signing and unrelated student access fails. The UI is a read-only draft, not a consent workflow.
+- Development sync `bunx convex dev --once` succeeded against dev:third-bandicoot-18. No production operation performed.
+- Live Coach browser verified synthetic driver creation and event assignment, trailer/adult settings, independent-travel demand decrement and restoration, extra-charge creation with automatic personal-credit allocation, the empty withdrawal queue and the read-only permission screen. Synthetic test data stays only in the development database; no student records, account identifiers or browser snapshots are committed.
+
+Limits: no full multi-account withdrawal browser rehearsal in this milestone; no full room management, cash/check payout UI, fundraiser transfer authority, real signatures, health export grant or production readiness. Historical allocations with ambiguous source stop safely rather than inventing financial provenance. Approved-withdrawal reenrollment needs a future explicit fee review. The preexisting Travel Lead permission-snapshot access path must be hardened with the final health-access/export policy before live records.
+
+Publication: pending verified push and draft PR; integration owner updates this line before completion.

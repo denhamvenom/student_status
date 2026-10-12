@@ -147,3 +147,12 @@ The real two-account Google OAuth rehearsal passed in development: student join/
 ## Human-readable progress guide
 
 See [Development checklist](DEVELOPMENT_CHECKLIST.md) for verified completed work, remaining workflows and user decisions organized into the expected development phases. Keep it current with milestone evidence; it supplements this technical acceptance plan and does not authorize new work or production deployment.
+
+## Active milestone October 12 withdrawals travel and consent draft
+
+Implemented and verified for development on `feature/withdrawals-and-travel`, based on the parent invitation milestone. Astra coordinates shared contracts and performs final review; Sol owners implement withdrawals, transport, and permission drafting in separate files. Root owns schema integration, live routes, verification and Git. No production deployment or main merge.
+
+Scope: reviewed full/partial/no-return withdrawal decisions, source-preserving reallocation and fee cancellation; drivers, vehicle assignments, independent travel, bus/adult counts and towing readiness; read-only permission wording for Coach approval with signing blocked. Complete room-management, cash/check payout recording, fundraising transfers and real consent/export workflows remain separate unless explicitly verified in this milestone.
+
+
+Verification: 32 backend tests, lint, strict TypeScript and build pass; Astra final source review accepted after fixing stale approvals, archived-event review, bounded-history rollback, old withdrawal bypasses and reenrollment capacity. Development synced to third-bandicoot-18. Live Coach browser checks verified driver/vehicle/settings/independent travel, categorized extra charge with automatic credit application, empty withdrawal queue, and draft form. Source provenance is explicit for new allocations; ambiguous old allocations fail closed for financial review. Approved-withdrawal reenrollment remains blocked until a deliberate new-fee workflow is built. Full multi-account withdrawal rehearsal remains pending. See REVIEW.md and DEVELOPMENT_CHECKLIST.md.
