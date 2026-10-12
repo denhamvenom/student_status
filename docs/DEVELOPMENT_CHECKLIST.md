@@ -194,9 +194,9 @@ These are repeating steps for each future milestone, not unfinished tasks in the
 
 ## Current evidence and next step
 
-The October 12 fictional rehearsal passed 97 automated tests, lint, strict types and build. Live Coach, Student and Parent checks verified approval/manual promotion, waitlist withdrawal with reactive parent updates, fictional personal payout/fundraising transfer, room finalization, vehicle capacity, and Timeclock automatic closure plus an audited correction preserving the original. See [the rehearsal report](REHEARSAL_2026-10-12.md) for the exact coverage and fixes.
+The October 12 fictional rehearsal and later follow-up passed 101 automated tests across 18 files, lint, strict types and build. Live Coach, Student and Parent checks verified approval/manual promotion, waitlist withdrawal with reactive parent updates, fictional personal payout/fundraising transfer, room finalization, vehicle capacity, and Timeclock automatic closure plus an audited correction preserving the original. Later ordinary Mentor and Travel Lead checks verified limited navigation, read-only finance and a saved transport adjustment. See [the rehearsal report](REHEARSAL_2026-10-12.md) for the exact coverage and fixes.
 
-**Next step:** Complete the family attendance screen, then finish live paid-withdrawal/room-invitation and Travel/Mentor journeys with authorized accounts, including independent-device conflicts. Permission wording still needs Coach approval before real signatures. Real consent, health-export permissions, rollover/retention and production readiness remain separate unfinished work.
+**Next step:** Complete the family attendance screen, then finish live paid-withdrawal, student room-invitation and broader Travel/Mentor journeys, including PIN-protected Timeclock actions and independent-device conflicts. Permission wording still needs Coach approval before real signatures. Real consent, health-export permissions, rollover/retention and production readiness remain separate unfinished work.
 
 Current development publication is [draft PR #7](https://github.com/denhamvenom/student_status/pull/7), `feature/student-status-operations`, stacked on `feature/timeclock-backend`. The separate Timeclock frontend is draft PR #6. This integration owner retains shared backend/deployment ownership. No main merge or production deployment is authorized.
 
@@ -213,9 +213,17 @@ Agreed decisions: chronological waitlist order with manual Coach/Travel promotio
 - [x] Rehearse a closed Timeclock session and audited correction while retaining original evidence.
 - [x] Rehearse fictional Coach payout/transfer, room assignment/finalization and transport capacity.
 - [x] Add integrated role/finance/withdrawal tests and guarded fictional fixture creation.
-- [ ] Finish live paid-withdrawal, student room-invitation, Travel/Mentor and independent-device journeys; automated coverage is not live acceptance.
+- [ ] Finish live paid-withdrawal, student room-invitation, broader Travel/Mentor and independent-device journeys; automated coverage is not live acceptance.
 - [x] Publish and verify implementation checkpoint `d33c701` on `feature/student-status-operations`, draft [PR #7](https://github.com/denhamvenom/student_status/pull/7), based on `feature/timeclock-backend`.
 
 Work runs in isolated `student-status-operations` / `feature/student-status-operations`. Timeclock frontend owns its separate worktree and `apps/timeclock`; one Student Status owner integrates shared backend and schema changes. Production, real signatures, automatic deletion and main merges remain outside this authorization.
 
 Timeclock parallel handoff: frontend owner reports Astra review, 34 synthetic intercepted-browser scenarios, 77 baseline backend tests, root/workspace checks and packaging dry run passed. This evidence is owner-reported; full live multi-device rehearsal remains pending. Student Status operations does not modify apps/timeclock.
+
+### Same-day Mentor and Travel Lead follow-up
+
+- [x] Ordinary Google-signed-in Mentor created a three-minute fictional Timeclock event and clocked a fictional test student in and out; Student Status showed limited Mentor navigation.
+- [x] Apply the owner-authorized, audited development Travel Lead grant to that existing Mentor without financial editing; verify reactive navigation, no Coach Attendance or Users & Roles entry, and no finance payment or payout controls. Returning to Timeclock kept Mentor access and showed the fictional session auto-closed; screenshot evidence stayed outside Git.
+- [x] Load Travel Lead event, transport and room controls; save fictional additional-adult demand from zero to one and back, observing four seats for three riders and then four seats for two riders.
+- [x] Rerun the full local check outside the Windows sandbox after its known Vitest temporary-file failure: 101 tests in 18 files, lint, types and build pass.
+- [ ] Rehearse paid withdrawal, student room invitation, PIN-protected Timeclock actions and independent-device conflict handling live.

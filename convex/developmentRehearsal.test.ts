@@ -1,12 +1,11 @@
 /// <reference types="vite/client" />
 import { afterEach, describe, expect, it } from "vitest";
 import { convexTest } from "convex-test";
-import { makeFunctionReference } from "convex/server";
-import type { Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
-const ensure = makeFunctionReference<"mutation", { expectedCoachEmail: string }, { studentIds: Id<"students">[]; eventId: Id<"events">; created: boolean }>("developmentRehearsal:ensure");
+const ensure = internal.developmentRehearsal.ensure;
 const devUrl = "https://third-bandicoot-18.convex.cloud";
 const priorUrl = process.env.CONVEX_CLOUD_URL;
 afterEach(() => { if (priorUrl === undefined) delete process.env.CONVEX_CLOUD_URL; else process.env.CONVEX_CLOUD_URL = priorUrl; });
