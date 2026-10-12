@@ -1,6 +1,6 @@
 # Denham Venom Student Status
 
-First development milestone for Team 8044. React/Vite SPA with a Convex backend, prepared for Cloudflare Workers Static Assets. This is a development workspace with fictional student data, not a production system.
+Development application for Team 8044. React/Vite SPA with a Convex backend, prepared for Cloudflare Workers Static Assets. This is a development workspace with fictional student data, not a production system.
 
 ## Run
 
@@ -12,8 +12,10 @@ For disconnected UI review, use http://localhost:5173/?review=student. Other rol
 
 The original standalone prototype is preserved in `demo/`. See [repository workflow](docs/REPOSITORY.md) for GitHub Pages and production-deployment boundaries.
 
+- [Plain-language development checklist](docs/DEVELOPMENT_CHECKLIST.md)
 - [Plan and acceptance matrix](docs/PLAN.md)
 - [Architecture](docs/ARCHITECTURE.md)
+- [Parent invitations](docs/PARENT_INVITATIONS.md)
 - [Astra milestone review](docs/REVIEW.md)
 - [Development and Google configuration](docs/DEVELOPMENT.md)
 - [Deployment boundaries](docs/DEPLOYMENT.md)

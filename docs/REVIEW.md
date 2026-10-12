@@ -28,7 +28,7 @@ Final follow-up: **all four targeted blockers are resolved for this milestone**.
 
 - First-time profile onboarding, locked initial rooming category, parent contacts, correction requests, student record management and archived/reactivation matching.
 - Complete optional-event approvals/waitlist management, Required-all-students UI, signup deadlines, editable/custom requirements and due dates.
-- Parent invitations and guardian verification; four-step consent wizard, correction targeting, immutable wording content, re-sign lifecycle and Coach paper acceptance.
+- Parent invitations were delivered in the later milestone below using good-faith relationship attestation. Remaining: four-step consent wizard, correction targeting, immutable permission wording content, re-sign lifecycle and Coach paper acceptance.
 - Medication authorization currently remains a profile value; unlike permission signing, it does not enforce approved wording/version or seasonal signature. Keep it synthetic-only until that consent workflow exists.
 - Transport model and interface for buses, independent travelers, extra adults and trailer towing; driver management; complete room invitation/cancellation and adult room placement/finalization interface.
 - Financial charge editing/voiding, refunds and adjustments, Coach priority controls, fundraiser creation/allocation, bulk import/export and detailed audit UI. Charged-event withdrawal currently requires reconciliation that is not yet offered end to end.
@@ -40,3 +40,27 @@ Final follow-up: **all four targeted blockers are resolved for this milestone**.
 ## Release boundaries
 
 Review disposition: **initial development milestone accepted within its limited scope of synthetic data and supervised development accounts**. The targeted blocking findings above are closed; this is not a full security certification. The product remains unsuitable for production student health/financial records, real consent, travel clearance or season close. Production deployment is not authorized. Final development synchronization, build and Cloudflare dry-run success are recorded as the integrating agent's delivery evidence; the dry run did not publish a site.
+
+
+## Parent invitation milestone review — October 12, 2026
+
+Astra reviewed the source and independently ran the 18-test revision before the final regression addition. Root subsequently ran the final lint, typecheck, **19-test** suite and build successfully, synchronized only the approved development deployment with typechecking, and passed 13 browser cases. The existing build bundle-size advisory remains. The actual signed-in Coach Join Requests panel loads the enabled setting and synthetic roster.
+
+Resolved findings: authoritative server-time preview and acceptance; indexed replacement/revocation checks across history; actionable old invitations retained in Coach lists; verified Google-email provenance; no existing-role conversion; attestation text/version captured on the server and checkbox bound to the displayed version; clean OAuth redirect using short-lived same-tab token storage while preserving the auth callback code; usable wrong-account switching; current-season children and revoke-one/revoke-all access denial.
+
+Disposition: **accepted for synthetic development**. The 13 browser cases cover fixture layout at phone/desktop in light/dark and a live missing-token landing; they do not prove a real multi-account acceptance round trip. The subsequent live multi-account rehearsal below closes that specific evidence gap. Invitation/access lists have documented bounds; no production deployment or full-product completion is implied.
+
+## Live multi-account invitation rehearsal — October 12, 2026
+
+Completed against development deployment third-bandicoot-18, using two explicitly authorized owner-controlled Google accounts and a fictional Test Student. Account emails, tokens and screenshots are not committed.
+
+- Added both accounts to the existing Google OAuth Testing allowlist without publishing the app.
+- Student completed real Google identity sign-in, submitted the ordinary join request with a short-lived team code, and received Coach approval.
+- Student created a parent invitation displaying a seven-day expiry. Pausing new invitations disabled the student creation controls while preserving the issued invitation.
+- Opening the invitation with the student account showed an email-mismatch rejection and no student details.
+- Switching to the invited parent account completed the actual Google OAuth redirect and restored the invitation. Acceptance remained disabled until relationship and attestation were supplied, then created the parent link while new invitations remained paused.
+- Parent saw only the linked fictional student. Reopening the consumed invitation rejected reuse.
+- Coach revoked the link while the parent profile was open: profile content disappeared reactively and the financial view required a linked student.
+- Coach restored the link with an audit reason and re-enabled new invitations. The parent financial view returned for the fictional student.
+
+This closes the live multi-account OAuth acceptance evidence gap. Seven-day elapsed-time expiry, unrelated-student direct API denial and multiple-link combinations remain covered by automated backend tests rather than this browser rehearsal. No real student/health/financial records were used, no financial entries or signed permission/medication consents were created, and no production deployment occurred. The synthetic profile and restored test link remain available for further testing; the join code expires after 24 hours. Google grants were limited to basic identity information.
