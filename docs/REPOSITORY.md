@@ -20,3 +20,15 @@ On a new workstation: `bun install --frozen-lockfile`, connect the approved deve
 
 Use feature branches and pull requests. Keep backend and frontend changes together when they share a contract. Do not force-push main or rewrite the preserved demo history.
 
+
+## Ongoing version control
+
+- Maintain GitHub history throughout development. Inspect the current branch, working tree and remote state before starting; preserve other agents' and users' uncommitted work.
+- Make focused commits at meaningful, reviewable checkpoints. Commit messages must describe the actual change; do not bundle unrelated work or claim unfinished features are complete.
+- Review staged files for secrets and student data before every commit. Run checks appropriate to the change and record actual results and unresolved limitations. Documentation-only changes require diff review, not an unnecessary application test run.
+- Push completed, reviewed checkpoints to the appropriate development branch and keep its pull request title, description and validation evidence aligned with the current scope. If a push is blocked, report what remains local. Do not claim work is backed up until the push is verified.
+- Update the project plan and relevant implementation documentation in the same checkpoint. Distinguish proposed, implemented, tested and released work; record remaining work for the next agent.
+- Coordinate parallel agents through one integration owner for staging, commits and pushes in a shared working tree. Do not stage another agent's unfinished files or overwrite their changes.
+- Preserve published history: use follow-up commits for corrections; do not amend published commits, force-push or move published tags without explicit authorization.
+- Use commit IDs for development checkpoints. Assign intentional semantic version numbers and matching immutable tags to approved releases, with release notes describing changes, checks and known limitations. Do not label ordinary development checkpoints as production releases or bump versions for every commit.
+- Version control does not authorize merging into a deploying branch, publishing a release or deploying production. Existing main/GitHub Pages and production approval boundaries remain in force.

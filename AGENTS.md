@@ -25,3 +25,4 @@ Convex agent skills for common tasks can be installed by running
 - Full product flows remain incomplete; consult the acceptance matrix and final milestone review before claiming completion.
 
 - Student records must never enter Git or GitHub, whether public or private, including issues, pull requests, attachments and CI logs/artifacts. Use synthetic student data only in fixtures, tests and documentation. Repository visibility does not change this rule.
+- Maintain accurate GitHub version history throughout development: follow docs/REPOSITORY.md, commit focused reviewed checkpoints, push and verify development-branch updates, and keep PR descriptions, validation evidence and project documentation current. One integration owner coordinates Git writes for parallel agents. Preserve published history and existing merge/release/production boundaries; never claim a local-only checkpoint is published.
