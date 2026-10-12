@@ -12,15 +12,25 @@ import type * as admin from "../admin.js";
 import type * as app from "../app.js";
 import type * as auth from "../auth.js";
 import type * as bootstrap from "../bootstrap.js";
+import type * as calendar from "../calendar.js";
+import type * as calendarState from "../calendarState.js";
+import type * as crons from "../crons.js";
 import type * as finance from "../finance.js";
 import type * as http from "../http.js";
 import type * as lib_access from "../lib/access.js";
+import type * as lib_authRedirect from "../lib/authRedirect.js";
+import type * as lib_calendarNormalize from "../lib/calendarNormalize.js";
 import type * as lib_money from "../lib/money.js";
 import type * as lib_readModels from "../lib/readModels.js";
+import type * as lib_timeclock from "../lib/timeclock.js";
+import type * as lib_timeclockPin from "../lib/timeclockPin.js";
 import type * as parentInvites from "../parentInvites.js";
 import type * as participation from "../participation.js";
 import type * as permissions from "../permissions.js";
 import type * as rooms from "../rooms.js";
+import type * as timeclock from "../timeclock.js";
+import type * as timeclockPinControl from "../timeclockPinControl.js";
+import type * as timeclockRoster from "../timeclockRoster.js";
 import type * as travel from "../travel.js";
 import type * as withdrawals from "../withdrawals.js";
 
@@ -35,15 +45,25 @@ declare const fullApi: ApiFromModules<{
   app: typeof app;
   auth: typeof auth;
   bootstrap: typeof bootstrap;
+  calendar: typeof calendar;
+  calendarState: typeof calendarState;
+  crons: typeof crons;
   finance: typeof finance;
   http: typeof http;
   "lib/access": typeof lib_access;
+  "lib/authRedirect": typeof lib_authRedirect;
+  "lib/calendarNormalize": typeof lib_calendarNormalize;
   "lib/money": typeof lib_money;
   "lib/readModels": typeof lib_readModels;
+  "lib/timeclock": typeof lib_timeclock;
+  "lib/timeclockPin": typeof lib_timeclockPin;
   parentInvites: typeof parentInvites;
   participation: typeof participation;
   permissions: typeof permissions;
   rooms: typeof rooms;
+  timeclock: typeof timeclock;
+  timeclockPinControl: typeof timeclockPinControl;
+  timeclockRoster: typeof timeclockRoster;
   travel: typeof travel;
   withdrawals: typeof withdrawals;
 }>;
@@ -74,4 +94,6 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {};
+export declare const components: {
+  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
+};

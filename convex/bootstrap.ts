@@ -5,6 +5,33 @@ import { env, internalMutation } from "./_generated/server";
 // be reused for another project or a production deployment by changing args.
 const EXPECTED_DEV_URL = "https://third-bandicoot-18.convex.cloud";
 
+/** Integration-owner-only setup after the test account completes Google sign-in. */
+export const provisionDevelopmentMentor = internalMutation({
+  args: { expectedEmail: v.string() },
+  returns: v.object({ mentorId: v.id("appUsers") }),
+  handler: async (ctx, args) => {
+    if (env.CONVEX_CLOUD_URL !== EXPECTED_DEV_URL) throw new Error("Mentor setup is development-only.");
+    const email = args.expectedEmail.trim().toLowerCase();
+    const authUser = await ctx.db.query("users").withIndex("email", q => q.eq("email", email)).unique();
+    if (!authUser?.emailVerificationTime || authUser.isAnonymous) throw new Error("Complete verified Google sign-in first.");
+    const google = await ctx.db.query("authAccounts").withIndex("userIdAndProvider", q => q.eq("userId", authUser._id).eq("provider", "google")).first();
+    if (!google) throw new Error("Google identity required.");
+    const existing = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", authUser._id)).unique();
+    if (existing) {
+      if (existing.active && existing.role === "mentor") return { mentorId: existing._id };
+      throw new Error("Existing account role must not be changed by development setup.");
+    }
+    let coach = null;
+    for await (const candidate of ctx.db.query("appUsers").withIndex("by_role", q => q.eq("role", "coach"))) {
+      if (candidate.active) { coach = candidate; break; }
+    }
+    if (!coach?.active) throw new Error("Active development Coach required.");
+    const mentorId = await ctx.db.insert("appUsers", { authUserId: authUser._id, email, name: authUser.name?.trim() || "Development Mentor", role: "mentor", travelLead: false, financialEdit: false, active: true });
+    await ctx.db.insert("audit", { actorId: coach._id, entity: "appUsers", entityId: mentorId, action: "provisionDevelopmentMentor", afterJson: JSON.stringify({ role: "mentor", active: true }), reason: "Owner-authorized development tester; existing roles preserved", at: Date.now() });
+    return { mentorId };
+  },
+});
+
 export const firstCoach = internalMutation({
   args: {
     authUserId: v.id("users"),

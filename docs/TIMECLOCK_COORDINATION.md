@@ -1,3 +1,5 @@
+> **Superseded planning snapshot:** The owner approved the remaining policies and authorized development implementation. Read [the implemented backend handoff](TIMECLOCK_BACKEND_HANDOFF.md) for current contracts, verification and ownership. The proposal and no-change restrictions below describe the earlier planning step only.
+
 # Timeclock coordination handoff
 
 October 12, 2026. Planning only: no Timeclock code, folder reorganization, schema change, role change, auth change, calendar connection or deployment was performed. Astra reviewed the architecture against the current source. This document proposes contracts; it does not authorize implementation or production deployment.

@@ -119,19 +119,26 @@ This checklist is the plain-language progress guide. The phases below show the r
 
 ## Phase 6 Connect attendance
 
-**Status: [Timeclock coordination proposal](TIMECLOCK_COORDINATION.md) documented; shared contract decisions and implementation remain.**
+**Status: Shared Timeclock backend implemented and reviewed in development. Separate frontend scaffold is ready; the complete clock interface and reporting screens remain.**
 
-- [x] Agree that clock-in/out belongs in a separate app on another subdomain.
-- [x] Agree that both apps will use a shared Convex backend and stable student identities.
-- [x] Inspect the current repository and document a proposed Timeclock structure and shared-backend ownership.
-- [ ] Approve the proposed shared contract and unresolved Timeclock policies.
-- [ ] Define exactly how the two apps share identity and attendance records without sharing unnecessary access.
-- [ ] Define meeting types, attendance totals, cancelled meetings and missing/stale-data behavior.
-- [ ] Build the separate clock app or coordinate its implementation as a separate project scope.
-- [ ] Connect Student Status to the attendance results and test account matching.
-- [ ] Verify that attendance-only access cannot retrieve health or financial information.
+- [x] Approve the shared policies and keep Timeclock separate from travel fees/participation.
+- [x] Prepare an independent Timeclock workspace on port 5174, with one shared Convex backend.
+- [x] Restrict operations to active Coaches/Mentors; keep attendance corrections Coach-only.
+- [x] Add reviewed first/last-name fields, minimized roster display and a Coach review API without guessing old names.
+- [x] Implement individual/group clocking, explicit PIN transfers, duplicate protection and one open interval per student.
+- [x] Implement half-hour extensions, exact server auto-close, schedule changes and cancellations with retained history.
+- [x] Derive attendance from one uninterrupted scheduled hour; keep early/extended time separate.
+- [x] Add append-only Coach correction and evidence APIs; preserve legacy boolean evidence.
+- [x] Connect the dedicated read-only Calendar identity and verify deployed minute polling.
+- [x] Verify Google Mentor sign-in at the Timeclock origin and preserve prior Student/Parent roles.
+- [x] Pass 73 automated tests, root/workspace checks and both Cloudflare packaging dry-runs; obtain Astra source review.
+- [ ] Build the complete Timeclock frontend, including cross-tab console coordination and PIN-protected controls.
+- [ ] Complete Coach structured-name review for existing roster records before real clocking.
+- [ ] Build Student Status attendance summaries and correction/admin screens.
+- [ ] Rehearse the complete multi-device interface with synthetic students.
+- [ ] Plan historical Sheets import and expand bounded queries if team scale requires it.
 
-**Decision needed:** Confirm who will build the clock app and when its data contract will be ready. The attendance values currently displayed are not proof of a completed clock-system connection.
+See [the concrete frontend handoff](TIMECLOCK_BACKEND_HANDOFF.md). Current Student Status attendance displays remain legacy evidence until its reporting UI is connected. No production release is authorized.
 
 ## Phase 7 Finish administration and reporting
 
@@ -180,8 +187,8 @@ These are repeating steps for each future milestone, not unfinished tasks in the
 
 ## Current evidence and next step
 
-The withdrawal/travel/draft milestone passed 32 backend tests, strict typechecking, lint and build. Astra accepted the source for synthetic development. Development synchronization succeeded. Live browser checks verified driver creation, vehicle assignment, trailer/adult settings, independent-travel demand updates, categorized extra-charge entry and credit allocation, the withdrawal queue, and the read-only permission draft. Full multi-account withdrawal rehearsal and complete trip rehearsal remain future checks; the earlier multi-account parent invitation test remains valid.
+The latest Timeclock backend foundation passed 73 automated tests, strict types, lint, both frontend builds and both Cloudflare packaging dry-runs. Astra reviewed the source. Development sync and repeated Calendar polling succeeded. Real Google sign-in passed for Mentor at Timeclock and Coach at Student Status; previous Student/Parent roles remain unchanged. This is a backend/scaffold milestone, not a complete Timeclock interface or production release.
 
-**Next step:** Review the [permission draft](PERMISSION_FORM_DRAFT.md), complete event/signup and room-management workflows, then rehearse a full fictional trip. Cash/check payout recording, fundraising transfers, real consent/signing and health-export permissions remain unfinished. See [confirmed finance and consent decisions](FINANCE_AND_CONSENT_DECISIONS.md).
+**Next step:** The separate Timeclock chat can build its frontend from the reviewed branch using [the backend handoff](TIMECLOCK_BACKEND_HANDOFF.md). This integration chat retains all shared backend/deployment ownership. In Student Status, finish attendance reporting/name review, event/signup/room-management workflows, permission-wording approval and a complete fictional-trip rehearsal. Cash/check payout recording, fundraising transfers, real consent/signatures and health-export permissions remain unfinished.
 
-For technical detail, see [the implementation plan](PLAN.md) and [review evidence](REVIEW.md). This milestone is on `feature/withdrawals-and-travel`, stacked on the parent-invitation branch. Published in [draft PR 3](https://github.com/denhamvenom/student_status/pull/3); implementation checkpoint `bd589ba`. All PRs remain drafts; no merge or production deployment is authorized.
+Earlier withdrawal/travel/draft work passed 32 tests and live Coach checks; full multi-account withdrawal/trip rehearsal remains pending. Parent-invitation multi-account testing remains valid. See [the plan](PLAN.md), [review evidence](REVIEW.md), and [confirmed finance and consent decisions](FINANCE_AND_CONSENT_DECISIONS.md). Draft PRs remain stacked; no main merge or production deployment is authorized.

@@ -160,3 +160,9 @@ Verification: 32 backend tests, lint, strict TypeScript and build pass; Astra fi
 ## Timeclock coordination October 12
 
 [Timeclock coordination handoff](TIMECLOCK_COORDINATION.md) records verified current entities, a proposed additive multi-app layout, shared attendance/calendar/auth contracts, single-backend ownership and unresolved policies. Planning only; no Timeclock implementation, schema/folder/account changes or deployment. The Timeclock chat must agree the contract before implementation.
+
+## Timeclock backend foundation — October 12
+
+The owner approved the remaining Timeclock policies. Implemented on isolated `feature/timeclock-backend` from verified coordination baseline `5eacf42`, preserving the original checkout and draft PR stack. Shared schema/attendance/calendar/auth belongs to this integration chat; separate `apps/timeclock/` scaffold only, full frontend delegated to the later Timeclock chat. See [concrete backend handoff](TIMECLOCK_BACKEND_HANDOFF.md).
+
+Astra final source review accepted synthetic development after timing/race/reconciliation findings were fixed. Root checks passed 73 tests, lint/types/build; workspace check/build and both Cloudflare packaging dry-runs passed. Development synchronized successfully. Dedicated read-only Calendar identity configured privately, sharing completed by owner, HTTP200 read verified and deployed minute poll observed successful. Existing roles preserved; Mentor Google sign-in and reactive access after verified provisioning passed. Full UI/reporting/import and production remain pending.
