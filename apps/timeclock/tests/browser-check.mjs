@@ -1,0 +1,147 @@
+import { chromium, expect } from '@playwright/test';
+import { readFile, mkdir, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+
+// Test-only synthetic transport. No test account, token, or live student data.
+const mock = await readFile(new URL('./mock-client.mjs', import.meta.url), 'utf8');
+const output = fileURLToPath(new URL('../../../test-results/timeclock/', import.meta.url));
+await mkdir(output, { recursive: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const results = [];
+const errors = [];
+const warnings = [];
+async function setup(width, theme) {
+  const context = await browser.newContext({ viewport: { width, height: 1000 }, colorScheme: theme });
+  let reactUrl;
+  await context.route('**/__clock_mock.js', route => route.fulfill({ contentType: 'text/javascript', body: mock.replace('/node_modules/.vite/deps/react.js', reactUrl) }));
+  await context.route('**/src/main.tsx*', async route => {
+    const response = await route.fetch();
+    const text = await response.text();
+    reactUrl = text.match(/["']([^"']*\/node_modules\/\.vite\/deps\/react\.js[^"']*)["']/)?.[1];
+    if (!reactUrl) throw new Error('Could not resolve the application React module for synthetic checks');
+    const body = text.replace(/from\s*["'][^"']*\/node_modules\/\.vite\/deps\/(?:convex_react|@convex-dev_auth_react)\.js[^"']*["']/g, 'from "/__clock_mock.js"');
+    await route.fulfill({ response, body });
+  });
+  const page = await context.newPage();
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') {
+    if (message.text().startsWith('Encountered a script tag while rendering React component.')) warnings.push('React development warning from next-themes initialization script');
+    else errors.push(message.text());
+  } });
+  await page.goto('http://localhost:5174');
+  await expect(page.getByRole('heading', { name: "Today's events", exact: true })).toBeVisible();
+  return { context, page };
+}
+try {
+  for (const width of [390, 1440]) {
+    for (const theme of ['light', 'dark']) {
+      const { context, page } = await setup(width, theme);
+      await expect(page.getByRole('article').filter({ hasText: 'Finished synthetic meeting' }).getByRole('button')).toBeDisabled();
+      await page.getByRole('article').filter({ hasText: 'Synthetic build meeting' }).getByRole('button').click();
+      await expect(page.getByRole('heading', { name: 'Clock students', exact: true })).toBeVisible();
+      await expect(page.getByText('Alex A.', { exact: true })).toBeVisible();
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+      expect(overflow).toBe(false);
+      await page.screenshot({ path: `${output}/roster-${width}-${theme}.png`, fullPage: true });
+      results.push(`Roster layout ${width}/${theme}`);
+      await page.evaluate(() => { window.__clockTest.state.offline = true; window.__clockTest.emit(); });
+      await expect(page.getByText('Connection interrupted.', { exact: false })).toBeVisible();
+      await expect(page.locator('.tc-roster-row').first().getByRole('button')).toBeDisabled();
+      await page.evaluate(() => { window.__clockTest.state.offline = false; window.__clockTest.emit(); });
+      results.push(`Disconnected clocking disabled ${width}/${theme}`);
+      await page.getByRole('button', { name: 'Change event', exact: true }).click();
+      const dialog = page.getByRole('dialog');
+      await expect(dialog).toBeVisible();
+      await expect(dialog.getByRole('button', { name: 'Confirm change' })).toBeDisabled();
+      await page.keyboard.press('Escape');
+      await expect(dialog).toHaveCount(0);
+      results.push(`PIN gate and dialog Escape ${width}/${theme}`);
+      const alex = page.locator('.tc-roster-row').filter({ hasText: 'Alex A.' });
+      await alex.getByRole('button', { name: 'Clock in', exact: true }).click();
+      await expect(alex.getByRole('button', { name: 'Clock out', exact: true })).toBeVisible();
+      await page.evaluate(() => { window.__clockTest.state.failNext = true; });
+      await alex.getByRole('button', { name: 'Clock out', exact: true }).click();
+      await expect(page.getByRole('button', { name: 'Retry same clock-out request', exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Change event', exact: true })).toBeDisabled();
+      await page.getByRole('button', { name: 'Retry same clock-out request', exact: true }).click();
+      await expect(alex.getByRole('button', { name: 'Clock in', exact: true })).toBeEnabled();
+      const keys = await page.evaluate(() => window.__clockTest.state.calls.filter(c => c.method === 'timeclock:clockGroup' && c.args.mode === 'out').map(c => c.args.key));
+      expect(keys).toHaveLength(2);
+      expect(keys[0]).toBe(keys[1]);
+      results.push(`Individual clocking and uncertain response same-key retry ${width}/${theme}`);
+      await page.getByRole('button', { name: 'Group', exact: true }).click();
+      await page.getByRole('checkbox', { name: 'Select Alex A.', exact: true }).check();
+      await page.getByRole('checkbox', { name: 'Select Blair B.', exact: true }).check();
+      await page.getByRole('button', { name: 'Clock in selected (2)', exact: true }).click();
+      await expect(page.getByText('2 clocked in', { exact: true })).toBeVisible();
+      results.push(`Group clock-in ${width}/${theme}`);
+      await page.getByRole('button', { name: 'Extend event', exact: true }).click();
+      await dialog.getByLabel('Operator PIN').fill('wrong');
+      await dialog.getByRole('button', { name: 'Extend event', exact: true }).click();
+      await expect(dialog.getByRole('alert')).toContainText('not accepted');
+      await dialog.getByLabel('Operator PIN').fill('test-pin');
+      await dialog.getByRole('button', { name: 'Extend event', exact: true }).click();
+      await expect(dialog).toHaveCount(0);
+      results.push(`Extension PIN rejection and success ${width}/${theme}`);
+      await page.evaluate(() => window.__clockTest.close());
+      await expect(page.getByRole('heading', { name: "Today's events", exact: true })).toBeVisible();
+      results.push(`Reactive close ${width}/${theme}`);
+      await context.close();
+    }
+  }
+  const { context, page } = await setup(1440, 'light');
+  const secondTab = await context.newPage();
+  await secondTab.goto('http://localhost:5174');
+  await expect(secondTab.getByRole('heading', { name: "Today's events" })).toBeVisible();
+  const profile = p => p.evaluate(() => Object.keys(window.localStorage).filter(k => k.startsWith('timeclock:profile:')).map(k => window.localStorage.getItem(k)));
+  expect(await profile(page)).toEqual(await profile(secondTab));
+  expect(await profile(page)).toHaveLength(1);
+  results.push('Two browser tabs share one profile identifier');
+  await secondTab.close();
+  await page.getByRole('button', { name: 'Create unscheduled event', exact: true }).click();
+  let dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Event name').fill('Synthetic extra session');
+  await dialog.getByLabel('Duration in minutes').fill('90');
+  await dialog.getByRole('button', { name: 'Create event', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Clock students' })).toBeVisible();
+  results.push('Unscheduled creation automatically selects session');
+  await page.evaluate(() => { window.__clockTest.state.conflict = true; window.__clockTest.emit(); });
+  await page.locator('.tc-roster-row').filter({ hasText: 'Alex A.' }).getByRole('button', { name: 'Clock in', exact: true }).click();
+  dialog = page.getByRole('dialog');
+  await expect(dialog.getByText('Alex A.', { exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Confirm transfer' })).toBeDisabled();
+  await dialog.getByLabel('Operator PIN').fill('test-pin');
+  await dialog.getByRole('button', { name: 'Confirm transfer' }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(await page.evaluate(() => window.__clockTest.state.calls.some(c => c.method === 'timeclock:clockGroup' && c.args.mode === 'transfer' && c.args.pin === '[entered]'))).toBe(true);
+  results.push('Named transfer requires confirmation and PIN');
+  await page.getByRole('button', { name: 'Change event', exact: true }).click();
+  await dialog.getByLabel('Operator PIN').fill('test-pin');
+  await dialog.getByRole('button', { name: 'Confirm change' }).click();
+  await expect(page.getByRole('heading', { name: "Today's events" })).toBeVisible();
+  await page.getByRole('article').filter({ hasText: 'Synthetic all-day outreach' }).getByRole('button').click();
+  const future = new Date(Date.now() + 86400000);
+  const chicagoParts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(future).map(p => [p.type, p.value]));
+  await dialog.getByLabel('Event end (Chicago)').fill(`${chicagoParts.year}-${chicagoParts.month}-${chicagoParts.day}T18:00`);
+  await dialog.getByRole('button', { name: 'Open event', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Clock students' })).toBeVisible();
+  results.push('All-day setup and PIN-protected event switching');
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await dialog.getByLabel('Operator PIN').fill('wrong');
+  await dialog.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('not accepted');
+  await dialog.getByLabel('Operator PIN').fill('test-pin');
+  await dialog.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();
+  results.push('Sign-out PIN rejection and success');
+  await page.evaluate(() => { window.__clockTest.state.authenticated = true; window.__clockTest.state.allowed = false; window.__clockTest.emit(); });
+  await expect(page.getByRole('heading', { name: 'Access unavailable' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Clock students' })).toHaveCount(0);
+  results.push('Revoked operator access removes console');
+  await context.close();
+} finally {
+  await writeFile(`${output}/results.json`, JSON.stringify({ mode: 'synthetic browser transport, not live backend proof', results, errors, warnings }, null, 2));
+  await browser.close();
+}
+console.log(JSON.stringify({ checks: results.length, errors, warnings }, null, 2));
+if (errors.length) process.exitCode = 1;
