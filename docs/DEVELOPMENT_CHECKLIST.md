@@ -52,7 +52,8 @@ This checklist is the plain-language progress guide. The phases below show the r
 - [x] Connect basic event creation, event views and selected participation actions to the database.
 - [x] Connect basic payment recording and financial summaries.
 - [x] Connect FIRST requirement completion and readiness updates.
-- [ ] Finish event signup approvals, waitlists, deadlines, required-event assignment and requirement editing.
+- [x] Finish signup approval, chronological manual waitlists, deadline editing and custom requirement editing.
+- [ ] Finish broader required-event assignment and a complete end-to-end event rehearsal.
 - [x] Build the student withdrawal request and Coach or Travel Lead decision screen.
 - [x] Implement Approve withdrawal and return payment to available funds.
 - [x] Implement Approve withdrawal and retain non-refundable payment, with a clear note.
@@ -60,12 +61,14 @@ This checklist is the plain-language progress guide. The phases below show the r
 - [x] Automatically cancel unpaid extra fees, such as an unpaid lunch fee, when withdrawal is approved.
 - [x] Implement Deny withdrawal, preserving participation and payment status.
 - [x] Release the student's event/room place when a withdrawal is approved, while preserving history.
-- [ ] Add Record money returned beside payment recording for actual cash/check refunds by authorized financial staff.
+- [x] Add Record money returned beside payment recording, restricted to available personal payments and authorized financial staff.
 - [ ] Finish charge corrections, cancellations, adjustments, payment priorities and financial history review.
 - [ ] Finish fundraiser creation and allocation of funds to students.
 - [x] Preserve separate personal-payment and fundraising sources through implemented allocations and withdrawal returns.
-- [ ] Extend source checks to future payouts, transfers and season carryover.
-- [ ] Add fundraising-credit transfers to another student, carryover and recorded transfers into the team account. Do not build team-account management.
+- [x] Extend source checks to recorded payouts and same-season fundraising transfers.
+- [ ] Extend source checks to season carryover.
+- [x] Add fundraising-credit transfers to an active student in the same season, with reasons and automatic recipient allocation.
+- [ ] Add carryover and recorded transfers into the team account. Do not build team-account management.
 - [x] Test withdrawal decisions for duplicate submissions, stale approval, correct balances, source tracking and role restrictions.
 - [ ] Test remaining financial workflows as they are implemented.
 
@@ -75,7 +78,7 @@ This checklist is the plain-language progress guide. The phases below show the r
 - [x] Build the explicit unpaid main-fee cancellation choice and record the decision.
 - [x] Agree that returned funds automatically pay other outstanding charges in their assigned order.
 - [x] Agree to distinguish personal payments from fundraising credits; fundraising credits can transfer to students, carry over or move into the team account. Family cash/check payouts of fundraising credit are not authorized.
-- [ ] Define who can authorize fundraising transfers and any recipient restrictions.
+- [x] Agree: Coach or Travel Lead with explicit finance permission; active recipients in the same season; reason required.
 
 **Already agreed:** Returning an event payment to available funds is an internal account change. Giving someone money back is a separate financial record. The app records that payout; it does not transfer money.
 
@@ -108,8 +111,8 @@ This checklist is the plain-language progress guide. The phases below show the r
 
 - [x] Separate student requirements, transportation and adult room placement in readiness calculations.
 - [x] Provide limited room-group and assignment-request actions.
-- [ ] Finish student room invitations, acceptance, cancellation and leaving a group.
-- [ ] Finish adult room assignments, moves, finalization and recorded fifth-person exceptions.
+- [x] Finish student room invitations, acceptance, cancellation, leaving and assignment requests, with server-enforced deadlines.
+- [x] Finish adult room assignments, moves, finalization and recorded fifth-person exceptions; prohibit six occupants and mixed categories.
 - [x] Finish driver and vehicle management, passenger seats and event assignments.
 - [x] Add bus seats, independently traveling students, additional adults and trailer/towing requirements.
 - [x] Make approved withdrawals release room places and update transportation demand.
@@ -133,9 +136,12 @@ This checklist is the plain-language progress guide. The phases below show the r
 - [x] Connect the dedicated read-only Calendar identity and verify deployed minute polling.
 - [x] Verify Google Mentor sign-in at the Timeclock origin and preserve prior Student/Parent roles.
 - [x] Pass 77 automated tests, root/workspace checks and both Cloudflare packaging dry-runs; obtain Astra source review.
-- [ ] Build the complete Timeclock frontend, including cross-tab console coordination and PIN-protected controls.
+- [x] Implement Timeclock frontend, including cross-tab console coordination and PIN-protected controls, on separate feature/timeclock-frontend branch (c73a6a3, draft PR #6).
+- [ ] Integrate/rehearse the Timeclock frontend with live reviewed synthetic roster names and multiple devices.
 - [ ] Complete Coach structured-name review for existing roster records before real clocking.
-- [ ] Build Student Status attendance summaries and correction/admin screens.
+- [x] Build Coach per-session/student Timeclock summaries, original evidence and correction screens.
+- [x] Build the Coach structured-name review screen.
+- [ ] Finish broader season attendance reports and family-facing Timeclock summaries.
 - [ ] Rehearse the complete multi-device interface with synthetic students.
 - [ ] Plan historical Sheets import and expand bounded queries if team scale requires it.
 
@@ -195,3 +201,19 @@ The latest Timeclock backend foundation and reactive-status follow-up passed 77 
 Earlier withdrawal/travel/draft work passed 32 tests and live Coach checks; full multi-account withdrawal/trip rehearsal remains pending. Parent-invitation multi-account testing remains valid. See [the plan](PLAN.md), [review evidence](REVIEW.md), and [confirmed finance and consent decisions](FINANCE_AND_CONSENT_DECISIONS.md). Draft PRs remain stacked; no main merge or production deployment is authorized.
 
 Latest publication: [draft PR 5](https://github.com/denhamvenom/student_status/pull/5), `feature/timeclock-backend`, implementation checkpoint `c39c7f7`. The complete frontend handoff includes the exact commit to branch from.
+
+## Operations milestone checkpoint — October 12, 2026
+
+Agreed decisions: chronological waitlist order with manual Coach/Travel promotion; student room changes stop at the deadline while adult corrections require an audit reason; financial editors may transfer available fundraising credits to active students within the same season, with a reason. Cash/check refunds are separate recorded payouts from available personal payments.
+
+- [x] Coach structured-name review and Timeclock attendance/correction screens.
+- [x] Event approval, ordered waitlist, requirements and rooming workflows.
+- [x] Source-preserving payout records, fundraising transfers and readable history.
+- [x] Astra final review; 90 tests across 15 suites; lint, types, builds and packaging checks; development sync.
+- [x] Smoke-check live Coach attendance/name review, payout/transfer forms and event/room workspace after browser connectivity recovered; event/finance phone layouts have no horizontal overflow.
+- [ ] Rehearse complete live multi-role mutations, attendance correction with closed sessions and a complete fictional trip.
+- [ ] Publish and verify the reviewed GitHub checkpoint (integration owner records the commit/PR).
+
+Work runs in isolated `student-status-operations` / `feature/student-status-operations`. Timeclock frontend owns its separate worktree and `apps/timeclock`; one Student Status owner integrates shared backend and schema changes. Production, real signatures, automatic deletion and main merges remain outside this authorization.
+
+Timeclock parallel handoff: frontend owner reports Astra review, 34 synthetic intercepted-browser scenarios, 77 baseline backend tests, root/workspace checks and packaging dry run passed. This evidence is owner-reported; full live multi-device rehearsal remains pending. Student Status operations does not modify apps/timeclock.

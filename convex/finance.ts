@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 import { activeSeason, audit, viewer } from "./lib/access";
-import { addCharge, allocateUnapplied, financialEntries } from "./lib/money";
+import { addCharge, allocateUnapplied, financialEntries, sourceBalances } from "./lib/money";
 
 function financeEditor(user: Awaited<ReturnType<typeof viewer>>) {
   if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead && user.financialEdit)) throw new Error("Financial editing is not enabled for this account.");
@@ -38,7 +38,8 @@ export const recordFunds = mutation({
     }
     const prior = await financialEntries(ctx, student._id);
     if (prior.length >= 500) throw new Error("Financial record limit reached; payment was not recorded.");
-    const funds = prior.filter(x => x.kind === "payment" || x.kind === "fundraiser").reduce((n, x) => n + x.amountCents, 0);
+    const sources = sourceBalances(prior);
+    const funds = sources.reduce((n, x) => n + x.entry.amountCents, 0) - prior.filter(x => x.kind === "payout" || x.kind === "transferOut").reduce((n, x) => n + x.amountCents, 0);
     await ctx.db.insert("ledgerEntries", { studentId: student._id, kind: args.kind, amountCents: args.amountCents, previousCents: funds, newCents: funds + args.amountCents, reason: args.reason.trim(), recordedBy: user._id, recordedAt: Date.now(), idempotencyKey: args.idempotencyKey });
     await audit(ctx, user, "ledger", student._id, args.kind, { funds }, { funds: funds + args.amountCents }, args.reason.trim());
     await allocateUnapplied(ctx, user, student._id, `auto:${args.idempotencyKey}`);

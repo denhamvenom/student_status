@@ -45,7 +45,7 @@ export async function studentReadiness(ctx: Ctx, event: Doc<"events">, student: 
     if (membership) {
       const group = await ctx.db.get(membership.groupId);
       const members = await ctx.db.query("roomMemberships").withIndex("by_groupId", q => q.eq("groupId", membership.groupId)).take(6);
-      complete = !!group?.finalized || members.length > 1;
+      complete = complete || !!group?.finalized || members.length > 1;
     }
     if (!complete) open.push("Room selection");
   }
