@@ -235,8 +235,9 @@ Timeclock parallel handoff: frontend owner reports Astra review, 34 synthetic in
 - [x] Agree that features added after the prototype must follow its overall design system and look and feel, while preserving approved product requirements.
 - [x] Preserve unfinished local development in local checkpoint `d47d85d`, tagged `pre-design-fix-2026-10-12`; not published or release validated.
 - [x] Extract and inventory the read-only design reference; identify its version and reference conflicts. `design-reference/` is ignored and preserved unchanged.
-- [ ] Compare all available role/screens at 390px and 1440px in light and dark themes; distinguish inspected, blocked and unimplemented states.
-- [x] Produce the first `design-drift-report.md` with proposed fixes, added-feature styling guidance and backend dependencies; remaining role/state coverage is explicitly pending.
+- [x] Consolidate visual comparisons for available Coach, Student, Parent and Travel screens at phone/desktop in both themes, with Astra review and parallel Sol image review. The report explicitly distinguishes valid observations, invalid captures, unimplemented screens and unavailable states; this is not visual acceptance.
+- [x] Complete `design-drift-report.md` with role/state coverage, prioritized findings, added-feature styling guidance and separate functional dependencies.
+- [ ] Close remaining evidence limits during correction verification: ordinary Mentor-only account, active room invitations/paid withdrawal, multiple linked children, invitation variants, and invalid Student Parents desktop captures. No permissions or domain records were changed to manufacture those states.
 - [ ] Obtain Coach approval of the report before making design corrections.
 - [ ] Implement approved shared labels, tokens/components and screen corrections; preserve backend and access rules.
 - [ ] Recompare corrected screens, document intentional differences and obtain final visual review.
