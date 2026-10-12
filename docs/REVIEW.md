@@ -80,3 +80,21 @@ Astra coordinated shared contracts and reviewed the implementation; Sol owners i
 Limits: no full multi-account withdrawal browser rehearsal in this milestone; no full room management, cash/check payout UI, fundraiser transfer authority, real signatures, health export grant or production readiness. Historical allocations with ambiguous source stop safely rather than inventing financial provenance. Approved-withdrawal reenrollment needs a future explicit fee review. The preexisting Travel Lead permission-snapshot access path must be hardened with the final health-access/export policy before live records.
 
 Publication: implementation checkpoint `bd589ba` pushed to `feature/withdrawals-and-travel`; [draft PR 3](https://github.com/denhamvenom/student_status/pull/3) targets `feature/parent-invitations`. Main and production remain unchanged.
+
+## October 12 Timeclock backend foundation
+
+Astra final source review accepted for synthetic development after concurrency, stale-job, schedule-revision, reconciliation and data-contract findings were fixed. Sol implemented core and Calendar/auth in parallel; integration owner prepared roster/workspace and owned all configuration/deploy/Git actions. See TIMECLOCK_BACKEND_HANDOFF.md for exact API contracts and limits.
+
+Root validation passed 73 tests across 12 suites with edge-runtime, lint, strict TypeScript and build. The separate Timeclock workspace lint/types/build passed; both Wrangler static packaging dry-runs passed without deployment. Installed rate-limiter and batch-worker component, synchronized only dev:third-bandicoot-18, and observed successful repeated minute Calendar refreshes with no error. The dedicated service account's read access returned HTTP200 after owner sharing; temporary credential files were removed after private server configuration.
+
+Real Mentor Google OAuth returned to localhost:5174. Access was denied before provisioning and reactively allowed after development-only verified Google provisioning. Existing Coach/Student/Parent roles were checked unchanged. Root Student Status Coach pages continued loading against the updated backend, and a fresh Coach Google OAuth sign-in returned successfully to localhost:5173. These checks do not constitute a full Timeclock UI or multi-device field rehearsal.
+
+Bounds remain 100 students per atomic command/event, 100 open sessions in today selection, and 500-record roster/selection/history scans. Full clock interface, Coach name review UI, attendance reporting, legacy import and production readiness remain pending. Secrets, account addresses and student records were excluded from committed artifacts. Main and production remain unchanged.
+
+Publication: implementation `c39c7f77d0c30fe784cb8bfcd313d4cbaea6b425` is pushed on `feature/timeclock-backend`, with [draft PR 5](https://github.com/denhamvenom/student_status/pull/5) targeting `docs/timeclock-coordination`. The exact frontend branch baseline and ownership are in TIMECLOCK_BACKEND_HANDOFF.md. All earlier draft PRs, main/demo and production remain unchanged.
+
+### Reactive clock status follow-up
+
+Frontend integration identified the missing live roster-status subscription. Added `timeclockRoster.clockStatus({sessionId})` with active-season/role/reviewed-name checks and minimal operational state plus other-event conflict pointers. No private fields or schema changes. Astra reviewed the source and transition/denial tests. Root check passed 77 tests across 12 suites, lint, strict types and build. The foundation port5174 server was identified and stopped; Student Status5173 was preserved. Coach structured-name review remains an explicitly documented owner action. See the handoff for exact return type and status semantics.
+
+Development sync of the reactive-status query succeeded on third-bandicoot-18. The final additional operational-versus-corrected-attendance test brought the passing suite to 77; strict types passed again. No schema, frontend or production changes.

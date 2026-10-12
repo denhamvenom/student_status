@@ -53,7 +53,7 @@ export const approveJoin = mutation({
       if (!student || student.seasonId !== season._id || student.userId || student.email !== request.email) throw new Error("Cannot link to the selected student.");
       await ctx.db.patch(student._id, { userId, active: true });
     } else {
-      await ctx.db.insert("students", { seasonId: season._id, userId, legalName: `${request.firstName} ${request.lastName}`, preferredName: request.firstName, email: request.email, subteam: "", active: true, travelTeam: false, roomCategoryLocked: false, allergies: { state: "unknown" }, medications: { state: "unknown" } });
+      await ctx.db.insert("students", { seasonId: season._id, userId, legalName: `${request.firstName} ${request.lastName}`, preferredName: request.firstName, firstName: request.firstName, lastName: request.lastName, structuredNameReviewed: false, email: request.email, subteam: "", active: true, travelTeam: false, roomCategoryLocked: false, allergies: { state: "unknown" }, medications: { state: "unknown" } });
     }
     await ctx.db.patch(request._id, { status: "approved", decidedAt: Date.now(), decidedBy: actor._id });
     await audit(ctx, actor, "joinRequests", request._id, "approve", "pending", "approved");
@@ -123,7 +123,7 @@ export const recordAttendance = mutation({
   args: { meetingId: v.id("attendanceMeetings"), studentId: v.id("students"), present: v.boolean() }, returns: v.null(),
   handler: async (ctx, args) => {
     const user = await viewer(ctx);
-    if (user.role !== "coach" && !user.travelLead) throw new Error("Attendance recording denied.");
+    if (user.role !== "coach") throw new Error("Attendance recording is Coach-only.");
     const meeting = await ctx.db.get(args.meetingId); const student = await ctx.db.get(args.studentId);
     const season = await activeSeason(ctx);
     if (!meeting || !student || !student.active || meeting.seasonId !== season._id || meeting.seasonId !== student.seasonId || meeting.cancelled) throw new Error("Meeting unavailable.");

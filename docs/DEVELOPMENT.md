@@ -57,3 +57,7 @@ Live routes: `/withdrawals` for Coach/Travel Lead review, `/drivers` for driver 
 New allocation entries record the originating payment/fundraiser ID. Legacy source inference only accepts an unambiguous source; otherwise stop for financial review. Do not reset or reseed existing records to work around this. Approved-withdrawal reenrollment is blocked until an intentional new-fee flow exists.
 
 Synthetic browser verification added one clearly named test driver and vehicle assignment, adult/trailer settings, and a fictional extra charge that consumed the existing synthetic credit. No real payments occurred. Independent travel was toggled and restored. Do not rerun bootstrap seed. See REVIEW.md for verification boundaries and DEVELOPMENT_CHECKLIST.md for remaining work.
+
+## Timeclock workspace
+
+Use the [backend handoff](TIMECLOCK_BACKEND_HANDOFF.md) for commands and API contracts. Root remains Student Status; `apps/timeclock` uses port5174, independent output and Cloudflare config. Root Bun lockfile governs both workspaces. `bun run dev:timeclock` starts frontend only. The frontend chat must never start its own Convex watcher. Existing Student Status namespace is preserved; Timeclock uses a separate namespace and exact localhost redirect origin. Calendar credentials and operator PIN stay only in development server configuration.

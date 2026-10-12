@@ -30,6 +30,12 @@ import type { DataModel } from "./dataModel.js";
 type Env = {
   readonly CONVEX_CLOUD_URL: string;
   readonly CONVEX_SITE_URL: string;
+  readonly SITE_URL: string | undefined;
+  readonly TIMECLOCK_CALENDAR_ID: string | undefined;
+  readonly TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_EMAIL: string | undefined;
+  readonly TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_PRIVATE_KEY: string | undefined;
+  readonly TIMECLOCK_OPERATOR_PIN: string | undefined;
+  readonly TIMECLOCK_SITE_URL: string | undefined;
 };
 
 /**
