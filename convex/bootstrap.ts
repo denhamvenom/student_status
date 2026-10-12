@@ -32,6 +32,31 @@ export const provisionDevelopmentMentor = internalMutation({
   },
 });
 
+/** Owner-authorized capability grant for an existing, verified development Mentor. */
+export const grantDevelopmentTravelLead = internalMutation({
+  args: { expectedCoachEmail: v.string(), expectedMentorEmail: v.string() },
+  returns: v.object({ mentorId: v.id("appUsers"), changed: v.boolean() }),
+  handler: async (ctx, args) => {
+    if (env.CONVEX_CLOUD_URL !== EXPECTED_DEV_URL) throw new Error("Travel Lead grant is development-only.");
+    const coachEmail = args.expectedCoachEmail.trim().toLowerCase();
+    const mentorEmail = args.expectedMentorEmail.trim().toLowerCase();
+    if (!coachEmail || !mentorEmail || coachEmail === mentorEmail) throw new Error("Distinct Coach and Mentor emails are required.");
+    const coach = await ctx.db.query("appUsers").withIndex("by_email", q => q.eq("email", coachEmail)).unique();
+    if (!coach?.active || coach.role !== "coach") throw new Error("Expected active development Coach not found.");
+    const authUser = await ctx.db.query("users").withIndex("email", q => q.eq("email", mentorEmail)).unique();
+    if (!authUser?.emailVerificationTime || authUser.isAnonymous) throw new Error("Verified Google Mentor sign-in required.");
+    const google = await ctx.db.query("authAccounts").withIndex("userIdAndProvider", q => q.eq("userId", authUser._id).eq("provider", "google")).first();
+    if (!google) throw new Error("Verified Google Mentor sign-in required.");
+    const mentor = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", authUser._id)).unique();
+    if (!mentor?.active || mentor.role !== "mentor" || mentor.email.toLowerCase() !== mentorEmail) throw new Error("Expected existing active Mentor not found; no account or role will be changed.");
+    if (mentor.financialEdit) throw new Error("Financial editing is already enabled; Travel Lead grant refused.");
+    if (mentor.travelLead) return { mentorId: mentor._id, changed: false };
+    await ctx.db.patch(mentor._id, { travelLead: true });
+    await ctx.db.insert("audit", { actorId: coach._id, entity: "appUsers", entityId: mentor._id, action: "grantDevelopmentTravelLead", beforeJson: JSON.stringify({ role: "mentor", travelLead: false, financialEdit: false }), afterJson: JSON.stringify({ role: "mentor", travelLead: true, financialEdit: false }), reason: "Owner-authorized development Travel Lead test; financial editing remains disabled", at: Date.now() });
+    return { mentorId: mentor._id, changed: true };
+  },
+});
+
 export const firstCoach = internalMutation({
   args: {
     authUserId: v.id("users"),

@@ -22,10 +22,12 @@ export const signUp = mutation({
     if (prior && prior.status !== "withdrawn") return prior.status;
     const withdrawal = await ctx.db.query("withdrawalRequests").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(100);
     if (withdrawal.some(x => x.status === "approved")) throw new Error("A Coach must review reenrollment after an approved withdrawal.");
-    const full = event.capacity !== undefined && await reserved(ctx, event._id) >= event.capacity;
+    const waiting = await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(501);
+    if (waiting.length > 500) throw new Error("Event roster limit reached.");
+    const full = waiting.some(p => p.status === "waitlist") || event.capacity !== undefined && waiting.filter(p => p.status === "confirmed" || p.status === "pending").length >= event.capacity;
     const status = full ? "waitlist" : event.signupMode === "approval" ? "pending" : "confirmed";
     const now = Date.now();
-    if (prior) await ctx.db.patch(prior._id, { status, updatedAt: now });
+    if (prior) await ctx.db.patch(prior._id, { status, createdAt: now, updatedAt: now });
     else await ctx.db.insert("participants", { eventId: event._id, studentId: student._id, status, createdAt: now, updatedAt: now });
     if (status === "confirmed" && event.feeCents > 0) await addCharge(ctx, user, student._id, event.name, event.feeCents, event.startsAt, `eventFee:${event._id}:${student._id}`, event._id);
     await audit(ctx, user, "participants", `${event._id}:${student._id}`, "signup", prior?.status ?? null, status);
@@ -57,11 +59,17 @@ export const setParticipation = mutation({
       if (withdrawals.some(x => x.status === "approved")) throw new Error("A Coach must review reenrollment after an approved withdrawal.");
     }
     if (prior?.status === "confirmed" && (args.status === "pending" || args.status === "waitlist")) throw new Error("Reconcile confirmed participation before changing its status.");
+    if (prior?.status === "waitlist" && args.status !== "waitlist") throw new Error("Use manual waitlist promotion in event operations.");
+    if (event.signupMode !== "assigned" && args.status !== "waitlist" && prior?.status !== "confirmed" && prior?.status !== "pending") {
+      const queue = await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(501);
+      if (queue.length > 500) throw new Error("Event roster limit reached.");
+      if (queue.some(p => p.status === "waitlist")) throw new Error("Promote the waitlist before adding another reserved place.");
+    }
     const takesSeat = args.status === "confirmed" || args.status === "pending";
     const alreadyReserved = prior?.status === "confirmed" || prior?.status === "pending";
     if (takesSeat && !alreadyReserved && event.capacity !== undefined && await reserved(ctx, event._id) >= event.capacity) throw new Error("Event capacity is full.");
     const now = Date.now();
-    if (prior) await ctx.db.patch(prior._id, { status: args.status, updatedAt: now });
+    if (prior) await ctx.db.patch(prior._id, { status: args.status, createdAt: prior.status === "withdrawn" ? now : prior.createdAt, updatedAt: now });
     else await ctx.db.insert("participants", { eventId: event._id, studentId: student._id, status: args.status, createdAt: now, updatedAt: now });
     if (args.status === "confirmed" && event.feeCents > 0) await addCharge(ctx, user, student._id, event.name, event.feeCents, event.startsAt, `eventFee:${event._id}:${student._id}`, event._id);
     await audit(ctx, user, "participants", `${event._id}:${student._id}`, "setStatus", prior?.status ?? null, args.status, args.reason);

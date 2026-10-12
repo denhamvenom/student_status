@@ -1,0 +1,97 @@
+import { useRef, useState, type FormEvent } from 'react'
+import { useMutation, useQuery } from 'convex/react'
+import { api } from '../../../convex/_generated/api'
+import type { Id } from '../../../convex/_generated/dataModel'
+import { Button } from '../../components/ui/button'
+import { Input } from '../../components/ui/input'
+import { NativeSelect, NativeSelectOption } from '../../components/ui/native-select'
+import styles from './FinanceOperations.module.css'
+
+const usd = (cents: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100)
+const errorText = (error: unknown) => error instanceof Error ? error.message : String(error)
+function chicagoDate() {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date())
+  const part = (type: string) => parts.find(value => value.type === type)?.value ?? ''
+  return `${part('year')}-${part('month')}-${part('day')}`
+}
+function chicagoStartOfDay(date: string) {
+  const guess = Date.parse(`${date}T06:00:00Z`)
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(guess))
+  const number = (type: string) => Number(parts.find(value => value.type === type)?.value)
+  const localAtGuess = Date.UTC(number('year'), number('month') - 1, number('day'), number('hour'), number('minute'))
+  return Date.parse(`${date}T00:00:00Z`) - (localAtGuess - guess)
+}
+function cents(value: string) {
+  if (!/^\d+(?:\.\d{1,2})?$/.test(value)) return null
+  const [dollars, fraction = ''] = value.split('.')
+  const result = Number(dollars) * 100 + Number(fraction.padEnd(2, '0'))
+  return Number.isSafeInteger(result) && result > 0 ? result : null
+}
+
+export function FinanceOperations({ studentId }: { studentId: Id<'students'> }) {
+  const options = useQuery(api.financeOperations.operationOptions, { studentId })
+  const payout = useMutation(api.financeOperations.recordPayout)
+  const transfer = useMutation(api.financeOperations.transferFundraising)
+  const [mode, setMode] = useState<'payout' | 'transfer'>('payout')
+  const [amount, setAmount] = useState('')
+  const [reason, setReason] = useState('')
+  const [method, setMethod] = useState<'cash' | 'check' | 'other'>('check')
+  const [reference, setReference] = useState('')
+  const [occurredDate, setOccurredDate] = useState(chicagoDate)
+  const [recipient, setRecipient] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [saved, setSaved] = useState('')
+  const pendingKey = useRef<string | null>(null)
+  const change = (setter: (value: string) => void, value: string) => { pendingKey.current = null; setter(value); setError(''); setSaved('') }
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault()
+    if (busy) return
+    const amountCents = cents(amount)
+    if (amountCents === null) { setError('Enter a positive amount with at most two decimal places.'); return }
+    if (!reason.trim()) { setError('Enter a reason.'); return }
+    if (mode === 'payout' && (!reference.trim() || !occurredDate)) { setError('Enter the date and method reference.'); return }
+    if (mode === 'transfer' && !recipient) { setError('Choose a recipient student.'); return }
+    const idempotencyKey = pendingKey.current ?? crypto.randomUUID()
+    pendingKey.current = idempotencyKey
+    setBusy(true); setError(''); setSaved('')
+    try {
+      if (mode === 'payout') {
+        const occurredAt = chicagoStartOfDay(occurredDate)
+        await payout({ studentId, amountCents, reason: reason.trim(), method, reference: reference.trim(), occurredAt, idempotencyKey })
+        setSaved('Cash/check refund recorded. This record does not send money.')
+      } else {
+        await transfer({ studentId, recipientStudentId: recipient as Id<'students'>, amountCents, reason: reason.trim(), idempotencyKey })
+        setSaved('Fundraising credit transferred and applied to the recipient’s charges where due.')
+      }
+      pendingKey.current = null; setAmount(''); setReason(''); setReference('')
+    } catch (cause) { setError(errorText(cause)) } finally { setBusy(false) }
+  }
+
+  return <section className={styles.panel} aria-label="Financial operations">
+    <h2>Money returned and fundraising transfers</h2>
+    <p className={styles.note}>Record money already given to a family. This app records the refund; it does not transfer money. Fundraising credits cannot be paid out.</p>
+    {options === undefined ? <p>Loading available funds…</p> : <>
+      <div className={styles.balances}><span>Unallocated personal payments <strong>{usd(options.personalAvailableCents)}</strong></span><span>Available fundraising credits <strong>{usd(options.fundraisingAvailableCents)}</strong></span></div>
+      <div className={styles.switch} role="group" aria-label="Choose financial operation">
+        <Button type="button" disabled={busy} variant={mode === 'payout' ? 'default' : 'outline'} onClick={() => { setMode('payout'); pendingKey.current = null; setError(''); setSaved('') }}>Record cash/check refund</Button>
+        <Button type="button" disabled={busy} variant={mode === 'transfer' ? 'default' : 'outline'} onClick={() => { setMode('transfer'); pendingKey.current = null; setError(''); setSaved('') }}>Transfer fundraising credit</Button>
+      </div>
+      <form className={styles.form} onSubmit={event => void submit(event)}>
+        <fieldset className={styles.fields} disabled={busy}>
+        <label>Amount (USD)<Input type="text" inputMode="decimal" value={amount} onChange={event => change(setAmount, event.target.value)} placeholder="0.00" required /></label>
+        {mode === 'payout' ? <>
+          <label>How was money returned?<NativeSelect value={method} onChange={event => { setMethod(event.target.value as 'cash' | 'check' | 'other'); pendingKey.current = null }}><NativeSelectOption value="check">Check</NativeSelectOption><NativeSelectOption value="cash">Cash</NativeSelectOption><NativeSelectOption value="other">Other external method</NativeSelectOption></NativeSelect></label>
+          <label>Date money was returned<Input type="date" value={occurredDate} max={chicagoDate()} onChange={event => change(setOccurredDate, event.target.value)} required /></label>
+          <label>Method reference<Input value={reference} maxLength={150} onChange={event => change(setReference, event.target.value)} placeholder="Check number or receipt reference" required /></label>
+        </> : <label>Recipient student<NativeSelect value={recipient} onChange={event => change(setRecipient, event.target.value)} required><NativeSelectOption value="">Choose an active student</NativeSelectOption>{options.recipients.map(student => <NativeSelectOption key={student._id} value={student._id}>{student.name}</NativeSelectOption>)}</NativeSelect></label>}
+        <label className={styles.wide}>Reason<Input value={reason} maxLength={500} onChange={event => change(setReason, event.target.value)} required /></label>
+        <Button type="submit" disabled={busy || (mode === 'payout' ? options.personalAvailableCents <= 0 : options.fundraisingAvailableCents <= 0)}>{busy ? 'Recording…' : mode === 'payout' ? 'Record money returned' : 'Transfer fundraising credit'}</Button>
+        </fieldset>
+      </form>
+      {error && <p role="alert" className={styles.error}>{error}</p>}
+      {saved && <p role="status" className={styles.success}>{saved}</p>}
+    </>}
+  </section>
+}

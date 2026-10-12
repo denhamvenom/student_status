@@ -30,10 +30,11 @@ export function sourceBalances(entries: Entry[]) {
   const sources = entries.filter((e): e is Entry & { kind: Source } => e.kind === "payment" || e.kind === "fundraiser");
   const byId = new Map(sources.map(s => [s._id, { entry: s, available: s.amountCents }]));
   for (const entry of entries) {
-    if (entry.kind !== "allocation" && entry.kind !== "deallocation") continue;
+    if (entry.kind !== "allocation" && entry.kind !== "deallocation" && entry.kind !== "payout" && entry.kind !== "transferOut") continue;
     const sourceId = allocationSourceId(entry, sources);
     const source = byId.get(sourceId);
     if (!source || entry.sourceKind && entry.sourceKind !== source.entry.kind || entry.amountCents <= 0) throw new Error("Financial source history is inconsistent.");
+    if (entry.studentId !== source.entry.studentId || entry.kind === "payout" && source.entry.kind !== "payment" || entry.kind === "transferOut" && source.entry.kind !== "fundraiser") throw new Error("Financial source history is inconsistent.");
     source.available += entry.kind === "deallocation" ? entry.amountCents : -entry.amountCents;
   }
   for (const source of byId.values()) if (source.available < 0 || source.available > source.entry.amountCents) throw new Error("Financial source balance is inconsistent.");

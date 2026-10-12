@@ -35,7 +35,7 @@ Track personal payments and fundraising credits as different sources. Fundraisin
 
 Record transfers between students without creating or losing money. Record when funds leave a student's balance for the team account, with source, amount, actor, date and reason. The team's own bank balance, spending and accounting are outside this app's scope. A transfer record does not execute a bank transaction.
 
-No cash/check payout of fundraising credits to a family has been authorized. Preserve that restriction unless the user explicitly changes it. The role allowed to transfer fundraising credit and any restrictions on eligible recipient students still need to be defined before enabling those actions.
+No cash/check payout of fundraising credits to a family has been authorized. Preserve that restriction unless the user explicitly changes it. Confirmed for this milestone: Coach or a Mentor with both Travel Lead and explicit financial-edit permission may transfer available fundraising credits to an active student in the same season. A reason is required. Recipient credits automatically apply to outstanding charges in priority order. Carryover and transfers to the team account remain separate future workflows.
 
 ## Permission form and medication choices
 
@@ -58,3 +58,7 @@ Retain archived records for five years starting when the Coach archives the stud
 ## Parallel development boundaries
 
 Work can proceed on independent interfaces, draft forms and tests while the remaining policies are clarified. Changes to shared financial calculations, schema and event/room withdrawal behavior need an agreed contract and a single integration owner. Use Sol agents for implementation, Astra for major coordination/review, and verified GitHub checkpoints. Do not treat this decision record as production-deployment approval.
+
+## Event queue and rooming decisions
+
+Waitlists use chronological signup order and manual Coach/Travel Lead promotion; no automatic enrollment. A genuine reenrollment receives a new queue position. After the rooming deadline, students cannot change groups or invitations; Coach/Travel Lead may make corrections with an audit reason. Student groups stop at four occupants; a fifth requires an explicit adult exception and reason; six and mixed categories are prohibited.

@@ -429,6 +429,11 @@ export const correctInterval = mutation({
   args: { sessionId, studentId, originalIntervalId: v.optional(v.id("timeclockIntervals")), targetCorrectionId: v.optional(v.id("timeclockCorrections")), kind: v.union(v.literal("add"), v.literal("replace"), v.literal("void")), inAt: v.optional(v.number()), outAt: v.optional(v.number()), reason: v.string(), key: v.string() }, returns: commandResult,
   handler: async (ctx, args): Promise<Result> => {
     const actor = await viewer(ctx); requireRole(actor, "coach");
+    // Check before command replay so an archived season cannot return a prior
+    // success as if a correction were still accepted.
+    const season = await activeSeason(ctx);
+    const currentSession = await ctx.db.get(args.sessionId);
+    if (!currentSession || currentSession.seasonId !== season._id) return fail("INVALID_SESSION");
     return await command(ctx, actor, args.key, JSON.stringify(["correct", args.sessionId, args.studentId, args.originalIntervalId, args.targetCorrectionId, args.kind, args.inAt, args.outAt, args.reason]), async () => {
       const session = await ctx.db.get(args.sessionId);
       if (!session || session.state === "open") return fail("SESSION_OPEN");
