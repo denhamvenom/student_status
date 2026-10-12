@@ -119,10 +119,12 @@ This checklist is the plain-language progress guide. The phases below show the r
 
 ## Phase 6 Connect attendance
 
-**Status: Integration remains to be designed and built.**
+**Status: [Timeclock coordination proposal](TIMECLOCK_COORDINATION.md) documented; shared contract decisions and implementation remain.**
 
 - [x] Agree that clock-in/out belongs in a separate app on another subdomain.
 - [x] Agree that both apps will use a shared Convex backend and stable student identities.
+- [x] Inspect the current repository and document a proposed Timeclock structure and shared-backend ownership.
+- [ ] Approve the proposed shared contract and unresolved Timeclock policies.
 - [ ] Define exactly how the two apps share identity and attendance records without sharing unnecessary access.
 - [ ] Define meeting types, attendance totals, cancelled meetings and missing/stale-data behavior.
 - [ ] Build the separate clock app or coordinate its implementation as a separate project scope.
