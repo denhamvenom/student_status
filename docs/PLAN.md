@@ -77,7 +77,7 @@ Implement and validate complete vertical slices before widening menus: (1) role-
 ## Production gates
 
 - Final permission and medication authorization wording/version and retention policy.
-- Complete a real additional-account Google OAuth acceptance rehearsal before production. Parent invitation matching, attestation, exception handling and server authorization are implemented and tested with synthetic identities.
+- Real multi-account Google OAuth invitation acceptance was rehearsed successfully in development using owner-controlled test identities and a fictional student. Production identity/privacy/consent gates still apply.
 - Implement and verify the explicit Coach-controlled Travel Lead health/form export grant.
 - Define the future clock app's shared identity/data contract and aggregation rules.
 - Owned development/production Convex and Cloudflare projects and Google OAuth configuration.
@@ -136,4 +136,8 @@ Final integration: lint, strict typechecking, all **19 backend tests**, and Vite
 
 Implemented Coach resolution for revoked invitations and family links; history lists retain actionable older invitations. Server preview/acceptance use authoritative time; acceptance snapshots exact versioned attestation. OAuth redirect excludes the token, using temporary same-tab storage for the round trip. Child lists exclude prior seasons and update after link revocation. No automatic emails are sent.
 
-Live additional-account Google OAuth invitation acceptance has not been rehearsed; Google remains in Testing mode. Bounded history/access-list limits and complete production readiness remain documented limitations. No real student records, production deployments, main changes or release tags were created. This milestone is published on feature/parent-invitations in a draft PR based on setup/development-app, leaving the setup PR and live demo unchanged.
+Live additional-account Google OAuth invitation acceptance was subsequently rehearsed successfully; Google remains in Testing mode. Bounded history/access-list limits and complete production readiness remain documented limitations. No real student records, production deployments, main changes or release tags were created. This milestone is published on feature/parent-invitations in a draft PR based on setup/development-app, leaving the setup PR and live demo unchanged.
+
+### Live invitation rehearsal completed
+
+The real two-account Google OAuth rehearsal passed in development: student join/Coach approval, invitation creation, paused-new-invitation behavior, wrong-account rejection, matching-parent acceptance through Google redirect, one-time replay rejection, reactive Coach revocation and restoration. The fictional student and parent link remain for further testing; new invitations were restored to enabled. Refer to REVIEW.md. Test-account addresses and invitation tokens are excluded from GitHub.

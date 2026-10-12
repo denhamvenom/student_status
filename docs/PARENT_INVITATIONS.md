@@ -34,4 +34,8 @@ Lint, typechecking, 19 backend tests and build pass; 13 browser checks pass. The
 
 ### Development limits
 
-The recent invitation list shows the newest 100 rows plus separately fetched actionable pending/revoked rows, with explicit overflow guards. Family/access lists are bounded at 100. Larger-scale pagination remains future work. A real additional-account OAuth acceptance rehearsal and production configuration remain outstanding; no production approval is implied.
+The recent invitation list shows the newest 100 rows plus separately fetched actionable pending/revoked rows, with explicit overflow guards. Family/access lists are bounded at 100. Larger-scale pagination remains future work. A real multi-account OAuth acceptance rehearsal passed as documented below. Production configuration remains outstanding; no production approval is implied.
+
+### Live Google acceptance evidence
+
+A real owner-controlled student/parent Google rehearsal passed: ordinary student onboarding, invitation issuance, wrong-account rejection, Google redirect recovery, attested acceptance while new invitations were paused, replay rejection, and Coach revocation/restoration with reactive profile/finance access changes. The test used a fictional student and left no account emails or tokens in this repository. See REVIEW.md for details. New invitations and the test parent link were restored to enabled/active afterward.

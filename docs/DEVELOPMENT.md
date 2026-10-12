@@ -45,6 +45,6 @@ Read `PLAN.md` for implemented versus pending work. Agents read app `AGENTS.md` 
 
 Student Parents and Coach Join Requests now include parent invitations; see [workflow and boundaries](PARENT_INVITATIONS.md). Links are shared manually; no email service is configured. Parent acceptance requires current verified Google-email evidence. Accounts signed in before this update may need to sign out and sign back in. New invited parents can establish their parent role through valid acceptance; existing student/adult or inactive accounts are never automatically converted.
 
-Google OAuth remains in Testing mode with the existing authorized Coach account. A real additional-account acceptance rehearsal still requires an authorized Google test identity; synthetic backend tests and UI review are not that rehearsal.
+Google OAuth remains in Testing mode. Two owner-controlled test accounts were added for a successful real student/parent invitation rehearsal. The resulting student profile is fictional; account addresses and invitation tokens are deliberately excluded from repository documentation. See REVIEW.md for evidence.
 
 Invitation layout checks: `bun scripts/parent-invites-browser-check.mjs` against the running frontend. It writes synthetic screenshots/results to ignored test-results/. Use /parents?review=student, /enroll?review=coach, and /invite-parent?review=parent for read-only fixture screens. If sandboxed Vitest fails on temporary-file ENOENT errors, rerun outside the sandbox; do not weaken tests or suppress failures.
