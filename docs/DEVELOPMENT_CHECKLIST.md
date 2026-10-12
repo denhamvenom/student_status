@@ -56,18 +56,23 @@ This checklist is the plain-language progress guide. The phases below show the r
 - [ ] Build the student withdrawal request and Coach or Travel Lead decision screen.
 - [ ] Implement Approve withdrawal and return payment to available funds.
 - [ ] Implement Approve withdrawal and retain non-refundable payment, with a clear note.
+- [ ] Implement partial return of event payments, showing how much was paid and allowing a return up to the full eligible paid amount.
+- [ ] Automatically cancel unpaid extra fees, such as an unpaid lunch fee, when withdrawal is approved.
 - [ ] Implement Deny withdrawal, preserving participation and payment status.
 - [ ] Release the student's event/room place when a withdrawal is approved, while preserving history.
 - [ ] Add Record money returned beside payment recording for actual cash/check refunds by authorized financial staff.
 - [ ] Finish charge corrections, cancellations, adjustments, payment priorities and financial history review.
 - [ ] Finish fundraiser creation and allocation of funds to students.
+- [ ] Preserve separate personal-payment and fundraising sources through all allocations and returns.
+- [ ] Add fundraising-credit transfers to another student, carryover and recorded transfers into the team account. Do not build team-account management.
 - [ ] Test all financial changes for duplicate submissions, correct balances and role restrictions.
 
 **Decisions needed before completing this phase:**
 
-- [ ] Decide how unpaid or partly paid event charges are handled when withdrawal is approved.
-- [ ] Decide whether money returned to available funds immediately pays other outstanding charges or stays available until deliberately applied.
-- [ ] Decide whether fundraising credits may ever be paid out to a student/family as cash or check.
+- [ ] Confirm the treatment of unpaid main event/travel balances and paid extra fees after withdrawal.
+- [x] Agree that returned funds automatically pay other outstanding charges in their assigned order.
+- [x] Agree to distinguish personal payments from fundraising credits; fundraising credits can transfer to students, carry over or move into the team account. Family cash/check payouts of fundraising credit are not authorized.
+- [ ] Define who can authorize fundraising transfers and any recipient restrictions.
 
 **Already agreed:** Returning an event payment to available funds is an internal account change. Giving someone money back is a separate financial record. The app records that payout; it does not transfer money.
 
@@ -78,9 +83,11 @@ This checklist is the plain-language progress guide. The phases below show the r
 - [x] Review the old permission slip as a reference.
 - [x] Provide basic profile/health fields for synthetic development testing.
 - [x] Keep real permission signing blocked while wording and the workflow are unfinished.
-- [ ] Approve updated permission wording, including the correct school/foundation names and responsibilities.
+- [x] Agree to name Denham Springs High School and FIRST Team 8044, Denham Venom.
+- [x] Agree that permission-form wording includes authorization for minor first aid as appropriate.
+- [ ] Approve the final permission wording and responsibilities.
 - [ ] Confirm who reviews and approves the final wording and medication-administration policy.
-- [ ] Confirm medication categories and choices. Current proposal: Pain, Allergy and Cold; Allow, Contact me first, or Do not allow.
+- [x] Agree on Pain, Allergy and Cold categories, each with Allow / Contact me first / Do not allow; nothing preselected.
 - [ ] Define which products/ingredients and exceptions each medication category covers.
 - [ ] Build the parent form and signature process, separate from account linking.
 - [ ] Save an unchangeable copy of the exact wording, covered events and information that was signed.
@@ -125,7 +132,7 @@ This checklist is the plain-language progress guide. The phases below show the r
 
 - [x] Connect basic Coach roster edits such as subteam and Travel Team status.
 - [x] Agree that the Coach manages application accounts.
-- [x] Agree to retain archived records for five years.
+- [x] Agree to retain archived records for five years from the date the Coach archives the student account.
 - [ ] Finish account/role administration and separate financial and health-export permissions.
 - [ ] Finish roster archival, reactivation and correction screens.
 - [ ] Build end-of-season review, balance decisions and creation of the next season.
@@ -133,7 +140,7 @@ This checklist is the plain-language progress guide. The phases below show the r
 - [ ] Finish reports and exports with the correct restrictions for each role.
 - [ ] Define and implement record deletion after the retention period, including backups and any holds.
 
-**Decisions needed:** Confirm when the five-year period starts, what records it covers, and how downloaded exports, backups and records under a hold are handled.
+**Decisions needed:** Confirm what the five-year policy covers and how downloaded exports, backups, holds and reactivated accounts are handled. The start date is now confirmed as account archival.
 
 ## Phase 8 Prepare and approve launch
 
@@ -168,6 +175,6 @@ These are repeating steps for each future milestone, not unfinished tasks in the
 
 The latest code milestone passed 19 backend tests, 13 browser checks, typechecking, lint and build. The later real Google-account rehearsal also passed. Astra accepted the invitation milestone for synthetic development. These results do not certify the unfinished product for production.
 
-**Recommended next step:** Settle the three financial decisions in Phase 3, then implement withdrawals and financial returns as one complete workflow. Permission wording can be developed in parallel.
+**Recommended next step:** Clarify the remaining fee edge cases in Phase 3, then implement withdrawals and financial returns as one complete workflow. Draft permission wording and independent event/travel tasks can proceed in parallel. See [confirmed finance and consent decisions](FINANCE_AND_CONSENT_DECISIONS.md).
 
 For technical detail, see [the implementation plan](PLAN.md), [review evidence](REVIEW.md), and [parent invitation workflow](PARENT_INVITATIONS.md). GitHub currently has [setup PR 1](https://github.com/denhamvenom/student_status/pull/1) and [parent invitations PR 2](https://github.com/denhamvenom/student_status/pull/2), both drafts; this checklist does not authorize their merge.
