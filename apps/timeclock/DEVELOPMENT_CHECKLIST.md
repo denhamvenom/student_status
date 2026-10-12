@@ -1,6 +1,6 @@
 # Timeclock frontend development checklist
 
-Status: frontend implemented and verified for development; publication in progress. No production deployment.
+Status: frontend implemented and verified for development; published in draft PR #6. No production deployment.
 
 ## 1. Shared foundation
 - [x] Read backend handoff and repository instructions.
@@ -34,8 +34,8 @@ Status: frontend implemented and verified for development; publication in progre
 
 ## 6. Handoff
 - [x] Review staged changes for secrets/student data.
-- [ ] Publish reviewed development checkpoint and draft PR.
-- [ ] Send implementation evidence and remaining limitations to backend owner.
+- [x] Publish reviewed development checkpoint and draft PR.
+- [x] Send implementation evidence and remaining limitations to backend owner.
 
 ## Boundaries and remaining external work
 - Only apps/timeclock is frontend-owned. Shared backend/root tooling belongs to Student Status integration.
@@ -66,3 +66,6 @@ Browser checks intercept module imports in Playwright; the production app has no
 Commands: from repository root, bun run dev:timeclock; bun run check:timeclock; node apps/timeclock/tests/browser-check.mjs (requires local preview and installed Edge); bun run check; bun run cloudflare:timeclock. Windows sandbox temporary-file/Edge isolation failures require running these checks in the host environment, not weakening tests.
 
 Remaining: Coach-reviewed synthetic names and live multi-device rehearsal; Student Status reporting/correction UI in its owning chat; historical import; production domain/deployment. Timeclock preview: http://localhost:5174/ while owned server runs. No production approval implied.
+
+## Publication
+Implementation checkpoint c73a6a3fb6a29f0495c462810af5d5b3f733dd4a is pushed to feature/timeclock-frontend. Draft PR: https://github.com/denhamvenom/student_status/pull/6, targeting feature/timeclock-backend. Remote branch verified. The Student Status integration chat received the direct handoff and owns subsequent shared integration. This documentation-only follow-up records publication; all live-rehearsal and production boundaries above remain.
