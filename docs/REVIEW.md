@@ -28,7 +28,7 @@ Final follow-up: **all four targeted blockers are resolved for this milestone**.
 
 - First-time profile onboarding, locked initial rooming category, parent contacts, correction requests, student record management and archived/reactivation matching.
 - Complete optional-event approvals/waitlist management, Required-all-students UI, signup deadlines, editable/custom requirements and due dates.
-- Parent invitations and guardian verification; four-step consent wizard, correction targeting, immutable wording content, re-sign lifecycle and Coach paper acceptance.
+- Parent invitations were delivered in the later milestone below using good-faith relationship attestation. Remaining: real additional-account OAuth acceptance rehearsal, four-step consent wizard, correction targeting, immutable permission wording content, re-sign lifecycle and Coach paper acceptance.
 - Medication authorization currently remains a profile value; unlike permission signing, it does not enforce approved wording/version or seasonal signature. Keep it synthetic-only until that consent workflow exists.
 - Transport model and interface for buses, independent travelers, extra adults and trailer towing; driver management; complete room invitation/cancellation and adult room placement/finalization interface.
 - Financial charge editing/voiding, refunds and adjustments, Coach priority controls, fundraiser creation/allocation, bulk import/export and detailed audit UI. Charged-event withdrawal currently requires reconciliation that is not yet offered end to end.
@@ -40,3 +40,12 @@ Final follow-up: **all four targeted blockers are resolved for this milestone**.
 ## Release boundaries
 
 Review disposition: **initial development milestone accepted within its limited scope of synthetic data and supervised development accounts**. The targeted blocking findings above are closed; this is not a full security certification. The product remains unsuitable for production student health/financial records, real consent, travel clearance or season close. Production deployment is not authorized. Final development synchronization, build and Cloudflare dry-run success are recorded as the integrating agent's delivery evidence; the dry run did not publish a site.
+
+
+## Parent invitation milestone review — October 12, 2026
+
+Astra reviewed the source and independently ran the 18-test revision before the final regression addition. Root subsequently ran the final lint, typecheck, **19-test** suite and build successfully, synchronized only the approved development deployment with typechecking, and passed 13 browser cases. The existing build bundle-size advisory remains. The actual signed-in Coach Join Requests panel loads the enabled setting and synthetic roster.
+
+Resolved findings: authoritative server-time preview and acceptance; indexed replacement/revocation checks across history; actionable old invitations retained in Coach lists; verified Google-email provenance; no existing-role conversion; attestation text/version captured on the server and checkbox bound to the displayed version; clean OAuth redirect using short-lived same-tab token storage while preserving the auth callback code; usable wrong-account switching; current-season children and revoke-one/revoke-all access denial.
+
+Disposition: **accepted for synthetic development**. The 13 browser cases cover fixture layout at phone/desktop in light/dark and a live missing-token landing; they do not prove a real multi-account acceptance round trip. Additional Google test identities and that rehearsal remain outstanding. Invitation/access lists have documented bounds; no production deployment or full-product completion is implied.

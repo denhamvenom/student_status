@@ -27,7 +27,7 @@ Stack: React, Vite, strict TypeScript, React Router 7 Data Mode, Tailwind 4, sha
 | Status | Money, participation, event readiness, and attendance are distinct. To-dos group by event and include due dates. Parent sees selected linked child and a Viewing banner. |
 | Profiles | Student edits preferred name, shirt and parent contacts. Parent/Coach edit health and emergency contact. Missing health is Not completed, distinct from None reported. Seasonal OTC authorization is Yes / Contact me first / No. |
 | Parent linking | Student invites parent by email; recipient signs in with the matching Google email and attests their relationship/authority. Valid acceptance establishes the link without routine Coach approval. Coach handles exceptions. One-time invitations expire after 7 days; landing reveals no student data before validation. Disabling new invitations preserves outstanding valid invitations and existing access. Multiple linked children supported. This is good-faith attestation, not independently verified guardianship. |
-| Parent invitation control (planned October 12, 2026) | Coach-only **Allow new parent invitations** toggle in **Join Requests**. Persist the setting in Convex and enforce it on every invitation-creation/replacement path. Show a clear explanation where inviting is disabled. See planned feature below; not implemented. |
+| Parent invitation control (implemented October 12, 2026) | Coach-only **Allow new parent invitations** toggle in **Join Requests**. Persist the setting in Convex and enforce it on every invitation-creation/replacement path. Show a clear explanation where inviting is disabled. Implemented with the parent-invitation milestone; see verification below. |
 | Events | Competition, Outreach and Team event types; six setup steps. Travel Team/Required assignment differs from optional signup. Pending reservations consume capacity but incur no charge until confirmed. Waitlist promotion is manual. |
 | Requirements | Payment/permission/room selection are computed. FIRST/custom completion is adult recorded; following an external link does not complete it. Due dates are per event and requirement. Attendance never contributes to readiness. |
 | Money | Charges are event-tied or standalone with all/selected recipients. There is no implicit Travel Fee. Event payment sums event-tied charges. Automatic credits follow Coach priority; no credit exceeds available balance. Every financial change logs actor/time/before/after; manual adjustments require reasons. |
@@ -46,18 +46,18 @@ Stack: React, Vite, strict TypeScript, React Router 7 Data Mode, Tailwind 4, sha
 
 ## Integration priorities
 
-### Planned feature: Coach control of new parent invitations
+### Implemented feature: Coach control of new parent invitations
 
-Requested October 12, 2026. **Planning only — do not implement until development is explicitly resumed/authorized for this feature.** Include with the parent-invitation workflow milestone.
+Requested October 12, 2026 and subsequently authorized for development. Implemented with the parent-invitation workflow milestone.
 
 - Placement: a **Parent invitations** section in Coach **Join Requests**, with an **Allow new parent invitations** toggle and visible enabled/disabled status.
 - Coach alone can change the setting; Travel Leads and other roles cannot change it through either the UI or direct backend calls.
-- Proposed scope: team-wide persistent setting. When disabled, reject new invitations and replacement/regenerated invitation links on the server, including requests from an already-open page. Explain that a Coach has paused invitations wherever users would normally invite a parent.
+- Confirmed and implemented scope: team-wide persistent setting. When disabled, reject new invitations and replacement/regenerated invitation links on the server, including requests from an already-open page. Explain that a Coach has paused invitations wherever users would normally invite a parent.
 - Confirmed behavior for existing access: preserve already-linked parents and outstanding invitations; invitations expire 7 days after issuance, without extending their expiry when the toggle changes.
-- Proposed default: enabled once the parent-invitation workflow is implemented and tested. The toggle does not bypass matching-email, relationship-attestation or other release gates. Turning it back on restores new invitation creation.
+- Confirmed and implemented default: enabled. The toggle does not bypass matching-email, relationship-attestation or other release gates. Turning it back on restores new invitation creation.
 - Record changes with Coach identity, timestamp and previous/new value. Test unauthorized toggles, blocked creation/replacement, re-enabling, and preservation of existing parent access.
 
-Team-wide scope and enabled default remain planning assumptions; existing-invitation behavior and 7-day expiry are confirmed. No UI, schema, backend or deployment changes were made for this request.
+Team-wide scope and enabled default were accepted when the user resumed this milestone. Parent invitation UI, schema and backend changes are implemented; later milestone evidence records testing and development synchronization.
 
 ### October 12 follow-up decisions — planning only
 
@@ -70,14 +70,14 @@ Team-wide scope and enabled default remain planning assumptions; existing-invita
 - **Attendance:** future separate clock app/subdomain, common Convex backend. Use account email for initial matching, stable student/account IDs thereafter; do not expose health/finance data to clock-only capabilities. Shared backend means a shared project/deployment contract, not merely both apps using Convex. Separate-origin authentication and aggregated attendance rules remain design work. Do not build clock-in/out UI in Student Status.
 - **Account management and retention:** Coach manages application accounts. Archived records retained for 5 years. Proposed start date is archival, pending user confirmation; deletion scope, backups, downloaded exports and any holds must be defined before implementing purge. Do not treat this business retention decision as a legal sufficiency determination.
 
-Next discussion: unpaid/partly paid event charges, auto-allocation of returned event credits to other charges, and external payout eligibility for fundraising credits; five-year retention start; detailed exception handling and consent wording. Parent linking, withdrawal payment disposition and separate financial-area cash/check refund recording are now decided. All items above are planned and not implemented.
+Next discussion: unpaid/partly paid event charges, auto-allocation of returned event credits to other charges, and external payout eligibility for fundraising credits; five-year retention start; detailed exception handling and consent wording. Parent linking, withdrawal payment disposition and separate financial-area cash/check refund recording are now decided. The parent-linking and invitation-control subset was subsequently authorized and implemented; financial, consent, attendance and retention changes above remain planned.
 
 Implement and validate complete vertical slices before widening menus: (1) role-scoped status/event participation, (2) requirement mutations/readiness, (3) charges/credit/audit, (4) rooming/transport, (5) approval/profile/forms, (6) remaining administration. Shared calculations belong in pure domain modules reused by synthetic fixtures and server code, while authorization belongs exclusively on the server.
 
 ## Production gates
 
 - Final permission and medication authorization wording/version and retention policy.
-- Implement and test the approved good-faith parent invitation, matching-account and relationship-attestation process; finalize exception handling and attestation wording.
+- Complete a real additional-account Google OAuth acceptance rehearsal before production. Parent invitation matching, attestation, exception handling and server authorization are implemented and tested with synthetic identities.
 - Implement and verify the explicit Coach-controlled Travel Lead health/form export grant.
 - Define the future clock app's shared identity/data contract and aggregation rules.
 - Owned development/production Convex and Cloudflare projects and Google OAuth configuration.
@@ -122,3 +122,18 @@ Confirmed: student records must always stay out of Git and GitHub, regardless of
 ### Ongoing GitHub versioning
 
 Confirmed: maintain accurate GitHub versioning as development proceeds. Repository guidance now requires focused checkpoint commits, reviewed staged content, appropriate validation, verified development-branch pushes, current pull requests and documentation, and coordinated Git writes across agents. Development checkpoints use commit IDs; approved releases use intentional semantic versions, immutable tags and release notes. Existing no-production and main/GitHub Pages merge boundaries remain unchanged.
+
+## Parent invitation milestone — completed for synthetic development
+
+User authorized development of the parent invitation workflow with the proposed defaults: one team-wide Coach toggle enabled by default, multiple parents per student, and multiple students per parent. Scope includes seven-day one-time invitations, matching Google identity, affirmative relationship/authority attestation, automatic linking, Coach exception revocation, and scoped frontend/backend verification. Existing valid invitations and links survive disabling new invitations. Linking does not sign travel or medication consent.
+
+Astra owns project/security review; separate Sol agents own backend/tests and frontend. The integrating agent owns documentation, validation, and Git checkpoints. Email delivery is not configured: initial UI must clearly provide a link to share manually and must not claim an email was sent. Only synthetic data is used; production and main/GitHub Pages publication remain unauthorized. Implementation is complete for synthetic development; final verification evidence follows.
+
+
+### Parent invitation delivery evidence
+
+Final integration: lint, strict typechecking, all **19 backend tests**, and Vite build pass. Thirteen browser checks cover student/Coach/parent fixture layouts at 390 and 1440 pixels in light/dark plus the missing-token live landing. Real signed-in Coach Join Requests displays the enabled setting and scoped synthetic student selector. Convex development synchronization with typechecking succeeded on third-bandicoot-18. Astra accepted the synthetic-development milestone after final source review. The existing bundle-size advisory remains.
+
+Implemented Coach resolution for revoked invitations and family links; history lists retain actionable older invitations. Server preview/acceptance use authoritative time; acceptance snapshots exact versioned attestation. OAuth redirect excludes the token, using temporary same-tab storage for the round trip. Child lists exclude prior seasons and update after link revocation. No automatic emails are sent.
+
+Live additional-account Google OAuth invitation acceptance has not been rehearsed; Google remains in Testing mode. Bounded history/access-list limits and complete production readiness remain documented limitations. No real student records, production deployments, main changes or release tags were created. This milestone is published on feature/parent-invitations in a draft PR based on setup/development-app, leaving the setup PR and live demo unchanged.

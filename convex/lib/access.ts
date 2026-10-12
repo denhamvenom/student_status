@@ -61,9 +61,11 @@ export async function ownStudent(ctx: Ctx, user: AppUser): Promise<Doc<"students
 export async function linkedStudents(ctx: Ctx, user: AppUser) {
   if (user.role === "student") return [await ownStudent(ctx, user)];
   if (user.role === "parent") {
+    const season = await ctx.db.query("seasons").withIndex("by_status", q => q.eq("status", "active")).first();
+    if (!season) return [];
     const links = await ctx.db.query("familyLinks").withIndex("by_parentUserId", q => q.eq("parentUserId", user._id)).take(100);
     const students = await Promise.all(links.filter(x => x.active).map(x => ctx.db.get(x.studentId)));
-    return students.filter((x): x is Doc<"students"> => !!x && x.active);
+    return students.filter((x): x is Doc<"students"> => !!x && x.active && x.seasonId === season._id);
   }
   return [];
 }

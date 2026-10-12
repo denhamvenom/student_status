@@ -17,6 +17,7 @@ import type * as http from "../http.js";
 import type * as lib_access from "../lib/access.js";
 import type * as lib_money from "../lib/money.js";
 import type * as lib_readModels from "../lib/readModels.js";
+import type * as parentInvites from "../parentInvites.js";
 import type * as participation from "../participation.js";
 import type * as permissions from "../permissions.js";
 import type * as rooms from "../rooms.js";
@@ -37,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   "lib/access": typeof lib_access;
   "lib/money": typeof lib_money;
   "lib/readModels": typeof lib_readModels;
+  parentInvites: typeof parentInvites;
   participation: typeof participation;
   permissions: typeof permissions;
   rooms: typeof rooms;
