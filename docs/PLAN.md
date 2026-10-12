@@ -113,3 +113,8 @@ Final baseline review confirms next-themes, shadcn Sonner and ephemeral Zustand 
 
 Connected this app to denhamvenom/student_status on branch setup/development-app. Preserved the four existing standalone demo files byte-for-byte under demo/. Added repository guidance, line-ending rules and exclusions for environment secrets, local tooling, dependencies, builds and private exports. Lint, strict typechecking, all 10 tests and build pass; the existing bundle-size advisory remains. Publication is through a draft pull request only: main currently serves GitHub Pages, so merging requires a deliberate hosting transition and separate authorization. No production deployment is authorized. See REPOSITORY.md.
 
+
+### Repository privacy clarification
+
+Confirmed: student records must always stay out of Git and GitHub, regardless of public/private visibility. This covers repository content and history, issues, pull requests, attachments and CI logs/artifacts. Fixtures, tests and documentation must use synthetic student data only. Recorded in AGENTS.md and REPOSITORY.md.
+

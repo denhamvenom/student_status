@@ -23,3 +23,5 @@ Convex agent skills for common tasks can be installed by running
 - `bun run check` validates lint, types, tests, and build. `bun run cloudflare:check` is packaging dry-run only. Google sign-in was verified in development; this is not production readiness.
 - Google OAuth secrets live only in Convex environment settings. Do not print env values, keys, or tokens. Internal bootstrap functions are deliberately tied to the initial development deployment.
 - Full product flows remain incomplete; consult the acceptance matrix and final milestone review before claiming completion.
+
+- Student records must never enter Git or GitHub, whether public or private, including issues, pull requests, attachments and CI logs/artifacts. Use synthetic student data only in fixtures, tests and documentation. Repository visibility does not change this rule.
