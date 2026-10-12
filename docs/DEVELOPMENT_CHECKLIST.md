@@ -47,30 +47,32 @@ This checklist is the plain-language progress guide. The phases below show the r
 
 ## Phase 3 Complete events and financial handling
 
-**Status: Basic event and payment tools exist. Recommended next development milestone.**
+**Status: Withdrawal requests, reviewed internal returns and categorized charge entry are implemented and tested for development. Other finance workflows remain.**
 
 - [x] Connect basic event creation, event views and selected participation actions to the database.
 - [x] Connect basic payment recording and financial summaries.
 - [x] Connect FIRST requirement completion and readiness updates.
 - [ ] Finish event signup approvals, waitlists, deadlines, required-event assignment and requirement editing.
-- [ ] Build the student withdrawal request and Coach or Travel Lead decision screen.
-- [ ] Implement Approve withdrawal and return payment to available funds.
-- [ ] Implement Approve withdrawal and retain non-refundable payment, with a clear note.
-- [ ] Implement partial return of event payments, showing how much was paid and allowing a return up to the full eligible paid amount.
-- [ ] Automatically cancel unpaid extra fees, such as an unpaid lunch fee, when withdrawal is approved.
-- [ ] Implement Deny withdrawal, preserving participation and payment status.
-- [ ] Release the student's event/room place when a withdrawal is approved, while preserving history.
+- [x] Build the student withdrawal request and Coach or Travel Lead decision screen.
+- [x] Implement Approve withdrawal and return payment to available funds.
+- [x] Implement Approve withdrawal and retain non-refundable payment, with a clear note.
+- [x] Implement partial return of event payments, showing how much was paid and allowing a return up to the full eligible paid amount.
+- [x] Automatically cancel unpaid extra fees, such as an unpaid lunch fee, when withdrawal is approved.
+- [x] Implement Deny withdrawal, preserving participation and payment status.
+- [x] Release the student's event/room place when a withdrawal is approved, while preserving history.
 - [ ] Add Record money returned beside payment recording for actual cash/check refunds by authorized financial staff.
 - [ ] Finish charge corrections, cancellations, adjustments, payment priorities and financial history review.
 - [ ] Finish fundraiser creation and allocation of funds to students.
-- [ ] Preserve separate personal-payment and fundraising sources through all allocations and returns.
+- [x] Preserve separate personal-payment and fundraising sources through implemented allocations and withdrawal returns.
+- [ ] Extend source checks to future payouts, transfers and season carryover.
 - [ ] Add fundraising-credit transfers to another student, carryover and recorded transfers into the team account. Do not build team-account management.
-- [ ] Test all financial changes for duplicate submissions, correct balances and role restrictions.
+- [x] Test withdrawal decisions for duplicate submissions, stale approval, correct balances, source tracking and role restrictions.
+- [ ] Test remaining financial workflows as they are implemented.
 
 **Decisions needed before completing this phase:**
 
 - [x] Agree that unpaid main event/travel balances remain owed unless the approver explicitly cancels them; paid extras are included in the eligible return amount.
-- [ ] Build the explicit unpaid main-fee cancellation choice and record the decision.
+- [x] Build the explicit unpaid main-fee cancellation choice and record the decision.
 - [x] Agree that returned funds automatically pay other outstanding charges in their assigned order.
 - [x] Agree to distinguish personal payments from fundraising credits; fundraising credits can transfer to students, carry over or move into the team account. Family cash/check payouts of fundraising credit are not authorized.
 - [ ] Define who can authorize fundraising transfers and any recipient restrictions.
@@ -79,13 +81,14 @@ This checklist is the plain-language progress guide. The phases below show the r
 
 ## Phase 4 Build permission and health forms
 
-**Status: Basic profile fields exist; the consent process is unfinished.**
+**Status: A read-only permission draft is prepared for Coach review; signing remains disabled.**
 
 - [x] Review the old permission slip as a reference.
 - [x] Provide basic profile/health fields for synthetic development testing.
 - [x] Keep real permission signing blocked while wording and the workflow are unfinished.
 - [x] Agree to name Denham Springs High School and FIRST Team 8044, Denham Venom.
 - [x] Agree that permission-form wording includes authorization for minor first aid as appropriate.
+- [x] Prepare a read-only [permission and medication draft](PERMISSION_FORM_DRAFT.md) for Coach review.
 - [ ] Approve the final permission wording and responsibilities.
 - [x] Agree that the Coach approves the final permission wording and medication-administration policy before real signatures.
 - [x] Agree on Pain, Allergy and Cold categories, each with Allow / Contact me first / Do not allow; nothing preselected.
@@ -101,15 +104,16 @@ This checklist is the plain-language progress guide. The phases below show the r
 
 ## Phase 5 Complete travel and event readiness
 
-**Status: Readiness calculations and limited room actions exist; travel operations are incomplete.**
+**Status: Drivers, vehicle assignments and transportation readiness are implemented and tested. Complete room management remains.**
 
 - [x] Separate student requirements, transportation and adult room placement in readiness calculations.
 - [x] Provide limited room-group and assignment-request actions.
 - [ ] Finish student room invitations, acceptance, cancellation and leaving a group.
 - [ ] Finish adult room assignments, moves, finalization and recorded fifth-person exceptions.
-- [ ] Finish driver and vehicle management, passenger seats and event assignments.
-- [ ] Add bus seats, independently traveling students, additional adults and trailer/towing requirements.
-- [ ] Make roster/participation changes update affected rooms and readiness consistently.
+- [x] Finish driver and vehicle management, passenger seats and event assignments.
+- [x] Add bus seats, independently traveling students, additional adults and trailer/towing requirements.
+- [x] Make approved withdrawals release room places and update transportation demand.
+- [ ] Finish consistent room updates for other roster changes and adult room actions.
 - [ ] Complete the Coach/Travel Lead event workspace and restricted Mentor reports.
 - [ ] Rehearse a complete fictional trip from signup through ready-to-travel review.
 
@@ -174,8 +178,8 @@ These are repeating steps for each future milestone, not unfinished tasks in the
 
 ## Current evidence and next step
 
-The latest code milestone passed 19 backend tests, 13 browser checks, typechecking, lint and build. The later real Google-account rehearsal also passed. Astra accepted the invitation milestone for synthetic development. These results do not certify the unfinished product for production.
+The withdrawal/travel/draft milestone passed 32 backend tests, strict typechecking, lint and build. Astra accepted the source for synthetic development. Development synchronization succeeded. Live browser checks verified driver creation, vehicle assignment, trailer/adult settings, independent-travel demand updates, categorized extra-charge entry and credit allocation, the withdrawal queue, and the read-only permission draft. Full multi-account withdrawal rehearsal and complete trip rehearsal remain future checks; the earlier multi-account parent invitation test remains valid.
 
-**Recommended next step:** Implement the now-defined withdrawal and internal-return workflow. Draft permission wording for Coach approval and independent event/travel tasks can proceed in parallel. Fundraising-transfer permissions must be settled before enabling those separate actions. See [confirmed finance and consent decisions](FINANCE_AND_CONSENT_DECISIONS.md).
+**Next step:** Review the [permission draft](PERMISSION_FORM_DRAFT.md), complete event/signup and room-management workflows, then rehearse a full fictional trip. Cash/check payout recording, fundraising transfers, real consent/signing and health-export permissions remain unfinished. See [confirmed finance and consent decisions](FINANCE_AND_CONSENT_DECISIONS.md).
 
-For technical detail, see [the implementation plan](PLAN.md), [review evidence](REVIEW.md), and [parent invitation workflow](PARENT_INVITATIONS.md). GitHub currently has [setup PR 1](https://github.com/denhamvenom/student_status/pull/1) and [parent invitations PR 2](https://github.com/denhamvenom/student_status/pull/2), both drafts; this checklist does not authorize their merge.
+For technical detail, see [the implementation plan](PLAN.md) and [review evidence](REVIEW.md). This milestone is on `feature/withdrawals-and-travel`, stacked on the parent-invitation branch. Published in [draft PR 3](https://github.com/denhamvenom/student_status/pull/3); implementation checkpoint `bd589ba`. All PRs remain drafts; no merge or production deployment is authorized.

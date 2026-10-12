@@ -123,7 +123,7 @@ describe("server boundaries", () => {
     const f = await fixture();
     await f.student.mutation(api.participation.signUp, { eventId: f.ids.event });
     await f.t.run(ctx => ctx.db.patch(f.ids.event, { archived: true }));
-    await expect(f.student.mutation(api.participation.withdraw, { eventId: f.ids.event })).rejects.toThrow("unavailable");
+    await expect(f.student.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.event, idempotencyKey: "archived-request-test" })).rejects.toThrow("unavailable");
     const row = await f.t.run(ctx => ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", f.ids.event).eq("studentId", f.ids.student)).unique());
     expect(row?.status).toBe("pending");
   });

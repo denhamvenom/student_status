@@ -1,6 +1,7 @@
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx, MutationCtx } from "../_generated/server";
 import { privateStudent, publicStudent } from "./access";
+import { effectiveChargeCents, sourceBalances } from "./money";
 
 type Ctx = QueryCtx | MutationCtx;
 
@@ -8,10 +9,12 @@ export async function financeFor(ctx: Ctx, studentId: Id<"students">) {
   const charges = await ctx.db.query("charges").withIndex("by_studentId_and_priority", q => q.eq("studentId", studentId)).take(501);
   const entries = await ctx.db.query("ledgerEntries").withIndex("by_studentId_and_recordedAt", q => q.eq("studentId", studentId)).order("desc").take(501);
   if (charges.length > 500 || entries.length > 500) throw new Error("Financial record limit reached; contact an administrator before continuing.");
-  const chargedCents = charges.reduce((sum, x) => sum + x.amountCents, 0);
+  const chargedCents = charges.reduce((sum, x) => sum + effectiveChargeCents(x), 0);
   const appliedCents = charges.reduce((sum, x) => sum + x.appliedCents, 0);
-  const creditCents = entries.filter(x => x.kind === "payment" || x.kind === "fundraiser").reduce((sum, x) => sum + x.amountCents, 0);
-  return { charges, entries, summary: { chargedCents, paidCents: appliedCents, dueCents: chargedCents - appliedCents, travelBalanceCents: Math.max(0, creditCents - appliedCents) } };
+  const sources = sourceBalances(entries);
+  const personalAvailableCents = sources.filter(x => x.entry.kind === "payment").reduce((sum, x) => sum + x.available, 0);
+  const fundraisingAvailableCents = sources.filter(x => x.entry.kind === "fundraiser").reduce((sum, x) => sum + x.available, 0);
+  return { charges, entries, summary: { chargedCents, paidCents: appliedCents, dueCents: chargedCents - appliedCents, travelBalanceCents: personalAvailableCents + fundraisingAvailableCents, personalAvailableCents, fundraisingAvailableCents } };
 }
 
 export async function permissionAccepted(ctx: Ctx, studentId: Id<"students">, eventId: Id<"events">) {
@@ -29,7 +32,7 @@ export async function studentReadiness(ctx: Ctx, event: Doc<"events">, student: 
   const participant = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
   if (participant?.status !== "confirmed") return { state: "notApplicable" as const, open, participation: participant?.status ?? null };
   const eventCharges = await ctx.db.query("charges").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(100);
-  if (eventCharges.some(x => x.appliedCents < x.amountCents)) open.push("Required payment");
+  if (eventCharges.some(x => x.appliedCents < x.amountCents - (x.cancelledCents ?? 0))) open.push("Required payment");
   if (event.permissionRequired && !(await permissionAccepted(ctx, student._id, event._id))) open.push("Permission accepted");
   const completions = await ctx.db.query("requirementCompletions").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(100);
   if (event.firstRequired && !completions.some(x => x.key === "first")) open.push("FIRST registration");

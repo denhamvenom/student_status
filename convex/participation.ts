@@ -20,6 +20,8 @@ export const signUp = mutation({
     if (event.signupClosesAt !== undefined && Date.now() > event.signupClosesAt) throw new Error("Signup has closed.");
     const prior = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
     if (prior && prior.status !== "withdrawn") return prior.status;
+    const withdrawal = await ctx.db.query("withdrawalRequests").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(100);
+    if (withdrawal.some(x => x.status === "approved")) throw new Error("A Coach must review reenrollment after an approved withdrawal.");
     const full = event.capacity !== undefined && await reserved(ctx, event._id) >= event.capacity;
     const status = full ? "waitlist" : event.signupMode === "approval" ? "pending" : "confirmed";
     const now = Date.now();
@@ -33,21 +35,8 @@ export const signUp = mutation({
 
 export const withdraw = mutation({
   args: { eventId: v.id("events") }, returns: v.null(),
-  handler: async (ctx, args) => {
-    const user = await viewer(ctx); const student = await ownStudent(ctx, user);
-    const event = await ctx.db.get(args.eventId); const season = await activeSeason(ctx);
-    if (!event || event.seasonId !== season._id || student.seasonId !== season._id || event.archived || !event.allowWithdrawal || event.signupMode === "assigned" || event.signupClosesAt !== undefined && Date.now() > event.signupClosesAt) throw new Error("Withdrawal is unavailable.");
-    const prior = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
-    if (!prior || prior.status === "withdrawn") return null;
-    if (prior.status === "confirmed") {
-      const charges = await ctx.db.query("charges").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(100);
-      if (charges.length) throw new Error("A coach must reconcile event charges before withdrawal.");
-    }
-    await ctx.db.patch(prior._id, { status: "withdrawn", updatedAt: Date.now() });
-    const member = await ctx.db.query("roomMemberships").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
-    if (member) { await ctx.db.delete(member._id); await ctx.db.patch(member.groupId, { needsReview: true }); }
-    await audit(ctx, user, "participants", prior._id, "withdraw", prior.status, "withdrawn");
-    return null;
+  handler: async () => {
+    throw new Error("Submit a withdrawal request for Coach or Travel Lead review.");
   },
 });
 
@@ -61,23 +50,20 @@ export const setParticipation = mutation({
     if (event.signupMode === "assigned" && user.role !== "coach") throw new Error("Required-event roster is coach only.");
     if (event.signupMode === "assigned" && (args.status === "pending" || args.status === "waitlist")) throw new Error("Required events cannot have pending or waitlisted participants.");
     const prior = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
+    if (args.status === "withdrawn") throw new Error("Use a reviewed withdrawal decision to remove participation.");
     if (prior?.status === args.status) return null;
+    if (args.status === "confirmed" || args.status === "pending" || args.status === "waitlist") {
+      const withdrawals = await ctx.db.query("withdrawalRequests").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(100);
+      if (withdrawals.some(x => x.status === "approved")) throw new Error("A Coach must review reenrollment after an approved withdrawal.");
+    }
     if (prior?.status === "confirmed" && (args.status === "pending" || args.status === "waitlist")) throw new Error("Reconcile confirmed participation before changing its status.");
     const takesSeat = args.status === "confirmed" || args.status === "pending";
     const alreadyReserved = prior?.status === "confirmed" || prior?.status === "pending";
     if (takesSeat && !alreadyReserved && event.capacity !== undefined && await reserved(ctx, event._id) >= event.capacity) throw new Error("Event capacity is full.");
-    if (args.status === "withdrawn" && prior?.status === "confirmed") {
-      const charges = await ctx.db.query("charges").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(100);
-      if (charges.length) throw new Error("Reconcile event charges before removing a confirmed student.");
-    }
     const now = Date.now();
     if (prior) await ctx.db.patch(prior._id, { status: args.status, updatedAt: now });
     else await ctx.db.insert("participants", { eventId: event._id, studentId: student._id, status: args.status, createdAt: now, updatedAt: now });
     if (args.status === "confirmed" && event.feeCents > 0) await addCharge(ctx, user, student._id, event.name, event.feeCents, event.startsAt, `eventFee:${event._id}:${student._id}`, event._id);
-    if (args.status === "withdrawn") {
-      const member = await ctx.db.query("roomMemberships").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
-      if (member) { await ctx.db.delete(member._id); await ctx.db.patch(member.groupId, { needsReview: true }); }
-    }
     await audit(ctx, user, "participants", `${event._id}:${student._id}`, "setStatus", prior?.status ?? null, args.status, args.reason);
     return null;
   },

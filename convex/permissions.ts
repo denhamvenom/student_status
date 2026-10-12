@@ -18,23 +18,11 @@ export const submit = mutation({
   handler: async (ctx, args) => {
     const user = await viewer(ctx);
     if (user.role !== "parent") throw new Error("Only a linked parent may sign.");
-    const student = await studentAccess(ctx, user, args.studentId); const season = await activeSeason(ctx);
-    if (student.seasonId !== season._id) throw new Error("Archived forms cannot be signed.");
-    if (season.permissionVersion.toLowerCase().includes("draft") || season.permissionVersion.toLowerCase().includes("placeholder")) throw new Error("Permission wording is still draft. Signing is unavailable.");
-    if (args.typedName.trim().toLocaleLowerCase() !== user.name.trim().toLocaleLowerCase()) throw new Error("Typed signature must match your verified account name.");
-    if (args.answersJson.length > 20000) throw new Error("Submission is too large.");
-    let answers: unknown;
-    try { answers = JSON.parse(args.answersJson); } catch { throw new Error("Invalid form answers."); }
-    if (!answers || typeof answers !== "object" || Array.isArray(answers)) throw new Error("Invalid form answers.");
-    const eventIds = [...new Set(args.eventIds)];
-    for (const eventId of eventIds) {
-      const event = await ctx.db.get(eventId);
-      if (!event || event.seasonId !== season._id) throw new Error("Selected event not found.");
-    }
-    const snapshot = JSON.stringify({ answers, student: { legalName: student.legalName, emergencyName: student.emergencyName, emergencyPhone: student.emergencyPhone, allergies: student.allergies, medications: student.medications, otcAuthorization: student.otcAuthorization }, wordingVersion: season.permissionVersion });
-    const id = await ctx.db.insert("permissionSubmissions", { studentId: student._id, seasonId: season._id, signedBy: user._id, typedName: args.typedName.trim(), wordingVersion: season.permissionVersion, eventIds, answersJson: snapshot, signedAt: Date.now() });
-    await audit(ctx, user, "permissionSubmissions", id, "submit", null, { studentId: student._id, eventIds, wordingVersion: season.permissionVersion });
-    return id;
+    await studentAccess(ctx, user, args.studentId);
+    await activeSeason(ctx);
+    // A season label alone cannot authorize live consent. Reopen this endpoint
+    // only with approved wording, versioned answers, and a tested signing flow.
+    throw new Error("Permission wording is still draft. Signing is unavailable.");
   },
 });
 
