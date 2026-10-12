@@ -79,4 +79,4 @@ Astra coordinated shared contracts and reviewed the implementation; Sol owners i
 
 Limits: no full multi-account withdrawal browser rehearsal in this milestone; no full room management, cash/check payout UI, fundraiser transfer authority, real signatures, health export grant or production readiness. Historical allocations with ambiguous source stop safely rather than inventing financial provenance. Approved-withdrawal reenrollment needs a future explicit fee review. The preexisting Travel Lead permission-snapshot access path must be hardened with the final health-access/export policy before live records.
 
-Publication: pending verified push and draft PR; integration owner updates this line before completion.
+Publication: implementation checkpoint `bd589ba` pushed to `feature/withdrawals-and-travel`; [draft PR 3](https://github.com/denhamvenom/student_status/pull/3) targets `feature/parent-invitations`. Main and production remain unchanged.

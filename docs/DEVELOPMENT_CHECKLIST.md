@@ -182,4 +182,4 @@ The withdrawal/travel/draft milestone passed 32 backend tests, strict typechecki
 
 **Next step:** Review the [permission draft](PERMISSION_FORM_DRAFT.md), complete event/signup and room-management workflows, then rehearse a full fictional trip. Cash/check payout recording, fundraising transfers, real consent/signing and health-export permissions remain unfinished. See [confirmed finance and consent decisions](FINANCE_AND_CONSENT_DECISIONS.md).
 
-For technical detail, see [the implementation plan](PLAN.md) and [review evidence](REVIEW.md). This milestone is on `feature/withdrawals-and-travel`, stacked on the parent-invitation branch. GitHub publication is recorded in the milestone review after verification. All PRs remain drafts; no merge or production deployment is authorized.
+For technical detail, see [the implementation plan](PLAN.md) and [review evidence](REVIEW.md). This milestone is on `feature/withdrawals-and-travel`, stacked on the parent-invitation branch. Published in [draft PR 3](https://github.com/denhamvenom/student_status/pull/3); implementation checkpoint `bd589ba`. All PRs remain drafts; no merge or production deployment is authorized.
