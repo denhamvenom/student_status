@@ -400,3 +400,13 @@ Progress estimates toward visual-approval readiness (scope estimates, not checke
 October 13 follow-up: missing-account finance preparation fix passed eight backend tests, UI preparation guards passed typecheck/lint, and development sync succeeded10:21:13. Team overview now includes genuine Gross Raised and incoming transfers; pending fundraiser source reversal progress is explicit. Seven focused UI tests pass. Live Coach rebuild verification and follow-up publication remain pending.
 
 October 13 live financial rebuild now verified: Coach can open Finances, start report rebuild and view loaded synthetic totals/history. Unknown legacy gross proceeds remain explicitly unavailable. Remaining: actual fundraiser posting/held-retry browser journeys and phone/desktop light/dark comparison; administration/season/retention work remains open.
+
+### October 13 progress report during parallel administration work
+
+- [x] Publish and remotely verify financial recovery checkpoint `f9282db`.
+- [x] Rehearse fictional fundraiser posting in the Coach browser: $10.01 gross produces $2.51 team proceeds and $7.50 student travel credit; one committed, zero held, completed history visible.
+- [x] Identify and locally fix the fundraiser posting form's missing explicit submit type; scoped lint passes and the posting journey succeeds. This fix is not yet a published checkpoint; retry behavior remains to be rehearsed.
+- [ ] Complete parallel charge correction/cancellation and fundraising-to-team implementation, focused tests, Astra review and integration. Current source changes are work in progress, not synchronized or accepted.
+- [ ] Finish shared fee priorities, season transition/carryover and retention preview/holds, then remaining live role and visual evidence.
+
+Checklist-linked estimates remain G1 frontend 85%, G2 visual evidence 55%, G3 Whole Team 90%, G4 dashboards 85%, G5 accounts/permissions 80%, G6 administration 55%, G7 final verification 50%: approximately 72% toward readiness for user visual approval. These are scope estimates, not checkbox counts or production readiness. All seven broad outcomes remain open. Ordinary Mentor verification still requires the authorized test account's onboarding/sign-in; real signing, production, main merge and automatic deletion remain gated.
