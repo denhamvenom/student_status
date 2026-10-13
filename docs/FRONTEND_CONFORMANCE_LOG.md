@@ -168,3 +168,6 @@ Current checkout frontend restarted after cached-page connection failure. Coach 
 
 ## October 13 — saved season confirmation wording
 Live Coach confirmation showed all six saved roster decisions and explicit debt/source choices. Replaced raw choice enums with shared readable labels; root observed Returning / Departing, Keep account active, Carry forward and Hold on historical record. Scoped lint and typecheck passed; Astra found no blockers. This is live wording evidence, not full prototype visual acceptance. A 390px clipped CDP capture was blank and rejected; normal viewport restored. Synthetic activation awaits explicit approval after automatic review blocked it; no season or balance transition occurred.
+
+### October 13 — Coach roster lifecycle integration
+Coach-only active/archived listing and reasoned archive/reactivate dialogs reuse shared Card, Dialog, Input, Button, table and copy conventions. Existing roster filters/subteam/Travel Team controls remain. Scoped lint/types and Astra review passed. Live archive and reactivation succeeded, including automatic later membership in an upcoming synthetic Whole Team event. Desktop dark behavior observed; representative prototype/phone comparisons remain pending, not inferred from source. Historical attendance correction saved with original evidence retained. Screenshots remain private.

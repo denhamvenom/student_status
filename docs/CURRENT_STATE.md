@@ -4,8 +4,8 @@ Updated October 13, 2026. Follow COMPLETION_WORKFLOW.md: finish usable workflows
 
 ## Workspace and boundaries
 
-- student-status-readiness-design; feature/student-status-completion; draft PR10. Latest published checkpoint `baca547` is pushed and remote verified. Root owns Git, publication, generated files and development synchronization.
-- Development only: daniel-eiland / denham-venom-student-status / dev:third-bandicoot-18. Latest sync completed 15:20:40 for the reviewed post-activation readiness fixes. Root's focused two-case transition check passed; build passed strict types and Vite. Astra cleared both fixes. These fixes are synchronized; the next publication remains root-owned.
+- student-status-readiness-design; feature/student-status-completion; draft PR10. Latest published checkpoint `f156744` is pushed and remote verified. Root owns Git, publication, generated files and development synchronization.
+- Development only: daniel-eiland / denham-venom-student-status / dev:third-bandicoot-18. Latest sync completed 15:20:40 for the reviewed post-activation readiness fixes. Root's focused two-case transition check passed; build passed strict types and Vite. Astra cleared both fixes. These fixes are synchronized and published; root owns the next evidence checkpoint.
 - All data is synthetic. Student records, secrets, screenshots and downloads stay outside Git. No production/main merge, real signing or deletion is authorized.
 
 ## Current live season and completed evidence
@@ -21,7 +21,7 @@ Updated October 13, 2026. Follow COMPLETION_WORKFLOW.md: finish usable workflows
 - Prior-season Finance table/history/payment/export evidence remains valid: fictional one-cent payment reconciled Paid 1.00→1.01 and Due 9.00→8.99; four CSV charge rows reconcile at effective 4000 / personal applied 3101 / fundraising applied 0 / due 899 cents. Manifest retains all six fictional members, including zero-charge members. Selected-scope preparation matched; final scoped download was interrupted by HMR. Do not repeat all-active export proof.
 - Family-link maintenance completed both passes with zero unresolved links. Prior-season Parent attendance loaded phase/Build/Outreach cards after four-session coverage rebuild, updated 2:56 PM, without updating/retry. Switching the two existing fictional children changed session totals correctly (one-minute rehearsals versus zero). Current-season Parent child context survived activation. This is scoped live evidence, not full G4 or visual acceptance.
 - Synthetic signing, Coach acceptance, correction/resubmission, re-signing, paper recording/acceptance and manifest versus health export retain accepted live evidence; do not repeat their happy paths.
-- Remaining scoped journeys: ordinary Mentor sign-in/profile, Student required setup and locked room correction, archive/reactivation/rearchive, adult invitation and independent Travel finance/health grants with revocation, no-linked Parent, Whole Team later-join/reactivation, payment import/receipt correction, supported historical correction actions and representative visual comparisons. Root coordinates the next concrete journey and publication. No broad test matrix or goal closure is implied.
+- Remaining scoped journeys: ordinary Mentor sign-in/profile, Student required setup and locked room correction, archive/reactivation/rearchive, adult invitation and independent Travel finance/health grants with revocation, no-linked Parent, Whole Team later-join/reactivation, supported historical attendance/charge correction actions and representative visual comparisons. Root coordinates the next concrete journey and publication. No broad test matrix or goal closure is implied.
 
 ## Decisions and browser handoff
 
@@ -32,3 +32,9 @@ FIRST kickoff starts build season at Chicago midnight on the verified date. Titl
 Coach Chrome3 tab976035137; Parent Chrome4 tab976035127. Frontend session92286 serves127.0.0.1:5173. HMR may stale AX indexes; use fresh semantic DOM locators. Browser evidence stays outside Git. A clipped blank phone capture was rejected; no phone visual completion is claimed.
 
 Latest historical rehearsal: Coach opened timed archived correction access, saved a fictional historical subteam correction, and returned to read-only. Read-only database verification proved the current-season profile unchanged and historical correction present. Current historical attendance/financial correction journeys remain open.
+
+Latest G6 evidence: CSV import and receipt correction completed live; original receipt retained, separate correction recorded, exact-cent totals restored and no payout. Selected-account manifest prepared1member, but download timeout/no verified file keeps download evidence open. Private screenshot import-correction-complete.png. Latest published source is f156744 (remote verified); next docs checkpoint pending. Avoid further docs edits during live form actions because Vite refresh can reset transient forms.
+
+Historical attendance rehearsal now completed through Coach UI: original interval/earlier correction preserved, new audited replacement saved, and access returned to read-only. Private evidence: historical-attendance-saved.png. Missing current roster archive/reactivate UI is being implemented by Sol using the existing backend contract; Astra will review before live lifecycle rehearsal.
+
+Roster controls are now implemented and Astra-cleared; scoped lint/types pass. Live archive/reactivate and upcoming Whole Team later-enrollment succeeded (event membership four to five, restored member once). All five current profiles are active again. Private screenshot whole-team-reactivation.png. No backend changes or new deployment required. Remaining account/retention/role journeys and visual comparisons stay open.

@@ -2,8 +2,7 @@
 
 ## Current completion checkpoint — October 13
 
-Follow CURRENT_STATE.md and GOAL_ACCEPTANCE.md for active G1-G7 scope. The six-step season transition is published as214cdfb and synchronized to development. The next local integrated batch covers payment import/receipt correction, kickoff attendance phases, Outreach classification from case-insensitive event titles, and historical attendance/roster corrections. Integrated lint, types,324tests and build pass; Astra review cleared and development synchronization completed14:43:39; publication and live evidence are next. Historical financial corrections, remaining live role evidence and representative prototype comparisons remain required. Production, real signing and automatic deletion remain separately gated.
-
+Follow CURRENT_STATE.md and GOAL_ACCEPTANCE.md for active G1-G7 scope. Published source checkpoint f156744 is synchronized to development. The synthetic season transition, historical roster and attendance corrections, CSV payment import and receipt correction have completed scoped live rehearsals. Existing integrated checks and Astra review remain valid for their recorded checkpoints. The next implementation closes the missing Coach roster archive/reactivate controls using the existing backend contract, followed by combined account-lifecycle and upcoming Whole Team enrollment rehearsal. Historical financial correction, remaining role journeys, selected-scope download evidence and representative prototype comparisons remain open. Production, real signing and automatic deletion remain separately gated.
 
 ## Scope and evidence
 
