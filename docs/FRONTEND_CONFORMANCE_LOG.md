@@ -12,7 +12,7 @@ Owners: integration owner — shared shell, tokens, LiveApp screens, browser evi
 - [x] Travel, withdrawals, attendance and room presentation
 - [x] Parent access, permission draft and finance editor
 - [ ] Role/viewport/theme comparisons, source checks and final review
-- [ ] Reviewed Git checkpoint and updated checklist
+- [x] Reviewed Git checkpoint and updated checklist
 
 No backend, generated API, domain logic, role changes, real consent, Timeclock or production changes. Missing workflows remain explicit dependencies rather than nonfunctional imitations. Verification cells and limits will be recorded below as completed.
 
@@ -62,3 +62,5 @@ Parent invitation and permission-draft wording now uses `family-copy.ts`; Dashbo
 ## Git checkpoint
 
 Local reviewed implementation commits: `2cdcd34` shared controls; `db738e1` operations cards; `b4ef144` role shell/reference labels; `24aa091` family/event views and shared copy. Final lint, typecheck and build after copy extraction pass; bundle advisory is approximately 796 kB minified. Astra accepted the final copy-only review. Publication is recorded separately after remote verification.
+
+Published and verified: `2bb7eee` on `feature/student-status-readiness-design`, draft [PR9](https://github.com/denhamvenom/student_status/pull/9), still based on the audit-report branch. Remote PR head matched that commit. Main was not merged; no production deployment occurred. This publication note is a subsequent documentation-only checkpoint.

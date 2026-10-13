@@ -242,7 +242,7 @@ Timeclock parallel handoff: frontend owner reports Astra review, 34 synthetic in
 - [ ] Implement approved shared labels, tokens/components and screen corrections; preserve backend and access rules.
 - [ ] Recompare corrected screens, document intentional differences and obtain final visual review.
 - [x] Append design-conformance instructions to existing AGENTS.md.
-- [ ] Publish and verify the broader reviewed frontend checkpoint.
+- [x] Publish and verify the broader reviewed frontend checkpoint `2bb7eee` in draft PR9.
 
 No backend work, Timeclock changes, real consent, production deployment or main merge is included in this design task. Newer features without an exact prototype screen inherit its typography, colors, spacing, layout patterns and component states; do not invent a separate visual style.
 
@@ -261,7 +261,7 @@ Representative Readiness checkpoint `ed69bbb` is published and verified in draft
 
 - [x] Coach approved representative Readiness and authorized frontend conformance across the app.
 - [ ] Complete existing-data presentation and verify role/viewport/theme coverage.
-- [ ] Keep [the work log](FRONTEND_CONFORMANCE_LOG.md), evidence limitations and Git checkpoints current.
+- [x] Update [the work log](FRONTEND_CONFORMANCE_LOG.md), evidence limitations and Git checkpoints for this implementation pass.
 
 Backend-dependent gaps remain separately deferred; no production action is authorized.
 
