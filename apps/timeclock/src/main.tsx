@@ -20,6 +20,7 @@ const newKey = () => crypto.randomUUID();
 const time = (n: number | null) => n === null ? "To be set" : new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" }).format(n);
 const dateTime = (n: number | null) => n === null ? "Never" : new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short", timeZone: "America/Chicago" }).format(n);
 const errors: Record<string, string> = {
+  SEASON_TRANSITION: "The season is being updated. New events, clock-ins, transfers, and extensions are paused. You can still clock students out. Try again after the Coach finishes the season change.",
   EXPIRED: "This event has ended. Choose another event.", FINISHED: "This event has finished.", UNAVAILABLE: "This event is unavailable.",
   STALE_SESSION: "The event changed. Review its current status and try again.", STALE_STUDENT: "A student's clock status changed. Review the roster and try again.", STALE_CONSOLE: "Another tab changed this console. Review its current event and try again.",
   TRANSFER_REQUIRED: "A student is clocked into another event. Review and confirm a transfer.", TRANSFER_CONFLICT: "A selected student is already in this event.", ALREADY_IN: "A selected student is already clocked in.", NOT_IN_EVENT: "A selected student is not in this event.",
