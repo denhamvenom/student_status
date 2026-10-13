@@ -8,7 +8,7 @@ Updated October 13, 2026
 - [x] Agree: reactivation followed by another archive restarts five-year retention from the latest archive date; automatic deletion remains unauthorized.
 - [x] Implement and source-review the latest-archive clock with before/after audit evidence; 13 focused account/profile tests pass. Development synchronization and live checks remain pending.
 - [ ] Complete the ordinary Mentor-only Google rehearsal using the newly supplied owner-controlled test account. Identity and role assignment remain to be verified; account details stay outside this checklist.
-- [ ] Finish materialized financial balances, bounded allocation jobs and fundraiser posting. Additive foundation schema is local and typechecked; the full feature is still in implementation and has not been synchronized or published.
+- [x] Implement, review and publish materialized financial balances, bounded allocation jobs and fundraiser posting; development sync and fictional posting/rebuild are verified. Remaining financial workflows and live cases are listed below.
 
 The app has a working foundation, Google sign-in, and a tested parent-invitation process. Several other features have working pieces, but the full app is not ready for real student records or public launch.
 
@@ -92,7 +92,7 @@ This checklist is the plain-language progress guide. The phases below show the r
 
 ## Phase 4 Build permission and health forms
 
-**Status: A read-only permission draft is prepared for Coach review; signing remains disabled.**
+**Status: Synthetic parent signing, Coach acceptance and correction/resubmission are verified in development. Real signing remains disabled pending final wording approval; re-signing, paper and export rehearsal remain.**
 
 - [x] Review the old permission slip as a reference.
 - [x] Provide basic profile/health fields for synthetic development testing.
@@ -104,8 +104,8 @@ This checklist is the plain-language progress guide. The phases below show the r
 - [x] Agree that the Coach approves the final permission wording and medication-administration policy before real signatures.
 - [x] Agree on Pain, Allergy and Cold categories, each with Allow / Contact me first / Do not allow; nothing preselected.
 - [ ] Define which products/ingredients and exceptions each medication category covers.
-- [ ] Build the parent form and signature process, separate from account linking.
-- [ ] Save an unchangeable copy of the exact wording, covered events and information that was signed.
+- [x] Build and rehearse the synthetic parent form and signature process, separate from account linking. Real signing remains gated.
+- [x] Save and verify an immutable synthetic submission snapshot of wording, covered events and signed information, retaining the original through correction/resubmission.
 - [ ] Build correction requests, re-signing and Coach recording of paper forms.
 - [ ] Add Coach export of permission/health packets.
 - [ ] Add the separate Coach-controlled permission allowing a Travel Lead to export those packets.
@@ -130,7 +130,7 @@ This checklist is the plain-language progress guide. The phases below show the r
 
 ## Phase 6 Connect attendance
 
-**Status: Shared Timeclock backend implemented and reviewed in development. Separate frontend scaffold is ready; the complete clock interface and reporting screens remain.**
+**Status: Shared Timeclock backend and separate frontend are implemented and integrated in development. Family attendance loads; controlled Group-mode concurrency, physical-device and remaining reporting/visual checks remain.**
 
 - [x] Approve the shared policies and keep Timeclock separate from travel fees/participation.
 - [x] Prepare an independent Timeclock workspace on port 5174, with one shared Convex backend.
@@ -153,7 +153,7 @@ This checklist is the plain-language progress guide. The phases below show the r
 - [ ] Rehearse the complete multi-device interface with synthetic students.
 - [ ] Plan historical Sheets import and expand bounded queries if team scale requires it.
 
-See [the concrete frontend handoff](TIMECLOCK_BACKEND_HANDOFF.md). Current Student Status attendance displays remain legacy evidence until its reporting UI is connected. No production release is authorized.
+See [the concrete frontend handoff](TIMECLOCK_BACKEND_HANDOFF.md). Student Status family attendance now loads aggregate-backed verified totals with legacy evidence distinguished; remaining rehearsal and visual comparisons are still open. No production release is authorized.
 
 ## Phase 7 Finish administration and reporting
 
@@ -421,3 +421,26 @@ October 13 continuation: fundraiser submit fix published and remotely verified a
 - [x] Pass full check216/216 across38files, lint/types/build; final affected backend8 and UI9 tests plus scoped lint pass. Timeclock lint/types/build passes.
 - [x] Synchronize reviewed source to dev:third-bandicoot-18 at10:54:14. No production deployment.
 - [ ] Complete new charge/team-transfer live journeys and prototype visual comparisons. Shared fee priorities/bulk fees, historical correction mode, season transition/carryover and retention controls remain open; no G1–G7 completion follows from this slice.
+
+### October 13 checklist-linked progress checkpoint
+
+Current estimates toward readiness for user visual approval: G1 frontend 85%, G2 visual evidence 55%, G3 Whole Team 90%, G4 dashboards/attendance 90%, G5 accounts/permissions 80%, G6 administration 65%, G7 final verification 55%; approximately 74% overall. These are scope estimates, not checkbox arithmetic or production readiness. Earlier estimates are historical; all seven outcomes remain open.
+
+- [x] Publish reviewed charge/team-transfer checkpoint `1c55fc5` to the development branch (remote verification recorded at publication).
+- [x] Verify a fictional fundraising-to-team transfer live: available credit decreased by the recorded amount, original gross proceeds and earned travel share stayed unchanged, and the operation completed with readable history. This records a transfer; it does not execute a bank payment.
+- [x] Verify live charge correction/cancellation and the held fundraising-reduction preview. Durable failed-job retry and remaining negative journeys stay open.
+- [ ] Finish shared season fee priorities and bulk fees. Sol backend and UI implementation continue in parallel, with Astra review required before integration/synchronization.
+- [ ] Finish season carryover, retention controls, remaining account/permission journeys, ordinary Mentor access and the visual matrix.
+
+Last integrated validation remains 216 tests across 38 files plus lint, types and build at the reviewed charge/team checkpoint; newly developing shared-fee work is not covered by that result. No production deployment or main merge.
+
+October 13 live policy check: a fictional attempt to reduce a previously transferred fundraising award was held at preview. The UI explained that original credit was spent/transferred, disabled posting and retained committed gross/team/travel amounts. This verifies the preventive preview; no held posting job was created and worker retry is not claimed. The draft returned to the committed amount afterward. Private evidence remains outside Git.
+
+### October 13 live charge correction and prototype checkpoint
+
+- [x] Rehearse a fictional fully funded charge reduction and cancellation: original $2.00 preserved, adjustment -$0.75, cancellation $1.25, final effective/applied/due all zero; $2.00 total returned to the same fundraising source and both reasons retained.
+- [x] Verify transferred fundraising-credit reduction is held at preview, with posting disabled and committed totals unchanged. This does not claim worker retry coverage.
+- [ ] Align Coach Finance with the freshly rendered prototype: primary team-wide student table, grouped record/add/bulk/import/export actions, shared fee order and recent changes. Current aggregate cards and one-student selection are not a substitute for that layout. Source-separated row/report/import contracts remain required.
+- [ ] Complete the independently assigned non-destructive retention review and hold workflow; no deletion functionality is authorized.
+
+Overall scope estimate remains approximately 74%; the new successful financial rehearsals do not close the remaining visual/administration scope. Timeclock concurrent Group rehearsal awaits its existing authorized operator sign-in; physical-device testing still needs a reachable approved origin. Sol agents continue shared-fee backend, shared-fee UI and retention modules with separate ownership. Last full integrated check remains the 216-test published checkpoint, not a claim about unfinished new source.
