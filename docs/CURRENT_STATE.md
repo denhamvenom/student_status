@@ -9,9 +9,9 @@ Updated October 13, 2026. Verify the actual Git/worktree state before using this
 
 ## Latest decision
 
-Whole Team means every active team member. New members joining after event creation are automatically included in that event too. Confirmed October 13; supersedes the proposed creation-time snapshot/manual-add recommendation. User confirmed upcoming events only for later joiners. Whole Team implementation/UI is local, not yet reviewed for scale or synced; do not treat it as complete.
+Whole Team means every active team member. New members joining after event creation are automatically included in that event too. Confirmed October 13; supersedes the proposed creation-time snapshot/manual-add recommendation. User confirmed upcoming events only for later joiners. Whole Team implementation/UI is local and source-reviewed with durable provisioning and focused synthetic tests; live development rehearsal and visual evidence remain pending.
 
-Before implementing, inspect existing event lifecycle, membership, charging and participation contracts. Surface unresolved cases such as past/closed events or reactivation rather than inventing exclusions, fees or withdrawal reversals.
+Before implementing, inspect existing event lifecycle, membership, charging and participation contracts. Apply upcoming-only additions and preserve existing participation/withdrawal decisions during reactivation.
 
 ## Context map
 
@@ -27,14 +27,16 @@ Before implementing, inspect existing event lifecycle, membership, charging and 
 
 Frontend: modal/section/invitation presentation implemented; remaining role/state/viewport checks in VISUAL_CHECKS.md. Shared live-app copy extraction is recorded complete; flag specific residual literals during future checks rather than reopening wholesale migration. Backend dependencies: Whole Team, aggregate finance/roster, family Attendance, missing readiness/form/admin contracts. Inspect existing contracts before assuming each gap requires new schema.
 
-Prior October13 full check100/101. Fixed-date Timeclock test now has a scoped clock spy and passes isolated test; new full suite pending. See conformance log for exact evidence; do not claim the suite is green. Visual coverage remains partial/scaled, not whole-app pixel parity. Keep screenshots and account-specific evidence outside Git.
+October13 final serial backend suite passed126/126 across22files. Full lint, typecheck and Vite build passed. The old100/101 failure is resolved by the scoped clock fixture fix. Astra accepted this incremental source checkpoint; live and visual evidence remain separate. Visual coverage remains partial/scaled, not whole-app pixel parity. Keep screenshots and account-specific evidence outside Git.
 
 At milestones update this handoff's scope, decision pointers, validation limits and publication status. Do not copy long histories into it.
 
 ## Active integration ownership and next evidence
 
-- Astra goal_manager: full acceptance map and scale architecture/review. Sol whole_team_goal: enrollment/admin/event operations plus proposed batch money helper. Sol dashboard_goal: new reporting queries/tests and frontend report connections/LiveApp. Root owns schema/generated/Git/sync.
-- WholeTeam small/large fixture tests pass, but review found multiplied query budgets across many events/financial histories. Address scalable enrollment before declaring item3 complete.
-- Reporting queries/tests are local; aggregate finance/attendance fan-out needs scalable summaries or pagination before item4 completion. Gross Raised needs fundraising source model; do not label null complete.
+- Astra goal_manager: full acceptance map and scale architecture/review. Sol whole_team_goal: enrollment/admin/event operations plus proposed batch money helper. Sol dashboard_goal: reporting queries/tests and DashboardReports connections (LiveApp released). Root owns schema/generated/Git/sync.
+- WholeTeam durable snapshot provisioning, atomic member/fee/cursor processing, retry, participant counters and batched money implemented.10worker/enrollment and4cross-module gate tests pass. Astra findings on readiness display and legacy driver gate fixed; live rehearsal/visual checks still required for item3.
+- Finance summaries and resumable verified backfill now replace raw team ledger fan-out; structured updating/failed states and Coach rebuild UI added. Aggregate component and attendance projections/pagination still pending before item4 completion. Gross Raised needs fundraising source model; do not label null complete.
 - Timeclock coordinator thread01a13097-bbb3-7712-ac06-fb4737daf269 reports latest branch checkpoint753b236, own clean worktree. Branch not yet ancestor here; integrate reviewed frontend after owned files settle. Synthetic PIN/transfer/independent-browser rehearsal passed, actual separate-device and deterministic live race remain limited.
 - Codegen regenerated local API on configured personaldev; CLI logged component upload. No explicit reviewed development backend sync completed for new feature slice. Do not run watcher on unfinished source.
+
+Current local slice includes enrollment notice on event, readiness and direct room routes; server guards prevent changes while enrollment is incomplete. See GOAL_ACCEPTANCE and forthcoming checkpoint validation. G5 proposal is documented in ACCOUNTS_PERMISSION_IMPLEMENTATION.md; no G5 implementation starts until shared contracts are reviewed.

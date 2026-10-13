@@ -1,3 +1,4 @@
+import { enrollmentPending, requireEnrollmentComplete } from "./lib/eventEnrollmentState";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
@@ -19,10 +20,12 @@ function whole(value: number, label: string, max = 500) {
 async function currentEvent(ctx: Ctx, eventId: Id<"events">) {
   const [event, season] = await Promise.all([ctx.db.get(eventId), activeSeason(ctx)]);
   if (!event || event.seasonId !== season._id || event.archived) throw new Error("Event is unavailable in the active season.");
+  if ("scheduler" in ctx) requireEnrollmentComplete(event);
   return event;
 }
 
 export async function transportSummary(ctx: Ctx, event: Doc<"events">) {
+  if (enrollmentPending(event)) return { state: "open" as const, seats: 0, demand: 0, ridingStudents: 0, additionalAdults: 0, busSeats: 0, vehicleSeats: 0, open: ["Whole Team enrollment is not complete."] };
   const enabled = event.transportEnabled ?? event.travel !== "Families provide transportation";
   if (!enabled) return { state: "notApplicable" as const, seats: 0, demand: 0, ridingStudents: 0, additionalAdults: 0, busSeats: 0, vehicleSeats: 0, open: [] as string[] };
   const participants = await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(MAX_PARTICIPANTS + 1);

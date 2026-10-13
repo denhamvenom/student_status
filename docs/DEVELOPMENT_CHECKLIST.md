@@ -311,7 +311,7 @@ Shared live-app copy extraction is recorded in the October 12 conformance follow
 - [x] Implement reference-sized New Event modal, collapsible event sections and invitation sharing/accepted confirmation; preserve backend contracts.
 - [x] Review final Basics modal phone/desktop light/dark, Cancel/Escape focus, section expansion/anchors and additional driver/finance slices.
 - [ ] Finish remaining cells in VISUAL_CHECKS.md, including invitation success and date-entry/submission rehearsal. No whole-app parity claim.
-- [ ] Separately correct the existing Timeclock test's expired fixed-date fixture; October 13 full suite is 100/101, isolated failure reproduced. Backend/test code unchanged here.
+- [x] Historical visual-pass follow-up resolved: expired Timeclock fixture corrected; final October13 integration suite126/126 passes.
 - [ ] Authorize a local QR dependency if QR sharing is required; no remote token-sharing service or fake QR added.
 
 No production deployment, main merge, real consent or domain-record mutation occurred in this visual pass.
@@ -326,3 +326,16 @@ User authorized completing all allowable frontend/backend work through readiness
 - [ ] Complete report/query UI and scalable team/attendance summaries; null gross-raised data is not completion.
 - [ ] Integrate Timeclock frontend checkpoint753b236 and its sanitized rehearsal evidence on completion branch.
 - [ ] Complete remaining requirements G1–G7 in GOAL_ACCEPTANCE.md; explicitly announce each only after full evidence.
+
+### October 13 enrollment and reporting integration (local)
+- [x] Implement Whole Team creation snapshot and durable one-member enrollment with atomic fee/cursor rollback and Coach retry.
+- [x] Verify upcoming-only activation, preserved prior participation, 500-member creation and 100-upcoming-event financial batching in focused synthetic tests.
+- [x] Guard participation, finance, rooms and transport while enrollment is unfinished; show enrollment progress instead of false readiness.
+- [x] Implement per-student finance summaries, resumable coverage-verified rebuild, readable roster counts and Coach rebuild UI.
+- [ ] Complete aggregate component and scalable corrected-attendance projections; existing bounded report implementation is interim.
+- [ ] Run live development rehearsal and prototype comparisons for new enrollment/report surfaces.
+- [ ] Publish reviewed integration checkpoint and verify remote after final checks.
+
+No G1–G7 completion is claimed by these substeps. Real signing, production and main remain gated.
+
+Validation at this incremental checkpoint: lint, strict typecheck, Vite build and22test files/126tests pass. Astra source review accepted; build retains an833KB chunk warning. No new live backend sync or browser acceptance is claimed.

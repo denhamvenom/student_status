@@ -4,6 +4,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { activeSeason, audit, viewer } from "./lib/access";
 import { addCharge } from "./lib/money";
+import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
 
 function requireOperations(user: Doc<"appUsers">) {
   if (user.role !== "coach" && !user.travelLead) throw new Error("Event operations require a Coach or Travel Lead.");
@@ -45,6 +46,7 @@ export const reviewSignup = mutation({
   handler: async (ctx, args) => {
     const user = await viewer(ctx); requireOperations(user);
     const event = await currentEvent(ctx, args.eventId);
+    requireEnrollmentComplete(event);
     if (event.signupMode === "assigned") throw new Error("Required event assignments use the Coach roster.");
     const rows = await roster(ctx, event._id);
     const participant = rows.find(p => p.studentId === args.studentId);
@@ -79,8 +81,10 @@ export const updateSettings = mutation({
     const user = await viewer(ctx);
     if (user.role !== "coach") throw new Error("Only a Coach can edit event settings.");
     const event = await currentEvent(ctx, args.eventId);
+    requireEnrollmentComplete(event);
     const patch: Partial<Doc<"events">> = {};
     if (args.capacity !== undefined) {
+      if (event.assignmentScope === "wholeTeam" && args.capacity !== null) throw new Error("Whole Team events cannot have a capacity limit.");
       if (args.capacity !== null && (!Number.isSafeInteger(args.capacity) || args.capacity < 1 || args.capacity > 500)) throw new Error("Capacity must be between 1 and 500.");
       const used = (await roster(ctx, event._id)).filter(p => p.status === "pending" || p.status === "confirmed").length;
       if (args.capacity !== null && args.capacity < used) throw new Error("Capacity cannot be below reserved places.");
@@ -109,6 +113,7 @@ export const saveRequirement = mutation({
   handler: async (ctx, args) => {
     const user = await viewer(ctx); if (user.role !== "coach") throw new Error("Only a Coach can edit requirements.");
     const event = await currentEvent(ctx, args.eventId);
+    requireEnrollmentComplete(event);
     const key = args.key.trim(); const label = args.label.trim();
     if (!/^[a-zA-Z0-9_-]{1,32}$/.test(key) || ["pay", "perm", "room", "first"].includes(key) || !label || label.length > 100 || (args.instructions?.length ?? 0) > 1000 || (args.url?.length ?? 0) > 500) throw new Error("Invalid requirement details.");
     if (args.dueAt !== undefined && args.dueAt !== null && !Number.isFinite(args.dueAt)) throw new Error("Invalid due date.");
@@ -131,6 +136,7 @@ export const removeRequirement = mutation({
   handler: async (ctx, args) => {
     const user = await viewer(ctx); if (user.role !== "coach") throw new Error("Only a Coach can edit requirements.");
     const event = await currentEvent(ctx, args.eventId);
+    requireEnrollmentComplete(event);
     const prior = await ctx.db.query("requirements").withIndex("by_eventId_and_key", q => q.eq("eventId", event._id).eq("key", args.key)).unique();
     if (!prior) return null;
     const completions = await ctx.db.query("requirementCompletions").withIndex("by_eventId_and_studentId_and_key", q => q.eq("eventId", event._id)).take(501);

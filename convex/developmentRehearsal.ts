@@ -1,3 +1,4 @@
+import { refreshStudentFinance } from "./lib/financeSummaries";
 import { v } from "convex/values";
 import { env, internalMutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
@@ -70,6 +71,7 @@ export const ensure = internalMutation({
       await audit(ctx, coach, "ledger", studentId, "seedFictionalRehearsalFunds", null, { paymentCents: person.paymentCents, fundraiserCents: person.fundraiserCents }, REASON);
     }
     await audit(ctx, coach, MARKER_ENTITY, season._id, "create", null, { studentIds, eventId }, REASON);
+    for (const studentId of studentIds) await refreshStudentFinance(ctx, studentId);
     return { studentIds, eventId, created: true };
   },
 });

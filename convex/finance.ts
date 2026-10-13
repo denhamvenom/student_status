@@ -1,3 +1,4 @@
+import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 import { activeSeason, audit, viewer } from "./lib/access";
@@ -17,6 +18,7 @@ export const createCharge = mutation({
     if (args.eventId) {
       const event = await ctx.db.get(args.eventId);
       if (!event || event.seasonId !== season._id) throw new Error("Event not found.");
+      requireEnrollmentComplete(event);
       const p = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
       if (p?.status !== "confirmed") throw new Error("Event charges require confirmed participation.");
     }

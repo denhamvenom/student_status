@@ -1,3 +1,5 @@
+import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
+import { refreshStudentFinance } from "./lib/financeSummaries";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -58,6 +60,7 @@ export const requestWithdrawal = mutation({
   handler: async (ctx, args) => {
     const user = await viewer(ctx), student = await ownStudent(ctx, user);
     const data = await details(ctx, args.eventId, student._id);
+    requireEnrollmentComplete(data.event);
     if (data.event.archived || !data.event.allowWithdrawal || data.participant.status === "withdrawn") throw new Error("Withdrawal is unavailable for this event.");
     if (args.idempotencyKey.length < 8 || args.idempotencyKey.length > 120) throw new Error("Invalid request key.");
     const duplicate = await ctx.db.query("withdrawalRequests").withIndex("by_idempotencyKey", q => q.eq("idempotencyKey", args.idempotencyKey)).unique();
@@ -105,6 +108,7 @@ export const reviewWithdrawal = mutation({
       throw new Error("This withdrawal request was already decided differently.");
     }
     const data = await details(ctx, request.eventId, request.studentId);
+    requireEnrollmentComplete(data.event);
     if (data.event.archived) throw new Error("This event was archived; withdrawal review is unavailable.");
     if (args.expectedRevision !== revision(data)) throw new Error("Participation or charges changed. Review the updated amounts before deciding.");
     if (data.participant._id !== request.participantId || data.participant.status === "withdrawn") throw new Error("Participation changed; review the request again.");
@@ -162,6 +166,7 @@ export const reviewWithdrawal = mutation({
     await audit(ctx, user, "withdrawalRequests", request._id, "approve", { status: "pending", participation: data.participant.status }, { status: "approved", participation: "withdrawn", returnedCents: returned, retainedCents: totalPaid - returned, charges: changes }, args.reason.trim());
     if (returned > 0) await allocateUnapplied(ctx, user, request.studentId, `withdraw:${request._id}:reallocate`, request.eventId);
     await financialEntries(ctx, request.studentId);
+    await refreshStudentFinance(ctx, request.studentId);
     return null;
   },
 });

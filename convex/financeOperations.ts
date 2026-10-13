@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { activeSeason, audit, viewer } from "./lib/access";
+import { refreshStudentFinance } from "./lib/financeSummaries";
 import { allocateUnapplied, financialEntries, sourceBalances } from "./lib/money";
 
 const method = v.union(v.literal("cash"), v.literal("check"), v.literal("other"));
@@ -88,6 +89,7 @@ export const recordPayout = mutation({
       await ctx.db.insert("ledgerEntries", { studentId: args.studentId, kind: "payout", sourceEntryId: source.entry._id, sourceKind: "payment", amountCents: cents, previousCents: source.available, newCents: source.available - cents, reason, method: args.method, reference, occurredAt: args.occurredAt, operationId, recordedBy: actor._id, recordedAt, idempotencyKey: `${key}:payout:${index}` });
     }
     await audit(ctx, actor, "financeOperations", operationId, "recordPayout", { personalAvailableCents: beforePersonal }, { personalAvailableCents: beforePersonal - args.amountCents, amountCents: args.amountCents, method: args.method, reference, occurredAt: args.occurredAt }, reason);
+    await refreshStudentFinance(ctx, args.studentId);
     return operationId;
   },
 });
@@ -127,6 +129,7 @@ export const transferFundraising = mutation({
     const recipientAfterEntries = await financialEntries(ctx, recipient._id);
     const recipientAfter = sourceBalances(recipientAfterEntries).filter(x => x.entry.kind === "fundraiser").reduce((n, x) => n + x.available, 0);
     await audit(ctx, actor, "financeOperations", operationId, "transferFundraising", { from: sender._id, fundraisingAvailableCents: senderBefore, to: recipient._id, recipientFundraisingAvailableCents: recipientBefore }, { from: sender._id, fundraisingAvailableCents: senderBefore - args.amountCents, to: recipient._id, recipientFundraisingAvailableCents: recipientAfter, amountCents: args.amountCents }, reason);
+    await refreshStudentFinance(ctx, args.studentId);
     return operationId;
   },
 });

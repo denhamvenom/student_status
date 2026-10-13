@@ -1,3 +1,4 @@
+import { EventEnrollmentNotice } from "../../EventEnrollmentNotice";
 import { operationsCopy, operationsText } from '../../lib/operations-copy'
 import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQuery } from "convex/react";
@@ -75,4 +76,10 @@ function AdultRoom({ eventId }: { eventId: Id<"events"> }) {
   </section>;
 }
 
-export function RoomOperations({ eventId, mode }: { eventId: Id<"events">; mode: "student" | "adult" }) { return mode === "student" ? <StudentRoom eventId={eventId} /> : <AdultRoom eventId={eventId} />; }
+export function RoomOperations({ eventId, mode }: { eventId: Id<"events">; mode: "student" | "adult" }) {
+  const detail = useQuery(api.app.eventDetail, { eventId });
+  const viewer = useQuery(api.app.viewer, {});
+  if (!detail || !viewer) return <p role="status">{operationsCopy.rooms.loadingRoomSelection}</p>;
+  if (detail.event.enrollmentState === "running" || detail.event.enrollmentState === "failed") return <EventEnrollmentNotice eventId={eventId} staff={mode === "adult"} coach={viewer.user?.role === "coach"} failed={detail.event.enrollmentState === "failed"}/>;
+  return mode === "student" ? <StudentRoom eventId={eventId} /> : <AdultRoom eventId={eventId} />;
+}

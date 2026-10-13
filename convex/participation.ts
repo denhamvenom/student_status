@@ -4,6 +4,7 @@ import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { activeSeason, audit, ownStudent, viewer } from "./lib/access";
 import { addCharge } from "./lib/money";
+import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
 
 async function reserved(ctx: MutationCtx, eventId: Id<"events">) {
   const rows = await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", eventId)).take(501);
@@ -49,6 +50,7 @@ export const setParticipation = mutation({
     if (user.role !== "coach" && !user.travelLead) throw new Error("Participation edit denied.");
     const event = await ctx.db.get(args.eventId); const student = await ctx.db.get(args.studentId); const season = await activeSeason(ctx);
     if (!event || event.archived || !student || !student.active || event.seasonId !== season._id || student.seasonId !== season._id) throw new Error("Student or event not found.");
+    requireEnrollmentComplete(event);
     if (event.signupMode === "assigned" && user.role !== "coach") throw new Error("Required-event roster is coach only.");
     if (event.signupMode === "assigned" && (args.status === "pending" || args.status === "waitlist")) throw new Error("Required events cannot have pending or waitlisted participants.");
     const prior = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
@@ -70,7 +72,15 @@ export const setParticipation = mutation({
     if (takesSeat && !alreadyReserved && event.capacity !== undefined && await reserved(ctx, event._id) >= event.capacity) throw new Error("Event capacity is full.");
     const now = Date.now();
     if (prior) await ctx.db.patch(prior._id, { status: args.status, createdAt: prior.status === "withdrawn" ? now : prior.createdAt, updatedAt: now });
-    else await ctx.db.insert("participants", { eventId: event._id, studentId: student._id, status: args.status, createdAt: now, updatedAt: now });
+    else {
+      if (event.assignmentScope === "wholeTeam") {
+        const count = event.wholeTeamParticipantCount;
+        if (count === undefined || !Number.isSafeInteger(count) || count < 0) throw new Error("Whole Team enrollment count needs reconciliation before adding members.");
+        if (count >= 500) throw new Error("Whole Team event roster limit reached.");
+        await ctx.db.patch(event._id, { wholeTeamParticipantCount: count + 1 });
+      }
+      await ctx.db.insert("participants", { eventId: event._id, studentId: student._id, status: args.status, createdAt: now, updatedAt: now });
+    }
     if (args.status === "confirmed" && event.feeCents > 0) await addCharge(ctx, user, student._id, event.name, event.feeCents, event.startsAt, `eventFee:${event._id}:${student._id}`, event._id);
     await audit(ctx, user, "participants", `${event._id}:${student._id}`, "setStatus", prior?.status ?? null, args.status, args.reason);
     return null;
@@ -85,6 +95,7 @@ export const recordRequirement = mutation({
     const event = await ctx.db.get(args.eventId); const student = await ctx.db.get(args.studentId);
     const season = await activeSeason(ctx);
     if (!event || !student || !student.active || event.seasonId !== season._id || student.seasonId !== season._id || ["pay", "perm", "room"].includes(args.key)) throw new Error("Invalid requirement.");
+    requireEnrollmentComplete(event);
     if (args.key !== "first") {
       const requirement = await ctx.db.query("requirements").withIndex("by_eventId_and_key", q => q.eq("eventId", event._id).eq("key", args.key)).unique();
       if (!requirement) throw new Error("Requirement not found.");

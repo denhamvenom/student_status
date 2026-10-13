@@ -1,3 +1,4 @@
+import { enrollmentPending } from "./eventEnrollmentState";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx, MutationCtx } from "../_generated/server";
 import { privateStudent, publicStudent } from "./access";
@@ -30,6 +31,7 @@ export async function permissionAccepted(ctx: Ctx, studentId: Id<"students">, ev
 export async function studentReadiness(ctx: Ctx, event: Doc<"events">, student: Doc<"students">) {
   const open: string[] = [];
   const participant = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
+  if (enrollmentPending(event)) return { state: "open" as const, open: ["Whole Team enrollment is not complete."], participation: participant?.status ?? null };
   if (participant?.status !== "confirmed") return { state: "notApplicable" as const, open, participation: participant?.status ?? null };
   const eventCharges = await ctx.db.query("charges").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(100);
   if (eventCharges.some(x => x.appliedCents < x.amountCents - (x.cancelledCents ?? 0))) open.push("Required payment");

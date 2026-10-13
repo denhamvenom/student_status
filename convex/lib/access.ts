@@ -79,7 +79,7 @@ export function mentorStudent(student: Doc<"students">) {
 }
 
 export function mentorEvent(event: Doc<"events">) {
-  return { _id: event._id, name: event.name, type: event.type, startsAt: event.startsAt, endsAt: event.endsAt, destination: event.destination };
+  return { _id: event._id, name: event.name, type: event.type, startsAt: event.startsAt, endsAt: event.endsAt, destination: event.destination, enrollmentState: event.enrollmentState ?? "complete" };
 }
 
 export function privateStudent(student: Doc<"students">) {

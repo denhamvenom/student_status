@@ -1,3 +1,4 @@
+import { refreshStudentFinance } from "./lib/financeSummaries";
 import { v } from "convex/values";
 import { env, internalMutation } from "./_generated/server";
 
@@ -106,6 +107,7 @@ export const seedSynthetic = internalMutation({
     const eventId = await ctx.db.insert("events", { seasonId: season._id, name: "Synthetic Regional", type: "Competition", startsAt: now + 30 * 86_400_000, endsAt: now + 33 * 86_400_000, destination: "Example City", travel: "Vehicles", overnight: true, roomingEnabled: true, feeCents: 0, signupMode: "assigned", assignmentScope: "travelTeam", allowWithdrawal: false, permissionRequired: true, firstRequired: true, archived: false });
     for (const studentId of students) await ctx.db.insert("participants", { eventId, studentId, status: "confirmed", createdAt: now, updatedAt: now });
     await ctx.db.insert("audit", { actorId: coach._id, entity: "seasons", entityId: season._id, action: "seedSyntheticDevelopment", afterJson: JSON.stringify({ studentCount: students.length, eventCount: 1 }), at: now });
+    for (const studentId of students) await refreshStudentFinance(ctx, studentId);
     return { studentCount: students.length, eventCount: 1 };
   },
 });

@@ -1,3 +1,4 @@
+import { enrollmentPending } from "./lib/eventEnrollmentState";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
@@ -136,6 +137,7 @@ export const eventReadiness = query({
       const student = await studentAccess(ctx, user, args.studentId);
       return { event: { _id: event._id, name: event.name }, students: [{ student: publicStudent(student), ...await studentReadiness(ctx, event, student) }], transportation: null, rooming: null, overall: null };
     }
+    if (enrollmentPending(event)) return { event: { _id: event._id, name: event.name }, students: [], transportation: null, rooming: null, overall: "open", enrollmentState: event.enrollmentState };
     const participants = await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(500);
     const rows = [];
     for (const p of participants.filter(x => x.status === "confirmed")) {

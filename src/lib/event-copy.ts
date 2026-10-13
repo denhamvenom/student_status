@@ -3,6 +3,13 @@ import { uiCopy } from './ui-copy'
 // Approved three-audience creation flow. The older reference options remain
 // available in uiCopy.reference; these labels describe the current safe fields.
 export const eventCopy = {
+  enrollment: {
+    running: 'Adding the Whole Team',
+    failed: 'Team enrollment needs attention',
+    description: 'Participation and event fees are being prepared. Event arrangements will be available when enrollment is complete.',
+    progress: (processed: number, assigned: number) => `${processed} profiles reviewed · ${assigned} members assigned`,
+    retry: 'Retry enrollment', retrying: 'Retrying…', retryError: 'Enrollment could not be restarted.',
+  },
   title: 'New event',
   description: 'Set up a competition, outreach event or team activity.',
   backToEvents: '← Events',
@@ -26,7 +33,7 @@ export const eventCopy = {
     travelTeam: uiCopy.audiences.travelTeam,
     travelTeamDetail: 'Active Travel Team students are assigned when the event is created.',
     wholeTeam: uiCopy.audiences.wholeTeam,
-    wholeTeamDetail: 'Available after Whole Team enrollment is implemented.',
+    wholeTeamDetail: 'Every active member is included. New members join upcoming events automatically.',
     open: uiCopy.audiences.open,
     openDetail: 'Students may sign up; set an optional capacity below.',
     individualNote: 'Individual student selection is not available in this creation flow.',

@@ -1,0 +1,22 @@
+.root{display:grid;gap:18px;margin-bottom:20px;min-width:0}
+.card{min-width:0;padding:20px;gap:16px;background:var(--surface-card);color:var(--text-body)}
+.header{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.header a{font-size:14px;white-space:nowrap}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:16px}
+.metrics>div{min-width:0}
+.metrics span{display:block;color:var(--text-muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.metrics strong{display:block;margin-top:4px;font:400 28px/1.1 Anton,Impact,sans-serif;overflow-wrap:anywhere}
+.metrics .unavailable{font-size:20px}
+.note{margin:0;color:var(--text-muted);font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+.attendanceBig{display:flex;align-items:baseline;gap:10px}
+.attendanceBig strong{font:400 36px/1.1 Anton,Impact,sans-serif}
+.attendanceBig span{font-size:14px;color:var(--text-muted)}
+.sessionGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:14px}
+.sessionTitle{margin:0;font:400 22px/1.15 Anton,Impact,sans-serif;overflow-wrap:anywhere}
+.statuses{display:flex;flex-wrap:wrap;gap:6px}
+.sessionMetrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.sessionMetrics dt{color:var(--text-muted);font-size:13px}
+.sessionMetrics dd{margin:2px 0 0;font-weight:700}
+.sessionMetrics>div{min-width:0}
+.sectionTitle{margin:4px 0 0;font:400 26px/1.1 Anton,Impact,sans-serif}
+@media(max-width:767px){.card{padding:16px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 12px}.metrics strong{font-size:26px}.sessionGrid{grid-template-columns:1fr}}
