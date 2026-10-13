@@ -116,6 +116,29 @@
     --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Keep Tailwind/shadcn primitives on the same semantic palette as the handoff. */
+:root {
+    --background: var(--surface-page);
+    --foreground: var(--text-body);
+    --card: var(--surface-card);
+    --card-foreground: var(--text-body);
+    --popover: var(--surface-card);
+    --popover-foreground: var(--text-body);
+    --primary: var(--gold-500);
+    --primary-foreground: var(--text-on-gold, #222);
+    --secondary: var(--purple-700);
+    --secondary-foreground: var(--text-on-purple, #fff);
+    --muted: var(--surface-metal);
+    --muted-foreground: var(--text-muted);
+    --accent: var(--purple-100);
+    --accent-foreground: var(--accent-text);
+    --destructive: var(--stop-dot);
+    --border: var(--border-default);
+    --input: var(--border-default);
+    --ring: var(--accent-text);
+    --radius: 0.5rem;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
