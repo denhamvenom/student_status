@@ -334,7 +334,7 @@ User authorized completing all allowable frontend/backend work through readiness
 - [x] Implement per-student finance summaries, resumable coverage-verified rebuild, readable roster counts and Coach rebuild UI.
 - [ ] Complete aggregate component and scalable corrected-attendance projections; existing bounded report implementation is interim.
 - [ ] Run live development rehearsal and prototype comparisons for new enrollment/report surfaces.
-- [ ] Publish reviewed integration checkpoint and verify remote after final checks.
+- [x] Publish reviewed integration checkpoint `f52d996`; remote verified and draft PR10 created.
 
 No G1–G7 completion is claimed by these substeps. Real signing, production and main remain gated.
 
