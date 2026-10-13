@@ -11,7 +11,7 @@ import schema from "./schema";
 const modules = import.meta.glob("./**/*.ts");
 const key = "operation-test-key";
 
-async function fixture() {
+async function fixture(prepared = true) {
   const t = convexTest(schema, modules);
   const ids = await t.run(async ctx => {
     async function account(name: string, role: "coach" | "mentor" | "student", financialEdit = false, travelLead = false) {
@@ -37,8 +37,10 @@ async function fixture() {
     await ctx.db.insert("ledgerEntries", { studentId: student, chargeId: charge, kind: "allocation", amountCents: 4000, previousCents: 0, newCents: 4000, sourceEntryId: payment, sourceKind: "payment", recordedBy: coach.user, recordedAt: 4, idempotencyKey: "fixture-allocation" });
     return { coach, lead, ungrantedLead, mentor, studentUser, student, recipient, inactive, old, payment, fundraisingA, fundraisingB };
   });
-  await rebuildStudent(t, ids.coach.user, ids.student);
-  await rebuildStudent(t, ids.coach.user, ids.recipient);
+  if (prepared) {
+    await rebuildStudent(t, ids.coach.user, ids.student);
+    await rebuildStudent(t, ids.coach.user, ids.recipient);
+  }
   const as = (auth: typeof ids.coach.auth) => t.withIdentity({ subject: `${auth}|session` });
   return { t, ids, coach: as(ids.coach.auth), lead: as(ids.lead.auth), ungrantedLead: as(ids.ungrantedLead.auth), mentor: as(ids.mentor.auth), student: as(ids.studentUser.auth) };
 }
@@ -179,6 +181,16 @@ describe("financial operations", () => {
     expect(await f.t.run(ctx => ctx.db.get(operationId))).toMatchObject({ state: "complete", committedCents: 7040 });
     expect(await f.t.run(ctx => financialAccount(ctx, f.ids.student))).toMatchObject({ state: "ready", fundraisingAvailableCents: 0 });
     expect(await f.t.run(ctx => financialAccount(ctx, f.ids.recipient))).toMatchObject({ state: "ready", fundraisingAvailableCents: 7040 });
+  });
+
+  it("returns preparation state without invented balances for historical accounts awaiting rebuild", async () => {
+    const f = await fixture(false);
+    expect(await f.coach.query(api.financeOperations.operationOptions, { studentId: f.ids.student })).toEqual({ state: "uninitialized", personalAvailableCents: null, fundraisingAvailableCents: null, sourceCount: null, chargeCount: null, recipients: [] });
+    await expect(f.mentor.query(api.financeOperations.operationOptions, { studentId: f.ids.student })).rejects.toThrow("Financial editing");
+    await f.coach.mutation(makeFunctionReference<"mutation">("financialSources:rebuild"), { studentId: f.ids.student });
+    expect(await f.coach.query(api.financeOperations.operationOptions, { studentId: f.ids.student })).toEqual({ state: "updating", personalAvailableCents: null, fundraisingAvailableCents: null, sourceCount: null, chargeCount: null, recipients: [] });
+    await rebuildStudent(f.t, f.ids.coach.user, f.ids.student);
+    expect(await f.coach.query(api.financeOperations.operationOptions, { studentId: f.ids.student })).toMatchObject({ state: "ready", personalAvailableCents: 1000, fundraisingAvailableCents: 7000 });
   });
 
 });

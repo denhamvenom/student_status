@@ -35,6 +35,8 @@ export const fundraisingCopy = {
   spentHold: 'The original travel credit has been spent or transferred. This reduction is on hold for Coach resolution; balances remain unchanged.',
   posting: 'Posting amounts',
   partial: 'Committed rows are recorded. Remaining rows have not been posted yet.',
+  committedReversal: 'Committed original-credit reversals:',
+  reversalTargetPending: 'Source reversal progress is separate from the target gross/team/travel totals, which commit only when the entire row finishes.',
   complete: 'All reviewed amounts have been posted.',
   retry: 'Retry remaining rows',
   history: 'Amount history',

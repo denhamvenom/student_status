@@ -13,6 +13,8 @@ export const reportCopy = {
   closed: 'Closed', open: 'Open', cancelled: 'Cancelled', timezone: 'Times shown in America/Chicago.',
   outreachUnavailable: 'Outreach totals require a session category.',
   teamOverview: 'Team finance overview', teamMoneyNote: 'Totals include active and inactive student accounts in the current season.',
+  grossRaised: 'Gross Raised', teamGrossUnavailable: 'Gross Raised is unavailable because some historical net fundraising credits lack recorded gross proceeds. Earned travel shares and available credits remain separate totals.',
+  teamGrossDefinition: 'Gross Raised is fundraising proceeds before the team/student split. Incoming transfers are not new amounts raised.',
   activeStudents: 'Active students', inactiveStudents: 'Inactive students', travelTeam: 'Travel Team', rosterSummary: 'Current season roster totals',
   charged: 'Charged', applied: 'Applied to charges', available: 'Available funds', due: 'Balance due',
   personal: 'Available personal payments', fundraising: 'Available fundraising credits', earned: 'Earned fundraising travel shares',

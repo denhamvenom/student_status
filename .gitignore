@@ -33,6 +33,7 @@ logs/
 tmp/
 temp/
 .local-test-temp*/
+.test-temp/
 exports/
 backups/
 private-data/

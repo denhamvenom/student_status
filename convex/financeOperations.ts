@@ -32,12 +32,18 @@ async function activeStudent(ctx: Parameters<typeof activeSeason>[0], studentId:
 
 export const operationOptions = query({
   args: { studentId: v.id("students") },
-  returns: v.object({ personalAvailableCents: v.number(), fundraisingAvailableCents: v.number(), state: v.union(v.literal("ready"), v.literal("updating"), v.literal("failed")), sourceCount: v.number(), chargeCount: v.number(), recipients: v.array(v.object({ _id: v.id("students"), name: v.string() })) }),
+  returns: v.object({ personalAvailableCents: v.union(v.number(), v.null()), fundraisingAvailableCents: v.union(v.number(), v.null()), state: v.union(v.literal("ready"), v.literal("updating"), v.literal("failed"), v.literal("uninitialized")), sourceCount: v.union(v.number(), v.null()), chargeCount: v.union(v.number(), v.null()), recipients: v.array(v.object({ _id: v.id("students"), name: v.string() })) }),
   handler: async (ctx, args) => {
     financialEditor(await viewer(ctx));
     const student = await activeStudent(ctx, args.studentId);
     const account = await financialAccount(ctx, student._id);
-    if (!account) throw new Error("Financial records need a Coach rebuild before operation options are available.");
+    const uninitialized = !account || account.state === "uninitialized";
+    const preparing = account?.state === "rebuilding" || account?.state === "failed" && !account.allocationJobId && !account.operationJobId && !account.fundraiserJobId;
+    if (uninitialized || preparing) return {
+      state: uninitialized ? "uninitialized" as const : account?.state === "failed" ? "failed" as const : "updating" as const,
+      personalAvailableCents: null, fundraisingAvailableCents: null, sourceCount: null, chargeCount: null, recipients: [],
+    };
+    if (!account) throw new Error("Financial account is unavailable.");
     const recipients = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", student.seasonId)).take(501);
     if (recipients.length > 500) throw new Error("Student selection limit reached; contact an administrator.");
     return {
