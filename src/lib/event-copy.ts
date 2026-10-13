@@ -41,6 +41,7 @@ export const eventCopy = {
     audience: 'Who’s going', fee: 'Fee', travel: 'Travel', rooming: 'Rooming',
     notEntered: 'Not entered', enabled: 'Enabled', notEnabled: 'Not enabled', currency: 'USD',
   },
+  workspace: { roomingSummary: 'Room groups, assignments and adult review' },
   errors: {
     required: 'Complete the event name, dates, destination and travel details.',
     fee: 'Enter a valid fee.',
