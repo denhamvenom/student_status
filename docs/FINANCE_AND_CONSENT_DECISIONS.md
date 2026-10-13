@@ -53,7 +53,11 @@ Each category offers **Allow**, **Contact me first**, or **Do not allow**, with 
 
 ## Retention
 
-Retain archived records for five years starting when the Coach archives the student's account. This resolves the start date. Deletion coverage, backups, downloaded exports, holds and treatment of later reactivation still need to be defined before automatic deletion is built.
+Retain archived records for five years starting when the Coach archives the student's account. Confirmed October 13, 2026: if the account is reactivated and later archived again, restart the five-year period from the most recent archive date. Preserve earlier archive/reactivation history for audit. Deletion coverage, backups, downloaded exports and holds still need to be defined; automatic deletion remains unauthorized.
+
+## Fundraising correction holds — confirmed October 13, 2026
+
+If a proposed award reduction cannot be covered by the still-available original award credits because credits were spent or transferred, hold the correction for Coach resolution. Leave existing balances unchanged. Do not create debt, reverse allocations or take funds from another student automatically. Implement the review/hold workflow; no automatic resolution policy is implied.
 
 ## Parallel development boundaries
 

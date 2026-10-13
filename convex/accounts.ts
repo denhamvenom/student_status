@@ -125,9 +125,9 @@ export const updateAdult = mutation({
       if (coaches.length > 500) throw new Error("Coach roster limit reached; account review is required.");
       if (!coaches.some(coach => coach._id !== user._id && coach.active)) throw new Error("The last active Coach cannot lose Coach access.");
     }
-    const patch = { role: args.role, travelLead: args.travelLead, financialEdit: args.financialEdit, healthExport: args.healthExport, active: args.active, accessRevision: (user.accessRevision ?? 0) + 1, ...(user.active && !args.active && user.archivedAt === undefined ? { archivedAt: Date.now() } : {}) };
+    const patch = { role: args.role, travelLead: args.travelLead, financialEdit: args.financialEdit, healthExport: args.healthExport, active: args.active, accessRevision: (user.accessRevision ?? 0) + 1, ...(user.active && !args.active ? { archivedAt: Date.now() } : {}) };
     await ctx.db.patch(user._id, patch);
-    await audit(ctx, actor, "appUsers", user._id, "updateAdultAccess", summary(user), patch, args.reason.trim());
+    await audit(ctx, actor, "appUsers", user._id, "updateAdultAccess", { ...summary(user), archivedAt: user.archivedAt ?? null }, { ...patch, archivedAt: patch.archivedAt ?? user.archivedAt ?? null }, args.reason.trim());
     return null;
   },
 });

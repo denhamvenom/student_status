@@ -130,10 +130,10 @@ export const updateRoster = mutation({
     if (args.legalName !== undefined && (!args.legalName.trim() || args.legalName.trim().length > 160)) throw new Error("Legal name under 160 characters is required.");
     if (args.preferredName !== undefined && (!args.preferredName.trim() || args.preferredName.trim().length > 80)) throw new Error("Preferred name under 80 characters is required.");
     if (args.roomCategory !== undefined && args.roomCategory !== student.roomCategory) await markRoomCategoryReview(ctx, student._id, student.seasonId);
-    const changes = { ...fields, ...(args.legalName !== undefined ? { legalName: args.legalName.trim() } : {}), ...(args.preferredName !== undefined ? { preferredName: args.preferredName.trim() } : {}), ...(args.roomCategory !== undefined ? { roomCategoryLocked: true } : {}), ...(args.active === false && student.active && student.archivedAt === undefined ? { archivedAt: Date.now() } : {}), profileRevision: (student.profileRevision ?? 0) + 1 };
+    const changes = { ...fields, ...(args.legalName !== undefined ? { legalName: args.legalName.trim() } : {}), ...(args.preferredName !== undefined ? { preferredName: args.preferredName.trim() } : {}), ...(args.roomCategory !== undefined ? { roomCategoryLocked: true } : {}), ...(args.active === false && student.active ? { archivedAt: Date.now() } : {}), profileRevision: (student.profileRevision ?? 0) + 1 };
     await ctx.db.patch(student._id, changes);
     if (args.active === true && !student.active) await syncWholeTeamMembership(ctx, user, { ...student, ...changes });
-    await audit(ctx, user, "students", student._id, "updateRoster", { profileRevision: student.profileRevision ?? 0, active: student.active, roomCategory: student.roomCategory, legalName: student.legalName }, changes, reason?.trim());
+    await audit(ctx, user, "students", student._id, "updateRoster", { profileRevision: student.profileRevision ?? 0, active: student.active, roomCategory: student.roomCategory, legalName: student.legalName, archivedAt: student.archivedAt ?? null }, { ...changes, archivedAt: changes.archivedAt ?? student.archivedAt ?? null }, reason?.trim());
     return null;
   },
 });

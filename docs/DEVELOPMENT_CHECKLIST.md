@@ -2,6 +2,14 @@
 
 Updated October 13, 2026
 
+### Latest decisions and active work
+
+- [x] Agree: fundraising reductions affecting spent/transferred credits wait for Coach resolution without changing balances (October 13).
+- [x] Agree: reactivation followed by another archive restarts five-year retention from the latest archive date; automatic deletion remains unauthorized.
+- [x] Implement and source-review the latest-archive clock with before/after audit evidence; 13 focused account/profile tests pass. Development synchronization and live checks remain pending.
+- [ ] Complete the ordinary Mentor-only Google rehearsal using the newly supplied owner-controlled test account. Identity and role assignment remain to be verified; account details stay outside this checklist.
+- [ ] Finish materialized financial balances, bounded allocation jobs and fundraiser posting. Additive foundation schema is local and typechecked; the full feature is still in implementation and has not been synchronized or published.
+
 The app has a working foundation, Google sign-in, and a tested parent-invitation process. Several other features have working pieces, but the full app is not ready for real student records or public launch.
 
 This checklist is the plain-language progress guide. The phases below show the recommended order of remaining work, not promised delivery dates. Some independent work can happen at the same time.

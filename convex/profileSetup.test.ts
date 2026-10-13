@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { convexTest } from "convex-test";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "./_generated/api";
@@ -114,17 +114,39 @@ describe("profile setup and corrections", () => {
     await expect(f.parent.query(api.profileSetup.corrections, { paginationOpts: { cursor: null, numItems: 20 } })).rejects.toThrow("Only a Coach");
   });
 
-  it("closes the legacy roster correction bypass and preserves archival date after reactivation", async () => {
+  it("retains revisioned roster room corrections and placement review", async () => {
     const f = await fixture();
     await expect(f.coach.mutation(api.admin.updateRoster, { studentId: f.ids.student, roomCategory: "Girls" })).rejects.toThrow("revision and reason");
     await f.coach.mutation(api.admin.updateRoster, { studentId: f.ids.student, roomCategory: "Girls", expectedRevision: 0, reason: "Confirmed correction" });
     expect(await f.t.run(ctx => ctx.db.get(f.ids.group))).toMatchObject({ needsReview: true });
+  });
+
+  it("records the latest archive transition and audits preserved clocks", async () => {
+    const f = await fixture();
+    await expect(f.coach.mutation(api.admin.updateRoster, { studentId: f.ids.student, roomCategory: "Girls" })).rejects.toThrow("revision and reason");
     await expect(f.coach.mutation(api.admin.updateRoster, { studentId: f.ids.student, active: false })).rejects.toThrow("revision and reason");
-    await f.coach.mutation(api.admin.updateRoster, { studentId: f.ids.student, active: false, expectedRevision: 1, reason: "Archive synthetic member" });
-    const archivedAt = (await f.t.run(ctx => ctx.db.get(f.ids.student)))?.archivedAt;
-    expect(archivedAt).toBeTypeOf("number");
-    await f.coach.mutation(api.admin.updateRoster, { studentId: f.ids.student, active: true, expectedRevision: 2, reason: "Reactivate synthetic member" });
-    await f.coach.mutation(api.admin.updateRoster, { studentId: f.ids.student, active: false, expectedRevision: 3, reason: "Archive again" });
-    expect((await f.t.run(ctx => ctx.db.get(f.ids.student)))?.archivedAt).toBe(archivedAt);
+    await expect(f.parent.mutation(api.admin.updateRoster, { studentId: f.ids.student, active: false, expectedRevision: 0, reason: "Denied" })).rejects.toThrow("permission");
+    const clock = vi.spyOn(Date, "now");
+    try {
+      const steps = [
+        { at: 1000, active: false, reason: "Archive synthetic member", prior: null, next: 1000 },
+        { at: 2000, active: true, reason: "Reactivate synthetic member", prior: 1000, next: 1000 },
+        { at: 3000, active: false, reason: "Archive again", prior: 1000, next: 3000 },
+        { at: 4000, active: false, reason: "Edit inactive member", prior: 3000, next: 3000 },
+      ];
+      for (const [revision, step] of steps.entries()) {
+        clock.mockReturnValue(step.at);
+        await f.coach.mutation(api.admin.updateRoster, { studentId: f.ids.student, active: step.active, expectedRevision: revision, reason: step.reason, ...(revision === 3 ? { preferredName: "Updated inactive name" } : {}) });
+        expect(await f.t.run(ctx => ctx.db.get(f.ids.student))).toMatchObject({ active: step.active, archivedAt: step.next, profileRevision: revision + 1 });
+      }
+      const records = await f.t.run(ctx => ctx.db.query("audit").withIndex("by_entity_and_entityId", q => q.eq("entity", "students").eq("entityId", f.ids.student)).collect());
+      const edits = records.filter(row => row.action === "updateRoster");
+      expect(edits).toHaveLength(4);
+      for (const [index, row] of edits.entries()) {
+        expect(row).toMatchObject({ actorId: f.ids.coach, reason: steps[index].reason, at: steps[index].at });
+        expect(JSON.parse(row.beforeJson!)).toMatchObject({ archivedAt: steps[index].prior });
+        expect(JSON.parse(row.afterJson!)).toMatchObject({ archivedAt: steps[index].next });
+      }
+    } finally { clock.mockRestore(); }
   });
 });

@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { convexTest } from "convex-test";
 import { api } from "./_generated/api";
 import schema from "./schema";
@@ -21,6 +21,31 @@ async function fixture() {
 const access = { role: "mentor" as const, travelLead: true, financialEdit: false, healthExport: true };
 const invite = { email: " Adult@Example.Invalid ", ...access };
 describe("adult accounts", () => {
+  it("records the latest adult archive transition and audit clocks without changing inactive edits", async () => {
+    const f = await fixture();
+    const userId = await f.t.run(ctx => ctx.db.insert("appUsers", { authUserId: f.ids.inviteAuth, email: "mentor@example.invalid", name: "Mentor", role: "mentor", travelLead: true, financialEdit: false, healthExport: true, active: true }));
+    const clock = vi.spyOn(Date, "now");
+    try {
+      const steps = [
+        { at: 1000, active: false, prior: null, next: 1000, reason: "Archive adult" },
+        { at: 2000, active: true, prior: 1000, next: 1000, reason: "Reactivate adult" },
+        { at: 3000, active: false, prior: 1000, next: 3000, reason: "Archive adult again" },
+        { at: 4000, active: false, prior: 3000, next: 3000, reason: "Edit inactive grants" },
+      ];
+      for (const [revision, step] of steps.entries()) {
+        clock.mockReturnValue(step.at);
+        await f.coach.mutation(api.accounts.updateAdult, { userId, expectedRevision: revision, ...access, active: step.active, reason: step.reason, ...(revision === 3 ? { healthExport: false } : {}) });
+        expect(await f.t.run(ctx => ctx.db.get(userId))).toMatchObject({ active: step.active, archivedAt: step.next, accessRevision: revision + 1 });
+      }
+      const rows = await f.t.run(ctx => ctx.db.query("audit").withIndex("by_entity_and_entityId", q => q.eq("entity", "appUsers").eq("entityId", userId)).collect());
+      expect(rows).toHaveLength(4);
+      for (const [index, row] of rows.entries()) {
+        expect(row).toMatchObject({ actorId: f.ids.coach, reason: steps[index].reason, at: steps[index].at });
+        expect(JSON.parse(row.beforeJson!)).toMatchObject({ archivedAt: steps[index].prior });
+        expect(JSON.parse(row.afterJson!)).toMatchObject({ archivedAt: steps[index].next });
+      }
+    } finally { clock.mockRestore(); }
+  });
   it("accepts only the invited verified Google account, saves grants separately and excludes tokens from lists", async () => {
     const f = await fixture();
     const link = await f.coach.mutation(api.accounts.inviteAdult, invite);
