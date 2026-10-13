@@ -2,14 +2,14 @@
 
 Updated October 13, 2026. Verify the actual Git/worktree state before using this snapshot. This short entry point links evidence rather than replacing it.
 
-- Active checkout: `student-status-readiness-design`; branch `feature/student-status-readiness-design`; draft PR #9. Prior verified workflow checkpoint: `51bbc3b`; current frontend checkpoint is recorded in Git history and the conformance log.
-- Current task: authorized frontend alignment resumed with both project skills, parallel Sol implementation and Astra review. Modal/sections/invitation corrections implemented; scoped visual checks completed, remaining cells stay open.
-- Frontend conformance authorized; next backend phase requires separate authorization. No main merge, production deployment or real signing authorized. Preserve sibling worktrees and paused backend drafts.
+- Active checkout: `student-status-readiness-design`; branch `feature/student-status-completion`, based on published frontend5343092/PR9. Completion branch is a new development integration branch; no main merge.
+- Active goal: complete checklist1–7 until ready for Coach visual approval. Read GOAL_ACCEPTANCE.md for full requirements. Frontend and backend development are now authorized; work is ongoing in parallel. No numbered item is yet claimed fully complete.
+- User now authorizes all allowable frontend/backend work and Timeclock coordination toward review readiness. No main merge, production deployment or real signing authorized. Preserve sibling worktrees and paused backend drafts.
 - Astra coordinates/reviews; Sol implements independent file-owned tasks. One integration owner handles Git and shared backend changes.
 
 ## Latest decision
 
-Whole Team means every active team member. New members joining after event creation are automatically included in that event too. Confirmed October 13; supersedes the proposed creation-time snapshot/manual-add recommendation. Decision recorded, implementation and verification pending. Whole Team remains unavailable in the current UI.
+Whole Team means every active team member. New members joining after event creation are automatically included in that event too. Confirmed October 13; supersedes the proposed creation-time snapshot/manual-add recommendation. User confirmed upcoming events only for later joiners. Whole Team implementation/UI is local, not yet reviewed for scale or synced; do not treat it as complete.
 
 Before implementing, inspect existing event lifecycle, membership, charging and participation contracts. Surface unresolved cases such as past/closed events or reactivation rather than inventing exclusions, fees or withdrawal reversals.
 
@@ -27,6 +27,14 @@ Before implementing, inspect existing event lifecycle, membership, charging and 
 
 Frontend: modal/section/invitation presentation implemented; remaining role/state/viewport checks in VISUAL_CHECKS.md. Shared live-app copy extraction is recorded complete; flag specific residual literals during future checks rather than reopening wholesale migration. Backend dependencies: Whole Team, aggregate finance/roster, family Attendance, missing readiness/form/admin contracts. Inspect existing contracts before assuming each gap requires new schema.
 
-October 13 full unsandboxed check: 100/101 tests passed; existing Timeclock test fixture expired on October 13 and fails in isolation. Lint/types/build checked separately. See conformance log for exact evidence; do not claim the suite is green. Visual coverage remains partial/scaled, not whole-app pixel parity. Keep screenshots and account-specific evidence outside Git.
+Prior October13 full check100/101. Fixed-date Timeclock test now has a scoped clock spy and passes isolated test; new full suite pending. See conformance log for exact evidence; do not claim the suite is green. Visual coverage remains partial/scaled, not whole-app pixel parity. Keep screenshots and account-specific evidence outside Git.
 
 At milestones update this handoff's scope, decision pointers, validation limits and publication status. Do not copy long histories into it.
+
+## Active integration ownership and next evidence
+
+- Astra goal_manager: full acceptance map and scale architecture/review. Sol whole_team_goal: enrollment/admin/event operations plus proposed batch money helper. Sol dashboard_goal: new reporting queries/tests and frontend report connections/LiveApp. Root owns schema/generated/Git/sync.
+- WholeTeam small/large fixture tests pass, but review found multiplied query budgets across many events/financial histories. Address scalable enrollment before declaring item3 complete.
+- Reporting queries/tests are local; aggregate finance/attendance fan-out needs scalable summaries or pagination before item4 completion. Gross Raised needs fundraising source model; do not label null complete.
+- Timeclock coordinator thread01a13097-bbb3-7712-ac06-fb4737daf269 reports latest branch checkpoint753b236, own clean worktree. Branch not yet ancestor here; integrate reviewed frontend after owned files settle. Synthetic PIN/transfer/independent-browser rehearsal passed, actual separate-device and deterministic live race remain limited.
+- Codegen regenerated local API on configured personaldev; CLI logged component upload. No explicit reviewed development backend sync completed for new feature slice. Do not run watcher on unfinished source.

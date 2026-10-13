@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { convexTest } from "convex-test";
 import rateLimiter from "@convex-dev/rate-limiter/test";
 import { api, internal } from "./_generated/api";
@@ -198,6 +198,8 @@ describe("timeclock transactions", () => {
   });
 
   it("shares one all-day opening across concurrent devices", async () => {
+    const clock = vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-12T15:00:00Z"));
+    try {
     const f = await fixture();
     const occurrence = await f.t.run(async ctx => {
       const session = await ctx.db.get(f.ids.sessionA);
@@ -215,6 +217,9 @@ describe("timeclock transactions", () => {
     expect(a.sessionId).toBe(b.sessionId);
     const rows = await f.t.run(ctx => ctx.db.query("timeclockSessions").withIndex("by_occurrenceId", q => q.eq("occurrenceId", occurrence)).take(2));
     expect(rows).toHaveLength(1);
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   it("selects timed events by Chicago-day overlap, including unopened multi-day events", async () => {

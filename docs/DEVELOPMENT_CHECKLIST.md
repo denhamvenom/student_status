@@ -315,3 +315,14 @@ Shared live-app copy extraction is recorded in the October 12 conformance follow
 - [ ] Authorize a local QR dependency if QR sharing is required; no remote token-sharing service or fake QR added.
 
 No production deployment, main merge, real consent or domain-record mutation occurred in this visual pass.
+
+## Active seven-item completion goal — October 13
+
+User authorized completing all allowable frontend/backend work through readiness for visual approval, with Astra/Sol parallel work and Timeclock coordination. See GOAL_ACCEPTANCE.md. This supersedes earlier frontend-only implementation boundaries for this goal, while privacy, real-signing approval, no production and no main merge remain.
+
+- [x] Confirm later Whole Team additions apply only to upcoming events.
+- [x] Fix existing expired Timeclock test with scoped fixed clock; isolated concurrency test passes.
+- [ ] Complete Whole Team integration/scale review/dev verification; local fixtures alone do not close item3.
+- [ ] Complete report/query UI and scalable team/attendance summaries; null gross-raised data is not completion.
+- [ ] Integrate Timeclock frontend checkpoint753b236 and its sanitized rehearsal evidence on completion branch.
+- [ ] Complete remaining requirements G1–G7 in GOAL_ACCEPTANCE.md; explicitly announce each only after full evidence.
