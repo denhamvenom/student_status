@@ -1,0 +1,31 @@
+.draft { display: grid; gap: 16px; }
+.draft :global(.page-head) { margin-bottom: 4px; }
+.draft :global(.card) { min-width: 0; }
+.draft :global(.card h2) { margin-bottom: 12px; }
+.draft :global(.card p:last-child) { margin-bottom: 0; }
+.draft :global(.detail) { flex-wrap: wrap; overflow-wrap: anywhere; }
+.surface { min-width: 0; }
+.surface h2 { margin-bottom: 12px; }
+.surface :global(.parent-record) { align-items: flex-start; }
+.surface :global(.parent-record) > div,
+.surface :global(.parent-record) > strong,
+.surface :global(.parent-record) > span { min-width: 0; overflow-wrap: anywhere; }
+.surface :global(.parent-invite-form),
+.surface :global(.parent-access-controls),
+.surface :global(.parent-accept-form) { max-width: 100%; }
+.surface :global(.parent-share) { border: 1px solid var(--border-default); border-radius: 8px; }
+.surface :global(button) { white-space: normal; }
+@media (max-width: 767px) {
+  .draft { gap: 16px; }
+  .surface :global(.parent-record) { display: grid; justify-content: stretch; }
+  .surface :global(.parent-record) > button,
+  .surface :global(.parent-restore) { justify-self: start; }
+}
+
+.surface .inviteShare { border-top: 3px solid var(--gold-500); }
+.inviteShare h3 { margin: 0 0 10px; }
+.shareControls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.shareControls input { flex: 1 1 220px; min-width: 0; font-family: ui-monospace, monospace; }
+.shareControls button { flex: none; }
+.accepted { display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
+.accepted h2, .accepted p { margin: 0; overflow-wrap: anywhere; }

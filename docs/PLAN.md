@@ -188,3 +188,29 @@ Implemented Coach structured-name review and per-session attendance/correction U
 ## Fictional rehearsal follow-up — October 12, 2026
 
 See [the rehearsal report](REHEARSAL_2026-10-12.md) for the current evidence, superseding earlier pending statements for the live closed-session correction and Coach financial/room/transport checks. Coach, Student and Parent live journeys passed within the documented scope. Fixed duplicate React sibling keys and financial draft leakage between students, preserved payment/charge retry keys, clarified waitlist withdrawal wording, and denied attendance correction writes to archived seasons. Added guarded fictional fixtures and integrated multi-role tests. Full root checks passed 97 tests across 17 suites, lint, strict types and build. Remaining live Travel/Mentor, independent-device, paid-withdrawal and room-invitation journeys are explicitly open; family Attendance still needs implementation. No real records, real signatures or production release.
+
+## Representative design review
+
+Coach authorized one screen before broader corrections. The isolated Coach Readiness candidate uses the existing backend with screen-scoped presentation. All four viewport/theme comparisons, Astra review and local checks are recorded in [READINESS_DESIGN_REVIEW.md](READINESS_DESIGN_REVIEW.md). Coach subsequently accepted this representative screen and authorized the frontend rollout below. Paused backend drafts and production remain excluded.
+
+## October 12 approved frontend rollout
+
+Coach approved representative Readiness and authorized frontend alignment across existing screens. Work runs on `feature/student-status-readiness-design`, draft PR9, excluding paused backend draft ancestry. See `FRONTEND_CONFORMANCE_LOG.md` for implementation, review and evidence limits. Sol agents own separate presentation areas; Astra reviews integration. Whole Team backend semantics, aggregate Coach finance views, missing states and real consent remain separate dependencies. No production or main merge authorization.
+
+### Copy and visual-check follow-up
+
+Live-app copy consolidation and sticky-anchor/empty-state corrections completed with Astra review and101 passing tests. Updated available-role visual checks distinguish scaled viewport evidence from pixel parity and unsupported states. See FRONTEND_CONFORMANCE_LOG.md for the current table and explicit backend dependency list. Legacy fixture-only preview, new backend work and production remain outside this pass.
+
+## October 13 Whole Team decision and context audit
+
+Whole Team includes every active team member; new members joining after creation are automatically included in that event too. This supersedes the suggested creation-time snapshot/manual addition. Agreed only: implementation and verification remain pending separate backend-phase authorization. Inspect event lifecycle, membership and financial interactions before implementation; do not silently invent closed-event or reactivation policy. Start future work with CURRENT_STATE.md; older workspace/pause statements in this plan are historical snapshots.
+
+## October 13 reusable workflow checkpoint
+
+Created the two first-party project skills under .agents/skills and linked them from AGENTS.md. VISUAL_CHECKS.md owns current outstanding visual comparisons; FRONTEND_CONFORMANCE_LOG.md retains dated evidence. No application/backend implementation or new browser verification is part of this checkpoint.
+
+Validation for this workflow checkpoint: both skills passed the skill-creator format validator. Astra read-only scenario review confirmed correct handling of stale worktree instructions, partial/wrong-theme screenshots, unavailable Mentor-only identity and unimplemented Whole Team. No blocking findings; clarified unexpected clipping versus intentional viewport slices. Documentation diff checked; no application tests/browser checks rerun.
+
+## October 13 frontend continuation
+
+Modal/event sections/invitation presentation implemented with existing contracts; staff personal participation labels removed. Both workflow skills used, parallel Sol ownership and Astra source review completed. See FRONTEND_CONFORMANCE_LOG.md and VISUAL_CHECKS.md for scoped browser evidence. Whole Team and other backend dependencies remain unimplemented. Full check100/101 due to expired existing Timeclock fixture; isolated failure confirmed and separately flagged. No production authorization.

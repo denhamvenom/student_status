@@ -1,0 +1,204 @@
+{
+  "navigation": {
+    "desktop": {
+      "student": [
+        "Status",
+        "Events",
+        "Finances",
+        "Attendance",
+        "Profile & health",
+        "Parents",
+        "Settings"
+      ],
+      "parent": [
+        "Status",
+        "Events",
+        "Finances",
+        "Attendance",
+        "Profile & health",
+        "Permission form",
+        "Settings"
+      ],
+      "coachGroups": [
+        [
+          "Team",
+          [
+            "Team",
+            "Join requests",
+            "Users & Roles"
+          ]
+        ],
+        [
+          "Events",
+          [
+            "Events",
+            "Event readiness",
+            "Drivers",
+            "Permission forms"
+          ]
+        ],
+        [
+          "Money",
+          [
+            "Finances",
+            "Fundraising"
+          ]
+        ],
+        [
+          "Reports",
+          [
+            "Reports"
+          ]
+        ],
+        [
+          "Admin",
+          [
+            "Attendance",
+            "Season",
+            "Settings"
+          ]
+        ]
+      ],
+      "travelLeadGroups": [
+        [
+          "Team",
+          [
+            "Team",
+            "Join requests"
+          ]
+        ],
+        [
+          "Events",
+          [
+            "Events",
+            "Event readiness",
+            "Drivers",
+            "Permission forms"
+          ]
+        ],
+        [
+          "Money",
+          [
+            "Finances",
+            "Fundraising"
+          ]
+        ],
+        [
+          "Reports",
+          [
+            "Reports"
+          ]
+        ],
+        [
+          "Account",
+          [
+            "My profile",
+            "Settings"
+          ]
+        ]
+      ],
+      "mentor": [
+        "Team report",
+        "My profile",
+        "Settings"
+      ]
+    },
+    "phoneBottomNav": {
+      "note": "4 items + More (More opens a sheet with the rest). Icons in assets/icons.",
+      "student": [
+        "Home",
+        "Events",
+        "Money",
+        "Profile"
+      ],
+      "parent": [
+        "Home",
+        "Events",
+        "Forms",
+        "Money"
+      ],
+      "coach": [
+        "Team",
+        "Events",
+        "Readiness",
+        "Money"
+      ],
+      "travelLead": [
+        "Readiness",
+        "Events",
+        "Team",
+        "Drivers"
+      ],
+      "mentor": [
+        "Report",
+        "Profile",
+        "Settings"
+      ]
+    },
+    "home": {
+      "student": "Status",
+      "parent": "Status",
+      "coach": "Team",
+      "travelLead": "Team",
+      "mentor": "Team report"
+    }
+  },
+  "options": {
+    "newEventSteps": [
+      "Basics",
+      "Who’s going",
+      "Costs",
+      "Requirements",
+      "Travel",
+      "Review"
+    ],
+    "eventWorkspaceTabs": [
+      {
+        "value": "overview",
+        "label": "Overview"
+      },
+      {
+        "value": "part",
+        "label": "Participants"
+      },
+      {
+        "value": "req",
+        "label": "Requirements"
+      },
+      {
+        "value": "trans",
+        "label": "Transport"
+      },
+      {
+        "value": "room",
+        "label": "Rooming"
+      }
+    ],
+    "statusWords": [
+      "Not submitted",
+      "Needs correction",
+      "Pending",
+      "Waitlist",
+      "Not applicable",
+      "Unavailable",
+      "Not completed",
+      "None reported",
+      "Ready",
+      "Ready to go"
+    ],
+    "participationStatuses": [
+      "Confirmed",
+      "Pending approval",
+      "Waitlist",
+      "Not registered"
+    ],
+    "moneyLabels": [
+      "Raised",
+      "Your travel share",
+      "Paid so far",
+      "Balance due",
+      "of {amount} charged",
+      "Fee applies if approved"
+    ]
+  }
+}

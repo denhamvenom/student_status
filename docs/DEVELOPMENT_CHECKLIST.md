@@ -1,6 +1,6 @@
 # Student Status Development Checklist
 
-Updated October 12, 2026
+Updated October 13, 2026
 
 The app has a working foundation, Google sign-in, and a tested parent-invitation process. Several other features have working pieces, but the full app is not ready for real student records or public launch.
 
@@ -198,9 +198,9 @@ These are repeating steps for each future milestone, not unfinished tasks in the
 
 The October 12 fictional rehearsal and later follow-up passed 101 automated tests across 18 files, lint, strict types and build. Live Coach, Student and Parent checks verified approval/manual promotion, waitlist withdrawal with reactive parent updates, fictional personal payout/fundraising transfer, room finalization, vehicle capacity, and Timeclock automatic closure plus an audited correction preserving the original. Later ordinary Mentor and Travel Lead checks verified limited navigation, read-only finance and a saved transport adjustment. See [the rehearsal report](REHEARSAL_2026-10-12.md) for the exact coverage and fixes.
 
-**Current priority:** Audit design drift against Design_Comparison.zip and obtain Coach approval of the drift report before frontend corrections. Product development and rehearsals remain paused; unfinished family Attendance and Who’s Going changes are preserved locally. Permission wording still needs Coach approval before real signatures. Real consent, health-export permissions, rollover/retention and production readiness remain separate unfinished work.
+**Current priority:** Frontend work resumed; complete remaining role/state checks in VISUAL_CHECKS.md after the modal/section/invitation checkpoint. Representative screen and frontend rollout were approved; remaining conformance and evidence gaps are in FRONTEND_CONFORMANCE_LOG.md. Whole Team includes every active member and automatically includes later joiners (decision confirmed October 13; implementation pending). See CURRENT_STATE.md for scope and boundaries.
 
-Current development publication is [draft PR #7](https://github.com/denhamvenom/student_status/pull/7), `feature/student-status-operations`, stacked on `feature/timeclock-backend`. The separate Timeclock frontend is draft PR #6. This integration owner retains shared backend/deployment ownership. No main merge or production deployment is authorized.
+Current frontend publication is draft PR #9 on feature/student-status-readiness-design (verified baseline 43a254b before the context audit). PR #7 is the earlier operations milestone. Timeclock remains separately coordinated. No main merge or production deployment is authorized.
 
 ## Operations milestone checkpoint — October 12, 2026
 
@@ -238,9 +238,80 @@ Timeclock parallel handoff: frontend owner reports Astra review, 34 synthetic in
 - [x] Consolidate visual comparisons for available Coach, Student, Parent and Travel screens at phone/desktop in both themes, with Astra review and parallel Sol image review. The report explicitly distinguishes valid observations, invalid captures, unimplemented screens and unavailable states; this is not visual acceptance.
 - [x] Complete `design-drift-report.md` with role/state coverage, prioritized findings, added-feature styling guidance and separate functional dependencies.
 - [ ] Close remaining evidence limits during correction verification: ordinary Mentor-only account, active room invitations/paid withdrawal, multiple linked children, invitation variants, and invalid Student Parents desktop captures. No permissions or domain records were changed to manufacture those states.
-- [ ] Obtain Coach approval of the report before making design corrections.
+- [x] Coach authorized representative corrections and then approved wider frontend rollout.
 - [ ] Implement approved shared labels, tokens/components and screen corrections; preserve backend and access rules.
 - [ ] Recompare corrected screens, document intentional differences and obtain final visual review.
-- [ ] Append design-conformance instructions to existing AGENTS.md and publish reviewed design checkpoints under the existing development workflow.
+- [x] Append design-conformance instructions to existing AGENTS.md.
+- [x] Publish and verify the broader reviewed frontend checkpoint `2bb7eee` in draft PR9.
 
 No backend work, Timeclock changes, real consent, production deployment or main merge is included in this design task. Newer features without an exact prototype screen inherit its typography, colors, spacing, layout patterns and component states; do not invent a separate visual style.
+
+## Representative design review — Coach Readiness
+
+- [x] Coach authorized one representative screen, then review before wider rollout.
+- [x] Prepare Coach Readiness at 390px and 1440px in both themes, with explicit existing-data limitations.
+- [x] Validate four visual comparisons, navigation/event selection/keyboard behavior, Astra review, lint/types, 101 tests and build. See [the representative review](READINESS_DESIGN_REVIEW.md).
+- [x] Coach approved representative Readiness and authorized applying its design across the app.
+
+This branch excludes paused backend drafts and earlier broad frontend drafts. No backend, Timeclock or production changes are authorized.
+
+Representative Readiness checkpoint `ed69bbb` is published and verified in draft [PR #9](https://github.com/denhamvenom/student_status/pull/9). Coach approved the representative screen; broader conformance verification is in progress.
+
+## Approved frontend rollout — October 12
+
+- [x] Coach approved representative Readiness and authorized frontend conformance across the app.
+- [ ] Complete existing-data presentation and verify role/viewport/theme coverage.
+- [x] Update [the work log](FRONTEND_CONFORMANCE_LOG.md), evidence limitations and Git checkpoints for this implementation pass.
+
+Backend-dependent gaps remain separately deferred; no production action is authorized.
+
+### Frontend implementation checkpoint
+
+- [x] Implement shared role shell, reference copy helpers and consistent Base UI tokens/controls.
+- [x] Implement existing-data presentation changes for Status, Finances, roster, event setup/workspace, Drivers, invitations, permission draft, attendance, rooms and withdrawals.
+- [x] Astra final source review and full check: 101 tests, lint, strict types and build. Cloudflare dry run packaged successfully without upload (optional sandbox log-write warning).
+- [x] Compare New Event audience at phone/desktop in both themes; verify open-capacity control, six-step navigation and Cancel without saving.
+- [ ] Finish remaining role/state/theme checks in VISUAL_CHECKS.md. Live-app shared-label extraction is recorded complete in the later conformance follow-up; inspect specific residual copy during checks.
+- [ ] Coach final visual acceptance of the broader app.
+
+### Copy and responsive verification follow-up
+
+- [x] Consolidate live route, role navigation and operation wording into shared copy modules; preserve domain values and later approved policies.
+- [x] Add Status All events link, missing-subteam fallback and roster no-matches state.
+- [x] Correct 4px small-control corners and verify event anchor offsets below sticky navigation at phone/desktop.
+- [x] Review additional Student/Parent layouts, desktop driver forms and lower finance controls; record exact capture/state limits in FRONTEND_CONFORMANCE_LOG.md.
+- [x] Astra final source review and complete local check: 101 tests, lint/types/build pass.
+- [ ] Finish restricted/unavailable-state rehearsals and remaining viewport slices; full pixel parity and final Coach acceptance are not claimed.
+- [ ] Resolve flagged backend dependencies in a separately authorized phase.
+- [x] Publish and verify follow-up checkpoint `d43fac3` in existing draft PR9.
+
+- [x] Review dark event transport/rooming viewport slices and clarify completed-room Finalized action while preserving required re-finalization.
+
+
+## October 13 context checkpoint
+
+- [x] Agree: Whole Team includes every active team member, including automatic inclusion when new members join after event creation.
+- [ ] Implement and verify that rule after backend-phase authorization; inspect lifecycle and financial interactions first.
+- [x] Audit context recovery, add CURRENT_STATE.md, correct stale approval/current-branch/startup guidance, and distinguish historical reports from current status.
+- [x] Create repository-local context-checkpoint and prototype-verification skills; validate their SKILL.md format.
+
+
+## October 13 workflow checkpoint
+
+- [x] Route future agents to the two tracked project skills through AGENTS.md; vendor skill bundles remain ignored.
+- [x] Consolidate outstanding comparisons in [VISUAL_CHECKS.md](VISUAL_CHECKS.md); older conformance matrices remain historical evidence.
+- [ ] Complete the remaining checks in that table. Consolidation does not count as new browser verification or Coach acceptance.
+
+Shared live-app copy extraction is recorded in the October 12 conformance follow-up. Earlier broad shared-label migration tasks are superseded by that evidence; future checks should identify specific residual literals rather than repeat the completed migration. Legacy fixture-only preview remains outside this live-app pass.
+
+
+## October 13 frontend alignment checkpoint
+
+- [x] Use both project skills; Sol implements separate files and Astra accepts final source review.
+- [x] Implement reference-sized New Event modal, collapsible event sections and invitation sharing/accepted confirmation; preserve backend contracts.
+- [x] Review final Basics modal phone/desktop light/dark, Cancel/Escape focus, section expansion/anchors and additional driver/finance slices.
+- [ ] Finish remaining cells in VISUAL_CHECKS.md, including invitation success and date-entry/submission rehearsal. No whole-app parity claim.
+- [ ] Separately correct the existing Timeclock test's expired fixed-date fixture; October 13 full suite is 100/101, isolated failure reproduced. Backend/test code unchanged here.
+- [ ] Authorize a local QR dependency if QR sharing is required; no remote token-sharing service or fake QR added.
+
+No production deployment, main merge, real consent or domain-record mutation occurred in this visual pass.

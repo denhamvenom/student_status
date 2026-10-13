@@ -14,6 +14,8 @@ Convex agent skills for common tasks can be installed by running
 
 ## Application boundaries and handoff
 
+- Start with docs/CURRENT_STATE.md and verify the actual checkout/branch. Read task-relevant linked evidence next. Dated pause/review notes are historical; later user decisions supersede them. Keep the short handoff current at milestones.
+
 - Work only in this app unless the user explicitly expands scope. Preserve the sibling design handoff, archives, root npm starter, and unrelated folders.
 - Read `docs/PLAN.md`, `docs/ARCHITECTURE.md`, `docs/REVIEW.md`, and `docs/DEVELOPMENT.md` for current state. Keep implemented, verified, and pending work distinct.
 - Bun; React Router 7 Data Mode SPA; Vite; strict TypeScript; Tailwind 4; shadcn Base UI. Convex is the only domain backend. Do not introduce Next.js, Radix, Docker/Unraid, or a second database.
@@ -31,3 +33,18 @@ Convex agent skills for common tasks can be installed by running
 ## Shared Timeclock workspace ownership
 
 Timeclock frontend work is scoped to `apps/timeclock/` in a separate branch/worktree. Student Status remains at root. Read `docs/TIMECLOCK_BACKEND_HANDOFF.md` for implemented contracts and verified baseline. Only this Student Status integration owner edits/synchronizes shared Convex, generated files, root dependency/tooling/lockfile or auth/calendar contracts. Frontend-only chats use `bun run dev:timeclock`, never a Convex watcher. Coordinate root dependency changes. No production or main merge authorization is implied by the development scaffold.
+
+## Frontend design conformance
+
+- Follow the immutable design reference: later explicit user decisions, then Flow index v2 changes, prototype screens, shared UI copy/options, and design tokens. The reference is preserved in sibling `student-status-operations/design-reference`; do not edit it.
+- Reuse shared labels, tokens and Base UI components. Added features inherit the prototype typography, spacing, colors and interaction patterns.
+- Compare changed screens with the prototype at phone and desktop widths in light and dark themes. Record observed states and evidence limitations separately from implementation.
+- Never invent domain fields, options, completion values or unsupported actions to imitate a prototype. List missing backend contracts explicitly.
+- Frontend conformance work must not edit backend code, generated API, Timeclock, dependencies or deployment configuration without separate authorization.
+- Keep `docs/FRONTEND_CONFORMANCE_LOG.md` and the checklist current. Screenshots and account-specific browser evidence stay outside Git.
+
+## Project workflow skills
+
+- For resume, milestone handoff or context audit, read `.agents/skills/student-status-context-checkpoint/SKILL.md`.
+- For prototype comparisons or visual evidence review, read `.agents/skills/student-status-prototype-verification/SKILL.md`.
+- `docs/VISUAL_CHECKS.md` is the single current outstanding visual-check table. Older tables are historical evidence. These first-party skills are tracked; downloaded vendor skills remain ignored.
