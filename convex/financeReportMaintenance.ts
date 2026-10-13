@@ -1,4 +1,4 @@
-import { seasonFinanceControl } from "./lib/seasonFinance";
+import { requireSeasonTransitionFinancialAccess, seasonFinanceControl } from "./lib/seasonFinance";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalMutation, mutation, query } from "./_generated/server";
@@ -29,6 +29,7 @@ export const start = mutation({
     const maintenance = await seasonFinanceControl(ctx, season._id);
     if (maintenance && maintenance.state !== "ready" && maintenance.state !== "failed") throw new Error("Wait for shared fee maintenance before rebuilding reports.");
     const previous = await ctx.db.query("financeSummaryBackfills").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).unique();
+    await requireSeasonTransitionFinancialAccess(ctx, season._id, previous?.state === "failed");
     if (previous?.state === "running") return previous._id;
     const resume = previous?.state === "failed";
     const cursor = resume ? previous.cursor : null;
@@ -54,6 +55,7 @@ export const continueBackfill = internalMutation({
   handler: async (ctx, args): Promise<null> => {
     const state = await ctx.db.get(args.backfillId);
     if (!state || state.state !== "running" || state.cursor !== args.expectedCursor) return null;
+    await requireSeasonTransitionFinancialAccess(ctx, state.seasonId, true);
     let verifyingCoverage = false;
     try {
       const actor = state.actorId ? await ctx.db.get(state.actorId) : null;

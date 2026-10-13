@@ -29,7 +29,7 @@ export function sourceBalances(entries: Entry[]) {
     const sourceId = allocationSourceId(entry, sources);
     const source = byId.get(sourceId);
     if (!source || entry.sourceKind && entry.sourceKind !== source.entry.kind || entry.amountCents <= 0) throw new Error("Financial source history is inconsistent.");
-    if (entry.studentId !== source.entry.studentId || entry.kind === "payout" && source.entry.kind !== "payment" || entry.kind === "transferOut" && source.entry.kind !== "fundraiser") throw new Error("Financial source history is inconsistent.");
+    if (entry.studentId !== source.entry.studentId || entry.kind === "payout" && source.entry.kind !== "payment" || entry.kind === "transferOut" && source.entry.kind !== "fundraiser" && !entry.seasonTransitionPlanId) throw new Error("Financial source history is inconsistent.");
     source.available += entry.kind === "deallocation" ? entry.amountCents : -entry.amountCents;
   }
   for (const source of byId.values()) if (source.available < 0 || source.available > source.entry.amountCents) throw new Error("Financial source balance is inconsistent.");
@@ -84,7 +84,7 @@ export async function allocateUnapplied(ctx: MutationCtx, actor: AppUser, studen
   else await requireSeasonFinanceReady(ctx, account.seasonId);
   if (account.personalAvailableCents + account.fundraisingAvailableCents === 0) { await refreshStudentFinance(ctx, studentId); return; }
   const origin = originId ? await ctx.db.get(originId) : null;
-  const requiredFinancialProjectionVersion = originId ? origin?.requiredFinancialProjectionVersion : 4 as const;
+  const requiredFinancialProjectionVersion = originId && origin && !("targetSeasonId" in origin) ? ("requiredFinancialProjectionVersion" in origin ? origin.requiredFinancialProjectionVersion : undefined) : 4 as const;
   const jobId = await ctx.db.insert("financialAllocationJobs", { requiredFinancialProjectionVersion, studentId, actorId: actor._id, generation: account.generation, state: "running", chargeCursor: null, step: 0, processed: 0, idempotencyPrefix, excludedEventId, maintenanceOriginId: originId, updatedAt: Date.now() });
   const job = await ctx.db.get(jobId);
   if (!job) throw new Error("Allocation job could not be created.");

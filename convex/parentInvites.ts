@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { activeSeason, audit, ownStudent, requireRole, viewer } from "./lib/access";
+import { activeSeason, audit, ownStudent, requireRole, requireSeasonProfileWritable, viewer } from "./lib/access";
 import { emailKey, tokenHash, newToken, verifiedGoogle } from "./lib/invitationIdentity";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -119,6 +119,7 @@ export const acceptParentInvite = mutation({
     const relationship = args.relationship.trim();
     if (!relationship || relationship.length > 80 || !args.authorityAttested || args.attestationVersion !== ATTESTATION_VERSION) throw new Error("Current relationship and legal guardian authority attestation are required.");
     const student = await eligibleStudent(ctx, row.studentId);
+    await requireSeasonProfileWritable(ctx, student.seasonId);
     if (who.email === emailKey(student.email)) throw new Error("A student cannot link their own identity as a parent.");
     let parent = await existingParent(ctx, who.authUserId);
     if ((parent && (!parent.active || parent.role !== "parent")) || await emailAccountConflict(ctx, who.email, who.authUserId)) throw new Error("This account has another role or is inactive. Ask a Coach for help.");
@@ -211,6 +212,20 @@ export const revokeFamilyLink = mutation({
     const link = await ctx.db.get(args.linkId);
     if (!link || !link.active) throw new Error("Active family link not found.");
     await ctx.db.patch(link._id, { active: false, revokedAt: Date.now(), revokedBy: actor._id });
+    const source = await ctx.db.get(link.studentId);
+    if (source) {
+      const plan = await ctx.db.query("seasonTransitionPlans").withIndex("by_sourceSeasonId_and_open", q => q.eq("sourceSeasonId", source.seasonId).eq("open", true)).unique();
+      if (plan) {
+        const mapping = await ctx.db.query("seasonTransitionRosterDecisions").withIndex("by_planId_and_sourceStudentId", q => q.eq("planId", plan._id).eq("sourceStudentId", source._id)).unique();
+        if (mapping?.targetStudentId) {
+          const target = await ctx.db.query("familyLinks").withIndex("by_parentUserId_and_studentId", q => q.eq("parentUserId", link.parentUserId).eq("studentId", mapping.targetStudentId!)).unique();
+          if (target?.active) {
+            await ctx.db.patch(target._id, { active: false, revokedAt: Date.now(), revokedBy: actor._id });
+            await audit(ctx, actor, "familyLinks", target._id, "revokeDuringTransition", true, false);
+          }
+        }
+      }
+    }
     await audit(ctx, actor, "familyLinks", link._id, "revoke", true, false);
     return null;
   },
@@ -223,6 +238,7 @@ export const restoreFamilyLink = mutation({
     const link = await ctx.db.get(args.linkId);
     if (!link || link.active || !args.reason.trim()) throw new Error("Revoked family link and reason are required.");
     const student = await eligibleStudent(ctx, link.studentId);
+    await requireSeasonProfileWritable(ctx, student.seasonId);
     const parent = await ctx.db.get(link.parentUserId);
     if (!parent || !parent.active || parent.role !== "parent" || parent.email === student.email) throw new Error("This family link cannot be restored.");
     if (link.seasonId && link.seasonId !== student.seasonId) throw new Error("Family link season changed; a Coach must review it.");

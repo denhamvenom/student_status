@@ -72,7 +72,7 @@ export async function projectSource(ctx: MutationCtx, account: FinancialAccount,
   cents(entry.amountCents);
   if (entry.originEntryId) {
     const origin = await ctx.db.get(entry.originEntryId);
-    if (entry.kind !== "fundraiser" || !origin || origin.kind !== "fundraiser" || origin.originEntryId || !Number.isSafeInteger(origin.amountCents) || origin.amountCents <= 0) throw new Error("Transferred credit lost its original fundraising source; Coach review is required.");
+    if (!origin || origin.kind !== entry.kind || entry.kind === "payment" && !entry.seasonTransitionPlanId || origin.originEntryId || !Number.isSafeInteger(origin.amountCents) || origin.amountCents <= 0) throw new Error("Transferred credit lost its original fundraising source; Coach review is required.");
   }
   if (entry.fundraiserId || entry.fundraiserRevisionId) {
     const revision = entry.fundraiserRevisionId ? await ctx.db.get(entry.fundraiserRevisionId) : null;
@@ -85,7 +85,7 @@ export async function projectSource(ctx: MutationCtx, account: FinancialAccount,
     sourceEntryId: entry._id, kind: entry.kind, rootOriginEntryId: entry.originEntryId ?? entry._id,
     receivedCents: entry.amountCents, availableCents: entry.amountCents, revision: 0,
     status: entry.amountCents > 0 ? "available" : "exhausted", sourceCreatedAt: entry._creationTime, createdAt: Date.now(),
-    fundraiserId: entry.fundraiserId, fundraiserRevisionId: entry.fundraiserRevisionId,
+    fundraiserId: entry.fundraiserId ?? (entry.originEntryId ? (await ctx.db.get(entry.originEntryId))?.fundraiserId : undefined), fundraiserRevisionId: entry.fundraiserRevisionId ?? (entry.originEntryId ? (await ctx.db.get(entry.originEntryId))?.fundraiserRevisionId : undefined),
   });
   const projected = await ctx.db.get(sourceId);
   if (!projected) throw new Error("Financial source projection is unavailable.");
@@ -111,7 +111,7 @@ export async function sourceForMovement(ctx: Ctx, account: FinancialAccount, ent
     sourceEntryId = earlier[0].sourceEntryId;
   }
   const source = await ctx.db.query("financialSources").withIndex("by_studentId_and_generation_and_sourceEntryId", q => q.eq("studentId", account.studentId).eq("generation", account.generation).eq("sourceEntryId", sourceEntryId!)).unique();
-  if (!source || entry.studentId !== account.studentId || entry.sourceKind && source.kind !== entry.sourceKind || entry.kind === "payout" && source.kind !== "payment" || entry.kind === "transferOut" && source.kind !== "fundraiser") throw new Error("Financial source history is inconsistent.");
+  if (!source || entry.studentId !== account.studentId || entry.sourceKind && source.kind !== entry.sourceKind || entry.kind === "payout" && source.kind !== "payment" || entry.kind === "transferOut" && source.kind !== "fundraiser" && !entry.seasonTransitionPlanId) throw new Error("Financial source history is inconsistent.");
   return source;
 }
 
@@ -119,7 +119,7 @@ export async function projectMovement(ctx: MutationCtx, account: FinancialAccoun
   if (!["allocation", "deallocation", "payout", "transferOut", "awardReversal"].includes(entry.kind)) return;
   if (cents(entry.amountCents) === 0) throw new Error("Financial movement must be positive.");
   const source = await sourceForMovement(ctx, account, entry);
-  if (entry.originEntryId && entry.originEntryId !== source.rootOriginEntryId || entry.destination === "team" && (entry.kind !== "transferOut" || source.kind !== "fundraiser")) throw new Error("Financial movement destination or root lineage is inconsistent.");
+  if (entry.originEntryId && entry.originEntryId !== source.rootOriginEntryId || entry.destination === "team" && (entry.kind !== "transferOut" || source.kind !== "fundraiser" && !entry.seasonTransitionPlanId)) throw new Error("Financial movement destination or root lineage is inconsistent.");
   if (entry.kind === "awardReversal" && (source.kind !== "fundraiser" || source.rootOriginEntryId !== source.sourceEntryId || !source.fundraiserId || source.fundraiserId !== entry.fundraiserId)) throw new Error("Award reduction must use its original fundraiser credit.");
   if (entry.kind === "awardReversal") {
     const revision = entry.fundraiserRevisionId ? await ctx.db.get(entry.fundraiserRevisionId) : null;
@@ -169,7 +169,7 @@ export async function ensureFinancialAccount(ctx: MutationCtx, studentId: Id<"st
   const current = await financialAccount(ctx, studentId);
   if (current) {
     let legacy = false;
-    if (originId) { await requireSeasonFinancialContinuation(ctx, current.seasonId, originId); const origin = await ctx.db.get(originId); legacy = !!origin && origin.requiredFinancialProjectionVersion === undefined; }
+    if (originId) { await requireSeasonFinancialContinuation(ctx, current.seasonId, originId); const origin = await ctx.db.get(originId); legacy = !!origin && !("targetSeasonId" in origin) && (!("requiredFinancialProjectionVersion" in origin) || origin.requiredFinancialProjectionVersion === undefined); }
     return readyFinancialAccount(ctx, studentId, legacy);
   }
   const entry = await ctx.db.query("ledgerEntries").withIndex("by_studentId_and_recordedAt", q => q.eq("studentId", studentId)).first();

@@ -6,6 +6,7 @@ import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { seasonAdminCopy as copy } from './lib/season-admin-copy'
 import styles from './SeasonAdministration.module.css'
+import { SeasonReviewSteps, SeasonTransitionProgress, SeasonHistory } from './SeasonReviewSteps'
 
 type Plan = { id: Id<'seasonTransitionPlans'>; targetName: string; targetCompetitionYear: number; targetStartDate: string; targetEndDate: string; revision: number; state: string; updatedAt: number }
 const message = (error: unknown) => error instanceof Error ? error.message : copy.retry
@@ -100,20 +101,27 @@ function RosterReview({ plan }: { plan: Plan }) {
   </section>
 }
 
-/** Draft and roster review only. Root mounts this after the reviewed backend is synchronized. */
+/** Six-step Coach season transition. */
 export function SeasonAdministration() {
+  const [step, setStep] = useState(0)
+  const completedSource = useRef<string | null>(null)
   const view = useQuery(api.seasonAdmin.overview, {})
   if (view === undefined) return <p role="status">{copy.loading}</p>
   const plan = view.plan as Plan | null
+  if (plan && plan.state !== "draft") completedSource.current = view.source.id
+  const completed = completedSource.current !== null && completedSource.current !== view.source.id
   return <div className={styles.page}>
+    {completed && <p role="status">Season transition complete. {view.source.name} is now active; historical records remain preserved.</p>}
     <header className={styles.heading}><h1>{copy.title}</h1><p>{copy.description}</p></header>
-    <p className={styles.notice}>{copy.draftOnly}</p>
-    <div className={styles.steps} aria-label="Season transition steps">{steps.map((step, index) => <span key={step} className={`${styles.step} ${index === (plan ? 1 : 0) ? styles.stepCurrent : index > 1 ? styles.stepLater : ''}`}>{index + 1}. {step}</span>)}</div>
+    <p className={styles.notice}>Review and save each decision before confirming. Historical records remain attached to their original season.</p>
+    <nav className={styles.steps} aria-label="Season transition steps">{steps.map((label, index) => <Button key={label} type="button" variant={step === index ? 'default' : 'outline'} disabled={!plan && index > 0 || !!plan && plan.state !== 'draft'} onClick={() => setStep(index)}>{index + 1}. {label}</Button>)}</nav>
     <p className={styles.muted}>{copy.activeSeason}: {view.source.name}</p>
-    <DraftForm key={plan?.id ?? 'new'} plan={plan} sourceYear={view.source.year} />
+    {step === 0 && (!plan || plan.state === 'draft') && <DraftForm key={plan?.id ?? 'new'} plan={plan} sourceYear={view.source.year} />}
     {view.kickoff?.state === 'verified' && <p>{copy.verifiedKickoff(view.kickoff.kickoffDate)}</p>}
     {view.kickoff?.state === 'unavailable' && <p className={styles.notice}>{copy.unverifiedKickoff}</p>}
-    {plan && <RosterReview plan={plan} />}
-    <p className={styles.muted}>{copy.pendingReview}</p>
+    {plan?.state === 'draft' && step === 1 && <RosterReview plan={plan} />}
+    {plan?.state === 'draft' && step >= 2 && <SeasonReviewSteps plan={plan} step={step} />}
+    {plan && plan.state !== 'draft' && <SeasonTransitionProgress plan={plan} onReview={setStep} />}
+    <SeasonHistory />
   </div>
 }

@@ -4,7 +4,7 @@ Updated October 13, 2026
 
 ### Current completion status
 
-All seven broad outcomes remain open. Connected Finance table/history/export and family-link maintenance are complete within their recorded development scope. Parent pagination and Coach season draft/roster are source-reviewed and in integration. Full season transition/carryover, import/payment correction, attendance reporting integration and remaining role journeys still require work. Latest Coach direction: representative visual checks and essential risk-based tests; older exhaustive matrix wording below is superseded. See CURRENT_STATE.md for the current checkpoint, not historical milestone counts.
+All seven broad outcomes remain open. Connected Finance table/history/export, family-link maintenance and season-scoped Parent consumers are implemented within their recorded development scope. The full six-step Coach season candidate, source-preserving carryover, automatic target allocation, recovery and read-only historical browsing are implemented and Astra reviewed. Integrated lint/types/319 tests and build passed; development sync completed 14:21:33. No live season activation occurred. The season batch remains uncommitted; latest published checkpoint is `314a4a9`. Import/payment correction, controlled historical corrections, attendance reporting integration, essential live rehearsal and representative visual/role checks remain required. Latest Coach direction: representative visual checks and essential risk-based tests; older exhaustive matrix wording below is superseded. See CURRENT_STATE.md for the current checkpoint, not historical milestone counts.
 
 ### Latest decisions and active work
 
@@ -83,9 +83,9 @@ This checklist is the plain-language progress guide. The phases below show the r
 - [ ] Finish fundraiser creation and allocation of funds to students.
 - [x] Preserve separate personal-payment and fundraising sources through implemented allocations and withdrawal returns.
 - [x] Extend source checks to recorded payouts and same-season fundraising transfers.
-- [ ] Extend source checks to season carryover.
+- [x] Extend source checks to season carryover, including paired amounts, source roots, retries and automatic target allocation; synthetic checks passed. Live cutover remains unverified.
 - [x] Add fundraising-credit transfers to an active student in the same season, with reasons and automatic recipient allocation.
-- [ ] Add carryover and recorded transfers into the team account. Do not build team-account management.
+- [x] Implement reviewed season carryover and source-preserving recorded moves into team funds. Team-account management is outside scope; no live activation occurred.
 - [x] Test withdrawal decisions for duplicate submissions, stale approval, correct balances, source tracking and role restrictions.
 - [ ] Test remaining financial workflows as they are implemented.
 
@@ -166,15 +166,16 @@ See [the concrete frontend handoff](TIMECLOCK_BACKEND_HANDOFF.md). Student Statu
 
 ## Phase 7 Finish administration and reporting
 
-**Status: Basic roster controls exist; season administration and exports remain.**
+**Status: Six-step season administration and read-only archived-season browsing are implemented and reviewed in development. Controlled historical corrections, essential live/visual evidence and broader reporting remain.**
 
 - [x] Connect basic Coach roster edits such as subteam and Travel Team status.
 - [x] Agree that the Coach manages application accounts.
 - [x] Agree to retain archived records for five years from the date the Coach archives the student account.
 - [ ] Finish account/role administration and separate financial and health-export permissions.
 - [ ] Finish roster archival, reactivation and correction screens.
-- [ ] Build end-of-season review, balance decisions and creation of the next season.
-- [ ] Build read-only historical records with controlled correction handling.
+- [x] Build the full six-step end-of-season review, balance decisions, mapped new-season profiles, typed confirmation, durable progress/recovery and safe final activation; reviewed synthetic development candidate, not a live activation claim.
+- [x] Build Coach-only read-only archived-season roster and held-balance browsing.
+- [ ] Complete controlled historical correction handling with warned, reasoned, audited changes.
 - [ ] Finish reports and exports with the correct restrictions for each role.
 - [ ] Define and implement record deletion after the retention period, including backups and any holds.
 
@@ -522,6 +523,22 @@ October13 live Finance export: all six fictional active members prepared; downlo
 - [x] Development family-link maintenance: Coach UI completed both passes with zero unresolved links; Parent consumer cutover remains in progress.
 - [x] Finance export manifest rehearsal: all six fictional members retained, including zero-charge members; four charge records reconcile with CSV. Selected scope and remaining visual cells stay open.
 
-October13 Coach direction: complete functional workflows with essential risk-based verification. Representative visual coverage replaces exhaustive state/viewport permutations; no new test-count target. Season draft/roster source review cleared; integration and remaining transition steps continue.
+Historical 14:04 milestone: October13 Coach direction was to complete functional workflows with essential risk-based verification. Representative visual coverage replaces exhaustive state/viewport permutations; no new test-count target. Season draft/roster source review cleared; integration and remaining transition steps continue.
 
 - [x] Integrate reviewed season-scoped Parent roster/selection/retry and Coach season draft/returning-roster screen. Development sync14:04:07. Lint/types, unaffected suites, corrected invitation suite and build pass. Full season activation/carryover remains unfinished.
+
+- [x] Implement local Timeclock transition guards: pause new sessions, clock-in/transfer/extension/correction and Calendar changes during transition; preserve clock-out and scheduled closure. Affected Timeclock/calendar checks and scoped lint pass. This historical root-only checkpoint preceded the combined season sync recorded below; it does not complete G6/G7.
+
+
+### October 13 six-step season candidate checkpoint
+
+- [x] Complete all six Coach steps, saved confirmation decisions, source-separated carry/hold/team choices and per-charge carry/write-off reasons.
+- [x] Implement durable progress, pre-application return-to-review and resumable application; preserve original student/account/session IDs and historical evidence.
+- [x] Integrate automatic target allocation, monetary pair verification, shared writer locks, revocation preservation and Timeclock/calendar cutover fences.
+- [x] Astra review the coherent source batch; integrated lint, strict types and 319 tests passed. Build passed after the root encoding correction; development synchronization completed 14:21:33.
+- [ ] Publish the reviewed season batch. It remains uncommitted; latest published and remote-verified checkpoint is `314a4a9`.
+- [x] Narrow live Coach smoke: `/season` loaded six-step navigation and the new-season form, with Save disabled until input. Current `2026–27 Development` remained unchanged; no draft save or activation was attempted.
+- [ ] Rehearse the synchronized season candidate with synthetic data and complete representative visual comparison. No live activation has been performed.
+- [ ] Complete controlled historical corrections. Existing historical browsing is read-only.
+
+These implementation and verification claims do not close G1-G7, authorize production or imply live cutover approval.

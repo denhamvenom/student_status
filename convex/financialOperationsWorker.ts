@@ -1,3 +1,4 @@
+import { requireSeasonTransitionFinancialAccess } from "./lib/seasonFinance";
 import { recordOperationChange } from "./lib/financeChanges";
 import { requireSeasonFinancialRetry, seasonFinancialRetryAvailable } from "./lib/seasonFinance";
 import { makeFunctionReference } from "convex/server";
@@ -43,6 +44,7 @@ export const processPage = internalMutation({
     const job = await ctx.db.get(args.jobId);
     if (!job || job.state !== "running" || job.step !== args.step) return null;
     const actor = await ctx.db.get(job.actorId); const season = await activeSeason(ctx);
+    await requireSeasonTransitionFinancialAccess(ctx, season._id, true);
     if (!actor?.active || actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead && (job.kind === "withdrawal" || actor.financialEdit))) throw new Error("Financial editing permission is unavailable; a Coach must retry.");
     const sender = await financialAccount(ctx, job.studentId);
     const recipient = job.recipientStudentId ? await financialAccount(ctx, job.recipientStudentId) : null;

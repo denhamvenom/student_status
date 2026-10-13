@@ -2,7 +2,7 @@ import { requireSeasonFinanceReady } from "./lib/seasonFinance";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { mutation, query } from "./_generated/server";
-import { activeSeason, audit, requireRole, viewer } from "./lib/access";
+import { activeSeason, audit, requireRole, requireSeasonProfileWritable, viewer } from "./lib/access";
 import { addCharge } from "./lib/money";
 import { refreshStudentFinance } from "./lib/financeSummaries";
 import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
@@ -148,7 +148,7 @@ export const recordAttendance = mutation({
     const user = await viewer(ctx);
     if (user.role !== "coach") throw new Error("Attendance recording is Coach-only.");
     const meeting = await ctx.db.get(args.meetingId); const student = await ctx.db.get(args.studentId);
-    const season = await activeSeason(ctx);
+    const season = await activeSeason(ctx); await requireSeasonProfileWritable(ctx, season._id);
     if (!meeting || !student || !student.active || meeting.seasonId !== season._id || meeting.seasonId !== student.seasonId || meeting.cancelled) throw new Error("Meeting unavailable.");
     const old = await ctx.db.query("attendanceRecords").withIndex("by_meetingId_and_studentId", q => q.eq("meetingId", meeting._id).eq("studentId", student._id)).unique();
     if (old) await ctx.db.patch(old._id, { present: args.present, recordedBy: user._id });
@@ -160,12 +160,12 @@ export const recordAttendance = mutation({
 
 export const createMeeting = mutation({
   args: { kind: v.union(v.literal("Tuesday"), v.literal("Thursday"), v.literal("Outreach")), startsAt: v.number(), eventId: v.optional(v.id("events")) }, returns: v.id("attendanceMeetings"),
-  handler: async (ctx, args) => { const user = await viewer(ctx); requireRole(user, "coach"); const season = await activeSeason(ctx); return await ctx.db.insert("attendanceMeetings", { ...args, seasonId: season._id, cancelled: false }); },
+  handler: async (ctx, args) => { const user = await viewer(ctx); requireRole(user, "coach"); const season = await activeSeason(ctx); await requireSeasonProfileWritable(ctx, season._id); return await ctx.db.insert("attendanceMeetings", { ...args, seasonId: season._id, cancelled: false }); },
 });
 
 export const setMeetingCancelled = mutation({
   args: { meetingId: v.id("attendanceMeetings"), cancelled: v.boolean() }, returns: v.null(),
-  handler: async (ctx, args) => { const user = await viewer(ctx); requireRole(user, "coach"); const meeting = await ctx.db.get(args.meetingId); const season = await activeSeason(ctx); if (!meeting || meeting.seasonId !== season._id) throw new Error("Meeting not found."); await ctx.db.patch(meeting._id, { cancelled: args.cancelled }); await audit(ctx, user, "attendanceMeetings", meeting._id, "setCancelled", meeting.cancelled, args.cancelled); return null; },
+  handler: async (ctx, args) => { const user = await viewer(ctx); requireRole(user, "coach"); const meeting = await ctx.db.get(args.meetingId); const season = await activeSeason(ctx); await requireSeasonProfileWritable(ctx, season._id); if (!meeting || meeting.seasonId !== season._id) throw new Error("Meeting not found."); await ctx.db.patch(meeting._id, { cancelled: args.cancelled }); await audit(ctx, user, "attendanceMeetings", meeting._id, "setCancelled", meeting.cancelled, args.cancelled); return null; },
 });
 
 export const createDriver = mutation({

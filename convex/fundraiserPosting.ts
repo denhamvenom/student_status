@@ -1,3 +1,4 @@
+import { requireSeasonTransitionFinancialAccess } from "./lib/seasonFinance";
 import { recordFundraiserChange } from "./lib/financeChanges";
 import { requireSeasonFinancialRetry } from "./lib/seasonFinance";
 import { makeFunctionReference, paginationOptsValidator } from "convex/server";
@@ -19,7 +20,8 @@ export const processPage = internalMutation({
   handler: async (ctx, args) => {
     const job = await ctx.db.get(args.jobId);
     if (!job || job.state !== "running" || job.cursor !== args.cursor) return null;
-    const actor = await ctx.db.get(job.actorId); const season = await activeSeason(ctx); const fundraiser = await ctx.db.get(job.fundraiserId);
+    const actor = await ctx.db.get(job.actorId); const season = await activeSeason(ctx);
+    await requireSeasonTransitionFinancialAccess(ctx, season._id, true); const fundraiser = await ctx.db.get(job.fundraiserId);
     if (!actor?.active || !fundraisingCapabilities(actor).canPost) throw new Error("Financial editing permission is unavailable; a Coach must retry.");
     if (!fundraiser || fundraiser.seasonId !== season._id || fundraiser.postingJobId !== job._id || fundraiser.state !== "posting") throw new Error("Fundraiser posting scope changed.");
     const page = await ctx.db.query("fundraiserPostingRows").withIndex("by_jobId", q => q.eq("jobId", job._id)).paginate({ cursor: job.cursor, numItems: 1, maximumRowsRead: 2 });

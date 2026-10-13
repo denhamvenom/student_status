@@ -7,6 +7,7 @@ import schema from "./schema";
 import type { Id } from "./_generated/dataModel";
 import type { FunctionReturnType } from "convex/server";
 import { chicagoDayBounds } from "./lib/timeclock";
+import { advanceTimeclockSeasonBoundary, finalizeTimeclockSeasonBoundary } from "./lib/timeclockTransition";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -89,12 +90,15 @@ describe("timeclock transactions", () => {
     await f.t.run(ctx => ctx.db.patch(f.ids.sessionA, { state: "closed", closedAt: now }));
     const args = { sessionId: f.ids.sessionA, studentId: f.ids.student, kind: "add" as const, inAt: now - 5 * 60_000, outAt: now - 4 * 60_000, reason: "Rehearsal correction", key: "archived-correction-01" };
     expect((await f.coach.mutation(api.timeclock.correctInterval, args)).ok).toBe(true);
+    const oldClockCommand = { sessionId: f.ids.sessionB, expectedRevision: 1, key: "archived-clock-command" };
+    expect((await f.coach.mutation(api.timeclock.clockOutAll, oldClockCommand)).ok).toBe(true);
     await f.t.run(async ctx => {
       await ctx.db.patch(f.ids.season, { status: "archived", endsAt: now });
       const coach = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", f.ids.authCoach)).unique();
       await ctx.db.insert("seasons", { name: "Next Synthetic Season", year: 2027, status: "active", startsAt: now + 1, permissionVersion: "test", createdBy: coach!._id });
     });
     expect(await f.coach.mutation(api.timeclock.correctInterval, args)).toMatchObject({ ok: false, code: "INVALID_SESSION" });
+    expect(await f.coach.mutation(api.timeclock.clockOutAll, oldClockCommand)).toMatchObject({ ok: false, code: "FINISHED" });
     expect(await f.coach.mutation(api.timeclock.correctInterval, { ...args, key: "archived-correction-02" })).toMatchObject({ ok: false, code: "INVALID_SESSION" });
     const rows = await f.t.run(ctx => ctx.db.query("timeclockCorrections").withIndex("by_sessionId_and_studentId", q => q.eq("sessionId", f.ids.sessionA).eq("studentId", f.ids.student)).take(10));
     expect(rows).toHaveLength(1);
@@ -302,5 +306,34 @@ describe("timeclock transactions", () => {
     const evidence = await f.coach.query(api.timeclock.correctionEvidence, { sessionId: f.ids.sessionA, studentId: f.ids.student });
     expect(evidence.corrections).toHaveLength(3);
     expect(evidence.corrections[0].correctionId).toBe(correctionId);
+  });
+  it("pauses new attendance and calendar work during transition while allowing clock-out", async () => {
+    const f = await fixture();
+    const input = { sessionId: f.ids.sessionA, mode: "in" as const, expectedRevision: 1, expected: [{ studentId: f.ids.student, intervalId: null }], key: "transition-clock-in-01" };
+    expect((await f.coach.mutation(api.timeclock.clockGroup, input)).ok).toBe(true);
+    await f.t.run(async ctx => {
+      const session = await ctx.db.get(f.ids.sessionA); if (!session) throw new Error("Missing session");
+      await ctx.db.insert("seasonTransitionPlans", { sourceSeasonId: session.seasonId, targetName: "Next", targetCompetitionYear: 2027, targetStartDate: "2026-08-01", targetEndDate: "2027-07-31", state: "draining", open: true, revision: 1, createdBy: session.openedBy, updatedBy: session.openedBy, createdAt: 0, updatedAt: 0, idempotencyKey: "transition-test", requestHash: "test" });
+    });
+    expect(await f.coach.mutation(api.timeclock.clockGroup, input)).toMatchObject({ ok: false, code: "SEASON_TRANSITION" });
+    expect(await f.coach.mutation(api.timeclock.createUnscheduled, { title: "Paused", durationMs: 60000, key: "transition-new-session" })).toMatchObject({ ok: false, code: "SEASON_TRANSITION" });
+    expect(await f.t.mutation(internal.calendarState.begin, { calendarIdHash: "synthetic", now: Date.now() })).toBeNull();
+    expect(await f.coach.mutation(api.timeclock.clockOutAll, { sessionId: f.ids.sessionA, expectedRevision: 1, key: "transition-out-all" })).toMatchObject({ ok: true, count: 1 });
+  });
+  it("moves future sessionless occurrences once and invalidates old calendar refreshes at cutover", async () => {
+    const f = await fixture();
+    await f.t.run(async ctx => {
+      const session = await ctx.db.get(f.ids.sessionA); if (!session) throw new Error("Missing session");
+      const target = await ctx.db.insert("seasons", { name: "Next", year: 2027, status: "draft", startsAt: Date.now(), permissionVersion: "test", createdBy: session.openedBy });
+      const future = await ctx.db.insert("timeclockOccurrences", { seasonId: session.seasonId, source: "calendar", sourceKey: "future-one", title: "Future", allDay: false, scheduledStart: Date.now()+86400000, scheduledEnd: Date.now()+90000000, cancelled:false, observedAt:Date.now(), revision:1, needsReview:false });
+      const sync = await ctx.db.insert("timeclockCalendarSync", {key:"team",calendarIdHash:"test",timezone:"America/Chicago",generation:3,syncToken:"old"});
+      await advanceTimeclockSeasonBoundary(ctx, session.seasonId, target, null, Date.now());
+      expect((await ctx.db.get(future))?.seasonId).toBe(target);
+      expect((await ctx.db.get(session.occurrenceId))?.seasonId).toBe(session.seasonId);
+      await expect(finalizeTimeclockSeasonBoundary(ctx,session.seasonId)).rejects.toThrow("Close all");
+      await ctx.db.patch(f.ids.sessionA,{state:"closed"});await ctx.db.patch(f.ids.sessionB,{state:"closed"});
+      await finalizeTimeclockSeasonBoundary(ctx,session.seasonId);
+      expect(await ctx.db.get(sync)).toMatchObject({generation:4});expect((await ctx.db.get(sync))?.syncToken).toBeUndefined();
+    });
   });
 });

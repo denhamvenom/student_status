@@ -1,3 +1,4 @@
+import { requireSeasonTransitionFinancialAccess } from "./lib/seasonFinance";
 import { seasonFinanceControl } from "./lib/seasonFinance";
 import { makeFunctionReference } from "convex/server";
 import { v } from "convex/values";
@@ -17,6 +18,7 @@ export const rebuild = mutation({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx);
     if (actor.role !== "coach") throw new Error("Only a Coach may rebuild financial records.");
+    await requireSeasonTransitionFinancialAccess(ctx, (await activeSeason(ctx))._id);
     const control = await seasonFinanceControl(ctx, (await activeSeason(ctx))._id);
     if (control && control.state !== "ready" && control.state !== "failed") throw new Error("Wait for season fee maintenance before starting a financial rebuild.");
     return startFinancialRebuild(ctx, args.studentId, actor._id);
@@ -28,6 +30,7 @@ export async function startFinancialRebuild(ctx: MutationCtx, studentId: Id<"stu
   if (!actor?.active || actor.role !== "coach") throw new Error("Only an active Coach may rebuild financial records.");
   const student = await ctx.db.get(studentId); const season = await activeSeason(ctx);
   if (!student || student.seasonId !== season._id) throw new Error("Student is unavailable in the active season.");
+  await requireSeasonTransitionFinancialAccess(ctx, season._id, true);
   const current = await financialAccount(ctx, student._id);
   if (current) await requireNoFinancialJob(ctx, current);
   if (current?.state === "allocating") throw new Error("Finish the pending allocation before rebuilding.");
@@ -55,6 +58,7 @@ export const processPage = internalMutation({
     const actor = account.rebuildActorId ? await ctx.db.get(account.rebuildActorId) : null;
     if (!actor?.active || actor.role !== "coach") throw new Error("Financial rebuild actor is unavailable; a Coach must restart.");
     const season = await activeSeason(ctx);
+    await requireSeasonTransitionFinancialAccess(ctx, season._id, true);
     if (season._id !== account.seasonId) throw new Error("Financial rebuild season changed.");
     const student = await ctx.db.get(account.studentId);
     if (!student || student.seasonId !== account.seasonId) throw new Error("Financial rebuild student scope changed.");

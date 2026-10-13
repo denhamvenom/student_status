@@ -1,6 +1,7 @@
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { timeclockTransitionLocked } from "./timeclockTransition";
 
 type Ctx = QueryCtx | MutationCtx;
 export type AppUser = Doc<"appUsers">;
@@ -37,11 +38,16 @@ export async function activeSeason(ctx: Ctx) {
   return season;
 }
 
+export async function requireSeasonProfileWritable(ctx: Ctx, seasonId: Id<"seasons">) {
+  if (await timeclockTransitionLocked(ctx, seasonId)) throw new Error("Season transition is in progress. Profile and roster changes are paused until it finishes.");
+}
+
 export async function studentAccess(ctx: Ctx, user: AppUser, studentId: Id<"students">): Promise<Doc<"students">> {
   const student = await ctx.db.get(studentId);
   if (!student) throw new Error("Student not found.");
   const season = await activeSeason(ctx);
   if (!student.active || student.seasonId !== season._id) throw new Error("Student is unavailable in the active season.");
+  if ("scheduler" in ctx) await requireSeasonProfileWritable(ctx, season._id);
   if (user.role === "coach" || user.travelLead) return student;
   if (user.role === "student" && student.userId === user._id) return student;
   if (user.role === "parent") {
@@ -55,6 +61,7 @@ export async function ownStudent(ctx: Ctx, user: AppUser): Promise<Doc<"students
   requireRole(user, "student");
   const season = await activeSeason(ctx);
   const student = await ctx.db.query("students").withIndex("by_seasonId_and_userId", q => q.eq("seasonId", season._id).eq("userId", user._id)).unique();
+  if ("scheduler" in ctx) await requireSeasonProfileWritable(ctx, season._id);
   if (!student || !student.active) throw new Error("No active student profile is linked to this account.");
   return student;
 }

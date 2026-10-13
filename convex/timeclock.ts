@@ -5,6 +5,7 @@ import { v, type Infer } from "convex/values";
 import { activeSeason, requireRole, viewer, type AppUser } from "./lib/access";
 import { assertIdempotencyKey, assertNoOverlap, assertProfileId, chicagoDateKey, chicagoDayBounds, classifiedTime, HALF_HOUR_MS, MAX_EXTENSION_MS, MAX_GROUP_SIZE } from "./lib/timeclock";
 import { verifyTimeclockPin } from "./lib/timeclockPin";
+import { requireTimeclockSeasonWritable, timeclockTransitionLocked } from "./lib/timeclockTransition";
 import { invalidateAttendanceSession } from "./lib/attendanceReports";
 
 const occurrenceId = v.id("timeclockOccurrences");
@@ -33,7 +34,16 @@ async function reviewedStudent(ctx: MutationCtx, id: Id<"students">, seasonId: I
 async function command(ctx: MutationCtx, actor: AppUser, key: string, fingerprint: string, run: () => Promise<Result>): Promise<Result> {
   assertIdempotencyKey(key);
   const old = await ctx.db.query("timeclockCommands").withIndex("by_actorId_and_key", q => q.eq("actorId", actor._id).eq("key", key)).unique();
-  if (old) return old.fingerprint === fingerprint ? JSON.parse(old.resultJson) as Result : fail("KEY_REUSED");
+  if (old) {
+    if (old.fingerprint !== fingerprint) return fail("KEY_REUSED");
+    const result = JSON.parse(old.resultJson) as Result;
+    const request = JSON.parse(fingerprint) as unknown[];
+    const sessionRef = result.sessionId ?? (["group", "extend", "outAll", "correct"].includes(String(request[0])) ? request[1] as Id<"timeclockSessions"> : undefined);
+    const occurrenceRef = result.occurrenceId ?? (request[0] === "open" ? request[1] as Id<"timeclockOccurrences"> : undefined);
+    const record = sessionRef ? await ctx.db.get(sessionRef) : occurrenceRef ? await ctx.db.get(occurrenceRef) : null;
+    if ((sessionRef || occurrenceRef) && (!record || record.seasonId !== (await activeSeason(ctx))._id)) return fail("FINISHED");
+    return result;
+  }
   const result = await run();
   await ctx.db.insert("timeclockCommands", { actorId: actor._id, key, fingerprint, resultJson: JSON.stringify(result), at: Date.now() });
   return result;
@@ -101,7 +111,9 @@ export const applyCalendarOccurrence = internalMutation({
     const sync = await ctx.db.query("timeclockCalendarSync").withIndex("by_key", q => q.eq("key", "team")).unique();
     if (!sync || sync.generation !== args.generation) throw new Error("Calendar refresh was superseded.");
     const season = await activeSeason(ctx);
+    await requireTimeclockSeasonWritable(ctx, season._id);
     const existing = await ctx.db.query("timeclockOccurrences").withIndex("by_source_and_sourceKey", q => q.eq("source", "calendar").eq("sourceKey", args.sourceKey)).unique();
+    if (existing && existing.seasonId !== season._id) return existing._id;
     if (existing?.providerUpdatedAt !== undefined && args.providerUpdatedAt !== undefined && args.providerUpdatedAt < existing.providerUpdatedAt) return existing._id;
     const now = Date.now();
     if (!existing) return await ctx.db.insert("timeclockOccurrences", { seasonId: season._id, source: "calendar", sourceKey: args.sourceKey, title: args.title.trim(), allDay: args.allDay, scheduledStart: args.scheduledStart, scheduledEnd: args.scheduledEnd, allDayStartDate: args.allDayStartDate, allDayEndDate: args.allDayEndDate, recurringEventId: args.recurringEventId, originalStartTime: args.originalStartTime, providerVersion: args.providerVersion, providerUpdatedAt: args.providerUpdatedAt, cancelled: args.cancelled, observedAt: args.observedAt, revision: 1, needsReview: false, lastSeenGeneration: args.generation });
@@ -143,11 +155,13 @@ export const reconcileCalendarGeneration = internalMutation({
   handler: async (ctx, args) => {
     const sync = await ctx.db.query("timeclockCalendarSync").withIndex("by_key", q => q.eq("key", "team")).unique();
     if (!sync || sync.generation !== args.generation) throw new Error("Calendar refresh was superseded.");
+    const currentSeason = await activeSeason(ctx);
+    await requireTimeclockSeasonWritable(ctx, currentSeason._id);
     const page = await ctx.db.query("timeclockOccurrences").withIndex("by_source_and_sourceKey", q => q.eq("source", "calendar")).paginate({ cursor: args.cursor, numItems: 50 });
     const now = Date.now();
     const startDate = chicagoDateKey(args.windowStart);
     for (const occurrence of page.page) {
-      if (occurrence.lastSeenGeneration === args.generation || occurrence.cancelled) continue;
+      if (occurrence.seasonId !== currentSeason._id || occurrence.lastSeenGeneration === args.generation || occurrence.cancelled) continue;
       if ((occurrence.scheduledEnd ?? -Infinity) < args.windowStart && (occurrence.allDayEndDate ?? "") < startDate) continue;
       await ctx.db.patch(occurrence._id, { cancelled: true, observedAt: now, revision: occurrence.revision + 1, needsReview: true });
       const session = await ctx.db.query("timeclockSessions").withIndex("by_occurrenceId", q => q.eq("occurrenceId", occurrence._id)).unique();
@@ -165,6 +179,7 @@ export const openOccurrence = mutation({
   args: { occurrenceId, allDayEnd: v.optional(v.number()), key: v.string() }, returns: commandResult,
   handler: async (ctx, args): Promise<Result> => {
     const actor = await operator(ctx); const now = Date.now();
+    if (await timeclockTransitionLocked(ctx, (await activeSeason(ctx))._id)) return fail("SEASON_TRANSITION");
     return await command(ctx, actor, args.key, JSON.stringify(["open", args.occurrenceId, args.allDayEnd]), async () => {
       const occurrence = await ctx.db.get(args.occurrenceId);
       const season = await activeSeason(ctx);
@@ -193,6 +208,7 @@ export const createUnscheduled = mutation({
   args: { title: v.string(), durationMs: v.number(), key: v.string() }, returns: commandResult,
   handler: async (ctx, args): Promise<Result> => {
     const actor = await operator(ctx); const now = Date.now();
+    if (await timeclockTransitionLocked(ctx, (await activeSeason(ctx))._id)) return fail("SEASON_TRANSITION");
     return await command(ctx, actor, args.key, JSON.stringify(["manual", args.title, args.durationMs]), async () => {
       const title = args.title.trim();
       if (!title || title.length > 160 || !Number.isFinite(args.durationMs) || args.durationMs <= 0 || !Number.isSafeInteger(now + args.durationMs)) return fail("INVALID_WINDOW");
@@ -277,7 +293,7 @@ export const previewGroup = query({
     await operator(ctx);
     if (args.studentIds.length > MAX_GROUP_SIZE || new Set(args.studentIds).size !== args.studentIds.length) throw new Error("Invalid group size or duplicate student.");
     const session = await ctx.db.get(args.sessionId);
-    if (!session || session.state !== "open") return { ok: false as const, code: "FINISHED" };
+    if (!session || session.state !== "open" || session.seasonId !== (await activeSeason(ctx))._id) return { ok: false as const, code: "FINISHED" };
     const locks = await Promise.all(args.studentIds.map(id => ctx.db.query("timeclockStudentLocks").withIndex("by_studentId", q => q.eq("studentId", id)).unique()));
     return { ok: true as const, sessionRevision: session.revision, expected: locks.map((lock, i) => ({ studentId: args.studentIds[i], intervalId: lock?.intervalId ?? null, sessionId: lock?.sessionId ?? null })), conflicts: locks.flatMap((lock, i) => lock?.sessionId && lock.sessionId !== args.sessionId ? [{ studentId: args.studentIds[i], sessionId: lock.sessionId, intervalId: lock.intervalId }] : []) };
   },
@@ -287,6 +303,7 @@ export const clockGroup = mutation({
   args: { sessionId, mode: v.union(v.literal("in"), v.literal("out"), v.literal("transfer")), expectedRevision: v.number(), expected: v.array(expected), pin: v.optional(v.string()), key: v.string() }, returns: commandResult,
   handler: async (ctx, args): Promise<Result> => {
     const actor = await operator(ctx); const now = Date.now();
+    if (args.mode !== "out" && await timeclockTransitionLocked(ctx, (await activeSeason(ctx))._id)) return fail("SEASON_TRANSITION");
     if (args.expected.length < 1 || args.expected.length > MAX_GROUP_SIZE || new Set(args.expected.map(x => x.studentId)).size !== args.expected.length) return fail("INVALID_GROUP");
     const fingerprint = JSON.stringify(["group", args.sessionId, args.mode, args.expectedRevision, args.expected]);
     return await command(ctx, actor, args.key, fingerprint, async () => {
@@ -366,6 +383,7 @@ export const extend = mutation({
   args: { sessionId, halfHours: v.number(), expectedRevision: v.number(), pin: v.string(), key: v.string() }, returns: commandResult,
   handler: async (ctx, args): Promise<Result> => {
     const actor = await operator(ctx); const now = Date.now();
+    if (await timeclockTransitionLocked(ctx, (await activeSeason(ctx))._id)) return fail("SEASON_TRANSITION");
     return await command(ctx, actor, args.key, JSON.stringify(["extend", args.sessionId, args.halfHours, args.expectedRevision]), async () => {
       const checked = await liveSession(ctx, args.sessionId, now);
       if (!checked.session) return fail(checked.expired ? "EXPIRED" : "FINISHED");
@@ -444,6 +462,7 @@ export const correctInterval = mutation({
     // Check before command replay so an archived season cannot return a prior
     // success as if a correction were still accepted.
     const season = await activeSeason(ctx);
+    if (await timeclockTransitionLocked(ctx, season._id)) return fail("SEASON_TRANSITION");
     const currentSession = await ctx.db.get(args.sessionId);
     if (!currentSession || currentSession.seasonId !== season._id) return fail("INVALID_SESSION");
     return await command(ctx, actor, args.key, JSON.stringify(["correct", args.sessionId, args.studentId, args.originalIntervalId, args.targetCorrectionId, args.kind, args.inAt, args.outAt, args.reason]), async () => {

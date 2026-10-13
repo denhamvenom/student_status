@@ -1,3 +1,4 @@
+import { requireSeasonTransitionFinancialAccess } from "./lib/seasonFinance";
 import { makeFunctionReference } from "convex/server";
 import { v } from "convex/values";
 import { internalMutation, mutation } from "./_generated/server";
@@ -21,7 +22,11 @@ export const processPage = internalMutation({
     // Jobs are minted only inside validated server writes; allocation itself is deterministic.
     if (!actor?.active) throw new Error("Allocation actor is unavailable; a Coach must retry.");
     const student = await ctx.db.get(job.studentId); const season = await ctx.db.get(account.seasonId);
-    if (!student?.active || !season || season.status !== "active" || student.seasonId !== account.seasonId) throw new Error("Allocation student is unavailable in the active season.");
+    const origin = job.maintenanceOriginId ? await ctx.db.get(job.maintenanceOriginId) : null;
+    const transitionTarget = origin && "targetSeasonId" in origin && origin.open && origin.targetSeasonId === account.seasonId && (origin.state === "applying" || origin.state === "verifying");
+    if (transitionTarget && job.maintenanceOriginId) await requireSeasonFinancialContinuation(ctx, account.seasonId, job.maintenanceOriginId);
+    if (!student?.active || !season || season.status !== "active" && !(transitionTarget && season.status === "draft") || student.seasonId !== account.seasonId) throw new Error("Allocation student is unavailable in the active season.");
+    await requireSeasonTransitionFinancialAccess(ctx, account.seasonId, true);
     const control = await seasonFinanceControl(ctx, account.seasonId);
     if (control && control.state !== "ready" && control.state !== "draining") {
       const maintenance = control.priorityJobId ? await ctx.db.get(control.priorityJobId) : control.mappingJobId ? await ctx.db.get(control.mappingJobId) : control.bulkJobId ? await ctx.db.get(control.bulkJobId) : null;
