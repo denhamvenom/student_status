@@ -339,3 +339,22 @@ User authorized completing all allowable frontend/backend work through readiness
 No G1–G7 completion is claimed by these substeps. Real signing, production and main remain gated.
 
 Validation at this incremental checkpoint: lint, strict typecheck, Vite build and22test files/126tests pass. Astra source review accepted; build retains an833KB chunk warning. No new live backend sync or browser acceptance is claimed.
+
+### October 13 next integration wave (in progress)
+- [x] Merge reviewed Timeclock frontend753b236 into completion branch; combined Timeclock lint/types/build pass. No main merge.
+- [x] Implement initial profile setup, locked room category, revision-checked ordinary edits and Coach correction requests; frontend integration present locally.
+- [x] Implement verified adult invitation and role/grant backend; frontend work in progress.
+- [ ] Finish reviewed aggregate and attendance worker integration, including failure rollback and request bounds.
+- [ ] Verify account/profile/adult invitation screens against prototype and exercise synthetic live journeys.
+- [ ] Complete permission signing/receipts/corrections/export behind real-signing gate; current first account slice does not close G5.
+Interim synthetic regression suite135/135 passed before final attendance worker tests. Current wave is not yet published or live-synchronized.
+
+Review checkpoint: combined lint/build and145/145 tests across25files passed before final review fixes. Attendance page size is now bounded at10; Astra is checking total fanout. Adult invitation fragment/token-free OAuth handling and paginated, duplicate-protected correction requests are being finalized. Source validation does not close live or visual checks.
+
+### October 13 reviewed account/report wave
+- [x] Resolve Astra findings: fragment-only adult links/token-free OAuth, duplicate-protected paginated corrections, bounded attendance pagination including expanded native pages.
+- [x] Validate152 tests across26files, lint/types/build. Sandbox temporary-file import failure required outside-sandbox rerun; mixed-encoding label fixed. Build retains867KB bundle warning.
+- [x] Sync reviewed source to development third-bandicoot-18; aggregate components installed successfully.
+- [ ] Exercise live profile/account/report journeys and finish four-combination visual evidence.
+- [ ] Publish this reviewed wave and verify remote commit.
+No numbered G1–G7 item is complete from this incremental checkpoint.

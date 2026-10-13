@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { describe, expect, it } from "vitest";
-import { convexTest } from "convex-test";
+import { createTest as convexTest } from "../testUtils";
 import { api } from "./_generated/api";
 import schema from "./schema";
 
@@ -35,6 +35,16 @@ async function fixture() {
 }
 
 describe("server boundaries", () => {
+  it("rejects stale profile edits and invalid required shirt sizes", async () => {
+    const f = await fixture();
+    await f.parent.mutation(api.app.updateStudentProfile, { studentId: f.ids.student, expectedRevision: 0, emergencyName: "Fictional Guardian" });
+    await expect(f.student.mutation(api.app.updateStudentProfile, { studentId: f.ids.student, expectedRevision: 0, preferredName: "Old draft" })).rejects.toThrow("Profile changed");
+    await expect(f.student.mutation(api.app.updateStudentProfile, { studentId: f.ids.student, expectedRevision: 1, shirtSize: "" })).rejects.toThrow("valid shirt");
+    await f.student.mutation(api.app.updateStudentProfile, { studentId: f.ids.student, expectedRevision: 1, shirtSize: "M" });
+    const profile = await f.parent.query(api.app.studentProfile, { studentId: f.ids.student });
+    expect(profile).toMatchObject({ preferredName: "Student", emergencyName: "Fictional Guardian", shirtSize: "M", profileRevision: 2 });
+  });
+
   it("limits family records to linked students and excludes mentor private data", async () => {
     const f = await fixture();
     expect((await f.parent.query(api.app.studentProfile, { studentId: f.ids.student })).allergies.state).toBe("reported");

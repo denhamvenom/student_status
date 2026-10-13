@@ -1,6 +1,9 @@
 /// <reference types="vite/client" />
 import { describe, expect, it } from "vitest";
-import { convexTest } from "convex-test";
+import { createTest } from "../testUtils";
+import { internal } from "./_generated/api";
+import { invalidateAttendanceSession } from "./lib/attendanceReports";
+import type { Id } from "./_generated/dataModel";
 import { makeFunctionReference } from "convex/server";
 import schema from "./schema";
 import type { ApiFromModules, FunctionArgs, FunctionReturnType } from "convex/server";
@@ -15,7 +18,7 @@ const teamRef = makeFunctionReference<"query", FunctionArgs<Reports["team"]>, Fu
 const hour = 3600000;
 const start = Date.parse("2026-10-13T21:00:00Z");
 async function fixture() {
-  const t = convexTest(schema, modules);
+  const t = createTest(schema, modules);
   const ids = await t.run(async ctx => {
     async function account(name: string, role: "coach" | "mentor" | "parent" | "student", travelLead = false) {
       const auth = await ctx.db.insert("users", { email: `${name}@example.invalid` });
@@ -41,10 +44,22 @@ async function fixture() {
     await refreshStudentFinance(ctx, sid);
     await refreshStudentFinance(ctx, other);
     await ctx.db.insert("financeSummaryBackfills", { seasonId: season, state: "complete", cursor: null, processed: 2, updatedAt: 4 });
+    await ctx.db.insert("attendanceReportBackfills", { seasonId: season, state: "complete", cursor: null, processed: 1, updatedAt: start+4*hour });
+    await invalidateAttendanceSession(ctx,session);
     return { coach, mentor, lead, parent, student, sid, other, session };
   });
+  await settleSession(t,ids.session);
   const as = (account: typeof ids.coach) => t.withIdentity({ subject: `${account.auth}|session` });
   return { t, ids, coach: as(ids.coach), mentor: as(ids.mentor), lead: as(ids.lead), parent: as(ids.parent), student: as(ids.student) };
+}
+
+async function settleSession(t:ReturnType<typeof createTest>,sessionId:Id<"timeclockSessions">){
+  for(let step=0;step<100;step++){
+    const row=await t.run(ctx=>ctx.db.query("timeclockSessionReportStates").withIndex("by_sessionId",q=>q.eq("sessionId",sessionId)).unique());
+    if(!row||row.state!=="rebuilding")return;
+    await t.mutation(internal.attendanceReportMaintenance.continueSession,{sessionId,expectedGeneration:row.reportGeneration,expectedSessionRevision:row.sessionRevision,expectedPhase:row.phase,expectedCursor:row.cursor});
+  }
+  throw new Error("Report did not settle.");
 }
 
 describe("role-scoped dashboard reports", () => {
@@ -82,8 +97,9 @@ describe("role-scoped dashboard reports", () => {
     expect(report.legacy.tuesdayHeld).toBe(0);
     expect(JSON.stringify(report)).not.toContain("PRIVATE CORRECTION REASON");
     expect(JSON.stringify(report)).not.toContain("SECRET HEALTH");
-    await f.t.run(ctx => ctx.db.patch(f.ids.session, { needsReview: true }));
-    expect((await f.student.query(attendanceRef, { studentId: f.ids.sid, asOf: start + 4 * hour })).verified.sessionsHeld).toBe(0);
+    await f.t.run(async ctx => {await ctx.db.patch(f.ids.session, { needsReview: true });await invalidateAttendanceSession(ctx,f.ids.session)});
+    await settleSession(f.t,f.ids.session);
+    expect((await f.student.query(attendanceRef, { studentId: f.ids.sid, asOf: start + 4 * hour })).verified?.sessionsHeld).toBe(0);
   });
   it("does not combine split visits to meet one uninterrupted hour or count open/cancelled sessions", async () => {
     const f = await fixture();
@@ -91,14 +107,16 @@ describe("role-scoped dashboard reports", () => {
       const corrections = await ctx.db.query("timeclockCorrections").withIndex("by_sessionId_and_studentId", q => q.eq("sessionId", f.ids.session).eq("studentId", f.ids.sid)).take(10);
       await ctx.db.patch(corrections[0]._id, { kind: "void", inAt: undefined, outAt: undefined });
       for (const [index, offset] of [0, hour].entries()) await ctx.db.insert("timeclockCorrections", { sessionId: f.ids.session, studentId: f.ids.sid, kind: "add", inAt: start + offset, outAt: start + offset + hour / 2, reason: "Synthetic split visit", actorId: f.ids.coach.id, at: start + 3 * hour, commandKey: `add-${index}` });
+      await invalidateAttendanceSession(ctx,f.ids.session);
     });
+    await settleSession(f.t,f.ids.session);
     const result = await f.student.query(attendanceRef, { studentId: f.ids.sid, asOf: start + 4 * hour });
     expect(result.sessions[0]).toMatchObject({ scheduledMs: hour, longestScheduledMs: hour / 2, qualifies: false });
-    expect(result.verified.sessionsAttended).toBe(0);
-    await f.t.run(ctx => ctx.db.patch(f.ids.session, { state: "open", closedAt: undefined }));
-    expect((await f.student.query(attendanceRef, { studentId: f.ids.sid, asOf: start + hour })).verified.sessionsHeld).toBe(0);
-    await f.t.run(ctx => ctx.db.patch(f.ids.session, { state: "cancelled", closedAt: start + 3 * hour }));
-    expect((await f.student.query(attendanceRef, { studentId: f.ids.sid, asOf: start + 4 * hour })).verified.sessionsHeld).toBe(0);
+    expect(result.verified?.sessionsAttended).toBe(0);
+    await f.t.run(async ctx => {await ctx.db.patch(f.ids.session, { state: "cancelled", closedAt: start + 3 * hour });await invalidateAttendanceSession(ctx,f.ids.session)});
+    expect((await f.student.query(attendanceRef,{studentId:f.ids.sid,asOf:start+4*hour})).state).toBe("updating");
+    await settleSession(f.t,f.ids.session);
+    expect((await f.student.query(attendanceRef, { studentId: f.ids.sid, asOf: start + 4 * hour })).verified?.sessionsHeld).toBe(0);
   });
   it("fails closed instead of returning truncated finance totals", async () => {
     const f = await fixture();

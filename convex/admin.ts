@@ -5,6 +5,7 @@ import { activeSeason, audit, requireRole, viewer } from "./lib/access";
 import { addCharge } from "./lib/money";
 import { refreshStudentFinance } from "./lib/financeSummaries";
 import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
+import { markRoomCategoryReview } from "./lib/profileCorrections";
 import { syncWholeTeamMembership } from "./lib/wholeTeam";
 
 export const listJoinRequests = query({
@@ -117,24 +118,22 @@ export const createEvent = mutation({
 });
 
 export const updateRoster = mutation({
-  args: { studentId: v.id("students"), legalName: v.optional(v.string()), preferredName: v.optional(v.string()), subteam: v.optional(v.string()), travelTeam: v.optional(v.boolean()), active: v.optional(v.boolean()), roomCategory: v.optional(v.union(v.literal("Boys"), v.literal("Girls"))) }, returns: v.null(),
+  args: { studentId: v.id("students"), expectedRevision: v.optional(v.number()), reason: v.optional(v.string()), legalName: v.optional(v.string()), preferredName: v.optional(v.string()), subteam: v.optional(v.string()), travelTeam: v.optional(v.boolean()), active: v.optional(v.boolean()), roomCategory: v.optional(v.union(v.literal("Boys"), v.literal("Girls"))) }, returns: v.null(),
   handler: async (ctx, args) => {
     const user = await viewer(ctx); requireRole(user, "coach");
     const student = await ctx.db.get(args.studentId); const season = await activeSeason(ctx);
     if (!student || student.seasonId !== season._id) throw new Error("Student not found.");
-    const { studentId: _studentId, ...changes } = args;
-    if (args.legalName !== undefined && !args.legalName.trim()) throw new Error("Legal name is required.");
-    if (args.roomCategory !== undefined && args.roomCategory !== student.roomCategory) {
-      // Category changes leave existing placements in place for adult review.
-      const events = await ctx.db.query("events").withIndex("by_seasonId_and_startsAt", q => q.eq("seasonId", season._id)).take(200);
-      for (const event of events) {
-        const member = await ctx.db.query("roomMemberships").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
-        if (member) await ctx.db.patch(member.groupId, { needsReview: true });
-      }
-    }
+    const { studentId: _studentId, expectedRevision, reason, ...fields } = args;
+    const identityCorrection = args.legalName !== undefined || args.preferredName !== undefined || args.roomCategory !== undefined || args.active !== undefined && args.active !== student.active;
+    if (identityCorrection && (expectedRevision === undefined || !reason?.trim() || reason.trim().length > 1000)) throw new Error("Identity, room-category and active-status changes require a current profile revision and reason.");
+    if (expectedRevision !== undefined && expectedRevision !== (student.profileRevision ?? 0)) throw new Error("Profile changed. Reload before saving.");
+    if (args.legalName !== undefined && (!args.legalName.trim() || args.legalName.trim().length > 160)) throw new Error("Legal name under 160 characters is required.");
+    if (args.preferredName !== undefined && (!args.preferredName.trim() || args.preferredName.trim().length > 80)) throw new Error("Preferred name under 80 characters is required.");
+    if (args.roomCategory !== undefined && args.roomCategory !== student.roomCategory) await markRoomCategoryReview(ctx, student._id, student.seasonId);
+    const changes = { ...fields, ...(args.legalName !== undefined ? { legalName: args.legalName.trim() } : {}), ...(args.preferredName !== undefined ? { preferredName: args.preferredName.trim() } : {}), ...(args.roomCategory !== undefined ? { roomCategoryLocked: true } : {}), ...(args.active === false && student.active && student.archivedAt === undefined ? { archivedAt: Date.now() } : {}), profileRevision: (student.profileRevision ?? 0) + 1 };
     await ctx.db.patch(student._id, changes);
     if (args.active === true && !student.active) await syncWholeTeamMembership(ctx, user, { ...student, ...changes });
-    await audit(ctx, user, "students", student._id, "updateRoster", student, changes);
+    await audit(ctx, user, "students", student._id, "updateRoster", { profileRevision: student.profileRevision ?? 0, active: student.active, roomCategory: student.roomCategory, legalName: student.legalName }, changes, reason?.trim());
     return null;
   },
 });

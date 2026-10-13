@@ -1,9 +1,10 @@
+import { updateFinanceAggregate } from "./reportAggregates";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { financeFor } from "./readModels";
 import { effectiveChargeCents, sourceBalances } from "./money";
 
-export const FINANCE_SUMMARY_VERSION = 1 as const;
+export const FINANCE_SUMMARY_VERSION = 2 as const;
 
 /** Source-authoritative recomputation; must run after all financial writes in the transaction. */
 export type FinanceSnapshot = { entries: Doc<"ledgerEntries">[]; charges: Doc<"charges">[] };
@@ -41,5 +42,6 @@ export async function refreshStudentFinance(ctx: MutationCtx, studentId: Id<"stu
   const previous = await ctx.db.query("studentFinanceSummaries").withIndex("by_studentId", q => q.eq("studentId", studentId)).unique();
   if (previous) await ctx.db.patch(previous._id, projection);
   else await ctx.db.insert("studentFinanceSummaries", projection);
+  await updateFinanceAggregate(ctx, previous, projection);
   return projection;
 }

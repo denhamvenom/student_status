@@ -8,9 +8,11 @@
  * @module
  */
 
+import type * as accounts from "../accounts.js";
 import type * as admin from "../admin.js";
 import type * as app from "../app.js";
 import type * as attendanceOperations from "../attendanceOperations.js";
+import type * as attendanceReportMaintenance from "../attendanceReportMaintenance.js";
 import type * as auth from "../auth.js";
 import type * as bootstrap from "../bootstrap.js";
 import type * as calendar from "../calendar.js";
@@ -25,18 +27,23 @@ import type * as financeOperations from "../financeOperations.js";
 import type * as financeReportMaintenance from "../financeReportMaintenance.js";
 import type * as http from "../http.js";
 import type * as lib_access from "../lib/access.js";
+import type * as lib_attendanceReports from "../lib/attendanceReports.js";
 import type * as lib_authRedirect from "../lib/authRedirect.js";
 import type * as lib_calendarNormalize from "../lib/calendarNormalize.js";
 import type * as lib_eventEnrollmentState from "../lib/eventEnrollmentState.js";
 import type * as lib_financeSummaries from "../lib/financeSummaries.js";
+import type * as lib_invitationIdentity from "../lib/invitationIdentity.js";
 import type * as lib_money from "../lib/money.js";
+import type * as lib_profileCorrections from "../lib/profileCorrections.js";
 import type * as lib_readModels from "../lib/readModels.js";
+import type * as lib_reportAggregates from "../lib/reportAggregates.js";
 import type * as lib_timeclock from "../lib/timeclock.js";
 import type * as lib_timeclockPin from "../lib/timeclockPin.js";
 import type * as lib_wholeTeam from "../lib/wholeTeam.js";
 import type * as parentInvites from "../parentInvites.js";
 import type * as participation from "../participation.js";
 import type * as permissions from "../permissions.js";
+import type * as profileSetup from "../profileSetup.js";
 import type * as rooms from "../rooms.js";
 import type * as timeclock from "../timeclock.js";
 import type * as timeclockPinControl from "../timeclockPinControl.js";
@@ -51,9 +58,11 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  accounts: typeof accounts;
   admin: typeof admin;
   app: typeof app;
   attendanceOperations: typeof attendanceOperations;
+  attendanceReportMaintenance: typeof attendanceReportMaintenance;
   auth: typeof auth;
   bootstrap: typeof bootstrap;
   calendar: typeof calendar;
@@ -68,18 +77,23 @@ declare const fullApi: ApiFromModules<{
   financeReportMaintenance: typeof financeReportMaintenance;
   http: typeof http;
   "lib/access": typeof lib_access;
+  "lib/attendanceReports": typeof lib_attendanceReports;
   "lib/authRedirect": typeof lib_authRedirect;
   "lib/calendarNormalize": typeof lib_calendarNormalize;
   "lib/eventEnrollmentState": typeof lib_eventEnrollmentState;
   "lib/financeSummaries": typeof lib_financeSummaries;
+  "lib/invitationIdentity": typeof lib_invitationIdentity;
   "lib/money": typeof lib_money;
+  "lib/profileCorrections": typeof lib_profileCorrections;
   "lib/readModels": typeof lib_readModels;
+  "lib/reportAggregates": typeof lib_reportAggregates;
   "lib/timeclock": typeof lib_timeclock;
   "lib/timeclockPin": typeof lib_timeclockPin;
   "lib/wholeTeam": typeof lib_wholeTeam;
   parentInvites: typeof parentInvites;
   participation: typeof participation;
   permissions: typeof permissions;
+  profileSetup: typeof profileSetup;
   rooms: typeof rooms;
   timeclock: typeof timeclock;
   timeclockPinControl: typeof timeclockPinControl;
@@ -116,4 +130,5 @@ export declare const internal: FilterApi<
 
 export declare const components: {
   rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
+  reportAggregates: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"reportAggregates">;
 };

@@ -5,6 +5,7 @@ import { v, type Infer } from "convex/values";
 import { activeSeason, requireRole, viewer, type AppUser } from "./lib/access";
 import { assertIdempotencyKey, assertNoOverlap, assertProfileId, chicagoDateKey, chicagoDayBounds, classifiedTime, HALF_HOUR_MS, MAX_EXTENSION_MS, MAX_GROUP_SIZE } from "./lib/timeclock";
 import { verifyTimeclockPin } from "./lib/timeclockPin";
+import { invalidateAttendanceSession } from "./lib/attendanceReports";
 
 const occurrenceId = v.id("timeclockOccurrences");
 const sessionId = v.id("timeclockSessions");
@@ -61,6 +62,7 @@ async function closeSession(ctx: MutationCtx, session: Doc<"timeclockSessions">,
   if (open.length > MAX_GROUP_SIZE) throw new Error("Too many open intervals to close atomically; contact a Coach.");
   for (const interval of open) await closeInterval(ctx, interval, at, reason);
   await ctx.db.patch(session._id, { state: cancelled ? "cancelled" : "closed", closedAt: at, closeReason: reason, revision: session.revision + 1, needsReview: session.needsReview || reason === "calendar_end_moved_into_past" || cancelled });
+  await invalidateAttendanceSession(ctx, session._id);
 }
 
 async function liveSession(ctx: MutationCtx, id: Id<"timeclockSessions">, now: number) {
@@ -120,12 +122,14 @@ export const applyCalendarOccurrence = internalMutation({
     } else if (session && existing.allDay) {
       // Once opened, the all-day operator-selected window is shared and fixed.
       await ctx.db.patch(session._id, { needsReview: true });
+        await invalidateAttendanceSession(ctx, session._id);
     } else if (!args.allDay && args.scheduledStart !== undefined && args.scheduledEnd !== undefined) {
       const effectiveEnd = args.scheduledEnd + session.extensionMs;
       if (existing.scheduledEnd !== args.scheduledEnd && args.scheduledEnd <= now) await closeSession(ctx, session, now, "calendar_end_moved_into_past");
       else {
         const nextRevision = session.revision + 1;
         await ctx.db.patch(session._id, { scheduledStart: args.scheduledStart, scheduledEnd: args.scheduledEnd, effectiveEnd, revision: nextRevision });
+        await invalidateAttendanceSession(ctx, session._id);
         await scheduleClose(ctx, session, effectiveEnd, nextRevision);
       }
     }
@@ -178,6 +182,7 @@ export const openOccurrence = mutation({
       const end = occurrence.allDay ? args.allDayEnd : occurrence.scheduledEnd;
       if (start === undefined || end === undefined || !Number.isFinite(end) || end <= now || end <= start) return fail("INVALID_WINDOW");
       const id = await ctx.db.insert("timeclockSessions", { occurrenceId: occurrence._id, seasonId: season._id, state: "open", scheduledStart: start, scheduledEnd: end, effectiveEnd: end, extensionMs: 0, revision: 1, openedAt: now, openedBy: actor._id, needsReview: false });
+      await invalidateAttendanceSession(ctx, id);
       await ctx.scheduler.runAt(end, internal.timeclock.scheduledClose, { sessionId: id, expectedRevision: 1, expectedEnd: end });
       return good({ sessionId: id, existing: false });
     });
@@ -194,6 +199,7 @@ export const createUnscheduled = mutation({
       const season = await activeSeason(ctx); const end = now + args.durationMs;
       const occurrence = await ctx.db.insert("timeclockOccurrences", { seasonId: season._id, source: "manual", sourceKey: args.key, title, allDay: false, scheduledStart: now, scheduledEnd: end, cancelled: false, observedAt: now, revision: 1, needsReview: false });
       const session = await ctx.db.insert("timeclockSessions", { occurrenceId: occurrence, seasonId: season._id, state: "open", scheduledStart: now, scheduledEnd: end, effectiveEnd: end, extensionMs: 0, revision: 1, openedAt: now, openedBy: actor._id, needsReview: false });
+      await invalidateAttendanceSession(ctx, session);
       await ctx.scheduler.runAt(end, internal.timeclock.scheduledClose, { sessionId: session, expectedRevision: 1, expectedEnd: end });
       return good({ occurrenceId: occurrence, sessionId: session });
     });
@@ -318,18 +324,22 @@ export const clockGroup = mutation({
         const alreadyOpen = await ctx.db.query("timeclockIntervals").withIndex("by_sessionId_and_outAt", q => q.eq("sessionId", session._id).eq("outAt", undefined)).take(MAX_GROUP_SIZE + 1);
         if (alreadyOpen.length + args.expected.length > MAX_GROUP_SIZE) return fail("EVENT_CAPACITY", { limit: MAX_GROUP_SIZE });
       }
+      const changedSessions = new Set<Id<"timeclockSessions">>();
       for (let i = 0; i < args.expected.length; i++) {
         const student = args.expected[i].studentId; const lock = locks[i];
         if (lock?.intervalId) {
           const interval = await ctx.db.get(lock.intervalId);
           if (!interval || interval.outAt !== undefined) throw new Error("Active interval pointer is inconsistent.");
           await closeInterval(ctx, interval, now, args.mode === "transfer" ? "transfer" : "operator", actor._id);
+          changedSessions.add(interval.sessionId);
         }
         if (args.mode !== "out") {
           const interval = await ctx.db.insert("timeclockIntervals", { sessionId: session._id, studentId: student, inAt: now, openedBy: actor._id, openCommandKey: args.key, scheduleRevision: session.revision });
           await putLock(ctx, student, session._id, interval);
+          changedSessions.add(session._id);
         }
       }
+      for (const changedSession of changedSessions) await invalidateAttendanceSession(ctx, changedSession);
       return good({ at: now, count: args.expected.length });
     });
   },
@@ -346,6 +356,7 @@ export const clockOutAll = mutation({
       const open = await ctx.db.query("timeclockIntervals").withIndex("by_sessionId_and_outAt", q => q.eq("sessionId", args.sessionId).eq("outAt", undefined)).take(MAX_GROUP_SIZE + 1);
       if (open.length > MAX_GROUP_SIZE) return fail("GROUP_TOO_LARGE", { limit: MAX_GROUP_SIZE });
       for (const interval of open) await closeInterval(ctx, interval, now, "operator_all", actor._id);
+      if (open.length) await invalidateAttendanceSession(ctx, args.sessionId);
       return good({ at: now, count: open.length });
     });
   },
@@ -366,6 +377,7 @@ export const extend = mutation({
       if (!verified.ok) return fail(verified.reason === "unconfigured" ? "PIN_UNCONFIGURED" : verified.reason === "rate_limited" ? "PIN_RATE_LIMITED" : "PIN_INVALID");
       const end = session.effectiveEnd + addedMs; const revision = session.revision + 1;
       await ctx.db.patch(session._id, { extensionMs: session.extensionMs + addedMs, effectiveEnd: end, revision });
+      await invalidateAttendanceSession(ctx, session._id);
       await ctx.db.insert("timeclockExtensions", { sessionId: session._id, actorId: actor._id, at: now, addedMs, previousEnd: session.effectiveEnd, newEnd: end, commandKey: args.key });
       await scheduleClose(ctx, session, end, revision);
       return good({ effectiveEnd: end, extensionMs: session.extensionMs + addedMs, revision });
@@ -465,6 +477,7 @@ export const correctInterval = mutation({
         for (const next of proposed) for (const previous of effective) if (next.inAt < previous.outAt && previous.inAt < next.outAt) return fail("CROSS_EVENT_OVERLAP");
       }
       const id = await ctx.db.insert("timeclockCorrections", { sessionId: session._id, studentId: args.studentId, originalIntervalId: args.originalIntervalId, targetCorrectionId: args.targetCorrectionId, kind: args.kind, inAt: args.inAt, outAt: args.outAt, reason, actorId: actor._id, at: Date.now(), commandKey: args.key });
+      await invalidateAttendanceSession(ctx, session._id);
       return good({ correctionId: id });
     });
   },

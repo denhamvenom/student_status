@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { describe, expect, it, vi } from "vitest";
-import { convexTest } from "convex-test";
+import { createTest as convexTest } from "../testUtils";
 import rateLimiter from "@convex-dev/rate-limiter/test";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";

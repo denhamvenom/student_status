@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { describe, expect, it, vi } from "vitest";
-import { convexTest } from "convex-test";
+import { createTest as convexTest } from "../testUtils";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import { syncWholeTeamMembership } from "./lib/wholeTeam";
@@ -29,12 +29,17 @@ async function createComplete(f: Awaited<ReturnType<typeof fixture>>, fields = d
   } finally { vi.useRealTimers(); }
 }
 
+async function setActive(f: Awaited<ReturnType<typeof fixture>>, studentId: (Awaited<ReturnType<typeof fixture>>)["ids"]["students"][number], active: boolean) {
+  const student = await f.t.run(ctx => ctx.db.get(studentId));
+  return f.coach.mutation(api.admin.updateRoster, { studentId, active, expectedRevision: student?.profileRevision ?? 0, reason: "Synthetic membership test" });
+}
+
 describe("Whole Team enrollment", () => {
   it("assigns every active member independently of Travel Team and bills once", async () => {
     const f = await fixture();
     const event = await createComplete(f);
-    await f.coach.mutation(api.admin.updateRoster, { studentId: f.ids.students[2], active: true });
-    await f.coach.mutation(api.admin.updateRoster, { studentId: f.ids.students[2], active: true });
+    await setActive(f, f.ids.students[2], true);
+    await setActive(f, f.ids.students[2], true);
     const rows = await f.t.run(async ctx => ({ participants: await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", event)).collect(), charges: await ctx.db.query("charges").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event)).collect() }));
     expect(rows.participants).toHaveLength(3);
     expect(rows.participants.every(p => p.status === "confirmed")).toBe(true);
@@ -51,9 +56,9 @@ describe("Whole Team enrollment", () => {
       const participant = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", upcoming).eq("studentId", f.ids.students[0])).unique();
       await ctx.db.patch(participant!._id, { status: "withdrawn" });
     });
-    await f.coach.mutation(api.admin.updateRoster, { studentId: f.ids.students[0], active: false });
-    await f.coach.mutation(api.admin.updateRoster, { studentId: f.ids.students[0], active: true });
-    await f.coach.mutation(api.admin.updateRoster, { studentId: f.ids.students[2], active: true });
+    await setActive(f, f.ids.students[0], false);
+    await setActive(f, f.ids.students[0], true);
+    await setActive(f, f.ids.students[2], true);
     const rows = await f.t.run(ctx => ctx.db.query("participants").withIndex("by_studentId", q => q.eq("studentId", f.ids.students[2])).collect());
     expect(rows.map(p => p.eventId)).toEqual([upcoming]);
     expect(await f.t.run(ctx => ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", upcoming).eq("studentId", f.ids.students[0])).unique())).toMatchObject({ status: "withdrawn" });
@@ -98,7 +103,7 @@ describe("Whole Team enrollment", () => {
         await ctx.db.insert("events", { ...eventFields, seasonId: f.ids.season, startsAt: i < 60 ? Date.now() - 10000 : Date.now() + 86400000, archived: i >= 60 });
       }
     });
-    await f.coach.mutation(api.admin.updateRoster, { studentId: f.ids.students[2], active: true });
+    await setActive(f, f.ids.students[2], true);
     const rows = await f.t.run(ctx => ctx.db.query("participants").withIndex("by_studentId", q => q.eq("studentId", f.ids.students[2])).collect());
     expect(rows.map(p => p.eventId)).toEqual([upcoming]);
   });
@@ -148,7 +153,7 @@ describe("Whole Team enrollment", () => {
       await f.t.mutation(internal.eventEnrollment.processPage, { jobId: job!._id, expectedCursor: null });
       expect(await f.coach.query(api.eventEnrollment.status, { eventId: event })).toMatchObject({ state: "running", assigned: 1, processed: 1 });
       // Later activation enrolls independently; it does not extend the original two-member snapshot.
-      await f.coach.mutation(api.admin.updateRoster, { studentId: f.ids.students[2], active: true });
+      await setActive(f, f.ids.students[2], true);
       await f.t.finishAllScheduledFunctions(() => vi.runAllTimers());
       expect(await f.coach.query(api.eventEnrollment.status, { eventId: event })).toMatchObject({ state: "complete", assigned: 3, processed: 2 });
       await f.t.mutation(internal.eventEnrollment.run, { jobId: job!._id });

@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { describe, expect, it } from "vitest";
-import { convexTest } from "convex-test";
+import { createTest as convexTest } from "../testUtils";
 import { makeFunctionReference, type ApiFromModules, type FunctionArgs, type FunctionReturnType } from "convex/server";
 import schema from "./schema";
 import { api } from "./_generated/api";
@@ -34,7 +34,7 @@ describe("source-authoritative finance report maintenance",()=>{
     await f.t.run(async ctx=>{
       const source=await financeFor(ctx,studentId);
       const summary=await ctx.db.query("studentFinanceSummaries").withIndex("by_studentId",q=>q.eq("studentId",studentId)).unique();
-      expect(summary).toMatchObject({...source.summary,travelShareCents:1000,transferredInCents:0,version:1});
+      expect(summary).toMatchObject({...source.summary,travelShareCents:1000,transferredInCents:0,version:2});
       expect(summary).toMatchObject({chargedCents:2500,paidCents:2500,dueCents:0,personalAvailableCents:500,fundraisingAvailableCents:0});
       expect(await calculateStudentFinance(ctx,studentId,{charges:source.charges,entries:source.entries})).toMatchObject({...source.summary,travelShareCents:1000});
     });

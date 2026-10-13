@@ -218,3 +218,7 @@ Modal/event sections/invitation presentation implemented with existing contracts
 ## Seven-item goal authorization — October 13
 
 Complete all allowable frontend/backend checklist work to readiness for Coach visual approval. Current integration branch feature/student-status-completion derives from5343092. GOAL_ACCEPTANCE.md maps requirements/evidence without reducing scope. Upcoming-only Whole Team additions confirmed by user. Real wording approval/signing, retention deletion policy, production/main remain gates. Maintain one owner for shared schema/generated/deployment and coordinate Timeclock branch753b236. Local WholeTeam/reporting candidates need scale corrections before acceptance; do not claim fixture-only success as completion.
+
+## Accounts and report integration review — October 13
+
+Whole Team source checkpoint is published; upcoming-only live rehearsal remains pending. Timeclock frontend753b236 is integrated locally through3946b88, with combined Timeclock checks passing. Account setup/corrections/adult management and aggregate-backed finance/attendance are now implemented locally. Final review fixes cover token handling, query fanout and correction queue scaling. Combined145tests/lint/build passed before those fixes; rerun affected checks and review before development sync. Permission signing, administration, full visual matrix and final multirole acceptance remain open in GOAL_ACCEPTANCE.md.

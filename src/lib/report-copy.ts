@@ -16,4 +16,8 @@ export const reportCopy = {
   charged: 'Charged', applied: 'Applied to charges', available: 'Available funds', due: 'Balance due',
   personal: 'Available personal payments', fundraising: 'Available fundraising credits', earned: 'Earned fundraising travel shares',
   reportUpdating: 'Financial totals are updating.', reportFailed: 'Financial reports need review.', rebuild: 'Rebuild financial reports', rebuilding: 'Starting rebuild…', rebuildProgress: 'Student accounts processed:', rebuildFailed: 'Unable to start the report rebuild.',
+  attendanceUpdating: 'Attendance report updating…', attendanceFailed: 'Attendance evidence needs Coach review.', attendanceUpdatingNote: 'Legacy attendance and available session details remain below. Contact a Coach if reports need review.',
+  finalizedScope: 'Season totals use the latest finalized records. Open-session time refreshes while you view this page.', olderSessions: 'Older sessions', latestSessions: 'Latest sessions',
+  attendanceReportMaintenance: 'Attendance reports', rebuildAttendance: 'Rebuild attendance reports', attendanceRebuildFailed: 'Unable to start attendance report rebuilding.', attendanceRebuildDescription: 'Rebuild verified reports from original Timeclock evidence and audited corrections. Totals stay unavailable until every affected session finishes.',
+  attendanceCoverage: { uninitialized: 'Coverage not initialized. Sessions processed:', running: 'Rebuilding coverage. Sessions processed:', failed: 'Coverage requires review. Sessions processed:', complete: 'Coverage discovered. Sessions processed:' },
 } as const

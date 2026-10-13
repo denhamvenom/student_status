@@ -85,3 +85,48 @@ Root: schema/generated API; shared access and verified-Google helper extraction;
 - Complete parent child-switching, Coach review, paper, invite, setup and export interfaces at the required phone/desktop and light/dark combinations. Synthetic backend tests are distinct from live account journeys and user visual approval.
 
 The later real-signing gate remains deliberate. None of these proposed schemas, synthetic journeys, or content approval metadata independently authorizes real permission signing or production release.
+
+## Frozen implementation recommendation: current permission coverage
+
+Astra design review, October 13, 2026. This section makes the proposed synthetic workflow concrete for root to freeze. It does not authorize real signing. Implement the full workflow below; the real-signing gate remains a separate server restriction.
+
+### Authoritative coverage table
+
+Add `permissionCoverage` with required `seasonId`, `studentId`, `eventId`, `state` (`required|pending|accepted|correction`), integer `revision`, `updatedAt`, `updatedBy`; optional `latestSubmissionId`, `versionId`, `latestReviewId`, `signatureRequestedAt`, `reason`, `correctionField`. Index `by_studentId_and_eventId`, `by_seasonId_and_eventId`, and `by_latestSubmissionId`. The student/event index must resolve uniquely through transactional lookup. Missing row means required, never implicitly accepted.
+
+The row is a mutable projection of append-only submission/review/request evidence. A submission's immutable snapshot and original covered events never change. `latestSubmissionId` identifies the controlling submission for this event, not the most recent historical record globally. A new submission becomes controlling only for its explicitly signed event IDs. It does not change the student's other events. Later-created events have no coverage and remain required.
+
+Use an append-only `permissionSignatureRequests` table for Coach/Travel Lead requests: student, season, bounded event IDs, actor/time, reason, and prior coverage revisions/submission IDs. A request sets affected coverage to required and increments revision, retaining the prior submission pointer for history. Set `signatureRequestedAt`; review must refuse to make that old submission accepted again. A fresh submission after the request clears this blocker on its selected events and moves them to pending.
+
+`permissionAccepted` reads this one coverage row and returns true only for state accepted with a valid controlling, sealed submission covering that exact student/season/event and matching the controlling review. It must not scan history for an older accepted fallback. Legacy submissions without the new typed snapshot/coverage remain readable history but cannot establish current acceptance. No backfill infers acceptance from arbitrary legacy answers JSON.
+
+### Submission and review transitions
+
+| Action | Required checks | Atomic effects |
+| --- | --- | --- |
+| Prepare electronic draft | Fresh verified Google identity; active linked parent; active-season fictional subject registered internally; bounded unique confirmed events; enrollment complete; required profile/contact/health answers available; current season version selected server-side. | Save immutable prepared wording/version, profile/contact/health and original-event snapshot, parent identity, profile revision, event fingerprint and expected coverage revisions. Return draft ID and reviewable exact content. No readiness change. |
+| Submit electronic draft | Same authenticated parent; active link and synthetic allowlist still valid; unused/unexpired draft; exact typed account name and explicit acknowledgment; each Pain/Allergy/Cold choice explicit; current profile/event/version/coverage fingerprints still match. | Insert sealed immutable submission with server-built final typed snapshot and synthetic provenance. Set draft usedSubmissionId. Upsert selected coverage rows to pending, latestSubmissionId=new ID, versionId, revision+1; clear prior correction/request blocker. Preserve old receipts. |
+| Record synthetic paper | Coach or Travel Lead; internally registered fictional student; same version/event/profile validity and real-signing block; actual paper signer distinct from recorder; paper reference/date/attestation and explicit medication choices; stable retry key. | Insert sealed immutable paper submission and pending coverage using the same common transition helper. Record recorder, named signer, source and paper provenance. Never fabricate a parent account login or bypass the synthetic gate. |
+| Accept or request correction | Coach/Travel Lead; complete sealed submission; exact expected latest review ID and exact current controlled event IDs with coverage revisions; correction note required. Reject a stale request or a submission controlling no eligible event. | Append review; update only the current controlled event rows to accepted/correction, latestReviewId, revision+1, correction field/note. Do not mutate submission JSON. If any supplied expected coverage changed, reject the entire transaction. |
+| Request a new signature | Coach/Travel Lead; active student/event scope, current coverage revisions, reason. | Append signature-request evidence and set affected rows required with incremented revision and request time. Keep prior receipt history. Old-submission review cannot satisfy this request. |
+| Re-sign | Same prepare/submit workflow against current required/correction/pending coverage. | New immutable submission with `supersedesSubmissionId` only when one prior submission applies; for mixed prior scope use bounded priorCoverage evidence in snapshot instead of inventing a single parent. Only selected event rows move to new pending submission. |
+
+A draft retry with an already-used draft ID may return its original submission receipt only to the same still-authorized signer; it must never create a second submission. A paper retry compares a stable operation fingerprint and returns the original result; mismatched reuse rejects. A review retry should use a stable idempotency key/fingerprint or explicitly reject stale review state, never append duplicate controlling reviews.
+
+Reviews may cover fewer events than the original receipt when later submissions superseded part of its scope. The review workspace must show the exact still-controlled event list. Supply and compare that full list with revisions, rather than silently reviewing a hidden subset. A request-new-signature row excludes the old submission from actionable acceptance until a new signed snapshot replaces it.
+
+### Version and real-signing boundaries
+
+Version body content, organization names, medication definitions and administration text are immutable. Editing wording creates a new version and changes the season's version pointer for future drafts. Prepared drafts reject if that pointer changes. Existing accepted original snapshots remain history and coverage until an explicit correction or request-new-signature transition; changing a draft version must not silently rewrite or retroactively expand signed scope. The Coach can use the explicit re-sign request workflow when new wording must be signed.
+
+Keep an unconditional real-signing denial in the common electronic/paper transition while this development milestone runs. The only accepted path additionally requires the approved development URL and an internally registered fictional student; electronic signing also requires the registered authorized test parent. Do not accept a public synthetic boolean or infer fictional status from a display name. Content approval metadata alone cannot enable real consent. Public pages and receipts clearly label synthetic test evidence and unapproved wording.
+
+### Minimized UI and export contracts
+
+The parent workspace returns their selected child's current coverage, original receipts and actionable correction fields. Child switches reset unsaved form state and draft identity. A receipt includes exact signed content, original events, signer/source/version/date and synthetic marker. Coach/Travel Lead review exposes current controlled scope alongside original scope, so accepted historical receipts cannot be confused with present readiness.
+
+Bulk export is Coach-only unless Travel Lead has the separate health-export grant for packets containing health/permission snapshots. Recheck the grant on every export request. A non-health manifest must construct an allowlisted projection without health fields or full snapshot JSON. Ordinary Mentor receives no permission packet or health data. Audit export actor, event/scope/count and time; do not duplicate packet contents into audit records. Paper and electronic exports preserve provenance and synthetic labels.
+
+### Required integration tests
+
+Test old accepted A then correction/new submission B cannot fall back to A; partial event supersession preserves other event coverage; explicit re-sign requirement rejects later review of the old receipt; new events remain uncovered; stale profile/event/version/coverage draft rejects; wrong/revoked parent and real/unregistered subjects reject; paper cannot bypass the real gate; duplicate retries do not create extra submissions/reviews; full typed snapshots stay byte-stable after live edits; cross-role health-export denial and immediate grant revocation. Readiness must use authoritative coverage throughout.

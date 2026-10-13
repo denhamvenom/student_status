@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { afterEach, describe, expect, it } from "vitest";
-import { convexTest } from "convex-test";
+import { createTest as convexTest } from "../testUtils";
 import { internal } from "./_generated/api";
 import schema from "./schema";
 

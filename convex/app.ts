@@ -14,7 +14,7 @@ export const viewer = query({
     const user = await maybeViewer(ctx);
     if (!user) return { status: "pending", user: null, students: [], season: null };
     const season = await ctx.db.query("seasons").withIndex("by_status", q => q.eq("status", "active")).first();
-    return { status: "active", user: { id: user._id, name: user.name, email: user.email, role: user.role, travelLead: user.travelLead, financialEdit: user.financialEdit, theme: user.theme ?? "system" }, students: (await linkedStudents(ctx, user)).map(publicStudent), season: season ? { _id: season._id, name: season.name, year: season.year } : null };
+    return { status: "active", user: { id: user._id, name: user.name, email: user.email, role: user.role, travelLead: user.travelLead, financialEdit: user.financialEdit, healthExport: user.healthExport ?? false, accessRevision: user.accessRevision ?? 0, theme: user.theme ?? "system" }, students: (await linkedStudents(ctx, user)).map(student => ({ ...publicStudent(student), profileSetupRequired: student.profileCompletedAt === undefined, profileRevision: student.profileRevision ?? 0 })), season: season ? { _id: season._id, name: season.name, year: season.year } : null };
   },
 });
 
@@ -157,10 +157,11 @@ export const eventReadiness = query({
 });
 
 export const updateStudentProfile = mutation({
-  args: { studentId: v.id("students"), preferredName: v.optional(v.string()), shirtSize: v.optional(v.string()), emergencyName: v.optional(v.string()), emergencyRelationship: v.optional(v.string()), emergencyPhone: v.optional(v.string()), allergies: v.optional(v.object({ state: v.union(v.literal("unknown"), v.literal("none"), v.literal("reported")), text: v.optional(v.string()) })), medications: v.optional(v.object({ state: v.union(v.literal("unknown"), v.literal("none"), v.literal("reported")), text: v.optional(v.string()) })), otcAuthorization: v.optional(v.union(v.literal("yes"), v.literal("contact"), v.literal("no"))) }, returns: v.null(),
+  args: { studentId: v.id("students"), expectedRevision: v.number(), preferredName: v.optional(v.string()), shirtSize: v.optional(v.string()), emergencyName: v.optional(v.string()), emergencyRelationship: v.optional(v.string()), emergencyPhone: v.optional(v.string()), allergies: v.optional(v.object({ state: v.union(v.literal("unknown"), v.literal("none"), v.literal("reported")), text: v.optional(v.string()) })), medications: v.optional(v.object({ state: v.union(v.literal("unknown"), v.literal("none"), v.literal("reported")), text: v.optional(v.string()) })), otcAuthorization: v.optional(v.union(v.literal("yes"), v.literal("contact"), v.literal("no"))) }, returns: v.null(),
   handler: async (ctx, args) => {
     const user = await requireViewer(ctx);
     const student = await studentAccess(ctx, user, args.studentId);
+    if ((student.profileRevision ?? 0) !== args.expectedRevision) throw new Error("Profile changed. Reload before saving.");
     const before = privateStudent(student);
     const changes: Partial<Doc<"students">> = {};
     if (args.preferredName !== undefined) {
@@ -171,6 +172,7 @@ export const updateStudentProfile = mutation({
     }
     if (args.shirtSize !== undefined) {
       if (user.role !== "student" && user.role !== "coach" && user.role !== "parent") throw new Error("Shirt size edit denied.");
+      if (!["XS", "S", "M", "L", "XL", "2XL", "3XL"].includes(args.shirtSize.trim())) throw new Error("Choose a valid shirt size.");
       changes.shirtSize = args.shirtSize.trim();
     }
     const privateEdit = args.emergencyName !== undefined || args.emergencyRelationship !== undefined || args.emergencyPhone !== undefined || args.allergies !== undefined || args.medications !== undefined || args.otcAuthorization !== undefined;
@@ -181,6 +183,7 @@ export const updateStudentProfile = mutation({
     if (args.allergies !== undefined) changes.allergies = args.allergies;
     if (args.medications !== undefined) changes.medications = args.medications;
     if (args.otcAuthorization !== undefined) changes.otcAuthorization = args.otcAuthorization;
+    changes.profileRevision = (student.profileRevision ?? 0) + 1;
     await ctx.db.patch(student._id, changes);
     await audit(ctx, user, "students", student._id, "updateProfile", before, changes);
     return null;

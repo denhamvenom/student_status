@@ -4,33 +4,15 @@ import { mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { activeSeason, audit, ownStudent, requireRole, viewer } from "./lib/access";
+import { emailKey, tokenHash, newToken, verifiedGoogle } from "./lib/invitationIdentity";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const ATTESTATION_VERSION = "parent-relationship-1";
 const ATTESTATION_TEXT = "I attest that I am this student's parent or legal guardian, that I have legal authority to access this student's information, and that the relationship I entered is accurate. Linking my account does not sign travel or medication consent.";
 type Ctx = QueryCtx | MutationCtx;
 
-function emailKey(value: string) { return value.trim().toLowerCase(); }
-async function tokenHash(token: string) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
-  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
-}
-function newToken() {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
-}
 async function setting(ctx: Ctx) {
   return ctx.db.query("parentInvitationSettings").withIndex("by_key", q => q.eq("key", "team")).unique();
-}
-async function verifiedGoogle(ctx: Ctx) {
-  const id = await getAuthUserId(ctx);
-  if (!id) return null;
-  const user = await ctx.db.get(id as Id<"users">);
-  if (!user?.email || user.isAnonymous || !user.emailVerificationTime) return null;
-  const accounts = await ctx.db.query("authAccounts").withIndex("userIdAndProvider", q => q.eq("userId", user._id).eq("provider", "google")).take(2);
-  const verifiedEmail = emailKey(user.email);
-  if (!accounts.some(account => account.emailVerified && emailKey(account.emailVerified) === verifiedEmail)) return null;
-  return { authUserId: user._id, email: emailKey(user.email), name: user.name?.trim() || user.email };
 }
 async function eligibleStudent(ctx: Ctx, studentId: Id<"students">) {
   const season = await activeSeason(ctx);
