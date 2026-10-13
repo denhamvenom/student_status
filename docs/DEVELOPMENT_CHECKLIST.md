@@ -594,3 +594,5 @@ October 13 payment rehearsal: CSV import recorded one simulated cent with exact 
 - [x] Record the Coach's hosted-reference clarification: use the public prototype for visual styling, preserve added features and later decisions, and flag conflicts instead of deleting functionality. Project instructions now enforce this boundary.
 
 - [x] Finance phone payment action now matches the hosted prototype's full-width primary Record payment treatment; rendered verification and Astra review complete. Existing financial functionality and desktop controls preserved.
+
+- [x] Representative phone-light inspection of lower Finance import/review, source totals, export explanation and history cards completed. No additional financial transactions or tests needed; account-details/sidebar and role boundaries remain separate.

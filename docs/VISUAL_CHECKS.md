@@ -40,3 +40,5 @@ October13 representative adult-management update: valid phone dark and desktop l
 October13 user clarification: https://denhamvenom.github.io/student_status/ is the selected visual reference. Preserve all later-added functionality and decisions; adapt their presentation to its design language. Hosted/preserved version differences do not block visual work and must not trigger feature removal. This supersedes the provisional-reference dependency above.
 
 VC-006/007 narrowed: valid phone-light Finance card and payment-dialog evidence now exists; mobile payment CTA mismatch corrected and reobserved, Astra cleared. Other lower import/account/sidebar states remain within the existing queue. No backend change required.
+
+VC-006/007 lower-phone evidence: CSV entry/review controls, source totals, export scope and stacked history now visually inspected at390 light with valid screenshots; prior distorted captures are not used. Remaining work is account-detail/fee-sidebar presentation and relevant role boundaries, not repeating completed import/correction/export transactions.
