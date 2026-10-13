@@ -83,6 +83,7 @@ import type * as profileSetup from "../profileSetup.js";
 import type * as retentionReview from "../retentionReview.js";
 import type * as retentionSchema from "../retentionSchema.js";
 import type * as rooms from "../rooms.js";
+import type * as seasonAdmin from "../seasonAdmin.js";
 import type * as seasonFamilyLinks from "../seasonFamilyLinks.js";
 import type * as timeclock from "../timeclock.js";
 import type * as timeclockPinControl from "../timeclockPinControl.js";
@@ -172,6 +173,7 @@ declare const fullApi: ApiFromModules<{
   retentionReview: typeof retentionReview;
   retentionSchema: typeof retentionSchema;
   rooms: typeof rooms;
+  seasonAdmin: typeof seasonAdmin;
   seasonFamilyLinks: typeof seasonFamilyLinks;
   timeclock: typeof timeclock;
   timeclockPinControl: typeof timeclockPinControl;

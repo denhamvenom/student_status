@@ -152,4 +152,36 @@ describe("server boundaries", () => {
     const finance = await f.student.query(api.app.studentFinances, { studentId: f.ids.student });
     expect(finance).toMatchObject({ state: "updating", summary: null });
   });
-});
+  it("resolves the Student viewer in the current season when an active historical profile shares the account", async () => {
+    const f = await fixture();
+    await f.t.run(async ctx => {
+      const student = await ctx.db.get(f.ids.student); if (!student) throw new Error("Fixture missing");
+      const season = await ctx.db.get(student.seasonId); if (!season) throw new Error("Season missing");
+      const old = await ctx.db.insert("seasons", { name: "Historical", year: 2025, status: "archived", startsAt: 0, permissionVersion: "DRAFT", createdBy: season.createdBy });
+      const { _id, _creationTime, ...fields } = student; void _id; void _creationTime;
+      await ctx.db.insert("students", { ...fields, seasonId: old, legalName: "Historical profile", preferredName: "Historical" });
+    });
+    const viewer = await f.student.query(api.app.viewer, {});
+    expect(viewer.students).toHaveLength(1); expect(viewer.students[0]._id).toBe(f.ids.student);
+    await expect(f.student.query(api.app.listEvents, {})).resolves.toHaveLength(1);
+  });
+  it("keeps Parent viewer and event listing independent of historical links and pages current children through empty nonfinal results", async () => {
+    const f = await fixture();
+    await f.t.run(async ctx => {
+      const student = await ctx.db.get(f.ids.student); const parent = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", f.ids.authParent)).unique(); if (!student || !parent) throw new Error("Fixture missing");
+      const season = await ctx.db.get(student.seasonId); if (!season) throw new Error("Season missing");
+      const old = await ctx.db.insert("seasons", { name: "Historical", year: 2025, status: "archived", startsAt: 0, permissionVersion: "DRAFT", createdBy: season.createdBy });
+      const { _id, _creationTime, ...fields } = student; void _id; void _creationTime;
+      for (let i = 0; i < 120; i++) { const historical = await ctx.db.insert("students", { ...fields, userId: undefined, seasonId: old, preferredName: `Historical ${i}` }); await ctx.db.insert("familyLinks", { parentUserId: parent._id, studentId: historical, seasonId: old, active: true, createdBy: season.createdBy }); }
+      const current = await ctx.db.query("familyLinks").withIndex("by_parentUserId_and_studentId", q => q.eq("parentUserId", parent._id).eq("studentId", student._id)).unique(); if (!current) throw new Error("Link missing"); await ctx.db.patch(current._id, { seasonId: student.seasonId });
+      await ctx.db.patch(student._id, { active: false });
+      await ctx.db.insert("familyLinks", { parentUserId: parent._id, studentId: f.ids.other, seasonId: student.seasonId, active: true, createdBy: season.createdBy });
+      await ctx.db.insert("familyLinkSeasonBackfill", { key: "team", state: "complete", phase: "verify", cursor: null, scanned: 244, unresolved: 0, updatedAt: 0, generation: 1, startedBy: season.createdBy });
+    });
+    expect((await f.parent.query(api.app.viewer, {})).students).toEqual([]);
+    await expect(f.parent.query(api.app.listEvents, {})).resolves.toHaveLength(1);
+    const first = await f.parent.query(api.seasonFamilyLinks.currentSeasonPage, { paginationOpts: { numItems: 1, cursor: null } }); expect(first.page).toEqual([]); expect(first.isDone).toBe(false);
+    const second = await f.parent.query(api.seasonFamilyLinks.currentSeasonPage, { paginationOpts: { numItems: 20, cursor: first.continueCursor } }); expect(second.page.map(row => row._id)).toEqual([f.ids.other]);
+    await f.t.run(async ctx => { const parent = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", f.ids.authParent)).unique(); if (!parent) throw new Error("Parent missing"); const link = await ctx.db.query("familyLinks").withIndex("by_parentUserId_and_studentId", q => q.eq("parentUserId", parent._id).eq("studentId", f.ids.other)).unique(); if (!link) throw new Error("Link missing"); await ctx.db.patch(link._id, { active: false }); });
+    await expect(f.parent.query(api.app.studentProfile, { studentId: f.ids.other })).rejects.toThrow("permission");
+  });});

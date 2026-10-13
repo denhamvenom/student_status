@@ -14,7 +14,7 @@ export const viewer = query({
     const user = await maybeViewer(ctx);
     if (!user) return { status: "pending", user: null, students: [], season: null };
     const season = await ctx.db.query("seasons").withIndex("by_status", q => q.eq("status", "active")).first();
-    return { status: "active", user: { id: user._id, name: user.name, email: user.email, role: user.role, travelLead: user.travelLead, financialEdit: user.financialEdit, healthExport: user.healthExport ?? false, accessRevision: user.accessRevision ?? 0, theme: user.theme ?? "system" }, students: (await linkedStudents(ctx, user)).map(student => ({ ...publicStudent(student), profileSetupRequired: student.profileCompletedAt === undefined, profileRevision: student.profileRevision ?? 0 })), season: season ? { _id: season._id, name: season.name, year: season.year } : null };
+    return { status: "active", user: { id: user._id, name: user.name, email: user.email, role: user.role, travelLead: user.travelLead, financialEdit: user.financialEdit, healthExport: user.healthExport ?? false, accessRevision: user.accessRevision ?? 0, theme: user.theme ?? "system" }, students: (user.role === "student" ? await linkedStudents(ctx, user) : []).map(student => ({ ...publicStudent(student), profileSetupRequired: student.profileCompletedAt === undefined, profileRevision: student.profileRevision ?? 0 })), season: season ? { _id: season._id, name: season.name, year: season.year } : null };
   },
 });
 
@@ -34,8 +34,8 @@ export const listEvents = query({
     const events = await ctx.db.query("events").withIndex("by_seasonId_and_startsAt", q => q.eq("seasonId", season._id)).take(200);
     if (user.role === "mentor" && !user.travelLead) return events.filter(x => !x.archived).map(event => ({ event: mentorEvent(event), participation: null }));
     if (user.role === "coach" || user.travelLead) return events.filter(x => !x.archived).map(event => ({ event, participation: null }));
-    const students = await linkedStudents(ctx, user);
     if (user.role === "parent") return events.filter(x => !x.archived).map(event => ({ event, participation: null }));
+    const students = await linkedStudents(ctx, user);
     const student = students[0];
     if (!student) return [];
     const participations = await ctx.db.query("participants").withIndex("by_studentId", q => q.eq("studentId", student._id)).take(200);

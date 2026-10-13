@@ -2,6 +2,10 @@
 
 User-directed working policy, October 13, 2026. The goal is a working, verified candidate for Coach visual approval. Preserve the full G1-G7 requirements in GOAL_ACCEPTANCE.md; do not redefine completion around what is already built. Production deployment still requires separate authorization.
 
+## Latest verification direction
+
+The Coach explicitly requested less testing and token use on October 13. Finish functional workflows first. Use targeted verification for permissions, financial correctness and record preservation, one integrated check at meaningful checkpoints, and representative phone/desktop/light/dark comparisons. Do not require every visual state in every viewport/theme permutation. Preserve existing tests, but do not expand their count without a concrete risk. This supersedes exhaustive visual-matrix instructions in older plans and skills; product requirements and production boundaries remain intact.
+
 ## Work in complete workflows
 
 - Choose the next user-visible workflow and state its acceptance conditions before starting. Finish its backend, screen, ordinary error/recovery path and essential tests together before starting another dependent feature.
@@ -26,7 +30,7 @@ Defer to the existing checklist's follow-up section: cosmetic micro-adjustments,
 
 - Use focused tests during implementation for real risks: permissions, financial conservation, retry/idempotency, state transitions and required behavior.
 - Run the full integrated checks at a coherent milestone. Repeat only when relevant source changes or unresolved failures justify it. Preserve test assertions; diagnose infrastructure/timeouts rather than rerunning blindly or hiding failures.
-- Compare the changed workflow with the prototype at the required phone/desktop and light/dark sizes. Record concrete mismatches and fix material ones. Do not equate more screenshots with more completion, or recollect valid unchanged evidence.
+- Compare representative changed workflows with the prototype on phone/desktop and in light/dark; expand only for an observed layout risk. Record concrete mismatches and fix material ones. Do not equate more screenshots with more completion, or recollect valid unchanged evidence.
 - A passing build is not a live rehearsal; a live happy path is not a permission audit. Collect the missing evidence without repeatedly re-proving what is already established.
 
 ## Conserve context and report outcomes

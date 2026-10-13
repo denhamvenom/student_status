@@ -4,6 +4,10 @@ Updated October 13, 2026. Baseline inspected: `5343092`, branch `feature/student
 
 The latest user instruction authorizes all seven workstreams below, superseding older documents that limit work to frontend-only. It does not authorize production, main merge, real permission signing before wording approval, or automatic retention deletion before policy is settled. Synthetic development evidence, user visual approval, and release approval are separate gates.
 
+## Verification scope update — October 13
+
+The Coach requested reduced testing and token use. Product outcomes G1–G7 remain required. Historical demands below for every state at all four viewport/theme combinations are superseded by representative phone/desktop/light/dark comparisons, expanding only for observed risks. Use essential permissions, financial and data-preservation tests; reuse valid prior evidence and batch integrated checks. See COMPLETION_WORKFLOW.md. Do not equate test counts with completion.
+
 ## Seven required outcomes
 
 | ID | Required outcome and full workflow | Baseline / source anchors | Evidence required before completion |

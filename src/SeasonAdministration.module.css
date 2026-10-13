@@ -1,0 +1,23 @@
+.page { display: grid; gap: 1.25rem; padding-bottom: 6rem; }
+.heading h1 { margin: 0; font-family: Anton, Impact, sans-serif; font-size: clamp(2rem, 4vw, 2.7rem); font-weight: 400; }
+.heading p { margin: .45rem 0 0; color: var(--text-muted); }
+.steps { display: flex; flex-wrap: wrap; gap: .4rem; }
+.step { border: 1px solid var(--border-default); border-radius: .3rem; padding: .45rem .65rem; background: var(--surface-card); font-size: .85rem; font-weight: 600; }
+.stepCurrent { background: var(--purple-700); color: #fff; border-color: var(--purple-700); }
+.stepLater { color: var(--text-muted); }
+.notice { margin: 0; padding: .8rem 1rem; border-radius: .35rem; background: var(--gold-100); border: 1px solid var(--gold-600); }
+.section { display: grid; gap: 1rem; border: 1px solid var(--border-default); border-radius: .5rem; background: var(--surface-card); padding: 1.25rem; }
+.section h2 { margin: 0; font-family: Anton, Impact, sans-serif; font-size: 1.45rem; font-weight: 400; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .9rem; }
+.field { display: grid; gap: .4rem; font-weight: 600; font-size: .9rem; }
+.field input { min-width: 0; }
+.muted { margin: 0; color: var(--text-muted); }
+.roster { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .65rem; }
+.student { display: grid; gap: .55rem; padding: .8rem; border: 1px solid var(--border-default); border-radius: .35rem; }
+.student strong { display: block; }
+.student small { color: var(--text-muted); }
+.choices { display: flex; flex-wrap: wrap; gap: .35rem; }
+.choices button { flex: 1 1 auto; }
+.actions { position: sticky; bottom: 0; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .6rem; padding: .8rem 0; background: var(--surface-page); border-top: 1px solid var(--border-default); }
+.error { color: var(--text-body); background: var(--gold-100); border: 1px solid var(--gold-600); border-radius: .35rem; padding: .65rem; }
+@media (max-width: 42rem) { .page { padding-bottom: 8rem; } .section { padding: 1rem; } .fields { grid-template-columns: 1fr; } .actions { bottom: 64px; } }

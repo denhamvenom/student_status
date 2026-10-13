@@ -117,7 +117,21 @@ export default defineSchema({
   adultInvitations: defineTable({ email: v.string(), role: v.union(v.literal("coach"), v.literal("mentor")), travelLead: v.boolean(), financialEdit: v.boolean(), healthExport: v.boolean(), tokenHash: v.string(), status: v.union(v.literal("pending"), v.literal("accepted"), v.literal("revoked"), v.literal("replaced")), createdBy: v.id("appUsers"), createdAt: v.number(), expiresAt: v.number(), acceptedBy: v.optional(v.id("appUsers")), acceptedAt: v.optional(v.number()) }).index("by_tokenHash", ["tokenHash"]).index("by_email_and_status", ["email", "status"]),
   profileCorrectionRequests: defineTable({ seasonId: v.optional(v.id("seasons")), studentId: v.id("students"), field: v.union(v.literal("roomCategory"), v.literal("legalName"), v.literal("account")), requestedBy: v.id("appUsers"), requestedAt: v.number(), note: v.string(), status: v.union(v.literal("pending"), v.literal("approved"), v.literal("denied")), decidedBy: v.optional(v.id("appUsers")), decidedAt: v.optional(v.number()), reason: v.optional(v.string()) }).index("by_studentId", ["studentId"]).index("by_status", ["status"]).index("by_seasonId_and_status", ["seasonId", "status"]).index("by_studentId_and_field_and_status", ["studentId", "field", "status"]),
   seasons: defineTable({ name: v.string(), year: v.number(), status: v.union(v.literal("active"), v.literal("archived")), startsAt: v.number(), endsAt: v.optional(v.number()), permissionVersion: v.string(), activePermissionVersionId: v.optional(v.id("permissionVersions")), createdBy: v.id("appUsers") })
-    .index("by_status", ["status"]).index("by_year", ["year"]),
+    .index("by_status", ["status"]).index("by_year", ["year"]).index("by_name", ["name"]),
+  seasonTransitionPlans: defineTable({
+    sourceSeasonId: v.id("seasons"), targetName: v.string(), targetCompetitionYear: v.number(),
+    targetStartDate: v.string(), targetEndDate: v.string(),
+    state: v.union(v.literal("draft"), v.literal("reviewing"), v.literal("draining"), v.literal("applying"), v.literal("verifying"), v.literal("failed"), v.literal("complete"), v.literal("cancelled")),
+    open: v.boolean(), revision: v.number(), createdBy: v.id("appUsers"), updatedBy: v.id("appUsers"),
+    createdAt: v.number(), updatedAt: v.number(), idempotencyKey: v.string(), requestHash: v.string(),
+    targetSeasonId: v.optional(v.id("seasons")), lastError: v.optional(v.string()),
+  }).index("by_sourceSeasonId_and_open", ["sourceSeasonId", "open"])
+    .index("by_createdBy_and_idempotencyKey", ["createdBy", "idempotencyKey"]),
+  seasonTransitionRosterDecisions: defineTable({
+    planId: v.id("seasonTransitionPlans"), sourceStudentId: v.id("students"), choice: v.union(v.literal("return"), v.literal("depart")),
+    studentFingerprint: v.string(), revision: v.number(), decidedBy: v.id("appUsers"), decidedAt: v.number(),
+  }).index("by_planId_and_sourceStudentId", ["planId", "sourceStudentId"])
+    .index("by_planId_and_choice", ["planId", "choice"]),
   students: defineTable({ seasonId: v.id("seasons"), userId: v.optional(v.id("appUsers")), profileCompletedAt: v.optional(v.number()), profileRevision: v.optional(v.number()), guardianName: v.optional(v.string()), guardianRelationship: v.optional(v.string()), guardianPhone: v.optional(v.string()), guardianEmail: v.optional(v.string()), archivedAt: v.optional(v.number()), legalName: v.string(), preferredName: v.string(), firstName: v.optional(v.string()), lastName: v.optional(v.string()), structuredNameReviewed: v.optional(v.boolean()), email: v.string(), subteam: v.string(), active: v.boolean(), travelTeam: v.boolean(), shirtSize: v.optional(v.string()), roomCategory: v.optional(category), roomCategoryLocked: v.boolean(), emergencyName: v.optional(v.string()), emergencyRelationship: v.optional(v.string()), emergencyPhone: v.optional(v.string()), allergies: report, medications: report, otcAuthorization: v.optional(v.union(v.literal("yes"), v.literal("contact"), v.literal("no"))) })
     .index("by_seasonId_and_active", ["seasonId", "active"]).index("by_seasonId", ["seasonId"]).index("by_userId", ["userId"]).index("by_seasonId_and_userId", ["seasonId", "userId"]).index("by_seasonId_and_email", ["seasonId", "email"]).index("by_active_and_archivedAt", ["active", "archivedAt"]),
   familyLinks: defineTable({ parentUserId: v.id("appUsers"), studentId: v.id("students"), seasonId: v.optional(v.id("seasons")), active: v.boolean(), createdBy: v.id("appUsers"), revokedAt: v.optional(v.number()), revokedBy: v.optional(v.id("appUsers")) })

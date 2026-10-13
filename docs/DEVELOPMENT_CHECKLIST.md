@@ -2,11 +2,15 @@
 
 Updated October 13, 2026
 
+### Current completion status
+
+All seven broad outcomes remain open. Connected Finance table/history/export and family-link maintenance are complete within their recorded development scope. Parent pagination and Coach season draft/roster are source-reviewed and in integration. Full season transition/carryover, import/payment correction, attendance reporting integration and remaining role journeys still require work. Latest Coach direction: representative visual checks and essential risk-based tests; older exhaustive matrix wording below is superseded. See CURRENT_STATE.md for the current checkpoint, not historical milestone counts.
+
 ### Latest decisions and active work
 
 - [x] Agree: build season begins automatically on the official FIRST kickoff calendar day (America/Chicago). Tested date helper is implemented; attendance report integration remains pending.
 - [x] Implement and source-review shared fee priorities, historical identity review, immutable bulk scopes, recovery controls, Mentor profile/driver ownership review, and retention preview/holds. Synced to development October 13 at 12:30:56 after lint, types, 266 tests and build passed; final enrollment retry guard passed its targeted regression.
-- [ ] Complete live and four-view visual rehearsal for the newly synchronized administration/profile controls. Implementation and source clearance do not close this item.
+- [ ] Complete essential live rehearsal and representative visual checks for the newly synchronized administration/profile controls. Implementation and source clearance do not close this item.
 - [x] Integrate reviewed Timeclock dialog focus and narrow-screen fixes; its local lint/types/build pass. Live Group race and physical-device evidence remain open.
 
 - [x] Agree: fundraising reductions affecting spent/transferred credits wait for Coach resolution without changing balances (October 13).
@@ -512,3 +516,12 @@ October 13 completion-first batch in progress: scoped Finance export backend and
 
 October 13 export integration: CSV/manifest controls connected, including local retry and cancellation. Full lint/types/304 tests/production build pass; build bundle warning remains follow-up. Astra backend/collector review clear and both final UI corrections applied. Desktop dark Finance hierarchy/spacing visually inspected at actual1440x1000; phone/light/lower controls and live export remain pending. Development sync is in progress; no G1-G7 closure.
 Development export/link synchronization completed13:42:46. Live migration and export rehearsal remain pending; Parent consumers have not switched.
+
+October13 live Finance export: all six fictional active members prepared; downloaded CSV has four charge rows and exact totals matching the screen (4000cents effective,3101personal applied,899due). Manifest/selected scope/error/cancel live checks remain open. Coach settings now mounts the reviewed-backend family-link maintenance UI; UI review and live migration pending. Season draft/roster UI proceeds in parallel.
+
+- [x] Development family-link maintenance: Coach UI completed both passes with zero unresolved links; Parent consumer cutover remains in progress.
+- [x] Finance export manifest rehearsal: all six fictional members retained, including zero-charge members; four charge records reconcile with CSV. Selected scope and remaining visual cells stay open.
+
+October13 Coach direction: complete functional workflows with essential risk-based verification. Representative visual coverage replaces exhaustive state/viewport permutations; no new test-count target. Season draft/roster source review cleared; integration and remaining transition steps continue.
+
+- [x] Integrate reviewed season-scoped Parent roster/selection/retry and Coach season draft/returning-roster screen. Development sync14:04:07. Lint/types, unaffected suites, corrected invitation suite and build pass. Full season activation/carryover remains unfinished.

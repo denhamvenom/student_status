@@ -53,20 +53,15 @@ export async function studentAccess(ctx: Ctx, user: AppUser, studentId: Id<"stud
 
 export async function ownStudent(ctx: Ctx, user: AppUser): Promise<Doc<"students">> {
   requireRole(user, "student");
-  const student = await ctx.db.query("students").withIndex("by_userId", q => q.eq("userId", user._id)).unique();
+  const season = await activeSeason(ctx);
+  const student = await ctx.db.query("students").withIndex("by_seasonId_and_userId", q => q.eq("seasonId", season._id).eq("userId", user._id)).unique();
   if (!student || !student.active) throw new Error("No active student profile is linked to this account.");
   return student;
 }
 
 export async function linkedStudents(ctx: Ctx, user: AppUser) {
   if (user.role === "student") return [await ownStudent(ctx, user)];
-  if (user.role === "parent") {
-    const season = await ctx.db.query("seasons").withIndex("by_status", q => q.eq("status", "active")).first();
-    if (!season) return [];
-    const links = await ctx.db.query("familyLinks").withIndex("by_parentUserId", q => q.eq("parentUserId", user._id)).take(100);
-    const students = await Promise.all(links.filter(x => x.active).map(x => ctx.db.get(x.studentId)));
-    return students.filter((x): x is Doc<"students"> => !!x && x.active && x.seasonId === season._id);
-  }
+  if (user.role === "parent") throw new Error("Parent students must be read through season-scoped roster pages.");
   return [];
 }
 
