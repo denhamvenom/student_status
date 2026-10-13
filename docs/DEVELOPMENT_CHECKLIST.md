@@ -391,3 +391,7 @@ Parent Status/Attendance live pages now load in the user-opened browser. Coach r
 - Development client type generation succeeded. Financial application synchronization, reviewed Git publication, live financial rehearsal and prototype visual comparison remain pending. G1–G7 remain open.
 
 October 13 10:00 update: all 194 tests across 34 files, lint, strict types and build passed. Withdrawal and travel fixture migrations are now verified. Financial code is awaiting final Astra review, development synchronization and live/visual rehearsal; none of G1–G7 closes on automated evidence alone. Subsequent finance first-page loading guard passed typecheck and scoped lint.
+
+October 13 10:08 publication/live update: financial checkpoint b66450d is verified on the remote development branch and synchronized to dev:third-bandicoot-18. Astra cleared the incremental source review. The additional fundraising grant-revocation regression passes (four fundraiser tests). Corrected fictional permission replacement accepted by Coach and reflected as Accepted in Parent coverage/history. Original corrected receipt remains separate. Re-sign/paper/export, financial rebuild/rehearsal and visual matrix remain open.
+
+Progress estimates toward visual-approval readiness (scope estimates, not checked-box arithmetic): G1 85%, G2 55%, G3 90%, G4 85%, G5 80%, G6 55%, G7 50%; approximately72% overall. All seven outcomes remain open.
