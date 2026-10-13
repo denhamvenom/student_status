@@ -4,18 +4,18 @@ Updated October 13, 2026
 
 ### Current completion status
 
-All seven broad outcomes remain open. Connected Finance table/history/export, family-link maintenance and season-scoped Parent consumers are implemented within their recorded development scope. The full six-step Coach season candidate, source-preserving carryover, automatic target allocation, recovery and read-only historical browsing are implemented and Astra reviewed. Integrated lint/types/319 tests and build passed; development sync completed 14:21:33. No live season activation occurred. The season batch remains uncommitted; latest published checkpoint is `314a4a9`. Import/payment correction, controlled historical corrections, attendance reporting integration, essential live rehearsal and representative visual/role checks remain required. Latest Coach direction: representative visual checks and essential risk-based tests; older exhaustive matrix wording below is superseded. See CURRENT_STATE.md for the current checkpoint, not historical milestone counts.
+All seven broad outcomes remain open. Finance table/history/export, family-link maintenance, season-scoped Parent consumers, the six-step season candidate, payment import/receipt correction, kickoff/Build/Outreach reporting and supported historical roster/attendance/charge corrections are implemented, Astra-reviewed and development-synchronized. Latest published checkpoint is `ba7477f`; latest sync completed 14:54:21. Root observed loaded Parent report cards after rebuilding coverage and correct session totals when switching two existing fictional children, without updating/retry states. No live season activation occurred. Remaining work is scoped live account/role/payment/historical/season journeys, no-linked Parent context and representative visual acceptance. Linked historical balances remain held under the approved contract. Latest Coach direction: representative visuals and essential risk-based checks; older exhaustive matrix wording below is superseded. See CURRENT_STATE.md for the current checkpoint, not historical milestone counts.
 
 ### Latest decisions and active work
 
-- [x] Agree: build season begins automatically on the official FIRST kickoff calendar day (America/Chicago). Tested date helper is implemented; attendance report integration remains pending.
+- [x] Agree: build season begins automatically on the official FIRST kickoff calendar day (America/Chicago). Kickoff phase reporting is implemented, reviewed and synchronized; scoped Parent report readiness is live-verified.
 - [x] Implement and source-review shared fee priorities, historical identity review, immutable bulk scopes, recovery controls, Mentor profile/driver ownership review, and retention preview/holds. Synced to development October 13 at 12:30:56 after lint, types, 266 tests and build passed; final enrollment retry guard passed its targeted regression.
 - [ ] Complete essential live rehearsal and representative visual checks for the newly synchronized administration/profile controls. Implementation and source clearance do not close this item.
 - [x] Integrate reviewed Timeclock dialog focus and narrow-screen fixes; its local lint/types/build pass. Live Group race and physical-device evidence remain open.
 
 - [x] Agree: fundraising reductions affecting spent/transferred credits wait for Coach resolution without changing balances (October 13).
 - [x] Agree: reactivation followed by another archive restarts five-year retention from the latest archive date; automatic deletion remains unauthorized.
-- [x] Implement and source-review the latest-archive clock with before/after audit evidence; 13 focused account/profile tests pass. Development synchronization and live checks remain pending.
+- [x] Implement and source-review the latest-archive clock with before/after audit evidence; 13 focused account/profile tests pass; development synchronization is complete. Live archive/reactivation/rearchive checks remain pending.
 - [ ] Complete the ordinary Mentor-only Google rehearsal using the newly supplied owner-controlled test account. Identity and role assignment remain to be verified; account details stay outside this checklist.
 - [x] Implement, review and publish materialized financial balances, bounded allocation jobs and fundraiser posting; development sync and fictional posting/rebuild are verified. Remaining financial workflows and live cases are listed below.
 
@@ -101,7 +101,7 @@ This checklist is the plain-language progress guide. The phases below show the r
 
 ## Phase 4 Build permission and health forms
 
-**Status: Synthetic parent signing, Coach acceptance and correction/resubmission are verified in development. Real signing remains disabled pending final wording approval; re-signing, paper and export rehearsal remain.**
+**Status: Synthetic signing, Coach acceptance, correction/resubmission, re-signing, paper recording and manifest/health export have live development evidence. Remaining role/grant and representative visual checks stay open; real signing remains disabled pending final wording/products/policy approval.**
 
 - [x] Review the old permission slip as a reference.
 - [x] Provide basic profile/health fields for synthetic development testing.
@@ -539,7 +539,8 @@ Historical 14:04 milestone: October13 Coach direction was to complete functional
 - [x] Publish the reviewed season batch: `214cdfb`, pushed and remote verified; draft PR10 updated.
 - [x] Narrow live Coach smoke: `/season` loaded six-step navigation and the new-season form, with Save disabled until input. Current `2026–27 Development` remained unchanged; no draft save or activation was attempted.
 - [ ] Rehearse the synchronized season candidate with synthetic data and complete representative visual comparison. No live activation has been performed.
-- [ ] Complete controlled historical corrections. Historical attendance is locally implemented/reviewed; roster and financial workflows remain in progress.
+- [x] Implement and source-review historical roster/attendance and supported prepared-account charge corrections; published and development-synchronized. Linked balances remain held.
+- [ ] Complete scoped live historical-correction journeys and representative visual checks.
 
 These implementation and verification claims do not close G1-G7, authorize production or imply live cutover approval.
 
@@ -547,21 +548,30 @@ These implementation and verification claims do not close G1-G7, authorize produ
 - [x] Agreed: events with Outreach in their title are outreach events (case-insensitive).
 - [x] Connect title-based outreach classification to attendance reporting in local source; review passed. Combined sync/live evidence remains below.
 
-### Current integration batch — October 13
+### Published payment/attendance/historical candidate — October 13
 - [x] Implement and source-review kickoff-based Offseason/Build reporting with existing weekday rules.
 - [x] Implement and source-review Outreach title classification; old unclassified projections require the existing report rebuild.
 - [x] Implement and source-review Coach historical attendance correction with expiring access, original evidence, audit and retry protection; focused check verifies report rebuild completes.
-- [ ] Complete combined validation, development sync and representative live/visual evidence for this batch.
-- [x] Implement payment bulk/CSV entry and source-preserving receipt corrections; focused checks pass, review/sync/live evidence pending.
-- [x] Implement historical roster name/subteam corrections with Coach-scoped access and before/after audit; focused checks pass, review/sync/live evidence pending.
-- [ ] Finish historical financial corrections.
+- [x] Complete combined validation, Astra source review, publication and development sync for the supported batch.
+- [ ] Complete remaining payment/historical live journeys and representative visual evidence.
+- [x] Implement, source-review, publish and development-synchronize payment bulk/CSV entry and source-preserving receipt corrections; live entry/correction evidence remains pending.
+- [x] Implement, source-review, publish and development-synchronize historical roster name/subteam corrections with Coach-scoped access and before/after audit; live correction evidence remains pending.
+- [x] Implement and source-review supported prepared-account historical charge corrections; development sync complete. Linked financial records remain held under the approved contract.
 
-October13 batch verification: integrated lint/types/324tests/build passed, Astra cleared payment/attendance/historical attendance/roster, and development sync completed14:43:39. Publication and representative live/visual evidence remain pending. No season activation or production deployment occurred.
+October13 batch verification: integrated lint/types/324tests/build passed, Astra cleared payment/attendance/historical attendance/roster, and development sync completed14:43:39. Publication subsequently completed in `687f2bf`; latest supported follow-up is `ba7477f`. Remaining live/visual evidence is scoped below. No season activation or production deployment occurred.
 
 ### Build meeting naming decision — October 13
 - [x] Agreed: titles containing Build identify Build meetings; calendar dates distinguish weekdays from Saturdays. Case-insensitive title matching and team-local calendar dates apply.
-- [x] Implement/source-review Build weekday/Saturday counts using calendar dates; focused checks passed. Development sync/live report rebuild pending. Outreach classification remains.
+- [x] Implement/source-review/publish Build weekday/Saturday counts using Chicago calendar dates; development sync 14:54:21 and existing coverage rebuild completed. Outreach remains title-classified; Sunday Build meetings stay separate.
 
-Historical finance candidate: prepared archived accounts without downstream carry/transfer lineage support audited charge correction/cancellation and source-preserving reallocation. Focused checks pass; review/sync pending. Linked balances and legacy unprepared projections remain held and are not claimed complete.
+Historical finance candidate: prepared archived accounts without downstream carry/transfer lineage support audited charge correction/cancellation and source-preserving reallocation. Focused checks and Astra review pass; published in `ba7477f` and synchronized at 14:54:21. Linked balances and legacy unprepared projections remain held and are not claimed complete.
 
-October13 historical-finance/Build checkpoint: scoped implementation and Astra review complete; focused checks/types/build pass; development sync14:54:21. Supported archived charge corrections preserve source/audit evidence. Linked financial records remain held under the approved contract, not silently changed. Publication and live/visual evidence pending. Prior synthetic signing/resigning/paper/export evidence is accepted and should not be repeated.
+October13 historical-finance/Build checkpoint: scoped implementation and Astra review complete; focused checks/types/build pass; development sync14:54:21. Supported archived charge corrections preserve source/audit evidence. Linked financial records remain held under the approved contract, not silently changed. Published in `ba7477f`, remote verified. Scoped Parent report readiness is verified below; remaining payment/historical/season live and representative visual evidence stays open. Prior synthetic signing/resigning/paper/export evidence is accepted and should not be repeated.
+- [x] Publish reviewed Build/historical finance checkpoint ba7477f; remote verified and draft PR10 updated.
+- [x] Run Coach development attendance coverage rebuild:4sessions processed.
+- [x] Observe Parent phase/Build/Outreach cards after coverage rebuild: updated 2:56 PM, loaded without updating/retry. Switching two existing fictional children changed session totals (one-minute rehearsals versus zero). This is scoped report/child-context evidence, not full G4.
+- [ ] Verify no-linked Parent context and remaining authorized role journeys; complete representative visual acceptance.
+
+October 13 live season draft rehearsal: all six fictional roster decisions saved, five returning profile reviews saved, reset boundaries saved, one unpaid charge disposition and six available-source dispositions visible in Confirm. No transition activation or financial application yet. Confirmation exposes raw internal choice labels; a bounded shared-copy correction is in progress before visual approval.
+
+Season confirmation wording correction: shared readable labels implemented and browser-verified; scoped lint/typecheck passed and Astra cleared the two-file change. Coach explicitly approved synthetic activation after open-session/lock checks; activation remains pending preflight.
