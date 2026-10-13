@@ -64,8 +64,20 @@ function Button({ children, onClick, disabled, primary, danger, pressed }: { chi
 }
 function Dialog({ title, children, close, feedback }: { title: string; children: React.ReactNode; close: () => void; feedback?: React.ReactNode }) {
   const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => { const node = ref.current; node?.showModal(); return () => node?.close(); }, []);
-  return <dialog ref={ref} className="tc-dialog" aria-label={title} onCancel={event => { event.preventDefault(); close(); }}><h2>{title}</h2>{children}{feedback}</dialog>;
+  useEffect(() => {
+    const node = ref.current;
+    const trigger = document.activeElement;
+    node?.showModal();
+    return () => { node?.close(); if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus(); };
+  }, []);
+  return <dialog ref={ref} className="tc-dialog" aria-label={title} onKeyDown={event => {
+    if (event.key !== "Tab") return;
+    const controls = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]')].filter(node => node.getClientRects().length > 0);
+    const first = controls[0];
+    const last = controls.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  }} onCancel={event => { event.preventDefault(); close(); }}><h2>{title}</h2>{children}{feedback}</dialog>;
 }
 function Pin({ value, change }: { value: string; change: (value: string) => void }) {
   return <label className="tc-label">Operator PIN<input className="tc-input" type="password" inputMode="numeric" autoComplete="off" value={value} onChange={e => change(e.target.value)} /></label>;
