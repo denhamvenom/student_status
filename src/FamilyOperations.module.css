@@ -21,3 +21,11 @@
   .surface :global(.parent-record) > button,
   .surface :global(.parent-restore) { justify-self: start; }
 }
+
+.surface .inviteShare { border-top: 3px solid var(--gold-500); }
+.inviteShare h3 { margin: 0 0 10px; }
+.shareControls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.shareControls input { flex: 1 1 220px; min-width: 0; font-family: ui-monospace, monospace; }
+.shareControls button { flex: none; }
+.accepted { display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
+.accepted h2, .accepted p { margin: 0; overflow-wrap: anywhere; }
