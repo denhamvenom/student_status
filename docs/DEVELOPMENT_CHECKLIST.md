@@ -473,3 +473,15 @@ October 13 visual continuation: restored Parent Attendance metric-card hierarchy
 - [x] Agree build season begins on the official FIRST kickoff day automatically; current2027 date/source verified. Calendar helper implementation assigned; attendance grouping is not yet complete.
 
 Shared-fee Astra review found recovery/mapping/cancellation issues under correction; no source clearance or development sync is claimed for that wave. Adult profile reconciliation/audit fixes are ready for rereview. Production and automatic deletion remain unauthorized.
+
+## Current progress report - October 13, after administration publication
+
+Approximately76% toward readiness for user visual approval. Scope estimates, not checkbox arithmetic or production readiness: G1 frontend85%, G2 visual checks55%, G3 WholeTeam90%, G4 dashboards/attendance90%, G5 accounts/permissions85%, G6 financial/season administration70%, G7 integrated verification60%. All seven remain open. This supersedes earlier progress estimates.
+
+Completed incremental evidence: reviewed fee/profile/retention source published0319966, handoff4beb330 remotely verified; development synchronized12:30:56; full266tests/48files lint/types/build pass, final13UI and1backend focused tests pass. Live explicit historical lunch mapping preserved charge1000/applied100/due900cents and reduced ambiguous queue by one. Mentor profile/retention complete live/four-view rehearsal still pending.
+
+Active: source-separated Coach financial table and change feed backend; table presentation4focused tests pass and Astra presentation review is clear, but it is not integrated/live. Recent-change presentation2focused tests pass; Astra review is pending. Season transition contract drafted. Latest Coach correction supersedes family-authorization requirement: departing funds normally non-refundable; Coach records any team transfer with audit, family can request exception, actual cash/check refund separate. No automatic transfer merely from archiving.
+
+Remaining before visual approval: full conditional phone/desktop light/dark comparisons; later-join/reactivation WholeTeam live check; ordinary Mentor-only access; new fee/profile/retention live workflows; attendance kickoff/category report integration; financial table/feed/export, historical corrections and season carryover; final combined rehearsal and Astra review. Production remains separate.
+
+October 13 scope audit: verified the active goal still explicitly requires all G1-G7 through readiness for user visual approval. Current financial backend work is part of G6 and supports G1/G4; it does not replace the visual queue, role rehearsal, attendance integration or season transition requirements. Sol reports28focused v4 backend tests passing; feed/backfill remains in progress and unsynchronized. Overall estimate stays76%; all seven remain open.

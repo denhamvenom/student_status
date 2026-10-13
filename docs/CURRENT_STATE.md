@@ -7,7 +7,7 @@ Updated October 13, 2026. Verify Git and deployment before continuing.
 - App student-status-readiness-design; branch feature/student-status-completion; draft PR10. Reviewed administration checkpoint0319966 is published and remote verified. Timeclock0df2fb1 is included as59f58d3.
 - Development only: dev:third-bandicoot-18, team daniel-eiland. Shared-fee, retention and profile functions synchronized October13 at12:30:56. No production/main merge authorized.
 - Synthetic student records only. Records, secrets, account-specific screenshots and exports never Git. Real signing and automatic retention deletion remain unauthorized.
-- Active full scope G1-G7: docs/GOAL_ACCEPTANCE.md. All seven remain open; approximately74% scope estimate is unchanged pending new live/visual acceptance.
+- Active full scope G1-G7: docs/GOAL_ACCEPTANCE.md. All seven remain open; approximately76% scope estimate; latest checklist report supersedes earlier estimates.
 
 ## Reviewed administration checkpoint
 
@@ -29,4 +29,10 @@ Integrated lint/types/build and266tests/48files pass outside sandbox; sandbox Vi
 
 ## Working procedure
 
-Use context-checkpoint and prototype-verification skills. Single Git/sync owner root; completed Sol owners are frozen. Astra source review cleared current increments; no live/visual acceptance is implied. Before further delegation, assign non-overlapping files. Keep DEVELOPMENT_CHECKLIST, PLAN and VISUAL_CHECKS current. Financial/attendance evidence detail lives in implementation docs and REVIEW; frontend captures stay private outside Git. Latest confirmed user decisions supersede dated proposals.
+Use context-checkpoint and prototype-verification skills. Single Git/sync owner root. Sol financial owner is actively implementing the source-separated v4 projections and typed financial change feed; those changes are not frozen or synchronized. Astra is reviewing the separate presentation components. Season-contract planning owner is complete and frozen. Earlier source clearance applies only to the published administration checkpoint; no live/visual acceptance is implied. Before further delegation, assign non-overlapping files. Keep DEVELOPMENT_CHECKLIST, PLAN and VISUAL_CHECKS current. Financial/attendance evidence detail lives in implementation docs and REVIEW; frontend captures stay private outside Git. Latest confirmed user decisions supersede dated proposals.
+
+## Current financial continuation
+
+The unmounted Coach Finance table has four focused tests and Astra presentation clearance; the recent-change presentation has two focused tests and is under Astra review. Both still require live query integration and prototype comparison. Sol reports 28 focused backend tests passing for v4 source/writer changes; feed emission, historical backfill and new reader regressions remain in progress. These scoped results do not replace the published 266-test integrated checkpoint.
+
+SEASON_ADMIN_IMPLEMENTATION.md records the reviewed transition contract, not implemented season rollover. Latest departure policy: funds normally remain non-refundable; Coach-reviewed team transfers require audit but no family authorization. Families can request an exception; actual cash/check refund recording remains separate. Archive alone does not transfer funds.

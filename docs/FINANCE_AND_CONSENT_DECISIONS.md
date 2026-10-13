@@ -1,6 +1,6 @@
 # Confirmed Finance and Consent Decisions
 
-Updated October 12, 2026. These are agreed requirements for upcoming development, not completed features. They supersede older planning notes where the rules differ.
+Updated October 13, 2026. These are agreed requirements for upcoming development, not completed features. They supersede older planning notes where the rules differ.
 
 ## Event withdrawal and fees
 
@@ -36,6 +36,14 @@ Track personal payments and fundraising credits as different sources. Fundraisin
 Record transfers between students without creating or losing money. Record when funds leave a student's balance for the team account, with source, amount, actor, date and reason. The team's own bank balance, spending and accounting are outside this app's scope. A transfer record does not execute a bank transaction.
 
 No cash/check payout of fundraising credits to a family has been authorized. Preserve that restriction unless the user explicitly changes it. Confirmed for this milestone: Coach or a Mentor with both Travel Lead and explicit financial-edit permission may transfer available fundraising credits to an active student in the same season. A reason is required. Recipient credits automatically apply to outstanding charges in priority order. Carryover and transfers to the team account remain separate future workflows.
+
+### Departing balances at season close — latest October 13, 2026 decision
+
+Departing funds are normally **nonrefundable** unless the family makes a special request to the Coach. Documented family authorization is **not required** for a Coach-reviewed transfer of unused personal-payment funds to team funds. Archiving an account or closing a season never sweeps a balance automatically: the Coach explicitly reviews and records the disposition for each remaining source and amount. A personal-payment-to-team transfer preserves its payment source lineage and records the Coach actor, amount, date/time and reason in append-only transfer/audit evidence. It is **not** a cash/check refund to the family and does not execute bank accounting. Fundraising-to-team remains a distinct source-class transfer.
+
+A family refund request is an exception for Coach review, not an automatic entitlement or a team-transfer reversal. If approved, an actual cash/check refund is recorded separately through the authorized payout workflow with its required method/reference/date and source restrictions; fundraising credits cannot be paid to a family. A mixed balance is split by source, and no transfer or refund may exceed the still-available amount.
+
+**Superseded October 13 instruction:** an earlier decision required documented family authorization before a personal-payment-to-team transfer. The later direct decision above removed that requirement. Keep the historical decision visible here for traceability; do not enforce it as current policy.
 
 ## Permission form and medication choices
 

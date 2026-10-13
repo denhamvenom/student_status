@@ -1,8 +1,8 @@
-# Proposed finance and administration implementation
+# Finance and administration implementation contracts
 
-October 13, 2026. Financial foundation and fundraiser Wave 1 were published in `b66450d` and synced to development at 10:08; handoff documentation followed in `9767afe` (root-reported evidence). The earlier proposal sections below preserve design history; current checkpoint review and the next-slice contract at the end supersede their baseline descriptions. Wave 2 and season/retention workflows remain unimplemented. The seven-goal acceptance map remains authoritative; no G4 or G6 closure, production action or monetary disposition follows from this document.
+October 13, 2026. Source now includes the financial foundation, fundraiser posting, single-charge corrections, team transfers, shared-fee maintenance, and non-destructive retention review/holds. The next financial slice is source-separated version-4 projections plus the Coach table and recent-change feed; scoped export and season transition remain required subsequent work. Earlier proposal sections preserve design history and must not be read as current implementation status. The checkpoint and frozen contracts near the end supersede their baseline descriptions. The seven-goal acceptance map remains authoritative; no G4 or G6 closure, production action or invented monetary disposition follows from this document.
 
-## Source-backed current state
+## Historical starting baseline (superseded by checkpoint sections)
 
 - `docs/GOAL_ACCEPTANCE.md`, G4 and G6, require genuine Raised/travel-share metrics, fundraiser creation/allocation, complete financial history, charge corrections/priorities, fundraising transfer to team and source-preserving season transitions.
 - `docs/FINANCE_AND_CONSENT_DECISIONS.md` defines separate personal-payment/fundraising sources, withdrawal cancellation/refund treatment, automatic reallocation, permitted fundraising destinations and the account-based retention clock.
@@ -22,6 +22,7 @@ October 13, 2026. Financial foundation and fundraiser Wave 1 were published in `
 4. Withdrawal returns become available account funds, not evidence that cash/check was paid to the family. Returned funds apply to other charges in priority order while excluding the withdrawn event. Unpaid extras cancel automatically; unpaid main balances remain unless explicitly cancelled. Existing reviewed dispositions remain history.
 5. The latest user instruction authorizes building the broader administration, fundraising and season workflows. It does not authorize production, main merge or invented monetary dispositions.
 6. Five-year retention starts at the most recent actual account archival, including archival after reactivation. Season archival is a separate lifecycle event. Holds/deletion coverage and backups/export policy remain unresolved. Do not start the clock merely by closing a season or implement automatic deletion here.
+7. Latest October 13 departure policy: remaining funds are normally nonrefundable unless the family makes a special request to the Coach. A Coach may explicitly record unused personal-payment funds moving to team funds without documented family authorization. Preserve payment lineage and record the exact amount, actor, time and reason; no automatic archive/season-close sweep. An approved exceptional family refund is a separate actual personal cash/check payout. Fundraising-to-team remains distinct, and fundraising family cashout remains prohibited. The earlier family-authorization requirement is superseded.
 
 ## Proposed engineering defaults
 
