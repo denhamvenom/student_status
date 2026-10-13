@@ -21,7 +21,7 @@ Current administration ownership: Sol whole_team_goal owns shared-fee schema/bac
 
 ## Live permission and role evidence
 
-Parent signing, Coach acceptance, correction/resubmission and original receipt immutability are verified with fictional records. Replacement acceptance is now verified in Coach and Parent views. Re-sign request, paper/export, and phone/desktop × light/dark comparisons remain pending. The user-opened Coach session is verified; the separate staff session is Travel Lead. Attendance rebuild found four sessions and Parent totals loaded.
+Parent signing, Coach acceptance, correction/resubmission and original receipt immutability are verified with fictional records. Replacement acceptance is now verified in Coach and Parent views. New signature request, Parent re-signing, Coach acceptance, fictional paper recording/acceptance and manifest-versus-health export are now verified live. Remaining grant/role variants and phone/desktop × light/dark comparisons remain pending. The user-opened Coach session is verified; the separate staff session is Travel Lead. Attendance rebuild found four sessions and Parent totals loaded.
 
 Ordinary Mentor-only test identity was supplied privately but Google test-user setup, first sign-in and assignment remain pending. Existing Mentor+Travel, Student and Parent roles stay unchanged. Timeclock coordinator confirms its integrated frontend has no new known defect; controlled concurrent Group-mode rehearsal and physical-device/origin evidence remain open. Preserve its reserved browser tab; backend/auth changes remain root-owned.
 
@@ -43,3 +43,6 @@ Live follow-up resolved: Coach financial report rebuild completed and synthetic 
 Latest checklist estimates are approximately 74% toward user visual-approval readiness. No G outcome is fully closed. New shared-fee source is unfinished and is not covered by the last 216-test checkpoint.
 
 Additional independent ownership: Sol retention owns new retention-specific backend/UI/test files and coordinates additive schema exports with the shared-fee schema owner. No automatic deletion. Fresh rendered Coach Finance reference confirms team table/grouped actions/recent changes remain a structural alignment gap; see FRONTEND_CONFORMANCE_LOG and FINANCE_ADMIN_IMPLEMENTATION. Timeclock Group concurrency awaits its existing operator sign-in; root is available for read-only interval/lock inspection when coordinated.
+
+
+Retention incremental Astra source review is clear after active-state fingerprint and native read-budget fixes; owner reports 11 tests/types/lint passing. Its UI remains unmounted and live/visual verification pending. Shared fee preparation/commit contracts remain under parallel implementation, with no application synchronization of this wave.

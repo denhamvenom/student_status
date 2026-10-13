@@ -444,3 +444,16 @@ October 13 live policy check: a fictional attempt to reduce a previously transfe
 - [ ] Complete the independently assigned non-destructive retention review and hold workflow; no deletion functionality is authorized.
 
 Overall scope estimate remains approximately 74%; the new successful financial rehearsals do not close the remaining visual/administration scope. Timeclock concurrent Group rehearsal awaits its existing authorized operator sign-in; physical-device testing still needs a reachable approved origin. Sol agents continue shared-fee backend, shared-fee UI and retention modules with separate ownership. Last full integrated check remains the 216-test published checkpoint, not a claim about unfinished new source.
+
+### October 13 permission rehearsal and parallel review checkpoint
+
+Checklist-linked scope estimates remain G1 85%, G2 55%, G3 90%, G4 90%, G5 80%, G6 65%, G7 55%; approximately 74% toward readiness for user visual approval. These are estimates, not checkbox arithmetic or production readiness. No broad outcome is closed.
+
+- [x] Verify a new signature request, Parent replacement submission and Coach acceptance using fictional records; earlier receipts remain separate and unchanged.
+- [x] Verify default manifest export omits full snapshots/health, while separately selected health export includes the snapshot. Downloaded files remain private and outside Git. This does not prove every role/grant variant.
+- [x] Verify fictional paper recording and Coach acceptance, including distinct signer/recorder, signed/recorded times, record reference and explicit medication choices. Real consent remains disabled.
+- [x] Complete incremental Astra source review of retention preview/holds after stale-reactivation and pagination fixes. Owner-reported 11 focused tests, types and lint pass.
+- [ ] Mount retention controls, integrate the shared-fee contracts, run combined validation and synchronize reviewed development source before live/visual checks.
+- [ ] Complete Coach Finance prototype structure, shared fees/bulk operations, remaining accounts/roles, season carryover and visual matrix.
+
+Shared-fee backend and UI continue in parallel. Bulk preparation will preserve an immutable paginated review scope before committing financial changes. Last full integrated result remains 216 tests at the published charge/team-transfer checkpoint, not verification of the unfinished shared-fee/retention wave.
