@@ -14,6 +14,8 @@ Convex agent skills for common tasks can be installed by running
 
 ## Application boundaries and handoff
 
+- Start with docs/CURRENT_STATE.md and verify the actual checkout/branch. Read task-relevant linked evidence next. Dated pause/review notes are historical; later user decisions supersede them. Keep the short handoff current at milestones.
+
 - Work only in this app unless the user explicitly expands scope. Preserve the sibling design handoff, archives, root npm starter, and unrelated folders.
 - Read `docs/PLAN.md`, `docs/ARCHITECTURE.md`, `docs/REVIEW.md`, and `docs/DEVELOPMENT.md` for current state. Keep implemented, verified, and pending work distinct.
 - Bun; React Router 7 Data Mode SPA; Vite; strict TypeScript; Tailwind 4; shadcn Base UI. Convex is the only domain backend. Do not introduce Next.js, Radix, Docker/Unraid, or a second database.

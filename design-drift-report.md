@@ -1,3 +1,5 @@
+> Historical pre-correction baseline. See docs/CURRENT_STATE.md and docs/FRONTEND_CONFORMANCE_LOG.md for current progress; the original findings below are not all still open.
+
 # Student Status design drift audit — October 12, 2026
 
 **Consolidated audit for Coach approval. Corrections have not been made.** Available live screens show recurring drift in shared components, navigation, mobile layout and information hierarchy. Several reference workflows are unfinished. This report separates functional gaps from presentation fixes. It is not a blanket visual pass, production acceptance or evidence that every role and state was available.

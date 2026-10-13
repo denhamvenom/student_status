@@ -1,3 +1,5 @@
+> Historical representative-screen checkpoint. Coach approval was obtained; current rollout evidence is in FRONTEND_CONFORMANCE_LOG.md.
+
 # Coach Readiness — representative design review
 
 Scope: one Coach screen at `/readiness`, including a screen-scoped header and navigation. Other roles and routes retain their existing interface. Coach review is required before any wider rollout.
@@ -7,7 +9,7 @@ Reference: immutable Claude Design prototype, Coach / readiness, 390px phone and
 ## Checklist
 
 - [x] Isolate the candidate from paused backend and broader frontend drafts.
-- [x] Compare all four size/theme combinations and inspect captures; available-data presentation follows the prototype. Coach acceptance remains pending.
+- [x] Compare all four size/theme combinations and inspect captures; available-data presentation follows the prototype. Coach accepted this screen; see the approval checkpoint below.
 - [x] Verify both event selections, grouped navigation, Settings round-trip, theme changes, More dismissal with Escape and focus return. No domain mutation submitted.
 - [x] Lint, strict types, 101 tests across 18 files and build pass. Tests required an unsandboxed rerun after the known Windows temporary-file failure. Existing large-bundle warning remains.
 - [x] Astra source and phone-dark image review accepted after fixing aggregate event readiness, preserving all Coach navigation destinations and guarding FIRST controls with event applicability.
@@ -28,4 +30,4 @@ Compared 390px and 1440px in light/dark against the actual rendered prototype. R
 
 Intentional differences: fictional development records/counts/date ranges; retained development banner; existing FIRST completion actions; unknown completion values displayed as dashes; unavailable exports clearly stated; user-approved Withdrawals retained in navigation. Unselected event summaries require selecting that event, avoiding unbounded queries. Only the selected event has a verified overall state. Account appearance restored to System after testing and viewport overrides cleared.
 
-Screenshots remain outside Git in the local visualization directory. No records, account addresses, screenshots or environment values are included in publication. This is readiness for Coach visual review, not approval for rollout or a claim that missing report/consent workflows are complete.
+Screenshots remain outside Git in the local visualization directory. No records, account addresses, screenshots or environment values are included in publication. Coach subsequently approved this representative screen and frontend rollout. This does not establish completion of missing report/consent workflows.

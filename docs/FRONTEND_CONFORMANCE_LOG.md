@@ -106,3 +106,5 @@ Final Event dark viewport slices were reviewed at both widths: transport and roo
 Available visual checks were completed within the listed states; unsupported or unexercised states remain explicit. All account theme preferences were restored to System and the browser viewport override was reset. The Coach workspace remains open. No driver, financial, invitation, room or event records were saved during this pass.
 
 Follow-up publication verified: `d43fac3` on the existing development branch and draft PR9. Included implementation checkpoints `8df3f85` (live/navigation copy), `3e6565c` (operations copy), and `7976e2c` (anchor/radius/finalized-room presentation). Remote PR head matched. This note is documentation-only; main and production remain untouched.
+
+October 13 decision update: Whole Team semantics are now confirmed: every active team member, with automatic inclusion of members who join after event creation. Implementation remains pending. See CURRENT_STATE.md. Earlier references to unresolved semantics are historical; lifecycle/financial interactions still require inspection before implementation.

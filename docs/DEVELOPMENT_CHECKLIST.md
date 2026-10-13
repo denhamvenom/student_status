@@ -1,6 +1,6 @@
 # Student Status Development Checklist
 
-Updated October 12, 2026
+Updated October 13, 2026
 
 The app has a working foundation, Google sign-in, and a tested parent-invitation process. Several other features have working pieces, but the full app is not ready for real student records or public launch.
 
@@ -198,9 +198,9 @@ These are repeating steps for each future milestone, not unfinished tasks in the
 
 The October 12 fictional rehearsal and later follow-up passed 101 automated tests across 18 files, lint, strict types and build. Live Coach, Student and Parent checks verified approval/manual promotion, waitlist withdrawal with reactive parent updates, fictional personal payout/fundraising transfer, room finalization, vehicle capacity, and Timeclock automatic closure plus an audited correction preserving the original. Later ordinary Mentor and Travel Lead checks verified limited navigation, read-only finance and a saved transport adjustment. See [the rehearsal report](REHEARSAL_2026-10-12.md) for the exact coverage and fixes.
 
-**Current priority:** Audit design drift against Design_Comparison.zip and obtain Coach approval of the drift report before frontend corrections. Product development and rehearsals remain paused; unfinished family Attendance and Who’s Going changes are preserved locally. Permission wording still needs Coach approval before real signatures. Real consent, health-export permissions, rollover/retention and production readiness remain separate unfinished work.
+**Current priority:** Context audit before resuming development. Representative screen and frontend rollout were approved; remaining conformance and evidence gaps are in FRONTEND_CONFORMANCE_LOG.md. Whole Team includes every active member and automatically includes later joiners (decision confirmed October 13; implementation pending). See CURRENT_STATE.md for scope and boundaries.
 
-Current development publication is [draft PR #7](https://github.com/denhamvenom/student_status/pull/7), `feature/student-status-operations`, stacked on `feature/timeclock-backend`. The separate Timeclock frontend is draft PR #6. This integration owner retains shared backend/deployment ownership. No main merge or production deployment is authorized.
+Current frontend publication is draft PR #9 on feature/student-status-readiness-design (verified baseline 43a254b before the context audit). PR #7 is the earlier operations milestone. Timeclock remains separately coordinated. No main merge or production deployment is authorized.
 
 ## Operations milestone checkpoint — October 12, 2026
 
@@ -286,3 +286,11 @@ Backend-dependent gaps remain separately deferred; no production action is autho
 - [x] Publish and verify follow-up checkpoint `d43fac3` in existing draft PR9.
 
 - [x] Review dark event transport/rooming viewport slices and clarify completed-room Finalized action while preserving required re-finalization.
+
+
+## October 13 context checkpoint
+
+- [x] Agree: Whole Team includes every active team member, including automatic inclusion when new members join after event creation.
+- [ ] Implement and verify that rule after backend-phase authorization; inspect lifecycle and financial interactions first.
+- [x] Audit context recovery, add CURRENT_STATE.md, correct stale approval/current-branch/startup guidance, and distinguish historical reports from current status.
+- [ ] Consider project-specific context-handoff and prototype-verification skills; no new skill installed in this audit.

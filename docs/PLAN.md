@@ -200,3 +200,7 @@ Coach approved representative Readiness and authorized frontend alignment across
 ### Copy and visual-check follow-up
 
 Live-app copy consolidation and sticky-anchor/empty-state corrections completed with Astra review and101 passing tests. Updated available-role visual checks distinguish scaled viewport evidence from pixel parity and unsupported states. See FRONTEND_CONFORMANCE_LOG.md for the current table and explicit backend dependency list. Legacy fixture-only preview, new backend work and production remain outside this pass.
+
+## October 13 Whole Team decision and context audit
+
+Whole Team includes every active team member; new members joining after creation are automatically included in that event too. This supersedes the suggested creation-time snapshot/manual addition. Agreed only: implementation and verification remain pending separate backend-phase authorization. Inspect event lifecycle, membership and financial interactions before implementation; do not silently invent closed-event or reactivation policy. Start future work with CURRENT_STATE.md; older workspace/pause statements in this plan are historical snapshots.
