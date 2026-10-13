@@ -138,3 +138,5 @@
 .content>h1{margin-bottom:8px}
 
 @media(max-width:1023px){.headerInner{gap:12px}.brand{flex:1;min-width:0}.brandCopy{min-width:0}.headerActions{flex-shrink:0}.product{overflow-wrap:anywhere}}
+
+.review a:global(.button-primary){color:#222}.review a:global(.button-outline){color:var(--rr-accent)}

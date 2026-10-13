@@ -1,13 +1,10 @@
-import { useState, type ReactNode } from 'react'
-import { useAuthActions } from '@convex-dev/auth/react'
+import { AppShell } from '../../AppShell'
+import { useState } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import { Link } from 'react-router'
-import { useTheme } from 'next-themes'
-import { Calendar, SquareCheck, Ellipsis, Moon, Users, DollarSign } from 'lucide-react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { Button } from '../../components/ui/button'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../../components/ui/sheet'
 import { readinessCopy as copy } from './readinessCopy'
 import styles from './ReadinessReview.module.css'
 
@@ -46,45 +43,6 @@ function FirstAction({ eventId, row }: { eventId: Id<'events'>; row: StudentRow 
   </span>
 }
 
-function Shell({ children, viewer }: { children: ReactNode; viewer: Viewer }) {
-  const { theme, resolvedTheme, setTheme } = useTheme()
-  const saveTheme = useMutation(api.app.setTheme)
-  const { signOut } = useAuthActions()
-  const [more, setMore] = useState(false)
-  const [group, setGroup] = useState('Events')
-  const [themeError, setThemeError] = useState('')
-  const [signOutError, setSignOutError] = useState('')
-  const exit = async () => { setSignOutError(''); try { await signOut() } catch { setSignOutError(copy.signOutFailed) } }
-  const changeTheme = async () => {
-    const next = resolvedTheme === 'dark' ? 'light' : 'dark'
-    setTheme(next); setThemeError('')
-    try { await saveTheme({ theme: next }) } catch { setTheme(theme ?? 'system'); setThemeError(copy.themeFailed) }
-  }
-  const nav = copy.navigation
-  const groups: Record<string, [string, string][]> = {
-    [nav.team]: [[nav.team, '/'], [nav.joinRequests, '/enroll']],
-    [nav.events]: [[nav.events, '/events'], [nav.eventReadiness, '/readiness'], [nav.drivers, '/drivers'], [nav.permissionForms, '/permissions'], [nav.withdrawals, '/withdrawals']],
-    [nav.money]: [[nav.money, '/finances'], [nav.fundraising, '/fundraising']],
-    [nav.reports]: [[nav.reports, '/reports']],
-    [nav.admin]: [[nav.users, '/adults'], [nav.attendance, '/attendance'], [nav.season, '/season'], [nav.settings, '/settings']],
-  }
-  const additionalLinks = Object.values(groups).flat().filter(([, path]) => !['/', '/events', '/readiness', '/finances'].includes(path))
-  return <div className={styles.review}>
-    <header className={styles.header}>
-      <div className={styles.headerInner}><Link to="/" aria-label={copy.brand} className={styles.brand}><img src="/assets/logos/logo-mark-white-text.png" alt="" /><span className={styles.brandCopy}><span className={styles.wordmark}>{copy.brand}</span><span className={styles.product}>{copy.product} · {viewer.season?.name ?? copy.seasonFallback}</span></span></Link><div className={styles.headerActions}><span className={styles.viewerName}><strong>{viewer.user?.name}</strong><small>{copy.role} · {viewer.user?.email}</small></span><Button type="button" variant="outline" role="switch" aria-checked={resolvedTheme === 'dark'} className={styles.headerButton} onClick={() => void changeTheme()} aria-label={copy.themeLabel(resolvedTheme === 'dark')}><Moon size={18} aria-hidden="true"/><span className={styles.themeTrack}><span className={styles.themeKnob}/></span></Button><Button type="button" variant="outline" className={`${styles.headerButton} ${styles.signOut}`} onClick={() => void exit()}>{nav.signOut}</Button></div></div>
-      {themeError && <p role="alert" className={styles.themeError}>{themeError}</p>}
-      {signOutError && <p role="alert" className={styles.themeError}>{signOutError}</p>}
-      <nav className={styles.groupNav} aria-label="Coach navigation"><div className={styles.navInner}>{Object.keys(groups).map(label => <button key={label} type="button" aria-expanded={group === label} className={group === label ? styles.activeGroup : ''} onClick={() => setGroup(label)}>{label}</button>)}</div></nav>
-      <nav className={styles.subNav} aria-label={`${group} navigation`}><div className={styles.navInner}>{groups[group].map(([label, path]) => <Link key={path} to={path} aria-current={path === '/readiness' ? 'page' : undefined}>{label}</Link>)}</div></nav>
-    </header>
-    {import.meta.env.DEV && <div className={styles.development} role="status">{copy.development}</div>}
-    <main className={styles.main}>{children}</main>
-    <Sheet open={more} onOpenChange={setMore}>
-      <nav className={styles.mobileNav} aria-label="Coach mobile navigation"><Link to="/"><Users size={21} aria-hidden="true"/>{nav.team}</Link><Link to="/events"><Calendar size={21} aria-hidden="true"/>{nav.events}</Link><Link to="/readiness" aria-current="page"><SquareCheck size={21} aria-hidden="true"/>{nav.readiness}</Link><Link to="/finances"><DollarSign size={21} aria-hidden="true"/>{nav.money}</Link><SheetTrigger><Ellipsis size={21} aria-hidden="true"/>{nav.more}</SheetTrigger></nav>
-      <SheetContent side="bottom" className={styles.moreSheet}><SheetHeader><SheetTitle>{nav.more}</SheetTitle></SheetHeader><nav aria-label="More Coach navigation">{additionalLinks.map(([label, path]) => <Link key={path} to={path} onClick={() => setMore(false)}>{label}</Link>)}<button type="button" onClick={() => void exit()}>{nav.signOut}</button></nav></SheetContent>
-    </Sheet>
-  </div>
-}
 
 export function ReadinessReview() {
   const viewer = useQuery(api.app.viewer, {}) as Viewer | undefined
@@ -94,7 +52,7 @@ export function ReadinessReview() {
   const readiness = useQuery(api.app.eventReadiness, eventId ? { eventId } : 'skip') as Readiness | undefined
   const detail = useQuery(api.app.eventDetail, eventId ? { eventId } : 'skip') as EventDetail | undefined
   if (!viewer || !choices) return <div className={styles.review}><main className={styles.main}><p role="status">{copy.loading}</p></main></div>
-  if (viewer.user?.role !== 'coach') return <div className={styles.review}><main className={styles.main}><h1>{copy.title}</h1><p role="alert">{copy.coachOnly}</p></main></div>
+  if (viewer.user?.role !== 'coach' && !viewer.user?.travelLead) return <div className={styles.review}><main className={styles.main}><h1>{copy.title}</h1><p role="alert">{copy.coachOnly}</p></main></div>
   const event = choices.find(choice => choice.event._id === eventId)?.event
   const rows = [...(readiness?.students ?? [])].sort((a, b) => Number(b.state === 'open') - Number(a.state === 'open'))
   const openItems = rows.reduce((count, row) => count + row.open.length, 0)
@@ -109,7 +67,7 @@ export function ReadinessReview() {
   ])] : []
   const roomState = readiness?.rooming?.state ?? 'notApplicable'
   const transportState = readiness?.transportation?.state ?? 'notApplicable'
-  return <Shell viewer={viewer}><div className={styles.content}>
+  return <AppShell viewer={viewer} role={viewer.user?.role==='coach'?'coach':'travelLead'}><div className={styles.content}>
     <h1>{copy.title}</h1>
     {choices.length === 0 ? <section className={styles.panel}><p>{copy.noEvents}</p></section> : <>
       <div className={styles.eventChoices} role="group" aria-label={copy.chooseEvent}>{choices.map(choice => <button type="button" key={choice.event._id} className={choice.event._id === eventId ? styles.selectedEvent : ''} aria-pressed={choice.event._id === eventId} onClick={() => setSelected(choice.event._id)}><strong>{choice.event.name}</strong><span>{choice.event._id === eventId && readiness ? statusText(readiness.overall, openItems + (readiness.transportation?.open.length ?? 0) + (readiness.rooming?.open ?? 0)) : copy.selectToView}</span></button>)}</div>
@@ -120,5 +78,5 @@ export function ReadinessReview() {
         <section className={styles.panel}><h2>{copy.pdf}</h2><p className={styles.muted}>{copy.pdfUnavailable}</p></section>
       </>}
     </>}
-  </div></Shell>
+  </div></AppShell>
 }
