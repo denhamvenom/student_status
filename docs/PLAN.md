@@ -210,3 +210,7 @@ Whole Team includes every active team member; new members joining after creation
 Created the two first-party project skills under .agents/skills and linked them from AGENTS.md. VISUAL_CHECKS.md owns current outstanding visual comparisons; FRONTEND_CONFORMANCE_LOG.md retains dated evidence. No application/backend implementation or new browser verification is part of this checkpoint.
 
 Validation for this workflow checkpoint: both skills passed the skill-creator format validator. Astra read-only scenario review confirmed correct handling of stale worktree instructions, partial/wrong-theme screenshots, unavailable Mentor-only identity and unimplemented Whole Team. No blocking findings; clarified unexpected clipping versus intentional viewport slices. Documentation diff checked; no application tests/browser checks rerun.
+
+## October 13 frontend continuation
+
+Modal/event sections/invitation presentation implemented with existing contracts; staff personal participation labels removed. Both workflow skills used, parallel Sol ownership and Astra source review completed. See FRONTEND_CONFORMANCE_LOG.md and VISUAL_CHECKS.md for scoped browser evidence. Whole Team and other backend dependencies remain unimplemented. Full check100/101 due to expired existing Timeclock fixture; isolated failure confirmed and separately flagged. No production authorization.

@@ -2,8 +2,8 @@
 
 Updated October 13, 2026. Verify the actual Git/worktree state before using this snapshot. This short entry point links evidence rather than replacing it.
 
-- Active checkout: `student-status-readiness-design`; branch `feature/student-status-readiness-design`; draft PR #9. Last verified published context-audit checkpoint: `205cd1c`; this subsequent skill/matrix checkpoint is recorded in Git history.
-- Current task: create two project workflow skills and consolidate outstanding visual checks. Application development remains paused through this documentation checkpoint.
+- Active checkout: `student-status-readiness-design`; branch `feature/student-status-readiness-design`; draft PR #9. Prior verified workflow checkpoint: `51bbc3b`; current frontend checkpoint is recorded in Git history and the conformance log.
+- Current task: authorized frontend alignment resumed with both project skills, parallel Sol implementation and Astra review. Modal/sections/invitation corrections implemented; scoped visual checks completed, remaining cells stay open.
 - Frontend conformance authorized; next backend phase requires separate authorization. No main merge, production deployment or real signing authorized. Preserve sibling worktrees and paused backend drafts.
 - Astra coordinates/reviews; Sol implements independent file-owned tasks. One integration owner handles Git and shared backend changes.
 
@@ -25,8 +25,8 @@ Before implementing, inspect existing event lifecycle, membership, charging and 
 
 ## Remaining work
 
-Frontend: modal/section presentation and outstanding role/state/viewport checks in VISUAL_CHECKS.md. Shared live-app copy extraction is recorded complete; flag specific residual literals during future checks rather than reopening wholesale migration. Backend dependencies: Whole Team, aggregate finance/roster, family Attendance, missing readiness/form/admin contracts. Inspect existing contracts before assuming each gap requires new schema.
+Frontend: modal/section/invitation presentation implemented; remaining role/state/viewport checks in VISUAL_CHECKS.md. Shared live-app copy extraction is recorded complete; flag specific residual literals during future checks rather than reopening wholesale migration. Backend dependencies: Whole Team, aggregate finance/roster, family Attendance, missing readiness/form/admin contracts. Inspect existing contracts before assuming each gap requires new schema.
 
-Last recorded full check: 101 tests across 18 files plus lint/types/build. Later label adjustment reran lint/types/build. No fresh application checks were run for this documentation audit. Visual coverage remains partial/scaled, not whole-app pixel parity. Keep screenshots and account-specific evidence outside Git.
+October 13 full unsandboxed check: 100/101 tests passed; existing Timeclock test fixture expired on October 13 and fails in isolation. Lint/types/build checked separately. See conformance log for exact evidence; do not claim the suite is green. Visual coverage remains partial/scaled, not whole-app pixel parity. Keep screenshots and account-specific evidence outside Git.
 
 At milestones update this handoff's scope, decision pointers, validation limits and publication status. Do not copy long histories into it.

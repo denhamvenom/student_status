@@ -198,7 +198,7 @@ These are repeating steps for each future milestone, not unfinished tasks in the
 
 The October 12 fictional rehearsal and later follow-up passed 101 automated tests across 18 files, lint, strict types and build. Live Coach, Student and Parent checks verified approval/manual promotion, waitlist withdrawal with reactive parent updates, fictional personal payout/fundraising transfer, room finalization, vehicle capacity, and Timeclock automatic closure plus an audited correction preserving the original. Later ordinary Mentor and Travel Lead checks verified limited navigation, read-only finance and a saved transport adjustment. See [the rehearsal report](REHEARSAL_2026-10-12.md) for the exact coverage and fixes.
 
-**Current priority:** Complete the project workflow skills and consolidated visual-check table before resuming development. Representative screen and frontend rollout were approved; remaining conformance and evidence gaps are in FRONTEND_CONFORMANCE_LOG.md. Whole Team includes every active member and automatically includes later joiners (decision confirmed October 13; implementation pending). See CURRENT_STATE.md for scope and boundaries.
+**Current priority:** Frontend work resumed; complete remaining role/state checks in VISUAL_CHECKS.md after the modal/section/invitation checkpoint. Representative screen and frontend rollout were approved; remaining conformance and evidence gaps are in FRONTEND_CONFORMANCE_LOG.md. Whole Team includes every active member and automatically includes later joiners (decision confirmed October 13; implementation pending). See CURRENT_STATE.md for scope and boundaries.
 
 Current frontend publication is draft PR #9 on feature/student-status-readiness-design (verified baseline 43a254b before the context audit). PR #7 is the earlier operations milestone. Timeclock remains separately coordinated. No main merge or production deployment is authorized.
 
@@ -303,3 +303,15 @@ Backend-dependent gaps remain separately deferred; no production action is autho
 - [ ] Complete the remaining checks in that table. Consolidation does not count as new browser verification or Coach acceptance.
 
 Shared live-app copy extraction is recorded in the October 12 conformance follow-up. Earlier broad shared-label migration tasks are superseded by that evidence; future checks should identify specific residual literals rather than repeat the completed migration. Legacy fixture-only preview remains outside this live-app pass.
+
+
+## October 13 frontend alignment checkpoint
+
+- [x] Use both project skills; Sol implements separate files and Astra accepts final source review.
+- [x] Implement reference-sized New Event modal, collapsible event sections and invitation sharing/accepted confirmation; preserve backend contracts.
+- [x] Review final Basics modal phone/desktop light/dark, Cancel/Escape focus, section expansion/anchors and additional driver/finance slices.
+- [ ] Finish remaining cells in VISUAL_CHECKS.md, including invitation success and date-entry/submission rehearsal. No whole-app parity claim.
+- [ ] Separately correct the existing Timeclock test's expired fixed-date fixture; October 13 full suite is 100/101, isolated failure reproduced. Backend/test code unchanged here.
+- [ ] Authorize a local QR dependency if QR sharing is required; no remote token-sharing service or fake QR added.
+
+No production deployment, main merge, real consent or domain-record mutation occurred in this visual pass.
