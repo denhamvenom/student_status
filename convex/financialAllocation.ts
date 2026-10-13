@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import { internalMutation, mutation } from "./_generated/server";
 import { activeSeason, audit, viewer } from "./lib/access";
 import { allocationStep } from "./lib/financialAllocation";
-import { financialAccount, saveFinancialAccount } from "./lib/financialSources";
+import { financialAccount, saveFinancialAccount, verifyAppliedSources } from "./lib/financialSources";
 import { refreshStudentFinance } from "./lib/financeSummaries";
 import { requireSeasonFinancialContinuation, requireSeasonFinancialRetry, seasonFinanceControl } from "./lib/seasonFinance";
 
@@ -17,6 +17,7 @@ export const processPage = internalMutation({
     if (!job || job.state !== "running" || job.step !== args.step) return null;
     const account = await financialAccount(ctx, job.studentId); const actor = await ctx.db.get(job.actorId);
     if (!account || account.state !== "allocating" || account.allocationJobId !== job._id || account.generation !== job.generation) throw new Error("Allocation account changed; Coach review is required.");
+    if (job.requiredFinancialProjectionVersion === 4 || account.allocationSourceVersion === 1) verifyAppliedSources(account);
     // Jobs are minted only inside validated server writes; allocation itself is deterministic.
     if (!actor?.active) throw new Error("Allocation actor is unavailable; a Coach must retry.");
     const student = await ctx.db.get(job.studentId); const season = await ctx.db.get(account.seasonId);

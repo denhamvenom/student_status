@@ -34,7 +34,7 @@ describe("source-authoritative finance report maintenance",()=>{
     await f.t.run(async ctx=>{
       const source=await financeFor(ctx,studentId);
       const summary=await ctx.db.query("studentFinanceSummaries").withIndex("by_studentId",q=>q.eq("studentId",studentId)).unique();
-      expect(summary).toMatchObject({...source.summary,travelShareCents:1000,transferredInCents:0,version:3});
+      expect(summary).toMatchObject({...source.summary,travelShareCents:1000,transferredInCents:0,version:4,personalAppliedCents:1500,fundraisingAppliedCents:1000});
       expect(summary).toMatchObject({chargedCents:2500,paidCents:2500,dueCents:0,personalAvailableCents:500,fundraisingAvailableCents:0});
       expect(await calculateStudentFinance(ctx,studentId)).toMatchObject({...source.summary,travelShareCents:1000});
     });

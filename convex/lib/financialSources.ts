@@ -1,7 +1,10 @@
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
+import { recordLedgerChange } from "./financeChanges";
 import { effectiveChargeCents } from "./chargeObligation";
 import { updateFinancialSourceAggregate } from "./reportAggregates";
+import type { FinancialContinuationId } from "./seasonFinance";
+import { requireSeasonFinancialContinuation } from "./seasonFinance";
 
 export type FinancialAccount = Doc<"financialAccounts">;
 type Ctx = MutationCtx | QueryCtx;
@@ -18,14 +21,29 @@ export function applyExactFinancialDelta(current: number, after: number, before:
   return Number(next);
 }
 
+export function verifyAppliedSources(account: FinancialAccount) {
+  if (account.allocationSourceVersion !== 1 || account.personalAppliedCents === undefined || account.fundraisingAppliedCents === undefined) throw new Error("Rebuild financial records to verify personal and fundraising allocations.");
+  cents(account.personalAppliedCents); cents(account.fundraisingAppliedCents);
+  if (BigInt(account.personalAppliedCents) + BigInt(account.fundraisingAppliedCents) !== BigInt(cents(account.paidCents))) throw new Error("Source-separated applied totals differ from the charge balance; Coach review is required.");
+}
+
+export function chargeAppliedSources(net: Doc<"financialChargeAllocations"> | null, expected: number) {
+  if (!net && expected === 0) return { personalAppliedCents: 0, fundraisingAppliedCents: 0 };
+  if (!net || net.allocationSourceVersion !== 1 || net.personalAppliedCents === undefined || net.fundraisingAppliedCents === undefined) throw new Error("Rebuild financial records to verify this charge's funding sources.");
+  cents(net.personalAppliedCents); cents(net.fundraisingAppliedCents);
+  if (BigInt(net.personalAppliedCents) + BigInt(net.fundraisingAppliedCents) !== BigInt(cents(expected))) throw new Error("Charge source totals differ from applied funds.");
+  return { personalAppliedCents: net.personalAppliedCents, fundraisingAppliedCents: net.fundraisingAppliedCents };
+}
+
 export async function financialAccount(ctx: Ctx, studentId: Id<"students">) {
   return ctx.db.query("financialAccounts").withIndex("by_studentId", q => q.eq("studentId", studentId)).unique();
 }
 
-export async function readyFinancialAccount(ctx: Ctx, studentId: Id<"students">) {
+export async function readyFinancialAccount(ctx: Ctx, studentId: Id<"students">, legacyContinuation = false) {
   const account = await financialAccount(ctx, studentId);
   if (!account || account.state !== "ready") throw new Error("Financial records are updating or require rebuilding. A Coach must finish the financial preparation before another transaction.");
   await requireNoFinancialJob(ctx, account);
+  if (!legacyContinuation) verifyAppliedSources(account);
   return account;
 }
 
@@ -42,7 +60,7 @@ export async function createFinancialAccount(ctx: MutationCtx, studentId: Id<"st
   if (!student) throw new Error("Student not found.");
   return ctx.db.insert("financialAccounts", {
     studentId, seasonId: student.seasonId, state, generation, revision: 0, phase: "sources", cursor: null,
-    processed: 0, updatedAt: Date.now(), chargedCents: 0, paidCents: 0, personalAvailableCents: 0,
+    processed: 0, updatedAt: Date.now(), chargedCents: 0, paidCents: 0, personalAppliedCents: 0, fundraisingAppliedCents: 0, allocationSourceVersion: 1, personalAvailableCents: 0,
     fundraisingAvailableCents: 0, travelShareCents: 0, transferredInCents: 0, knownRaisedCents: 0,
     unknownGrossSourceCount: 0, ledgerCount: 0, sourceCount: 0, chargeCount: 0, lastLedgerAt: null, lastFinancialChangeAt: null,
   });
@@ -118,14 +136,26 @@ export async function projectMovement(ctx: MutationCtx, account: FinancialAccoun
   if (entry.kind !== "allocation" && entry.kind !== "deallocation") return;
   if (!entry.chargeId) throw new Error("Allocation has no charge.");
   const netDelta = -delta;
+  if (account.allocationSourceVersion === 1) {
+    if (account.personalAppliedCents === undefined || account.fundraisingAppliedCents === undefined) throw new Error("Source allocation projection is unavailable.");
+    if (source.kind === "payment") account.personalAppliedCents = applyExactFinancialDelta(account.personalAppliedCents, entry.kind === "allocation" ? entry.amountCents : 0, entry.kind === "deallocation" ? entry.amountCents : 0);
+    else account.fundraisingAppliedCents = applyExactFinancialDelta(account.fundraisingAppliedCents, entry.kind === "allocation" ? entry.amountCents : 0, entry.kind === "deallocation" ? entry.amountCents : 0);
+  }
   const allocation = await ctx.db.query("financialAllocations").withIndex("by_studentId_and_generation_and_chargeId_and_sourceEntryId", q => q.eq("studentId", account.studentId).eq("generation", account.generation).eq("chargeId", entry.chargeId!).eq("sourceEntryId", source.sourceEntryId)).unique();
   const appliedCents = cents((allocation?.appliedCents ?? 0) + netDelta);
   if (allocation) await ctx.db.patch(allocation._id, { appliedCents, status: appliedCents ? "applied" : "returned", revision: allocation.revision + 1 });
   else await ctx.db.insert("financialAllocations", { studentId: account.studentId, generation: account.generation, chargeId: entry.chargeId, sourceEntryId: source.sourceEntryId, sourceKind: source.kind, appliedCents, status: appliedCents ? "applied" : "returned", revision: 1 });
   const chargeNet = await ctx.db.query("financialChargeAllocations").withIndex("by_studentId_and_generation_and_chargeId", q => q.eq("studentId", account.studentId).eq("generation", account.generation).eq("chargeId", entry.chargeId!)).unique();
   const total = cents((chargeNet?.appliedCents ?? 0) + netDelta);
-  if (chargeNet) await ctx.db.patch(chargeNet._id, { appliedCents: total, verified: false });
-  else await ctx.db.insert("financialChargeAllocations", { studentId: account.studentId, generation: account.generation, chargeId: entry.chargeId, appliedCents: total, verified: false });
+  if (chargeNet && account.allocationSourceVersion === 1) chargeAppliedSources(chargeNet, chargeNet.appliedCents);
+  const sourceFields = account.allocationSourceVersion === 1 ? {
+    personalAppliedCents: applyExactFinancialDelta(chargeNet?.personalAppliedCents ?? 0, source.kind === "payment" && netDelta > 0 ? netDelta : 0, source.kind === "payment" && netDelta < 0 ? -netDelta : 0),
+    fundraisingAppliedCents: applyExactFinancialDelta(chargeNet?.fundraisingAppliedCents ?? 0, source.kind === "fundraiser" && netDelta > 0 ? netDelta : 0, source.kind === "fundraiser" && netDelta < 0 ? -netDelta : 0), allocationSourceVersion: 1 as const,
+  } : {};
+  if (chargeNet && account.allocationSourceVersion === 1 && chargeNet.allocationSourceVersion !== 1) throw new Error("Existing charge source projection requires rebuilding.");
+  if (account.allocationSourceVersion === 1 && BigInt(sourceFields.personalAppliedCents!) + BigInt(sourceFields.fundraisingAppliedCents!) !== BigInt(total)) throw new Error("Charge source allocation totals are inconsistent.");
+  if (chargeNet) await ctx.db.patch(chargeNet._id, { appliedCents: total, verified: false, ...sourceFields });
+  else await ctx.db.insert("financialChargeAllocations", { studentId: account.studentId, generation: account.generation, chargeId: entry.chargeId, appliedCents: total, verified: false, ...sourceFields });
 }
 
 export async function saveFinancialAccount(ctx: MutationCtx, account: FinancialAccount) {
@@ -135,9 +165,13 @@ export async function saveFinancialAccount(ctx: MutationCtx, account: FinancialA
 }
 
 /** Empty new students need no historical rebuild. Existing history is never silently scanned. */
-export async function ensureFinancialAccount(ctx: MutationCtx, studentId: Id<"students">) {
+export async function ensureFinancialAccount(ctx: MutationCtx, studentId: Id<"students">, originId?: FinancialContinuationId) {
   const current = await financialAccount(ctx, studentId);
-  if (current) return readyFinancialAccount(ctx, studentId);
+  if (current) {
+    let legacy = false;
+    if (originId) { await requireSeasonFinancialContinuation(ctx, current.seasonId, originId); const origin = await ctx.db.get(originId); legacy = !!origin && origin.requiredFinancialProjectionVersion === undefined; }
+    return readyFinancialAccount(ctx, studentId, legacy);
+  }
   const entry = await ctx.db.query("ledgerEntries").withIndex("by_studentId_and_recordedAt", q => q.eq("studentId", studentId)).first();
   const charge = await ctx.db.query("charges").withIndex("by_studentId_and_priority", q => q.eq("studentId", studentId)).first();
   if (entry || charge) throw new Error("Historical financial records need a Coach rebuild before another transaction.");
@@ -152,6 +186,7 @@ export async function recordProjectedEntry(ctx: MutationCtx, entryId: Id<"ledger
   if (!entry || entry.studentId !== account.studentId) throw new Error("Financial entry scope is inconsistent.");
   if (entry.kind === "payment" || entry.kind === "fundraiser") await projectSource(ctx, account, entry);
   else await projectMovement(ctx, account, entry);
+  await recordLedgerChange(ctx, entry, account.seasonId);
   account.ledgerCount++;
   account.lastLedgerAt = Math.max(account.lastLedgerAt ?? 0, entry.recordedAt);
   account.revision++;
@@ -165,13 +200,23 @@ export async function recordChargeChange(ctx: MutationCtx, account: FinancialAcc
   if (charge.studentId !== account.studentId || charge.appliedCents > effective) throw new Error("Charge projection is inconsistent.");
   const net = await ctx.db.query("financialChargeAllocations").withIndex("by_studentId_and_generation_and_chargeId", q => q.eq("studentId", account.studentId).eq("generation", account.generation).eq("chargeId", charge._id)).unique();
   if ((net?.appliedCents ?? 0) !== charge.appliedCents) throw new Error("Charge allocation projection differs from its balance.");
+  if (account.allocationSourceVersion === 1) chargeAppliedSources(net, charge.appliedCents);
   if (net) await ctx.db.patch(net._id, { verified: true });
   charge.revision = (charge.revision ?? 0) + 1;
   await ctx.db.patch(charge._id, { outstanding: effective > charge.appliedCents, revision: charge.revision });
   account.chargedCents = applyExactFinancialDelta(account.chargedCents, effective, previousEffective);
   account.paidCents = applyExactFinancialDelta(account.paidCents, charge.appliedCents, previousApplied);
+  if (account.allocationSourceVersion === 1) verifyAppliedSources(account);
   if (newlyCreated) account.chargeCount++;
   account.revision++;
   account.lastFinancialChangeAt = Date.now();
   await saveFinancialAccount(ctx, account);
+}
+
+/** Persisted origin only: absent markers designate pre-migration jobs, never a public bypass flag. */
+export async function readyFinancialAccountForFeeJob(ctx: Ctx, studentId: Id<"students">, job: Doc<"feePriorityJobs"> | Doc<"feeMappingJobs">) {
+  const student = await ctx.db.get(studentId);
+  const persisted = await ctx.db.get(job._id);
+  if (!student || !persisted || student.seasonId !== persisted.seasonId || persisted.state === "complete" || persisted.state === "cancelled") throw new Error("Fee projection continuation is unavailable.");
+  return readyFinancialAccount(ctx, studentId, persisted.requiredFinancialProjectionVersion === undefined);
 }

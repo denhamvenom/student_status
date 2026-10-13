@@ -53,7 +53,7 @@ export const move = mutation({
     if (!second) throw new Error("This fee is already at the boundary of the season order.");
     for (const fee of [first, second]) { if (fee.latestJobId && !["complete", "cancelled"].includes((await ctx.db.get(fee.latestJobId))?.state ?? "missing")) throw new Error("Finish the existing fee operation before moving either adjacent definition."); }
     const now = Date.now();
-    const id = await ctx.db.insert("feePriorityJobs", { seasonId: season._id, originalActorId: actor._id, actorId: actor._id, idempotencyKey: args.idempotencyKey, operationHash: hash, reason: args.reason.trim(), state: "draining", step: 0, cursor: null, phase: "drain", firstFeeId: first._id, secondFeeId: second._id, firstPriority: first.priority, secondPriority: second.priority, firstRevision: first.revision, secondRevision: second.revision, processed: 0, createdAt: now, updatedAt: now });
+    const id = await ctx.db.insert("feePriorityJobs", { requiredFinancialProjectionVersion: 4, seasonId: season._id, originalActorId: actor._id, actorId: actor._id, idempotencyKey: args.idempotencyKey, operationHash: hash, reason: args.reason.trim(), state: "draining", step: 0, cursor: null, phase: "drain", firstFeeId: first._id, secondFeeId: second._id, firstPriority: first.priority, secondPriority: second.priority, firstRevision: first.revision, secondRevision: second.revision, processed: 0, createdAt: now, updatedAt: now });
     await ctx.db.patch(control._id, { state: "draining", priorityJobId: id, mappingJobId: undefined, bulkJobId: undefined, revision: control.revision + 1, updatedAt: now });
     await ctx.scheduler.runAfter(0, makeFunctionReference<"mutation">("feePriorityWorker:run"), { jobId: id });
     return id;

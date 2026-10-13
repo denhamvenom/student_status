@@ -1,3 +1,4 @@
+import { recordFundraiserChange } from "./lib/financeChanges";
 import { requireSeasonFinancialRetry } from "./lib/seasonFinance";
 import { makeFunctionReference, paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
@@ -33,7 +34,7 @@ export const processPage = internalMutation({
       const locked = account?.fundraiserJobId === job._id && account.fundraiserRowId === row._id;
       if (account?.state === "ready" && !locked) await requireNoFinancialJob(ctx, account);
       const available = account ? await availableOriginalFundraiserCredit(ctx, row.studentId, account.generation, fundraiser._id) : 0;
-      const unavailable = !student?.active || student.seasonId !== fundraiser.seasonId || !account || (!locked && account.state !== "ready");
+      const unavailable = !student?.active || student.seasonId !== fundraiser.seasonId || !account || (!locked && account.state !== "ready") || job.requiredFinancialProjectionVersion === 4 && account?.allocationSourceVersion !== 1;
       const stale = !locked && (account?.revision !== row.expectedFinancialRevision || (previous?.revision ?? 0) !== row.expectedRowRevision);
       const spent = !locked && reduction > available;
       if (unavailable || stale || spent) {
@@ -85,6 +86,9 @@ export const processPage = internalMutation({
           account.revision++; account.state = "ready"; account.fundraiserJobId = undefined; account.fundraiserRowId = undefined;
           await saveFinancialAccount(ctx, account);
           await ctx.db.patch(row._id, { state: "committed", revisionId, holdCode: undefined, message: undefined });
+          const committedRevision = await ctx.db.get(revisionId);
+          if (!committedRevision) throw new Error("Fundraiser revision is unavailable.");
+          await recordFundraiserChange(ctx, committedRevision);
           committed++;
           await audit(ctx, actor, "fundraiserStudentTotals", totalId, "postAmount", previous, fields, job.reason);
           await allocateUnapplied(ctx, actor, row.studentId, `fundraiser:${row._id}:allocate`, undefined, job._id);
@@ -149,8 +153,8 @@ export const retryPreview = query({
       const split = fundraisingSplit(row.grossCents, fundraiser.studentBps, fundraiser.teamBps);
       const required = Math.max(0, (previous?.travelCreditCents ?? 0) - split.travelCreditCents);
       const available = account ? await availableOriginalFundraiserCredit(ctx, studentId, account.generation, fundraiser._id) : 0;
-      const state = !student?.active || student.seasonId !== fundraiser.seasonId || account?.state !== "ready" ? "updating" as const : required > available ? "hold" as const : "ready" as const;
-      result.push({ studentId, name: student?.preferredName || student?.legalName || "Unavailable student", grossCents: row.grossCents, expectedRowRevision: previous?.revision ?? 0, expectedFinancialRevision: account?.state === "ready" ? account.revision : null, requiredReductionCents: required, availableOriginalCents: available, state, message: state === "hold" ? "Original credit remains spent or transferred; balances remain unchanged." : state === "updating" ? "Student financial preparation must finish." : null });
+      const state = !student?.active || student.seasonId !== fundraiser.seasonId || account?.state !== "ready" || account?.allocationSourceVersion !== 1 ? "updating" as const : required > available ? "hold" as const : "ready" as const;
+      result.push({ studentId, name: student?.preferredName || student?.legalName || "Unavailable student", grossCents: row.grossCents, expectedRowRevision: previous?.revision ?? 0, expectedFinancialRevision: account?.state === "ready" && account.allocationSourceVersion === 1 ? account.revision : null, requiredReductionCents: required, availableOriginalCents: available, state, message: state === "hold" ? "Original credit remains spent or transferred; balances remain unchanged." : state === "updating" ? "Student financial preparation must finish." : null });
     }
     return result;
   },

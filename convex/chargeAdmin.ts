@@ -40,8 +40,8 @@ export const detail = query({
     const { actor, charge, student, event } = await accessibleCharge(ctx, args.chargeId);
     const maintenance = await seasonFinanceControl(ctx, student.seasonId);
     const account = await financialAccount(ctx, charge.studentId);
-    const state = !account || account.state === "uninitialized" ? "uninitialized" as const : account.state === "ready" ? "ready" as const : account.state === "failed" ? "failed" as const : "updating" as const;
-    return { charge, amounts: correctionSnapshot(charge), financialState: state, financialRevision: account?.state === "ready" ? account.revision : null, canCorrect: actor.role === "coach" && state === "ready" && !event?.archived && (!maintenance || maintenance.state === "ready") };
+    const state = !account || account.state === "uninitialized" ? "uninitialized" as const : account.state === "ready" && account.allocationSourceVersion === 1 ? "ready" as const : account.state === "failed" ? "failed" as const : "updating" as const;
+    return { charge, amounts: correctionSnapshot(charge), financialState: state, financialRevision: account?.state === "ready" && account.allocationSourceVersion === 1 ? account.revision : null, canCorrect: actor.role === "coach" && state === "ready" && !event?.archived && (!maintenance || maintenance.state === "ready") };
   },
 });
 
@@ -52,10 +52,10 @@ export const previewCorrection = query({
     if (actor.role !== "coach") throw new Error("Only a Coach may correct or cancel charges.");
     targetCents(args.targetEffectiveCents);
     const before = correctionSnapshot(charge); const account = await financialAccount(ctx, charge.studentId);
-    const updating = account?.state !== "ready" || event?.enrollmentState === "running" || event?.enrollmentState === "failed";
+    const updating = account?.state !== "ready" || account.allocationSourceVersion !== 1 || event?.enrollmentState === "running" || event?.enrollmentState === "failed";
     const oversized = args.kind === "adjustment" && !Number.isSafeInteger(args.targetEffectiveCents + before.cancelledCents);
     const hold = !!event?.archived || oversized || args.targetEffectiveCents === before.effectiveCents || args.kind === "cancellation" && args.targetEffectiveCents > before.effectiveCents;
-    return { state: event?.archived ? "hold" as const : updating ? "updating" as const : hold ? "hold" as const : "ready" as const, message: event?.archived ? "Archived event charges require explicit historical review." : updating ? "Financial or enrollment preparation must finish before correction." : oversized ? "Target plus prior cancellations exceeds the supported exact-cent range." : hold ? args.targetEffectiveCents === before.effectiveCents ? "Target amount already matches this obligation." : "Cancellation cannot increase a charge." : null, chargeId: charge._id, amounts: before, targetEffectiveCents: args.targetEffectiveCents, releaseRequiredCents: Math.max(0, before.appliedCents - args.targetEffectiveCents), targetOutstandingCents: Math.max(0, args.targetEffectiveCents - before.appliedCents), expectedChargeRevision: before.revision, expectedFinancialRevision: account?.state === "ready" ? account.revision : null };
+    return { state: event?.archived ? "hold" as const : updating ? "updating" as const : hold ? "hold" as const : "ready" as const, message: event?.archived ? "Archived event charges require explicit historical review." : updating ? "Financial or enrollment preparation must finish before correction." : oversized ? "Target plus prior cancellations exceeds the supported exact-cent range." : hold ? args.targetEffectiveCents === before.effectiveCents ? "Target amount already matches this obligation." : "Cancellation cannot increase a charge." : null, chargeId: charge._id, amounts: before, targetEffectiveCents: args.targetEffectiveCents, releaseRequiredCents: Math.max(0, before.appliedCents - args.targetEffectiveCents), targetOutstandingCents: Math.max(0, args.targetEffectiveCents - before.appliedCents), expectedChargeRevision: before.revision, expectedFinancialRevision: account?.state === "ready" && account.allocationSourceVersion === 1 ? account.revision : null };
   },
 });
 
@@ -82,7 +82,7 @@ export const correct = mutation({
     if (args.kind === "adjustment" && !Number.isSafeInteger(args.targetEffectiveCents + before.cancelledCents)) throw new Error("Target plus prior cancellations exceeds the supported exact-cent range.");
     const releaseRequiredCents = Math.max(0, before.appliedCents - args.targetEffectiveCents);
     const now = Date.now();
-    const jobId = await ctx.db.insert("financialOperationJobs", { kind: "chargeCorrection", studentId: student._id, actorId: actor._id, originalActorId: actor._id, generation: account.generation, state: "running", step: 0, amountCents: releaseRequiredCents, committedCents: 0, idempotencyKey: args.idempotencyKey, operationHash: hash, eventId: charge.eventId, chargeId: charge._id, correctionKind: args.kind, targetEffectiveCents: args.targetEffectiveCents, originalEffectiveCents: before.effectiveCents, originalAppliedCents: before.appliedCents, releaseRequiredCents, chargeBeforeJson: JSON.stringify(before), chargeCursor: null, reason: args.reason.trim(), updatedAt: now });
+    const jobId = await ctx.db.insert("financialOperationJobs", { requiredFinancialProjectionVersion: 4, kind: "chargeCorrection", studentId: student._id, actorId: actor._id, originalActorId: actor._id, generation: account.generation, state: "running", step: 0, amountCents: releaseRequiredCents, committedCents: 0, idempotencyKey: args.idempotencyKey, operationHash: hash, eventId: charge.eventId, chargeId: charge._id, correctionKind: args.kind, targetEffectiveCents: args.targetEffectiveCents, originalEffectiveCents: before.effectiveCents, originalAppliedCents: before.appliedCents, releaseRequiredCents, chargeBeforeJson: JSON.stringify(before), chargeCursor: null, reason: args.reason.trim(), updatedAt: now });
     account.state = "posting"; account.operationJobId = jobId; await saveFinancialAccount(ctx, account);
     await audit(ctx, actor, "charges", charge._id, "startCorrection", before, { jobId, targetEffectiveCents: args.targetEffectiveCents, releaseRequiredCents, state: "running" }, args.reason.trim());
     await ctx.runMutation(makeFunctionReference<"mutation">("financialOperationsWorker:processPage"), { jobId, step: 0 });
@@ -101,7 +101,7 @@ export const status = query({
     const job = args.jobId ? await ctx.db.get(args.jobId) : await ctx.db.query("financialOperationJobs").withIndex("by_chargeId_and_updatedAt", q => q.eq("chargeId", charge._id)).order("desc").first();
     if (job && (job.kind !== "chargeCorrection" || job.chargeId !== charge._id || job.studentId !== charge.studentId)) throw new Error("Correction job is unavailable for this charge.");
     const original = job?.originalActorId ? await ctx.db.get(job.originalActorId) : null; const processor = job ? await ctx.db.get(job.actorId) : null;
-    return { job, financialState: !account || account.state === "uninitialized" ? "uninitialized" as const : account.state === "ready" ? "ready" as const : account.state === "failed" ? "failed" as const : "updating" as const, canRetry: actor.role === "coach" && job?.state === "failed" && !event?.archived && await seasonFinancialRetryAvailable(ctx, student.seasonId, job._id), originalActorName: original?.name ?? null, processingActorName: processor?.name ?? null };
+    return { job, financialState: !account || account.state === "uninitialized" ? "uninitialized" as const : account.state === "ready" && account.allocationSourceVersion === 1 ? "ready" as const : account.state === "failed" ? "failed" as const : "updating" as const, canRetry: actor.role === "coach" && job?.state === "failed" && !event?.archived && await seasonFinancialRetryAvailable(ctx, student.seasonId, job._id), originalActorName: original?.name ?? null, processingActorName: processor?.name ?? null };
   },
 });
 
@@ -128,7 +128,7 @@ export const sourceEvidence = query({
   handler: async (ctx, args) => {
     const { charge } = await accessibleCharge(ctx, args.chargeId); const account = await financialAccount(ctx, charge.studentId);
     if (!Number.isSafeInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 20) throw new Error("Request at most 20 funding sources per page.");
-    const state = !account || account.state === "uninitialized" ? "uninitialized" as const : account.state === "ready" ? "ready" as const : account.state === "failed" ? "failed" as const : "updating" as const;
+    const state = !account || account.state === "uninitialized" ? "uninitialized" as const : account.state === "ready" && account.allocationSourceVersion === 1 ? "ready" as const : account.state === "failed" ? "failed" as const : "updating" as const;
     if (!account || account.state === "uninitialized" || account.state === "rebuilding" || account.state === "failed" && !account.operationJobId && !account.allocationJobId && !account.fundraiserJobId) return { financialState: state, page: [], isDone: true, continueCursor: "" };
     boundRead(args.paginationOpts);
     const page = await ctx.db.query("financialAllocations").withIndex("by_studentId_and_generation_and_chargeId", q => q.eq("studentId", charge.studentId).eq("generation", account.generation).eq("chargeId", charge._id)).paginate(args.paginationOpts);

@@ -249,3 +249,5 @@ Continue the reviewed FINANCE_ADMIN_IMPLEMENTATION contract: Sol owns shared sch
 ## Completion-first working policy — October 13
 
 The Coach requested explicit protection against minutiae and context churn. Follow COMPLETION_WORKFLOW.md for workflow-sized delivery, blocking-versus-follow-up decisions, convergent reviews, proportionate verification and concise handoffs. Finish connected Finance next; retain all G1-G7 requirements and privacy/production gates. This supersedes habits of fragment-sized repeated reviews and per-step narrative updates, not required acceptance evidence.
+
+October13 connected Finance milestone: source-separated table/history and recovery/payment integration reviewed, tested and synchronized to development13:21:10. Fictional account preparation/history/payment reconciliation verified. Next complete scoped export and remaining financial workflows while independent season-link migration proceeds; retain visual/role acceptance queue. See CURRENT_STATE and checklist for exact validation limits.

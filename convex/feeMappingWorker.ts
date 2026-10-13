@@ -1,9 +1,10 @@
+import { recordChargeRevisionChange } from "./lib/financeChanges";
 import { makeFunctionReference } from "convex/server";
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { seasonFinanceControl, seasonFinancialDrain } from "./lib/seasonFinance";
 import { provenMainFee } from "./lib/feeDefinitions";
-import { readyFinancialAccount, recordChargeChange } from "./lib/financialSources";
+import { readyFinancialAccountForFeeJob, recordChargeChange } from "./lib/financialSources";
 import { effectiveChargeCents } from "./lib/chargeObligation";
 import { refreshStudentFinance } from "./lib/financeSummaries";
 const runRef = makeFunctionReference<"mutation">("feeMappingWorker:run");
@@ -101,10 +102,13 @@ export const processPage = internalMutation({
         const fee = charge.feeDefinitionId ? await ctx.db.get(charge.feeDefinitionId) : null;
         if (!fee || fee.seasonId !== job.seasonId) throw new Error("Unmapped fee appeared during locked propagation.");
         if (charge.priority === fee.priority) continue;
-        const account = await readyFinancialAccount(ctx, charge.studentId); const effective = effectiveChargeCents(charge); const previousPriority = charge.priority;
+        const account = await readyFinancialAccountForFeeJob(ctx, charge.studentId, job); const effective = effectiveChargeCents(charge); const previousPriority = charge.priority;
         await ctx.db.patch(charge._id, { priority: fee.priority }); charge.priority = fee.priority;
         await recordChargeChange(ctx, account, charge, effective, charge.appliedCents);
-        await ctx.db.insert("chargeRevisions", { chargeId: charge._id, studentId: charge.studentId, seasonId: job.seasonId, kind: "priority", beforeAdjustedCents: charge.adjustedCents ?? 0, afterAdjustedCents: charge.adjustedCents ?? 0, beforeCancelledCents: charge.cancelledCents ?? 0, afterCancelledCents: charge.cancelledCents ?? 0, beforeEffectiveCents: effective, afterEffectiveCents: effective, beforeAppliedCents: charge.appliedCents, afterAppliedCents: charge.appliedCents, beforePriority: previousPriority, afterPriority: fee.priority, releasedCents: 0, createdBy: job.originalActorId, processedBy: actor._id, recordedAt: Date.now(), reason: job.reason, idempotencyKey: `mapping:${job._id}:${charge._id}`, operationHash: job.operationHash });
+        const changeRevisionId = await ctx.db.insert("chargeRevisions", { chargeId: charge._id, studentId: charge.studentId, seasonId: job.seasonId, kind: "priority", beforeAdjustedCents: charge.adjustedCents ?? 0, afterAdjustedCents: charge.adjustedCents ?? 0, beforeCancelledCents: charge.cancelledCents ?? 0, afterCancelledCents: charge.cancelledCents ?? 0, beforeEffectiveCents: effective, afterEffectiveCents: effective, beforeAppliedCents: charge.appliedCents, afterAppliedCents: charge.appliedCents, beforePriority: previousPriority, afterPriority: fee.priority, releasedCents: 0, createdBy: job.originalActorId, processedBy: actor._id, recordedAt: Date.now(), reason: job.reason, idempotencyKey: `mapping:${job._id}:${charge._id}`, operationHash: job.operationHash });
+        const changeRevision = await ctx.db.get(changeRevisionId);
+        if (!changeRevision) throw new Error("Charge change evidence is unavailable.");
+        await recordChargeRevisionChange(ctx, changeRevision);
         await refreshStudentFinance(ctx, charge.studentId);
       }
       cursor = page.isDone ? null : page.continueCursor; if (page.isDone) phase = "verify";

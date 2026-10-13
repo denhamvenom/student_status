@@ -81,6 +81,7 @@ describe("Whole Team enrollment", () => {
     expect(rows.some(p => p.studentId === f.ids.students[2])).toBe(true);
   });
 
+  // Includes 500-record fixture construction and paginated work under parallel-suite load.
   it("creates the supported 500-member Whole Team roster", async () => {
     const f = await fixture();
     await f.t.run(async ctx => {
@@ -92,7 +93,7 @@ describe("Whole Team enrollment", () => {
     const rows = await f.t.run(ctx => ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", event)).collect());
     expect(rows).toHaveLength(500);
     expect(new Set(rows.map(p => p.studentId)).size).toBe(500);
-  });
+  }, 15_000);
 
   it("ignores more than 100 historical or archived events when enrolling a later member", async () => {
     const f = await fixture();

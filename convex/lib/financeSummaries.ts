@@ -1,9 +1,9 @@
 import { updateFinanceAggregate } from "./reportAggregates";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { cents, ensureFinancialAccount, financialAccount } from "./financialSources";
+import { cents, ensureFinancialAccount, financialAccount, verifyAppliedSources } from "./financialSources";
 
-export const FINANCE_SUMMARY_VERSION = 3 as const;
+export const FINANCE_SUMMARY_VERSION = 4 as const;
 export type FinanceSnapshot = { entries: Doc<"ledgerEntries">[]; charges: Doc<"charges">[] };
 
 /** Committed projection totals are constant-time, independent of lifetime ledger length. */
@@ -11,6 +11,7 @@ export async function calculateStudentFinance(ctx: MutationCtx | QueryCtx, stude
   void _snapshot;
   const account = await financialAccount(ctx, studentId);
   if (!account || account.state === "rebuilding" || account.state === "uninitialized" || account.state === "failed" && !account.allocationJobId && !account.operationJobId && !account.fundraiserJobId) throw new Error("Financial records require preparation before totals are available.");
+  if (account.allocationSourceVersion === 1) verifyAppliedSources(account);
   const projection = {
     studentId, seasonId: account.seasonId, chargedCents: account.chargedCents, paidCents: account.paidCents,
     dueCents: cents(account.chargedCents - account.paidCents), personalAvailableCents: account.personalAvailableCents,
@@ -18,7 +19,10 @@ export async function calculateStudentFinance(ctx: MutationCtx | QueryCtx, stude
     travelBalanceCents: cents(account.personalAvailableCents + account.fundraisingAvailableCents),
     travelShareCents: account.travelShareCents, transferredInCents: account.transferredInCents,
     knownRaisedCents: account.knownRaisedCents, raisedComplete: account.unknownGrossSourceCount === 0,
-    updatedAt: account.lastFinancialChangeAt ?? account.lastLedgerAt, version: FINANCE_SUMMARY_VERSION,
+    personalAppliedCents: account.allocationSourceVersion === 1 ? account.personalAppliedCents : undefined,
+    fundraisingAppliedCents: account.allocationSourceVersion === 1 ? account.fundraisingAppliedCents : undefined,
+    financialGeneration: account.generation, financialRevision: account.revision,
+    updatedAt: account.lastFinancialChangeAt ?? account.lastLedgerAt, version: account.allocationSourceVersion === 1 ? FINANCE_SUMMARY_VERSION : 3 as const,
   };
   for (const value of [projection.chargedCents, projection.paidCents, projection.personalAvailableCents, projection.fundraisingAvailableCents, projection.travelShareCents, projection.transferredInCents, projection.knownRaisedCents]) cents(value);
   return projection;

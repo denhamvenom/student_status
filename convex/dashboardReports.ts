@@ -8,7 +8,7 @@ import { activeSeason, requireRole, studentAccess, viewer } from "./lib/access";
 import { calculateStudentFinance, FINANCE_SUMMARY_VERSION } from "./lib/financeSummaries";
 import { financialAccount } from "./lib/financialSources";
 import { attendanceEvidence } from "./lib/attendanceReports";
-import { attendanceNamespace, studentAttendanceNamespace, reportAggregate, readFinanceAggregates } from "./lib/reportAggregates";
+import { attendanceNamespace, studentAttendanceNamespace, reportAggregate } from "./lib/reportAggregates";
 export { correctedIntervals } from "./lib/attendanceReports";
 
 const nullableNumber = v.union(v.number(), v.null());
@@ -19,7 +19,7 @@ async function financialProjection(ctx: QueryCtx, studentId: Id<"students">) {
   const student = await ctx.db.get(studentId);
   const maintenance = student ? await feeMaintenanceProjection(ctx, student.seasonId) : null;
   const account = await financialAccount(ctx, studentId);
-  if (account?.state !== "ready") return { state: account?.state === "failed" ? "failed" as const : "updating" as const, maintenance };
+  if (account?.state !== "ready" || account.allocationSourceVersion !== 1) return { state: account?.state === "failed" ? "failed" as const : "updating" as const, maintenance };
   const data = await calculateStudentFinance(ctx, studentId);
   return { state: "ready" as const, maintenance, chargedCents: data.chargedCents, paidCents: data.paidCents, dueCents: data.dueCents,
     travelBalanceCents: data.travelBalanceCents, personalAvailableCents: data.personalAvailableCents,
@@ -105,8 +105,16 @@ export const team = query({
     };
     if (backfill?.state !== "complete" || summaries.length > 500 || summaries.length !== students.length || summaries.some(summary => summary.version !== FINANCE_SUMMARY_VERSION || !students.some(student => student._id === summary.studentId)) || students.some(student => !summaries.some(summary => summary.studentId === student._id))) return { state: backfill?.state === "failed" ? "failed" as const : "updating" as const, ...roster, finance: null, processed: backfill?.processed ?? 0, rebuildRunning: backfill?.state === "running", canRebuild: user.role === "coach" && backfill?.state !== "running" && (!maintenance || maintenance.state === "ready" || maintenance.state === "failed"), message: backfill?.lastError ?? "Financial reports are updating; rebuild reports before viewing totals." };
     // Finance includes inactive current-season accounts: archiving never erases debt or credit.
-    const { knownRaisedCents, unknownRaisedAccounts, ...aggregated } = await readFinanceAggregates(ctx,season._id);
-    const totals = { ...aggregated, raisedCents: unknownRaisedAccounts === 0 ? knownRaisedCents : null, updatedAt: null as number | null };
+    const metrics = ["chargedCents", "paidCents", "dueCents", "travelBalanceCents", "personalAvailableCents", "fundraisingAvailableCents", "travelShareCents", "transferredInCents", "knownRaisedCents"] as const;
+    const invalidProjection = summaries.some(row => {
+      const account = readyAccounts.find(item => item.studentId === row.studentId);
+      return !account || account.allocationSourceVersion !== 1 || account.operationJobId || account.allocationJobId || account.fundraiserJobId || row.financialGeneration !== account.generation || row.financialRevision !== account.revision || metrics.some(key => row[key] === undefined || !Number.isSafeInteger(row[key]) || row[key]! < 0) || row.personalAppliedCents === undefined || row.fundraisingAppliedCents === undefined || !Number.isSafeInteger(row.personalAppliedCents) || !Number.isSafeInteger(row.fundraisingAppliedCents) || row.personalAppliedCents < 0 || row.fundraisingAppliedCents < 0 || BigInt(row.personalAppliedCents) + BigInt(row.fundraisingAppliedCents) !== BigInt(row.paidCents);
+    });
+    if (invalidProjection) return { state: "failed" as const, ...roster, finance: null, processed: backfill.processed, rebuildRunning: false, canRebuild: user.role === "coach" && (!maintenance || maintenance.state === "ready" || maintenance.state === "failed"), message: "Financial projections require verification before team totals are available." };
+    const exact = Object.fromEntries(metrics.map(key => [key, summaries.reduce((total, row) => total + BigInt(row[key] ?? 0), 0n)])) as Record<typeof metrics[number], bigint>;
+    if (Object.values(exact).some(value => value < 0n || value > BigInt(Number.MAX_SAFE_INTEGER))) return { state: "failed" as const, ...roster, finance: null, processed: backfill.processed, rebuildRunning: false, canRebuild: user.role === "coach" && (!maintenance || maintenance.state === "ready" || maintenance.state === "failed"), message: "Team totals exceed the supported exact-cent range; individual student records remain available." };
+    const { knownRaisedCents, ...aggregated } = Object.fromEntries(metrics.map(key => [key, Number(exact[key])])) as Record<typeof metrics[number], number>;
+    const totals = { ...aggregated, raisedCents: summaries.every(row => row.raisedComplete) ? knownRaisedCents : null, updatedAt: null as number | null };
     for (const finance of summaries) {
       if (finance.updatedAt !== null) totals.updatedAt = Math.max(totals.updatedAt ?? finance.updatedAt, finance.updatedAt);
     }

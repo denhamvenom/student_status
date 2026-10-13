@@ -20,7 +20,7 @@ export const prepareMapping = mutation({
     await requireNoUnfinishedFeeScopes(ctx, season._id);
     const control = await ctx.db.query("seasonFinanceControls").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).unique();
     const now = Date.now();
-    const jobId = await ctx.db.insert("feeMappingJobs", { seasonId: season._id, originalActorId: actor._id, actorId: actor._id, mode: "prove", state: "draining", phase: "drain", step: 0, cursor: null, nextRank: 1, processed: 0, mapped: 0, unmapped: 0, idempotencyKey: args.idempotencyKey, operationHash: hash, reason: args.reason.trim(), createdAt: now, updatedAt: now });
+    const jobId = await ctx.db.insert("feeMappingJobs", { requiredFinancialProjectionVersion: 4, seasonId: season._id, originalActorId: actor._id, actorId: actor._id, mode: "prove", state: "draining", phase: "drain", step: 0, cursor: null, nextRank: 1, processed: 0, mapped: 0, unmapped: 0, idempotencyKey: args.idempotencyKey, operationHash: hash, reason: args.reason.trim(), createdAt: now, updatedAt: now });
     const fields = { state: "draining" as const, mappingJobId: jobId, priorityJobId: undefined, bulkJobId: undefined, mappingInitialized: false, orderReady: false, unmappedCount: 0, updatedAt: now };
     if (control) await ctx.db.patch(control._id, { ...fields, revision: control.revision + 1 });
     else await ctx.db.insert("seasonFinanceControls", { ...fields, seasonId: season._id, revision: 1 });
@@ -70,7 +70,7 @@ export const mapCharges = mutation({
       if (!charge || !student || student.seasonId !== season._id || charge.feeDefinitionId || (charge.revision ?? 0) !== row.expectedChargeRevision || review?.state !== "unmapped" || charge.eventId !== definition.eventId) throw new Error("A selected charge changed or belongs to another fee scope.");
     }
     const now = Date.now();
-    const jobId = await ctx.db.insert("feeMappingJobs", { seasonId: season._id, originalActorId: actor._id, actorId: actor._id, mode: "review", state: "draining", phase: "drain", step: 0, cursor: null, nextRank: 1, processed: 0, mapped: 0, unmapped: control.unmappedCount ?? 0, feeDefinitionId: definition._id, idempotencyKey: args.idempotencyKey, operationHash: hash, reason: args.reason.trim(), createdAt: now, updatedAt: now });
+    const jobId = await ctx.db.insert("feeMappingJobs", { requiredFinancialProjectionVersion: 4, seasonId: season._id, originalActorId: actor._id, actorId: actor._id, mode: "review", state: "draining", phase: "drain", step: 0, cursor: null, nextRank: 1, processed: 0, mapped: 0, unmapped: control.unmappedCount ?? 0, feeDefinitionId: definition._id, idempotencyKey: args.idempotencyKey, operationHash: hash, reason: args.reason.trim(), createdAt: now, updatedAt: now });
     for (const row of args.chargeIds) await ctx.db.insert("feeMappingRows", { jobId, ...row, state: "pending" });
     await ctx.db.patch(control._id, { state: "draining", mappingJobId: jobId, priorityJobId: undefined, bulkJobId: undefined, revision: control.revision + 1, updatedAt: now });
     await ctx.scheduler.runAfter(0, makeFunctionReference<"mutation">("feeMappingWorker:run"), { jobId }); return jobId;

@@ -1,3 +1,4 @@
+import { recordChargeRevisionChange } from "./financeChanges";
 import type { Doc } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import type { AppUser } from "./access";
@@ -56,6 +57,9 @@ export async function chargeCorrectionStep(ctx: MutationCtx, actor: AppUser, acc
   await recordChargeChange(ctx, account, charge, before.effectiveCents, previousApplied);
   if (done) {
     const revisionId = await ctx.db.insert("chargeRevisions", { chargeId: charge._id, studentId: account.studentId, seasonId: account.seasonId, kind: job.correctionKind, beforeAdjustedCents: before.adjustedCents, afterAdjustedCents: charge.adjustedCents ?? 0, beforeCancelledCents: before.cancelledCents, afterCancelledCents: charge.cancelledCents ?? 0, beforeEffectiveCents: before.effectiveCents, afterEffectiveCents: job.targetEffectiveCents, beforeAppliedCents: before.appliedCents, afterAppliedCents: charge.appliedCents, beforePriority: before.priority, afterPriority: charge.priority, requestedTargetCents: job.targetEffectiveCents, releasedCents: committed, createdBy: job.originalActorId, processedBy: actor._id, recordedAt: Date.now(), reason: job.reason, idempotencyKey: job.idempotencyKey, operationHash: job.operationHash, jobId: job._id });
+    const revision = await ctx.db.get(revisionId);
+    if (!revision) throw new Error("Charge change evidence is unavailable.");
+    await recordChargeRevisionChange(ctx, revision);
     await ctx.db.patch(job._id, { chargeRevisionId: revisionId });
     await audit(ctx, actor, "charges", charge._id, "completeCorrection", before, { ...correctionSnapshot(charge), releasedCents: committed, revisionId }, job.reason);
   } else await audit(ctx, actor, "charges", charge._id, "releaseCorrectionSources", { appliedCents: previousApplied }, { appliedCents: charge.appliedCents, releasedCents: committed, targetPending: job.targetEffectiveCents }, job.reason);

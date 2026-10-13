@@ -499,3 +499,11 @@ October13 integration verification:12focused Finance UI tests pass. Full lint/ty
 
 - [x] Add mandatory completion-first policy to AGENTS.md and docs/COMPLETION_WORKFLOW.md: usable workflow milestones, concrete blocking criteria, batched reviews/tests and less context churn.
 - [ ] Deliver the connected Finance workflow and its necessary evidence before optional polish. All seven goal outcomes remain open.
+
+### Connected Finance milestone — October 13
+
+- [x] Integrate the source-separated Coach account table, guarded account preparation, named payment dialog, independent query recovery and readable historical feed with fee identity. Astra batch review clear; synchronized development13:21:10.
+- [x] Verify all six fictional accounts prepare without changing balances; historical coverage completes with real timestamps and identified fee-order changes. Verify a fictional one-cent payment updates the row and team totals, with submission/close guards and success feedback.
+- [ ] Complete Finance responsive reference comparisons and account-detail action rehearsal; scoped export/import/payment corrections remain required.
+
+Full integrated289tests/54files lint/types/build passed before final refinements; final13UI tests, strict types, scoped lint/build and owner9backend tests after refinement pass. Bundle-size warning remains a follow-up. This completes a connected slice, not G1/G6/G7 in full.

@@ -91,7 +91,7 @@ export const students = query({
       if (!student.active) continue;
       const row = await ctx.db.query("fundraiserStudentTotals").withIndex("by_fundraiserId_and_studentId", q => q.eq("fundraiserId", fundraiser._id).eq("studentId", student._id)).unique();
       const account = await financialAccount(ctx, student._id);
-      rows.push({ studentId: student._id, name: student.preferredName || student.legalName, grossCents: row?.grossCents ?? 0, teamCents: row?.teamCents ?? 0, travelCreditCents: row?.travelCreditCents ?? 0, rowRevision: row?.revision ?? 0, financialRevision: account?.state === "ready" ? account.revision : null, financialState: account?.state === "ready" ? "ready" as const : "updating" as const });
+      rows.push({ studentId: student._id, name: student.preferredName || student.legalName, grossCents: row?.grossCents ?? 0, teamCents: row?.teamCents ?? 0, travelCreditCents: row?.travelCreditCents ?? 0, rowRevision: row?.revision ?? 0, financialRevision: account?.state === "ready" && account.allocationSourceVersion === 1 ? account.revision : null, financialState: account?.state === "ready" && account.allocationSourceVersion === 1 ? "ready" as const : "updating" as const });
     }
     return { page: rows, isDone: page.isDone, continueCursor: page.continueCursor };
   },
@@ -115,8 +115,8 @@ export const preview = query({
       const account = await financialAccount(ctx, student._id);
       const available = account?.state === "ready" ? await availableOriginalFundraiserCredit(ctx, student._id, account.generation, fundraiser._id) : 0;
       const required = Math.max(0, (previous?.travelCreditCents ?? 0) - split.travelCreditCents);
-      const state = account?.state !== "ready" ? "updating" as const : required > available ? "hold" as const : "ready" as const;
-      rows.push({ studentId: student._id, ...split, grossDeltaCents: split.grossCents - (previous?.grossCents ?? 0), teamDeltaCents: split.teamCents - (previous?.teamCents ?? 0), travelDeltaCents: split.travelCreditCents - (previous?.travelCreditCents ?? 0), expectedRowRevision: previous?.revision ?? 0, expectedFinancialRevision: account?.state === "ready" ? account.revision : null, availableOriginalCents: available, requiredReductionCents: required, state, message: state === "updating" ? "Financial records must finish updating before posting." : state === "hold" ? "Original fundraiser credit was spent or transferred. Balances remain unchanged; a Coach must resolve this hold." : null });
+      const state = account?.state !== "ready" || account?.allocationSourceVersion !== 1 ? "updating" as const : required > available ? "hold" as const : "ready" as const;
+      rows.push({ studentId: student._id, ...split, grossDeltaCents: split.grossCents - (previous?.grossCents ?? 0), teamDeltaCents: split.teamCents - (previous?.teamCents ?? 0), travelDeltaCents: split.travelCreditCents - (previous?.travelCreditCents ?? 0), expectedRowRevision: previous?.revision ?? 0, expectedFinancialRevision: account?.state === "ready" && account.allocationSourceVersion === 1 ? account.revision : null, availableOriginalCents: available, requiredReductionCents: required, state, message: state === "updating" ? "Financial records must finish updating before posting." : state === "hold" ? "Original fundraiser credit was spent or transferred. Balances remain unchanged; a Coach must resolve this hold." : null });
     }
     return { fundraiserRevision: fundraiser.revision, rows };
   },
@@ -143,7 +143,7 @@ export const post = mutation({
       if (!student?.active || student.seasonId !== fundraiser.seasonId) throw new Error("Choose active students in the current season before starting a posting job.");
     }
     const now = Date.now();
-    const jobId = await ctx.db.insert("fundraiserPostingJobs", { fundraiserId: fundraiser._id, actorId: actor._id, originalActorId: actor._id, state: "running", cursor: null, processed: 0, committed: 0, held: 0, idempotencyKey: args.idempotencyKey, operationHash: hash, reason: args.reason.trim(), createdAt: now, updatedAt: now });
+    const jobId = await ctx.db.insert("fundraiserPostingJobs", { requiredFinancialProjectionVersion: 4, fundraiserId: fundraiser._id, actorId: actor._id, originalActorId: actor._id, state: "running", cursor: null, processed: 0, committed: 0, held: 0, idempotencyKey: args.idempotencyKey, operationHash: hash, reason: args.reason.trim(), createdAt: now, updatedAt: now });
     for (const row of args.rows) await ctx.db.insert("fundraiserPostingRows", { jobId, ...row, state: "pending" });
     await ctx.db.patch(fundraiser._id, { state: "posting", revision: fundraiser.revision + 1, postingJobId: jobId, updatedAt: now });
     await audit(ctx, actor, "fundraisers", fundraiser._id, "startPosting", { revision: fundraiser.revision }, { jobId, rows: args.rows.length }, args.reason.trim());

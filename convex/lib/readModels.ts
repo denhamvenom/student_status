@@ -14,7 +14,7 @@ export async function financeFor(ctx: Ctx, studentId: Id<"students">) {
   const account = await ctx.db.query("financialAccounts").withIndex("by_studentId", q => q.eq("studentId", studentId)).unique();
   const student = await ctx.db.get(studentId);
   const maintenance = student ? await feeMaintenanceProjection(ctx, student.seasonId) : null;
-  if (account?.state !== "ready") return { state: account?.state === "failed" ? "failed" as const : "updating" as const, summary: null, maintenance };
+  if (account?.state !== "ready" || account.allocationSourceVersion !== 1) return { state: account?.state === "failed" ? "failed" as const : "updating" as const, summary: null, maintenance };
   return { state: "ready" as const, summary: await calculateStudentFinance(ctx, studentId), maintenance };
 }
 export async function studentReadiness(ctx: Ctx, event: Doc<"events">, student: Doc<"students">) {
@@ -25,7 +25,7 @@ export async function studentReadiness(ctx: Ctx, event: Doc<"events">, student: 
   const financialAccount = await ctx.db.query("financialAccounts").withIndex("by_studentId", q => q.eq("studentId", student._id)).unique();
   const maintenance = await feeMaintenanceProjection(ctx, event.seasonId);
   if (maintenance && maintenance.state !== "ready") open.push("Season fee maintenance is not complete");
-  if (financialAccount?.state !== "ready") open.push("Financial records require review or are updating");
+  if (financialAccount?.state !== "ready" || financialAccount.allocationSourceVersion !== 1) open.push("Financial records require review or are updating");
   const eventCharges = await ctx.db.query("charges").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(101);
   if (eventCharges.length > 100) open.push("Event financial records require review");
   if (eventCharges.some(x => x.appliedCents < effectiveChargeCents(x))) open.push("Required payment");

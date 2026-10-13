@@ -110,7 +110,7 @@ export const createEvent = mutation({
     }
     if (args.assignmentScope === "wholeTeam") {
       const now = Date.now();
-      const jobId = await ctx.db.insert("eventEnrollmentJobs", { eventId: id, actorId: user._id, state: "running", cursor: null, processed: 0, startedAt: now, updatedAt: now });
+      const jobId = await ctx.db.insert("eventEnrollmentJobs", { requiredFinancialProjectionVersion: 4, eventId: id, actorId: user._id, state: "running", cursor: null, processed: 0, startedAt: now, updatedAt: now });
       for (const studentId of assigned) await ctx.db.insert("eventEnrollmentMembers", { jobId, studentId });
       await ctx.db.patch(id, { enrollmentJobId: jobId });
       await ctx.scheduler.runAfter(0, internal.eventEnrollment.run, { jobId });

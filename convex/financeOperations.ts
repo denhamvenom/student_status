@@ -41,7 +41,7 @@ export const operationOptions = query({
     const account = await financialAccount(ctx, student._id);
     const maintenance = await seasonFinanceControl(ctx, student.seasonId);
     const uninitialized = !account || account.state === "uninitialized";
-    const preparing = account?.state === "rebuilding" || account?.state === "failed" && !account.allocationJobId && !account.operationJobId && !account.fundraiserJobId;
+    const preparing = account?.state === "ready" && account.allocationSourceVersion !== 1 || account?.state === "rebuilding" || account?.state === "failed" && !account.allocationJobId && !account.operationJobId && !account.fundraiserJobId;
     if (uninitialized || preparing) return {
       state: uninitialized ? "uninitialized" as const : account?.state === "failed" ? "failed" as const : "updating" as const,
       personalAvailableCents: null, fundraisingAvailableCents: null, sourceCount: null, chargeCount: null, recipients: [],
@@ -80,7 +80,7 @@ export const recordPayout = mutation({
     if (args.amountCents > beforePersonal) throw new Error("Amount exceeds unallocated personal payments.");
     const recordedAt = Date.now();
     const operationId = await ctx.db.insert("financeOperations", { kind: "payout", studentId: args.studentId, amountCents: args.amountCents, reason, method: args.method as Method, reference, occurredAt: args.occurredAt, recordedBy: actor._id, recordedAt, idempotencyKey: key, state: "running", committedCents: 0 });
-    const jobId = await ctx.db.insert("financialOperationJobs", { kind: "payout", studentId: args.studentId, actorId: actor._id, generation: account.generation, state: "running", step: 0, amountCents: args.amountCents, committedCents: 0, idempotencyKey: key, operationId, chargeCursor: null, reason, method: args.method, reference, occurredAt: args.occurredAt, updatedAt: recordedAt });
+    const jobId = await ctx.db.insert("financialOperationJobs", { requiredFinancialProjectionVersion: 4, kind: "payout", studentId: args.studentId, actorId: actor._id, generation: account.generation, state: "running", step: 0, amountCents: args.amountCents, committedCents: 0, idempotencyKey: key, operationId, chargeCursor: null, reason, method: args.method, reference, occurredAt: args.occurredAt, updatedAt: recordedAt });
     await ctx.db.patch(operationId, { jobId });
     account.state = "posting"; account.operationJobId = jobId; await saveFinancialAccount(ctx, account);
     await ctx.runMutation(makeFunctionReference<"mutation">("financialOperationsWorker:processPage"), { jobId, step: 0 });
@@ -117,7 +117,7 @@ export const transferFundraising = mutation({
     if (args.amountCents > senderBefore) throw new Error("Amount exceeds available fundraising credits.");
     const recordedAt = Date.now();
     const operationId = await ctx.db.insert("financeOperations", { kind: "transfer", studentId: sender._id, recipientStudentId: recipient._id, amountCents: args.amountCents, reason, recordedBy: actor._id, recordedAt, idempotencyKey: key, state: "running", committedCents: 0 });
-    const jobId = await ctx.db.insert("financialOperationJobs", { kind: "transfer", studentId: sender._id, recipientStudentId: recipient._id, actorId: actor._id, generation: senderAccount.generation, recipientGeneration: recipientAccount.generation, state: "running", step: 0, amountCents: args.amountCents, committedCents: 0, idempotencyKey: key, operationId, chargeCursor: null, reason, updatedAt: recordedAt });
+    const jobId = await ctx.db.insert("financialOperationJobs", { requiredFinancialProjectionVersion: 4, kind: "transfer", studentId: sender._id, recipientStudentId: recipient._id, actorId: actor._id, generation: senderAccount.generation, recipientGeneration: recipientAccount.generation, state: "running", step: 0, amountCents: args.amountCents, committedCents: 0, idempotencyKey: key, operationId, chargeCursor: null, reason, updatedAt: recordedAt });
     await ctx.db.patch(operationId, { jobId });
     senderAccount.state = "posting"; senderAccount.operationJobId = jobId;
     recipientAccount.state = "posting"; recipientAccount.operationJobId = jobId;
@@ -162,7 +162,7 @@ export const transferToTeam = mutation({
     if (args.amountCents > account.fundraisingAvailableCents) throw new Error("Amount exceeds available fundraising credit. Personal payments cannot transfer to the team.");
     const now = Date.now();
     const operationId = await ctx.db.insert("financeOperations", { kind: "teamTransfer", destination: "team", studentId: args.studentId, amountCents: args.amountCents, reason, recordedBy: actor._id, recordedAt: now, idempotencyKey: `team:${actor._id}:${key}`, state: "running", committedCents: 0 });
-    const jobId = await ctx.db.insert("financialOperationJobs", { kind: "teamTransfer", destination: "team", studentId: args.studentId, actorId: actor._id, originalActorId: actor._id, generation: account.generation, state: "running", step: 0, amountCents: args.amountCents, committedCents: 0, idempotencyKey: key, operationHash: hash, operationId, chargeCursor: null, reason, updatedAt: now });
+    const jobId = await ctx.db.insert("financialOperationJobs", { requiredFinancialProjectionVersion: 4, kind: "teamTransfer", destination: "team", studentId: args.studentId, actorId: actor._id, originalActorId: actor._id, generation: account.generation, state: "running", step: 0, amountCents: args.amountCents, committedCents: 0, idempotencyKey: key, operationHash: hash, operationId, chargeCursor: null, reason, updatedAt: now });
     await ctx.db.patch(operationId, { jobId }); account.state = "posting"; account.operationJobId = jobId; await saveFinancialAccount(ctx, account);
     await audit(ctx, actor, "financeOperations", operationId, "startTeamTransfer", { fundraisingAvailableCents: account.fundraisingAvailableCents }, { destination: "team", requestedCents: args.amountCents, committedCents: 0, jobId }, reason);
     await ctx.runMutation(makeFunctionReference<"mutation">("financialOperationsWorker:processPage"), { jobId, step: 0 });

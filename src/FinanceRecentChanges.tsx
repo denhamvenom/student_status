@@ -5,7 +5,7 @@ import { chargeCurrency } from './lib/charge-money'
 import styles from './CoachFinanceTable.module.css'
 
 export type FinanceChangeRow = {
-  changeId: string; studentName: string | null; actorName: string; occurredAt: number
+  changeId: string; feeLabel?: string | null; studentName: string | null; actorName: string; occurredAt: number
   kind: string; state: 'committed' | 'progress'; meaning: 'receipt' | 'obligation' | 'applied' | 'personalAvailable' | 'fundraisingAvailable' | 'grossRaised' | 'priority'
   beforeCents: number | null; afterCents: number | null; deltaCents: number | null; reason: string
   sourceKind: 'payment' | 'fundraiser' | null; historical: boolean
@@ -27,8 +27,8 @@ export function FinanceRecentChanges({ rows, loading, loadingMore, hasMore, cove
 }) {
   return <section className={styles.root} aria-label={copy.title}><h2>{copy.title}</h2><p className={styles.note}>{copy.coverageNote}</p>{coverage && <div role={coverage.state === 'failed' ? 'alert' : 'status'}><p>{copy.coverage[coverage.state]}</p>{coverage.startedAt !== null && <p className={styles.note}>{copy.coverageStarted}: {when(coverage.startedAt)}</p>}{coverage.completedAt !== null && <p className={styles.note}>{copy.coverageCompleted}: {when(coverage.completedAt)}</p>}</div>}
     {loading ? <p role="status">{copy.loading}</p> : rows.length === 0 ? <p>{hasMore || loadingMore ? copy.continuing : copy.empty}</p> : <>
-      <div className={styles.desktop}><Table><TableHeader><TableRow>{[copy.when,copy.student,copy.change,copy.amounts,copy.actor].map(label => <TableHead key={label}>{label}</TableHead>)}</TableRow></TableHeader><TableBody>{rows.map(row => <TableRow key={row.changeId}><TableCell>{when(row.occurredAt)}</TableCell><TableCell>{row.studentName ?? copy.team}</TableCell><TableCell><Change row={row}/></TableCell><TableCell><Amounts row={row}/></TableCell><TableCell>{row.actorName}<span className={styles.note}>{row.reason}</span></TableCell></TableRow>)}</TableBody></Table></div>
-      <div className={styles.mobile}>{rows.map(row => <article className={styles.account} key={row.changeId}><h3>{row.studentName ?? copy.team}</h3><span className={styles.note}>{when(row.occurredAt)}</span><div><Change row={row}/></div><div><Amounts row={row}/></div><p className={styles.note}>{row.actorName} · {row.reason}</p></article>)}</div>
+      <div className={styles.desktop}><Table><TableHeader><TableRow>{[copy.when,copy.student,copy.change,copy.amounts,copy.actor].map(label => <TableHead key={label}>{label}</TableHead>)}</TableRow></TableHeader><TableBody>{rows.map(row => <TableRow key={row.changeId}><TableCell>{when(row.occurredAt)}</TableCell><TableCell>{row.studentName ?? copy.team}{row.feeLabel && <span className={styles.note}>{row.feeLabel}</span>}</TableCell><TableCell><Change row={row}/></TableCell><TableCell><Amounts row={row}/></TableCell><TableCell>{row.actorName}<span className={styles.note}>{row.reason}</span></TableCell></TableRow>)}</TableBody></Table></div>
+      <div className={styles.mobile}>{rows.map(row => <article className={styles.account} key={row.changeId}><h3>{row.studentName ?? copy.team}{row.feeLabel && <span className={styles.note}>{row.feeLabel}</span>}</h3><span className={styles.note}>{when(row.occurredAt)}</span><div><Change row={row}/></div><div><Amounts row={row}/></div><p className={styles.note}>{row.actorName} · {row.reason}</p></article>)}</div>
     </>}
     {(hasMore || loadingMore) && <Button type="button" variant="outline" disabled={loading || loadingMore} onClick={onMore}>{loadingMore ? copy.loading : copy.more}</Button>}
   </section>

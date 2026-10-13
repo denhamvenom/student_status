@@ -1,8 +1,9 @@
+import { recordChargeRevisionChange, recordPriorityJobChange } from "./lib/financeChanges";
 import { makeFunctionReference } from "convex/server";
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { seasonFinancialDrain, seasonFinanceControl } from "./lib/seasonFinance";
-import { readyFinancialAccount, recordChargeChange } from "./lib/financialSources";
+import { readyFinancialAccountForFeeJob, recordChargeChange } from "./lib/financialSources";
 import { effectiveChargeCents } from "./lib/chargeObligation";
 import { refreshStudentFinance } from "./lib/financeSummaries";
 import { allocateUnapplied } from "./lib/money";
@@ -37,11 +38,14 @@ export const processPage = internalMutation({
         if (charge.priority === target) continue;
         const student = await ctx.db.get(charge.studentId);
         if (!student || student.seasonId !== job.seasonId) throw new Error("Linked fee charge belongs to another season.");
-        const account = await readyFinancialAccount(ctx, charge.studentId);
+        const account = await readyFinancialAccountForFeeJob(ctx, charge.studentId, job);
         const effective = effectiveChargeCents(charge); const beforePriority = charge.priority;
         await ctx.db.patch(charge._id, { priority: target }); charge.priority = target;
         await recordChargeChange(ctx, account, charge, effective, charge.appliedCents);
-        await ctx.db.insert("chargeRevisions", { chargeId: charge._id, studentId: charge.studentId, seasonId: job.seasonId, kind: "priority", beforeAdjustedCents: charge.adjustedCents ?? 0, afterAdjustedCents: charge.adjustedCents ?? 0, beforeCancelledCents: charge.cancelledCents ?? 0, afterCancelledCents: charge.cancelledCents ?? 0, beforeEffectiveCents: effective, afterEffectiveCents: effective, beforeAppliedCents: charge.appliedCents, afterAppliedCents: charge.appliedCents, beforePriority, afterPriority: target, releasedCents: 0, createdBy: job.originalActorId, processedBy: actor._id, recordedAt: Date.now(), reason: job.reason, idempotencyKey: `priority:${job._id}:${charge._id}`, operationHash: job.operationHash });
+        const changeRevisionId = await ctx.db.insert("chargeRevisions", { chargeId: charge._id, studentId: charge.studentId, seasonId: job.seasonId, kind: "priority", beforeAdjustedCents: charge.adjustedCents ?? 0, afterAdjustedCents: charge.adjustedCents ?? 0, beforeCancelledCents: charge.cancelledCents ?? 0, afterCancelledCents: charge.cancelledCents ?? 0, beforeEffectiveCents: effective, afterEffectiveCents: effective, beforeAppliedCents: charge.appliedCents, afterAppliedCents: charge.appliedCents, beforePriority, afterPriority: target, releasedCents: 0, createdBy: job.originalActorId, processedBy: actor._id, recordedAt: Date.now(), reason: job.reason, idempotencyKey: `priority:${job._id}:${charge._id}`, operationHash: job.operationHash });
+        const changeRevision = await ctx.db.get(changeRevisionId);
+        if (!changeRevision) throw new Error("Charge change evidence is unavailable.");
+        await recordChargeRevisionChange(ctx, changeRevision);
         await refreshStudentFinance(ctx, charge.studentId);
       }
       await ctx.db.patch(job._id, { cursor: page.isDone ? null : page.continueCursor, phase: page.isDone ? job.phase === "firstFee" ? "secondFee" : "verify" : job.phase, processed: job.processed + page.page.length, step: job.step + 1, updatedAt: Date.now() });
@@ -62,6 +66,10 @@ export const processPage = internalMutation({
       }
       const done = page.isDone && job.phase === "allocateSecond";
       await ctx.db.patch(job._id, { cursor: page.isDone ? null : page.continueCursor, phase: page.isDone && !done ? "allocateSecond" : job.phase, state: done ? "complete" : "applying", step: job.step + 1, updatedAt: Date.now() });
+      if (done) {
+        const completedJob = await ctx.db.get(job._id); if (!completedJob) throw new Error("Fee order receipt is unavailable.");
+        await recordPriorityJobChange(ctx, completedJob);
+      }
       if (done) await ctx.db.patch(control._id, { state: "ready", priorityJobId: undefined, revision: control.revision + 1, updatedAt: Date.now() });
     }
     const current = await ctx.db.get(job._id);

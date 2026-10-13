@@ -1,10 +1,11 @@
+import { recordOperationChange } from "./lib/financeChanges";
 import { requireSeasonFinancialRetry, seasonFinancialRetryAvailable } from "./lib/seasonFinance";
 import { makeFunctionReference } from "convex/server";
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import schema from "./schema";
 import { activeSeason, audit, viewer } from "./lib/access";
-import { financialAccount, recordProjectedEntry, saveFinancialAccount } from "./lib/financialSources";
+import { financialAccount, recordProjectedEntry, saveFinancialAccount, verifyAppliedSources } from "./lib/financialSources";
 import { refreshStudentFinance } from "./lib/financeSummaries";
 import { allocateUnapplied } from "./lib/money";
 import { withdrawalStep } from "./lib/financialWithdrawal";
@@ -49,6 +50,8 @@ export const processPage = internalMutation({
     const recipientStudent = job.recipientStudentId ? await ctx.db.get(job.recipientStudentId) : null;
     if (!senderStudent?.active || senderStudent.seasonId !== season._id || job.kind === "transfer" && (!recipientStudent?.active || recipientStudent.seasonId !== season._id)) throw new Error("Financial operation student became unavailable; Coach review is required.");
     if (!sender || sender.state !== "posting" || sender.operationJobId !== job._id || sender.generation !== job.generation || sender.seasonId !== season._id) throw new Error("Financial operation account changed.");
+    if (job.requiredFinancialProjectionVersion === 4 || sender.allocationSourceVersion === 1) verifyAppliedSources(sender);
+    if (recipient && (job.requiredFinancialProjectionVersion === 4 || recipient.allocationSourceVersion === 1)) verifyAppliedSources(recipient);
     if (job.kind === "chargeCorrection") {
       if (actor.role !== "coach") throw new Error("Only a Coach may process charge corrections.");
       if (job.eventId) {
@@ -106,6 +109,10 @@ export const processPage = internalMutation({
       if (recipient) {
         recipient.state = "ready"; recipient.operationJobId = undefined; await saveFinancialAccount(ctx, recipient);
         await allocateUnapplied(ctx, actor, recipient.studentId, `transfer:${job.idempotencyKey}`, undefined, job._id);
+      }
+      if (job.operationId) {
+        const receipt = await ctx.db.get(job.operationId); if (!receipt) throw new Error("Completed operation receipt is unavailable.");
+        await recordOperationChange(ctx, receipt, sender.seasonId);
       }
       await audit(ctx, actor, "financeOperations", job.operationId ?? job._id, "completeOperation", { committedCents: job.committedCents }, { requestedCents: job.amountCents, committedCents: committed, state: "complete", senderAvailableCents: sender.personalAvailableCents + sender.fundraisingAvailableCents }, job.reason);
     } else await ctx.scheduler.runAfter(0, runRef, { jobId: job._id });

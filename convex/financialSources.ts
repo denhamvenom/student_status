@@ -5,7 +5,7 @@ import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { internalMutation, mutation } from "./_generated/server";
 import { activeSeason, viewer } from "./lib/access";
-import { cents, createFinancialAccount, financialAccount, projectMovement, projectSource, requireNoFinancialJob, saveFinancialAccount } from "./lib/financialSources";
+import { cents, chargeAppliedSources, verifyAppliedSources, createFinancialAccount, financialAccount, projectMovement, projectSource, requireNoFinancialJob, saveFinancialAccount } from "./lib/financialSources";
 import { effectiveChargeCents } from "./lib/money";
 import { refreshStudentFinance } from "./lib/financeSummaries";
 
@@ -80,6 +80,7 @@ export const processPage = internalMutation({
       for (const charge of page.page) {
         const net = await ctx.db.query("financialChargeAllocations").withIndex("by_studentId_and_generation_and_chargeId", q => q.eq("studentId", account.studentId).eq("generation", account.generation).eq("chargeId", charge._id)).unique();
         if ((net?.appliedCents ?? 0) !== charge.appliedCents) throw new Error("Charge balance differs from its funding history; Coach review is required.");
+        chargeAppliedSources(net, charge.appliedCents);
         if (net) await ctx.db.patch(net._id, { verified: true });
         const effective = effectiveChargeCents(charge);
         await ctx.db.patch(charge._id, { outstanding: effective > charge.appliedCents });
@@ -102,6 +103,7 @@ export const processPage = internalMutation({
     } else {
       const orphan = await ctx.db.query("financialChargeAllocations").withIndex("by_studentId_and_generation_and_verified", q => q.eq("studentId", account.studentId).eq("generation", account.generation).eq("verified", false)).first();
       if (orphan || account.paidCents > account.chargedCents) throw new Error("Financial allocations refer to unavailable charges; Coach review is required.");
+      verifyAppliedSources(account);
       account.state = "ready"; account.revision++;
     }
     await saveFinancialAccount(ctx, account);

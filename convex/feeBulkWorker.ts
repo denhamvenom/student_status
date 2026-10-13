@@ -19,7 +19,7 @@ async function snapshotRow(ctx: MutationCtx, job: Doc<"feeBulkJobs">, studentId:
   const charge = matches.length === 1 ? matches[0] : null;
   let message: string | undefined;
   if (!student || student.seasonId !== job.seasonId || !student.active) message = "Student is inactive or unavailable in this prepared season scope.";
-  else if (!account || account.state !== "ready") message = "Financial preparation must be repaired before this row can post.";
+  else if (!account || account.state !== "ready" || job.requiredFinancialProjectionVersion === 4 && account.allocationSourceVersion !== 1) message = "Financial preparation must be repaired before this row can post.";
   else if (matches.length > 1) message = "Multiple linked charges require explicit historical review.";
   else if (job.kind !== "create" && !charge && job.scope === "existingCharges") message = "Original charge evidence is unavailable.";
   else if (account) message = bulkTargetHold(account, charge, job.targetAmountCents, job.kind) ?? undefined;
@@ -105,7 +105,7 @@ export const processPage = internalMutation({
           const charge = row.chargeId ? await ctx.db.get(row.chargeId) : null;
           let message: string | undefined;
           if (!student?.active || student.seasonId !== job.seasonId) message = "Original prepared student is inactive or unavailable.";
-          else if (!account || account.state !== "ready" || !fence || account.generation !== fence.generation || account.revision !== fence.expectedFinancialRevision) message = "Financial state changed after preparation; explicit fresh review is required.";
+          else if (!account || account.state !== "ready" || job.requiredFinancialProjectionVersion === 4 && account.allocationSourceVersion !== 1 || !fence || account.generation !== fence.generation || account.revision !== fence.expectedFinancialRevision) message = "Financial state changed after preparation; explicit fresh review is required.";
           else if (row.chargeId && (!charge || charge.feeDefinitionId !== fee._id || (charge.revision ?? 0) !== row.expectedChargeRevision)) message = "Original prepared charge changed; explicit fresh review is required.";
           else if (account) message = bulkTargetHold(account, charge, row.targetAmountCents, job.kind) ?? undefined;
           if (fee.eventId) {

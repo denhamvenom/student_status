@@ -56,7 +56,7 @@ export async function addCharges(ctx: MutationCtx, actor: AppUser, studentId: Id
     ids.set(draft.idempotencyKey, charge._id);
   }
   if (!missing.length) return drafts.map(d => ids.get(d.idempotencyKey)!);
-  const account = await ensureFinancialAccount(ctx, studentId);
+  const account = await ensureFinancialAccount(ctx, studentId, originId);
   const student = await ctx.db.get(studentId);
   if (!student) throw new Error("Student is unavailable for fee assignment.");
   if (originId) await requireSeasonFinancialContinuation(ctx, student.seasonId, originId);
@@ -79,11 +79,13 @@ export async function addCharges(ctx: MutationCtx, actor: AppUser, studentId: Id
 
 /** Bounded synchronous work; remaining allocation is durable and locks competing writers. */
 export async function allocateUnapplied(ctx: MutationCtx, actor: AppUser, studentId: Id<"students">, idempotencyPrefix: string, excludedEventId?: Id<"events">, originId?: FinancialContinuationId) {
-  const account = await ensureFinancialAccount(ctx, studentId);
+  const account = await ensureFinancialAccount(ctx, studentId, originId);
   if (originId) await requireSeasonFinancialContinuation(ctx, account.seasonId, originId);
   else await requireSeasonFinanceReady(ctx, account.seasonId);
   if (account.personalAvailableCents + account.fundraisingAvailableCents === 0) { await refreshStudentFinance(ctx, studentId); return; }
-  const jobId = await ctx.db.insert("financialAllocationJobs", { studentId, actorId: actor._id, generation: account.generation, state: "running", chargeCursor: null, step: 0, processed: 0, idempotencyPrefix, excludedEventId, maintenanceOriginId: originId, updatedAt: Date.now() });
+  const origin = originId ? await ctx.db.get(originId) : null;
+  const requiredFinancialProjectionVersion = originId ? origin?.requiredFinancialProjectionVersion : 4 as const;
+  const jobId = await ctx.db.insert("financialAllocationJobs", { requiredFinancialProjectionVersion, studentId, actorId: actor._id, generation: account.generation, state: "running", chargeCursor: null, step: 0, processed: 0, idempotencyPrefix, excludedEventId, maintenanceOriginId: originId, updatedAt: Date.now() });
   const job = await ctx.db.get(jobId);
   if (!job) throw new Error("Allocation job could not be created.");
   account.state = "allocating"; account.allocationJobId = jobId;

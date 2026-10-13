@@ -136,7 +136,7 @@ export const reviewWithdrawal = mutation({
     if (args.decision !== "partial" && args.returnCents !== undefined) throw new Error("Custom return is only for a partial decision.");
     const account = await ensureFinancialAccount(ctx, request.studentId);
     const key = `withdraw:${request._id}`;
-    const jobId = await ctx.db.insert("financialOperationJobs", { kind: "withdrawal", studentId: request.studentId, actorId: user._id, generation: account.generation, state: "running", step: 0, amountCents: returned, committedCents: 0, idempotencyKey: key, withdrawalRequestId: request._id, eventId: request.eventId, decision: args.decision, returnCents: returned, cancelUnpaidMain: args.cancelUnpaidMain, chargeCursor: null, reason: args.reason.trim(), updatedAt: Date.now() });
+    const jobId = await ctx.db.insert("financialOperationJobs", { requiredFinancialProjectionVersion: 4, kind: "withdrawal", studentId: request.studentId, actorId: user._id, generation: account.generation, state: "running", step: 0, amountCents: returned, committedCents: 0, idempotencyKey: key, withdrawalRequestId: request._id, eventId: request.eventId, decision: args.decision, returnCents: returned, cancelUnpaidMain: args.cancelUnpaidMain, chargeCursor: null, reason: args.reason.trim(), updatedAt: Date.now() });
     let remaining = returned;
     const ordered = [...data.charges].sort((a, b) => (a.category ?? "main") === (b.category ?? "main") ? a.createdAt - b.createdAt : (a.category ?? "main") === "main" ? -1 : 1);
     for (const charge of ordered) {

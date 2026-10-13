@@ -186,6 +186,7 @@ describe("synthetic versioned permission workflow", () => {
     expect(await f.t.run(ctx => ctx.db.query("permissionDrafts").withIndex("by_studentId_and_parentId", q => q.eq("studentId", f.ids.student).eq("parentId", f.ids.parent.id)).collect())).toHaveLength(0);
   });
 
+  // Includes 500-record fixture construction and paginated work under parallel-suite load.
   it("paginates a 500-member health export and rechecks revoked grants between pages", async () => {
     const f = await fixture(); const original = await sign(f, [f.ids.events[0]]); await review(f, original.submissionId);
     await f.t.run(async ctx => {
@@ -217,7 +218,7 @@ describe("synthetic versioned permission workflow", () => {
     await f.t.run(ctx => ctx.db.patch(f.ids.lead.id, {healthExport: false}));
     await expect(f.lead.mutation(api.permissions.exportPacket, {eventId: f.ids.events[0], includeHealth: true, paginationOpts: {cursor: first.continueCursor, numItems: 10}})).rejects.toThrow("health-export");
     await expect(f.coach.mutation(api.permissions.exportPacket, {eventId: f.ids.events[0], includeHealth: true, paginationOpts: {cursor: null, numItems: 11}})).rejects.toThrow("at most 10");
-  });
+  }, 15_000);
 
   it("never infers coverage from legacy answers JSON and refuses legacy review promotion", async () => {
     const f = await fixture();

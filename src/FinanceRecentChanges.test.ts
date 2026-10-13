@@ -40,3 +40,10 @@ describe('finance history coverage and pagination', () => {
     expect(html).toMatch(/<button[^>]*disabled/)
   })
 })
+
+it('identifies team fee-order records without guessing a student', () => {
+  const html = render({ ...row, kind: 'feePriority', meaning: 'priority', studentName: null, feeLabel: 'Fictional lunch fee', beforeCents: 2, afterCents: 1, deltaCents: null, sourceKind: null })
+  expect(html).toContain('Fictional lunch fee')
+  expect(html).toContain('Team')
+  expect(html).toContain('2 → 1')
+})

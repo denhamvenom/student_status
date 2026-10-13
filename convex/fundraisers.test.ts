@@ -40,6 +40,7 @@ describe("fundraiser source posting", () => {
     expect(await f.t.run(ctx => financialAccount(ctx, f.ids.student))).toMatchObject({ knownRaisedCents: 2900, travelShareCents: 0, fundraisingAvailableCents: 0 });
     expect((await f.t.run(ctx => ctx.db.query("studentFinanceSummaries").withIndex("by_studentId", q => q.eq("studentId", f.ids.student)).unique()))?.updatedAt).not.toBeNull();
     expect(await f.t.run(ctx => ctx.db.query("ledgerEntries").withIndex("by_studentId_and_recordedAt", q => q.eq("studentId", f.ids.student)).collect())).toHaveLength(0);
+    expect(await f.t.run(ctx => ctx.db.query("financeChangeEvents").collect())).toMatchObject([{ kind: "fundraiserGross", state: "committed", beforeCents: 0, afterCents: 2900, deltaCents: 2900 }]);
   });
 
   it("preserves original award source, reverses only available award credit and holds spent reductions unchanged", async () => {

@@ -68,7 +68,7 @@ export const continueBackfill = internalMutation({
           if (!entry && !charge) await ensureFinancialAccount(ctx, student._id);
           else { await startFinancialRebuild(ctx, student._id, actor._id); waiting = true; }
         }
-        else if (account.state === "uninitialized") { await startFinancialRebuild(ctx, student._id, actor._id); waiting = true; }
+        else if (account.state === "uninitialized" || account.state === "ready" && account.allocationSourceVersion !== 1) { await startFinancialRebuild(ctx, student._id, actor._id); waiting = true; }
         else if (account.state === "failed") throw new Error("Student financial processing failed.");
         else if (account.state !== "ready") waiting = true;
       }
