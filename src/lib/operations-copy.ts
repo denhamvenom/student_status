@@ -210,6 +210,7 @@ export const operationsCopy = {
     "confirmed": "Confirmed:"
   },
   "rooms": {
+    reviewAndFinalize: "Review and finalize",
     "loadingRoomSelection": "Loading room selection…",
     "yourRoomSelection": "Your room selection",
     "yourRoom": "Your room",

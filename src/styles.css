@@ -29,3 +29,7 @@ select,[data-slot="native-select-wrapper"]{max-width:100%}
 .event-wizard{width:100%;max-width:840px;margin:auto}.event-wizard>.card{margin-top:16px}.audience-choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px}.audience-choices [aria-pressed=true]{background:var(--purple-700);color:white}
 
 .roster-filters{display:flex;flex-wrap:wrap;gap:12px}.roster-filters>*{flex:1;min-width:180px}.roster-filters [aria-pressed=true]{background:var(--purple-700);color:white}
+
+/* Keep section headings below the sticky shell and event navigation. */
+[id^="event-"]{scroll-margin-top:232px}
+@media(max-width:1023px){.event-workspace-nav{top:72px}[id^="event-"]{scroll-margin-top:156px}}
