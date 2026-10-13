@@ -63,3 +63,6 @@ Astra confirmed financial administration, fundraiser posting/source totals, prio
 
 ## October 13 Coach roster milestone
 Coach roster → student record functional gap is now implemented and reviewed: paginated minimized Coach-only list, current-season inactive detail, validated finance reuse, bounded truthful next-event readiness, missing information and account access, existing controls/workspace links and scoped recovery. Development sync18:21:30; targeted permissions/projection/coverage and integrated checks passed; representative live navigation/filter/layout checks retained in conformance log. Reachable Coach/Travel Reports route remains a concrete G1/G4/G6 gap; no broad G1/G2/G4–G7 closure is claimed.
+
+## October 13 Reports milestone
+The reachable Coach/Travel Reports gap is implemented and development-synchronized at18:39:33. Astra cleared scoped backend/privacy/finance/coverage/CSV review and targeted fixes; integrated checks passed. Coach live filters/individual report and representative responsive presentation verified. Browser CSV file delivery and live Travel presentation remain evidence gaps; broader role journeys and visual queue remain open. No broad G1/G2/G4–G7 closure or production authorization follows.

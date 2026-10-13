@@ -4,8 +4,8 @@ Updated October 13, 2026. Follow COMPLETION_WORKFLOW.md. G3 is functionally comp
 
 ## Workspace and boundaries
 
-- Checkout student-status-readiness-design; branch feature/student-status-completion; draft PR10. Prior published checkpoint 3ef3d45 (remote reverified); Coach roster milestone is recorded in the current commit. Root owns Git, shared backend/generated files and synchronization.
-- Development only: daniel-eiland / denham-venom-student-status / dev:third-bandicoot-18. Latest development sync 18:21:30 (Coach roster queries and shared unchanged finance projection). No production, main merge, real signing or deletion authorization.
+- Checkout student-status-readiness-design; branch feature/student-status-completion; draft PR10. Prior published checkpoint 06076bd (Coach roster); Reports milestone is recorded in the current commit. Root owns Git, shared backend/generated files and synchronization.
+- Development only: daniel-eiland / denham-venom-student-status / dev:third-bandicoot-18. Latest development sync 18:39:33 (Reports queries; existing writers and shared contracts unchanged). No production, main merge, real signing or deletion authorization.
 - All application records are synthetic. Account-specific evidence, screenshots, exports and secrets stay outside Git.
 
 ## Completed outcomes to retain
@@ -30,6 +30,6 @@ Updated October 13, 2026. Follow COMPLETION_WORKFLOW.md. G3 is functionally comp
 User resumed the full remaining G1–G7 goal with this chat as integration owner. Sol implements; Astra reviews consequential changes and final milestones. The current checklist is reconciled once; historical phase entries retain their original evidence. Timeclock confirms no conflicting backend work.
 
 1. Coach roster → student record is implemented, reviewed and development-synchronized. Coach-only paginated rows, current-season active/inactive detail, validated balances, account linkage/access, missing fields, bounded next-event readiness and preserved archive controls are integrated. Targeted permission/projection/coverage tests and integrated lint/types/tests/build passed. Representative desktop-dark and phone-light layouts, balance filter, record/back navigation, error recovery and disabled archive/focus were observed. Final scoped layout fixes and error copy passed lint/types as applicable. No repeated financial, season or membership mutation rehearsal.
-2. Connect the reachable Coach/Travel Lead Reports placeholder to usable role-scoped reporting, reusing existing finance/attendance projections. This concrete route gap is not optional polish.
+2. Reports is implemented and Astra-cleared: bounded Coach/Travel queries, source-validated money, aggregate attendance with unknown kickoff gating, selected-event readiness, filters, individual report and Draft-aware loaded CSV. Integrated lint/types/tests/build passed (types rerun after a fixture update). Coach live filters/detail and desktop-dark/phone-light presentation verified. Remaining: browser CSV delivery observation and live Travel presentation. Download event timed out; browser policy blocked downloads-page inspection, no bypass attempted.
 3. Finish remaining role journeys when connected sessions are available; no repeated sign-in polling. Complete remaining representative visual queue and final G1–G7 review.
 4. User visual approval, production ownership/configuration/policy/backup/monitoring/rollback and explicit deployment approval remain separate gates in the checklist.

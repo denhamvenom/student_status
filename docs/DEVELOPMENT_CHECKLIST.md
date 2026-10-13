@@ -21,9 +21,11 @@ G3 Whole Team enrollment is functionally complete. G1, G2 and G4–G7 remain ope
 
 - [x] Complete Coach roster → student record: record navigation, validated balances, bounded genuine next-event readiness, missing-information summaries/filters and truthful account linkage/access status. Membership controls and Coach-only data boundaries preserved. Reviewed and synchronized at 18:21:30; targeted and integrated checks passed, followed by representative live layout/navigation/filter/recovery verification.
 
-- [ ] Connect the reachable Coach/Travel Lead Reports route to usable role-scoped reporting; current `/reports` navigation still reaches the unfinished fallback. Retain existing finance/attendance report implementations.
+- [x] Connect Coach/Travel Lead Reports to bounded role-scoped finance, attendance and selected-event readiness, individual reports and safe loaded-filtered CSV. Reviewed and development-synchronized at 18:39:33; focused and integrated validation passed. Coach live filtering/detail and representative presentation verified.
 
 ### Missing evidence
+
+- [ ] Confirm Reports CSV file delivery in the browser and its Travel Lead live presentation. CSV scope, Draft metadata and injection protection pass automated checks; browser download observation timed out, and browser policy blocked the downloads-page inspection. Do not retry through a workaround.
 
 - [ ] Student required setup and locked-room correction journey.
 - [ ] Ordinary Mentor invitation acceptance, profile and report journey.
