@@ -8,6 +8,10 @@ The latest user instruction authorizes all seven workstreams below, superseding 
 
 The Coach requested reduced testing and token use. Product outcomes G1–G7 remain required. Historical demands below for every state at all four viewport/theme combinations are superseded by representative phone/desktop/light/dark comparisons, expanding only for observed risks. Use essential permissions, financial and data-preservation tests; reuse valid prior evidence and batch integrated checks. See COMPLETION_WORKFLOW.md. Do not equate test counts with completion.
 
+## Current outcome status — October 13
+
+**G3 complete (functional).** Published e62b3ef and live Coach rehearsal prove that an inactive fictional member is excluded when a future Whole Team event is created, then added exactly once when reactivated. All five profiles were restored active. The live event was zero-fee; existing wholeTeam and enrollment-gate tests provide fee/source preservation, approved new/matched join, withdrawal preservation, season/timing, retry, capacity and access evidence. Astra confirmed closure under the completion-first policy. Remaining prototype comparisons belong to G1/G2. G1, G2, G4, G5, G6 and G7 remain open.
+
 ## Seven required outcomes
 
 | ID | Required outcome and full workflow | Baseline / source anchors | Evidence required before completion |

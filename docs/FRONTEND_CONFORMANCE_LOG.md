@@ -171,3 +171,5 @@ Live Coach confirmation showed all six saved roster decisions and explicit debt/
 
 ### October 13 — Coach roster lifecycle integration
 Coach-only active/archived listing and reasoned archive/reactivate dialogs reuse shared Card, Dialog, Input, Button, table and copy conventions. Existing roster filters/subteam/Travel Team controls remain. Scoped lint/types and Astra review passed. Live archive and reactivation succeeded, including automatic later membership in an upcoming synthetic Whole Team event. Desktop dark behavior observed; representative prototype/phone comparisons remain pending, not inferred from source. Historical attendance correction saved with original evidence retained. Screenshots remain private.
+
+October 13 retention observation: Coach preview displayed archive/latest-archive/five-year-review dates, disabled deletion notice, affected record classes, reasoned hold/release controls and both saved history entries. Live hold and release succeeded; synthetic profile restored active. Desktop dark lower-dialog screenshot is private and does not establish phone or reference parity.

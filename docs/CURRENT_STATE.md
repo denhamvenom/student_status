@@ -1,10 +1,10 @@
 # Current integration handoff
 
-Updated October 13, 2026. Follow COMPLETION_WORKFLOW.md: finish usable workflows, use essential risk-based checks and representative visuals, and retain accepted evidence. All G1–G7 remain open; DEVELOPMENT_CHECKLIST is the human guide and VISUAL_CHECKS is the single visual queue.
+Updated October 13, 2026. Follow COMPLETION_WORKFLOW.md: finish usable workflows, use essential risk-based checks and representative visuals, and retain accepted evidence. G3 is functionally complete; G1, G2 and G4–G7 remain open; DEVELOPMENT_CHECKLIST is the human guide and VISUAL_CHECKS is the single visual queue.
 
 ## Workspace and boundaries
 
-- student-status-readiness-design; feature/student-status-completion; draft PR10. Latest published checkpoint `f156744` is pushed and remote verified. Root owns Git, publication, generated files and development synchronization.
+- student-status-readiness-design; feature/student-status-completion; draft PR10. Latest published checkpoint `e62b3ef` is pushed and remote verified. Root owns Git, publication, generated files and development synchronization.
 - Development only: daniel-eiland / denham-venom-student-status / dev:third-bandicoot-18. Latest sync completed 15:20:40 for the reviewed post-activation readiness fixes. Root's focused two-case transition check passed; build passed strict types and Vite. Astra cleared both fixes. These fixes are synchronized and published; root owns the next evidence checkpoint.
 - All data is synthetic. Student records, secrets, screenshots and downloads stay outside Git. No production/main merge, real signing or deletion is authorized.
 
@@ -38,3 +38,5 @@ Latest G6 evidence: CSV import and receipt correction completed live; original r
 Historical attendance rehearsal now completed through Coach UI: original interval/earlier correction preserved, new audited replacement saved, and access returned to read-only. Private evidence: historical-attendance-saved.png. Missing current roster archive/reactivate UI is being implemented by Sol using the existing backend contract; Astra will review before live lifecycle rehearsal.
 
 Roster controls are now implemented and Astra-cleared; scoped lint/types pass. Live archive/reactivate and upcoming Whole Team later-enrollment succeeded (event membership four to five, restored member once). All five current profiles are active again. Private screenshot whole-team-reactivation.png. No backend changes or new deployment required. Remaining account/retention/role journeys and visual comparisons stay open.
+
+Retention preview/hold/release and profile rearchive rehearsal completed live. Both hold events retained, deletion disabled, all five current profiles active again. Private retention-hold-release.png is a desktop dark lower-dialog observation, not full visual conformance. G3 functional outcome closed by Astra; visual queue reconciled to representative policy. Remaining Student setup, ordinary Mentor/adult acceptance/grant journeys, scoped download, historical financial correction and representative visuals remain open.
