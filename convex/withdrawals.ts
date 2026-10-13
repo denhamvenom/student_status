@@ -12,7 +12,7 @@ import { makeFunctionReference } from "convex/server";
 type Context = MutationCtx | QueryCtx;
 const decision = v.union(v.literal("full"), v.literal("retain"), v.literal("partial"), v.literal("deny"));
 const progressValidator = v.object({ jobId: v.id("financialOperationJobs"), state: v.union(v.literal("running"), v.literal("failed"), v.literal("complete")), committedCents: v.number(), totalCents: v.number(), lastError: v.union(v.string(), v.null()) });
-const previewResult = v.object({ progress: v.union(progressValidator, v.null()), canRetry: v.boolean(), eventName: v.string(), studentName: v.string(), allowWithdrawal: v.boolean(), revision: v.string(), status: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("waitlist"), v.literal("withdrawn")), requestId: v.union(v.id("withdrawalRequests"), v.null()), requestStatus: v.union(v.literal("pending"), v.literal("processing"), v.literal("approved"), v.literal("denied"), v.null()), charges: v.array(v.object({ id: v.id("charges"), label: v.string(), category: v.union(v.literal("main"), v.literal("extra")), chargedCents: v.number(), paidCents: v.number(), unpaidCents: v.number(), cancelledCents: v.number() })), paidMainCents: v.number(), paidExtraCents: v.number(), unpaidMainCents: v.number(), unpaidExtraCents: v.number() });
+const previewResult = v.object({ progress: v.union(progressValidator, v.null()), canRetry: v.boolean(), eventName: v.string(), studentName: v.string(), allowWithdrawal: v.boolean(), revision: v.string(), status: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("waitlist"), v.literal("withdrawn")), requestId: v.union(v.id("withdrawalRequests"), v.null()), requestStatus: v.union(v.literal("pending"), v.literal("processing"), v.literal("approved"), v.literal("denied"), v.null()), charges: v.array(v.object({ id: v.id("charges"), label: v.string(), category: v.union(v.literal("main"), v.literal("extra")), chargedCents: v.number(), originalChargedCents: v.number(), adjustedCents: v.number(), paidCents: v.number(), unpaidCents: v.number(), cancelledCents: v.number() })), paidMainCents: v.number(), paidExtraCents: v.number(), unpaidMainCents: v.number(), unpaidExtraCents: v.number() });
 
 async function details(ctx: Context, eventId: Id<"events">, studentId: Id<"students">) {
   const event = await ctx.db.get(eventId), student = await ctx.db.get(studentId), season = await activeSeason(ctx);
@@ -27,7 +27,7 @@ async function details(ctx: Context, eventId: Id<"events">, studentId: Id<"stude
 }
 
 async function summary(ctx: Context, user: Doc<"appUsers">, data: Awaited<ReturnType<typeof details>>) {
-  const charges = data.charges.map(c => ({ id: c._id, label: c.label, category: c.category ?? "main" as const, chargedCents: c.amountCents, paidCents: c.appliedCents, unpaidCents: effectiveChargeCents(c) - c.appliedCents, cancelledCents: c.cancelledCents ?? 0 }));
+  const charges = data.charges.map(c => ({ id: c._id, label: c.label, category: c.category ?? "main" as const, chargedCents: effectiveChargeCents(c), originalChargedCents: c.amountCents, adjustedCents: c.adjustedCents ?? 0, paidCents: c.appliedCents, unpaidCents: effectiveChargeCents(c) - c.appliedCents, cancelledCents: c.cancelledCents ?? 0 }));
   const pending = data.requests.find(r => (r.status === "pending" || r.status === "processing")) ?? data.requests.at(-1);
   const job = pending?.jobId ? await ctx.db.get(pending.jobId) : null;
   const progress = job ? { jobId: job._id, state: job.state, committedCents: job.committedCents, totalCents: job.amountCents, lastError: job.lastError ?? null } : null;
@@ -35,7 +35,7 @@ async function summary(ctx: Context, user: Doc<"appUsers">, data: Awaited<Return
 }
 
 function revision(data: Awaited<ReturnType<typeof details>>) {
-  return JSON.stringify([data.event._id, data.event.archived, data.participant.status, data.participant.updatedAt, ...data.charges.map(c => [c._id, c.amountCents, c.appliedCents, c.cancelledCents ?? 0, c.category ?? "main"])]);
+  return JSON.stringify([data.event._id, data.event.archived, data.participant.status, data.participant.updatedAt, ...data.charges.map(c => [c._id, c.amountCents, c.adjustedCents ?? 0, c.appliedCents, c.cancelledCents ?? 0, c.revision ?? 0, c.category ?? "main"])]);
 }
 
 export const withdrawalPreview = query({

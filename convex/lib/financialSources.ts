@@ -1,5 +1,6 @@
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
+import { effectiveChargeCents } from "./chargeObligation";
 import { updateFinancialSourceAggregate } from "./reportAggregates";
 
 export type FinancialAccount = Doc<"financialAccounts">;
@@ -93,6 +94,7 @@ export async function projectMovement(ctx: MutationCtx, account: FinancialAccoun
   if (!["allocation", "deallocation", "payout", "transferOut", "awardReversal"].includes(entry.kind)) return;
   if (cents(entry.amountCents) === 0) throw new Error("Financial movement must be positive.");
   const source = await sourceForMovement(ctx, account, entry);
+  if (entry.originEntryId && entry.originEntryId !== source.rootOriginEntryId || entry.destination === "team" && (entry.kind !== "transferOut" || source.kind !== "fundraiser")) throw new Error("Financial movement destination or root lineage is inconsistent.");
   if (entry.kind === "awardReversal" && (source.kind !== "fundraiser" || source.rootOriginEntryId !== source.sourceEntryId || !source.fundraiserId || source.fundraiserId !== entry.fundraiserId)) throw new Error("Award reduction must use its original fundraiser credit.");
   if (entry.kind === "awardReversal") {
     const revision = entry.fundraiserRevisionId ? await ctx.db.get(entry.fundraiserRevisionId) : null;
@@ -152,12 +154,13 @@ export async function recordProjectedEntry(ctx: MutationCtx, entryId: Id<"ledger
 
 /** Called after authoritative charge writes; account deltas never read unrelated history. */
 export async function recordChargeChange(ctx: MutationCtx, account: FinancialAccount, charge: Doc<"charges">, previousEffective: number, previousApplied: number, newlyCreated = false) {
-  const effective = cents(charge.amountCents - (charge.cancelledCents ?? 0));
+  const effective = effectiveChargeCents(charge);
   if (charge.studentId !== account.studentId || charge.appliedCents > effective) throw new Error("Charge projection is inconsistent.");
   const net = await ctx.db.query("financialChargeAllocations").withIndex("by_studentId_and_generation_and_chargeId", q => q.eq("studentId", account.studentId).eq("generation", account.generation).eq("chargeId", charge._id)).unique();
   if ((net?.appliedCents ?? 0) !== charge.appliedCents) throw new Error("Charge allocation projection differs from its balance.");
   if (net) await ctx.db.patch(net._id, { verified: true });
-  await ctx.db.patch(charge._id, { outstanding: effective > charge.appliedCents });
+  charge.revision = (charge.revision ?? 0) + 1;
+  await ctx.db.patch(charge._id, { outstanding: effective > charge.appliedCents, revision: charge.revision });
   account.chargedCents = cents(account.chargedCents + effective - previousEffective);
   account.paidCents = cents(account.paidCents + charge.appliedCents - previousApplied);
   if (newlyCreated) account.chargeCount++;

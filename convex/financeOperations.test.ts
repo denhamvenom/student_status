@@ -193,4 +193,50 @@ describe("financial operations", () => {
     expect(await f.coach.query(api.financeOperations.operationOptions, { studentId: f.ids.student })).toMatchObject({ state: "ready", personalAvailableCents: 1000, fundraisingAvailableCents: 7000 });
   });
 
+  it("transfers only fundraising to the team with explicit destination, preserved roots and creator-scoped replay", async () => {
+    const f = await fixture();
+    const account = await f.t.run(ctx => financialAccount(ctx, f.ids.student)); if (!account) throw new Error("Missing account");
+    const args = { studentId: f.ids.student, amountCents: 5000, expectedFinancialRevision: account.revision, reason: "Approved unused fundraising to team", idempotencyKey: "team-transfer-test" };
+    const transfer = makeFunctionReference<"mutation">("financeOperations:transferToTeam");
+    const id = await f.lead.mutation(transfer, args) as Id<"financeOperations">;
+    expect(await f.lead.mutation(transfer, args)).toBe(id);
+    expect(await f.t.run(ctx => ctx.db.get(id))).toMatchObject({ kind: "teamTransfer", destination: "team", state: "complete", committedCents: 5000 });
+    expect(await f.t.run(ctx => financialAccount(ctx, f.ids.student))).toMatchObject({ personalAvailableCents: 1000, fundraisingAvailableCents: 2000, travelShareCents: 7000, knownRaisedCents: 0, unknownGrossSourceCount: 2 });
+    const entries = await f.t.run(ctx => ctx.db.query("ledgerEntries").withIndex("by_studentId_and_recordedAt", q => q.eq("studentId", f.ids.student)).take(20));
+    const outgoing = entries.filter(e => e.operationId === id);
+    expect(outgoing).toHaveLength(2);
+    expect(outgoing.every(e => e.kind === "transferOut" && e.destination === "team" && e.sourceKind === "fundraiser" && e.originEntryId === e.sourceEntryId && !e.counterpartyStudentId)).toBe(true);
+    await expect(f.lead.mutation(transfer, { ...args, amountCents: 1 })).rejects.toThrow("different financial command");
+    await expect(f.student.mutation(transfer, args)).rejects.toThrow("Financial editing");
+    const updated = await f.t.run(ctx => financialAccount(ctx, f.ids.student)); if (!updated) throw new Error("Missing account");
+    await expect(f.coach.mutation(transfer, { ...args, amountCents: 2001, expectedFinancialRevision: updated.revision, idempotencyKey: "cannot-transfer-personal" })).rejects.toThrow("Personal payments");
+    await expect(f.coach.mutation(transfer, { ...args, amountCents: 1, idempotencyKey: "stale-team-preview" })).rejects.toThrow("changed");
+  });
+
+  it("resumes a multipage team transfer after grant revocation without spending personal money or losing creator replay", async () => {
+    const f = await fixture();
+    await f.t.run(async ctx => { for (let i = 0; i < 40; i++) await ctx.db.insert("ledgerEntries", { studentId: f.ids.student, kind: "fundraiser", amountCents: 1, previousCents: 0, newCents: 1, recordedBy: f.ids.coach.user, recordedAt: 100 + i, idempotencyKey: `team-fragment:${i}` }); });
+    await rebuildStudent(f.t, f.ids.coach.user, f.ids.student);
+    const account = await f.t.run(ctx => financialAccount(ctx, f.ids.student)); if (!account) throw new Error("Missing account");
+    const args = { studentId: f.ids.student, amountCents: 7040, expectedFinancialRevision: account.revision, reason: "Approved original credit to team", idempotencyKey: "multipage-team-transfer" };
+    const transfer = makeFunctionReference<"mutation">("financeOperations:transferToTeam");
+    const operationId = await f.lead.mutation(transfer, args) as Id<"financeOperations">;
+    const operation = await f.t.run(ctx => ctx.db.get(operationId)); if (!operation?.jobId) throw new Error("Missing job");
+    expect(operation).toMatchObject({ state: "running", committedCents: 7018 });
+    await f.t.run(ctx => ctx.db.patch(f.ids.lead.user, { financialEdit: false }));
+    await f.t.mutation(makeFunctionReference<"mutation">("financialOperationsWorker:run"), { jobId: operation.jobId });
+    expect(await f.t.run(ctx => financialAccount(ctx, f.ids.student))).toMatchObject({ state: "failed", personalAvailableCents: 1000, fundraisingAvailableCents: 22 });
+    await f.coach.mutation(makeFunctionReference<"mutation">("financialOperationsWorker:retry"), { jobId: operation.jobId, reason: "Coach authorizes remaining transfer" });
+    for (let i = 0; i < 5; i++) {
+      const job = await f.t.run(ctx => ctx.db.get(operation.jobId!)); if (!job || job.state !== "running") break;
+      const step = { jobId: job._id, step: job.step };
+      await f.t.mutation(makeFunctionReference<"mutation">("financialOperationsWorker:processPage"), step);
+      await f.t.mutation(makeFunctionReference<"mutation">("financialOperationsWorker:processPage"), step);
+    }
+    expect(await f.t.run(ctx => financialAccount(ctx, f.ids.student))).toMatchObject({ state: "ready", personalAvailableCents: 1000, fundraisingAvailableCents: 0 });
+    expect(await f.t.run(ctx => ctx.db.get(operation.jobId!))).toMatchObject({ state: "complete", committedCents: 7040, originalActorId: f.ids.lead.user, actorId: f.ids.coach.user });
+    await f.t.run(ctx => ctx.db.patch(f.ids.lead.user, { financialEdit: true }));
+    expect(await f.lead.mutation(transfer, args)).toBe(operationId);
+  });
+
 });

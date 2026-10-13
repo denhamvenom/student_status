@@ -9,6 +9,7 @@ import { allocateUnapplied } from "./lib/money";
 import { withdrawalStep } from "./lib/financialWithdrawal";
 import { finalizeWithdrawal } from "./withdrawals";
 import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
+import { chargeCorrectionStep } from "./lib/chargeCorrection";
 
 const runRef = makeFunctionReference<"mutation">("financialOperationsWorker:run");
 const pageRef = makeFunctionReference<"mutation">("financialOperationsWorker:processPage");
@@ -24,7 +25,12 @@ export const status = query({
     if (args.operationId && (!operation || operation.studentId !== student._id)) throw new Error("Financial operation is unavailable for this student.");
     const jobId = operation?.jobId ?? account?.operationJobId;
     const job = jobId ? await ctx.db.get(jobId) : null;
-    return { job, operation, canRetry: actor.role === "coach" && job?.state === "failed" };
+    let canRetry = actor.role === "coach" && job?.state === "failed" && student.active;
+    if (canRetry && job?.kind === "chargeCorrection" && job.eventId) {
+      const event = await ctx.db.get(job.eventId);
+      canRetry = !!event && !event.archived && event.seasonId === season._id;
+    }
+    return { job, operation, canRetry };
   },
 });
 
@@ -41,6 +47,22 @@ export const processPage = internalMutation({
     const recipientStudent = job.recipientStudentId ? await ctx.db.get(job.recipientStudentId) : null;
     if (!senderStudent?.active || senderStudent.seasonId !== season._id || job.kind === "transfer" && (!recipientStudent?.active || recipientStudent.seasonId !== season._id)) throw new Error("Financial operation student became unavailable; Coach review is required.");
     if (!sender || sender.state !== "posting" || sender.operationJobId !== job._id || sender.generation !== job.generation || sender.seasonId !== season._id) throw new Error("Financial operation account changed.");
+    if (job.kind === "chargeCorrection") {
+      if (actor.role !== "coach") throw new Error("Only a Coach may process charge corrections.");
+      if (job.eventId) {
+        const event = await ctx.db.get(job.eventId);
+        if (!event || event.archived || event.seasonId !== season._id) throw new Error("Correction event is archived or unavailable; explicit historical review is required.");
+        requireEnrollmentComplete(event);
+      }
+      const result = await chargeCorrectionStep(ctx, actor, sender, job);
+      await ctx.db.patch(job._id, { committedCents: result.committed, step: job.step + 1, state: result.done ? "complete" : "running", updatedAt: Date.now() });
+      if (result.done) {
+        sender.state = "ready"; sender.operationJobId = undefined; await saveFinancialAccount(ctx, sender);
+        await allocateUnapplied(ctx, actor, sender.studentId, `correction:${job._id}:reallocate`);
+      } else await ctx.scheduler.runAfter(0, runRef, { jobId: job._id });
+      await refreshStudentFinance(ctx, sender.studentId);
+      return null;
+    }
     if (job.kind === "withdrawal") {
       const event = job.eventId ? await ctx.db.get(job.eventId) : null;
       if (!event || event.archived || event.seasonId !== season._id) throw new Error("Withdrawal event became unavailable.");
@@ -56,6 +78,7 @@ export const processPage = internalMutation({
       return null;
     }
     if (job.kind === "transfer" && (!recipient || recipient.state !== "posting" || recipient.operationJobId !== job._id || recipient.generation !== job.recipientGeneration || recipient.seasonId !== sender.seasonId)) throw new Error("Transfer recipient account changed.");
+    if (job.kind === "teamTransfer" && (job.destination !== "team" || job.recipientStudentId)) throw new Error("Team transfer destination is inconsistent.");
     const kind = job.kind === "payout" ? "payment" : "fundraiser";
     const sources = await ctx.db.query("financialSources").withIndex("by_studentId_and_generation_and_kind_and_status", q => q.eq("studentId", sender.studentId).eq("generation", sender.generation).eq("kind", kind).eq("status", "available")).take(20);
     let remaining = job.amountCents - job.committedCents;
@@ -63,10 +86,10 @@ export const processPage = internalMutation({
     for (const source of sources) {
       const amount = Math.min(remaining, source.availableCents);
       if (amount <= 0) continue;
-      const outId = await ctx.db.insert("ledgerEntries", { studentId: sender.studentId, kind: job.kind === "payout" ? "payout" : "transferOut", sourceEntryId: source.sourceEntryId, sourceKind: kind, counterpartyStudentId: recipient?.studentId, amountCents: amount, previousCents: source.availableCents, newCents: source.availableCents - amount, reason: job.reason, method: job.method, reference: job.reference, occurredAt: job.occurredAt, operationId: job.operationId, recordedBy: actor._id, recordedAt: Date.now(), idempotencyKey: `${job.idempotencyKey}:out:${job.step}:${source.sourceEntryId}` });
+      const outId = await ctx.db.insert("ledgerEntries", { studentId: sender.studentId, kind: job.kind === "payout" ? "payout" : "transferOut", sourceEntryId: source.sourceEntryId, sourceKind: kind, originEntryId: job.kind === "teamTransfer" ? source.rootOriginEntryId : undefined, destination: job.kind === "teamTransfer" ? "team" : undefined, counterpartyStudentId: recipient?.studentId, amountCents: amount, previousCents: source.availableCents, newCents: source.availableCents - amount, reason: job.reason, method: job.method, reference: job.reference, occurredAt: job.occurredAt, operationId: job.operationId, recordedBy: actor._id, recordedAt: Date.now(), idempotencyKey: `operation:${job._id}:out:${job.step}:${source.sourceEntryId}` });
       await recordProjectedEntry(ctx, outId, sender);
       if (recipient) {
-        const inId = await ctx.db.insert("ledgerEntries", { studentId: recipient.studentId, kind: "fundraiser", originEntryId: source.rootOriginEntryId, sourceKind: "fundraiser", counterpartyStudentId: sender.studentId, amountCents: amount, previousCents: 0, newCents: amount, reason: job.reason, operationId: job.operationId, recordedBy: actor._id, recordedAt: Date.now(), idempotencyKey: `${job.idempotencyKey}:in:${job.step}:${source.sourceEntryId}` });
+        const inId = await ctx.db.insert("ledgerEntries", { studentId: recipient.studentId, kind: "fundraiser", originEntryId: source.rootOriginEntryId, sourceKind: "fundraiser", counterpartyStudentId: sender.studentId, amountCents: amount, previousCents: 0, newCents: amount, reason: job.reason, operationId: job.operationId, recordedBy: actor._id, recordedAt: Date.now(), idempotencyKey: `operation:${job._id}:in:${job.step}:${source.sourceEntryId}` });
         await recordProjectedEntry(ctx, inId, recipient);
       }
       remaining -= amount; committed += amount;
@@ -118,6 +141,10 @@ export const retry = mutation({
     const season = await activeSeason(ctx);
     const job = await ctx.db.get(args.jobId);
     if (!job || job.state !== "failed") throw new Error("No failed operation is available to retry.");
+    if (job.kind === "chargeCorrection" && job.eventId) {
+      const event = await ctx.db.get(job.eventId);
+      if (!event || event.archived || event.seasonId !== season._id) throw new Error("Correction event is archived or unavailable; explicit historical review is required.");
+    }
     for (const studentId of [job.studentId, job.recipientStudentId]) {
       if (!studentId) continue;
       const account = await financialAccount(ctx, studentId);

@@ -412,3 +412,12 @@ October 13 live financial rebuild now verified: Coach can open Finances, start r
 Checklist-linked estimates remain G1 frontend 85%, G2 visual evidence 55%, G3 Whole Team 90%, G4 dashboards 85%, G5 accounts/permissions 80%, G6 administration 55%, G7 final verification 50%: approximately 72% toward readiness for user visual approval. These are scope estimates, not checkbox counts or production readiness. All seven broad outcomes remain open. Ordinary Mentor verification still requires the authorized test account's onboarding/sign-in; real signing, production, main merge and automatic deletion remain gated.
 
 October 13 continuation: fundraiser submit fix published and remotely verified as04c14d7. Parent live view reconciles gross raised1001 cents, travel share750 cents and available fundraising750 cents; team portion does not enter student balance. Phone dark top inspected at390x844; remaining themes/lower states stay open. Current charge/team-transfer types generated and strict typecheck passes; source review/tests remain in progress, no full application sync claimed. Timeclock coordinator notified to continue authorized verification.
+
+### October 13 reviewed charge and team-transfer slice
+- [x] Implement source-preserving single-charge adjustment/cancellation with immutable original obligation, bounded release jobs, reasons, history, stale/replay guards and Coach-only corrections.
+- [x] Implement fundraising-to-team recording with original-source lineage and explicit team destination; personal payments and gross proceeds are not converted or invented.
+- [x] Integrate charge detail/history/progress/retry and exact-cent previews into Finance; preserve readable evidence while balances update and distinguish original versus effective amounts in withdrawals.
+- [x] Resolve Astra findings for native pagination, archived-event correction/retry restrictions, exact-cent range/display and source-release progress labels.
+- [x] Pass full check216/216 across38files, lint/types/build; final affected backend8 and UI9 tests plus scoped lint pass. Timeclock lint/types/build passes.
+- [x] Synchronize reviewed source to dev:third-bandicoot-18 at10:54:14. No production deployment.
+- [ ] Complete new charge/team-transfer live journeys and prototype visual comparisons. Shared fee priorities/bulk fees, historical correction mode, season transition/carryover and retention controls remain open; no G1–G7 completion follows from this slice.

@@ -16,11 +16,7 @@ export function allocationSourceId(entry: Entry, sources: (Entry & { kind: Sourc
   throw new Error("Historical allocations have ambiguous funding sources; a financial review is required.");
 }
 
-export function effectiveChargeCents(charge: Doc<"charges">) {
-  const cancelled = charge.cancelledCents ?? 0;
-  if (!Number.isSafeInteger(cancelled) || cancelled < 0 || cancelled > charge.amountCents || charge.appliedCents > charge.amountCents - cancelled) throw new Error("Charge balance is inconsistent.");
-  return charge.amountCents - cancelled;
-}
+export { effectiveChargeCents } from "./chargeObligation";
 
 /** Resolve each allocation to its actual payment or fundraising entry. Older ambiguous records fail closed. */
 export function sourceBalances(entries: Entry[]) {

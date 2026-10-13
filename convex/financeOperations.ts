@@ -5,6 +5,7 @@ import { activeSeason, audit, viewer } from "./lib/access";
 import { refreshStudentFinance } from "./lib/financeSummaries";
 import { ensureFinancialAccount, financialAccount, saveFinancialAccount } from "./lib/financialSources";
 import { makeFunctionReference } from "convex/server";
+import { tokenHash } from "./lib/invitationIdentity";
 
 const method = v.union(v.literal("cash"), v.literal("check"), v.literal("other"));
 type Method = "cash" | "check" | "other";
@@ -123,6 +124,43 @@ export const transferFundraising = mutation({
     const senderAfter = (await financialAccount(ctx, sender._id))!.fundraisingAvailableCents;
     await audit(ctx, actor, "financeOperations", operationId, "transferFundraising", { from: sender._id, fundraisingAvailableCents: senderBefore, to: recipient._id, recipientFundraisingAvailableCents: recipientBefore }, { from: sender._id, fundraisingAvailableCents: senderAfter, to: recipient._id, recipientFundraisingAvailableCents: recipientAfter, requestedCents: args.amountCents, committedCents: observed?.committedCents ?? 0, state: observed?.state }, reason);
     await refreshStudentFinance(ctx, args.studentId);
+    return operationId;
+  },
+});
+
+export const previewTeamTransfer = query({
+  args: { studentId: v.id("students"), amountCents: v.number() },
+  returns: v.object({ destination: v.literal("team"), state: v.union(v.literal("ready"), v.literal("updating"), v.literal("hold")), fundraisingAvailableCents: v.union(v.number(), v.null()), amountCents: v.number(), expectedFinancialRevision: v.union(v.number(), v.null()), message: v.union(v.string(), v.null()) }),
+  handler: async (ctx, args) => {
+    financialEditor(await viewer(ctx)); await activeStudent(ctx, args.studentId); validAmount(args.amountCents);
+    const account = await financialAccount(ctx, args.studentId);
+    if (account?.state !== "ready") return { destination: "team" as const, state: "updating" as const, fundraisingAvailableCents: null, amountCents: args.amountCents, expectedFinancialRevision: null, message: "Financial preparation must finish before a transfer to the team." };
+    const hold = args.amountCents > account.fundraisingAvailableCents;
+    return { destination: "team" as const, state: hold ? "hold" as const : "ready" as const, fundraisingAvailableCents: account.fundraisingAvailableCents, amountCents: args.amountCents, expectedFinancialRevision: account.revision, message: hold ? "Amount exceeds available fundraising credit. Personal payments cannot transfer to the team." : null };
+  },
+});
+
+export const transferToTeam = mutation({
+  args: { studentId: v.id("students"), amountCents: v.number(), expectedFinancialRevision: v.number(), reason: v.string(), idempotencyKey: v.string() }, returns: v.id("financeOperations"),
+  handler: async (ctx, args) => {
+    const actor = await viewer(ctx); financialEditor(actor); await activeStudent(ctx, args.studentId); validAmount(args.amountCents);
+    const reason = requiredText(args.reason, "Reason", 1000); const key = requiredText(args.idempotencyKey, "Transaction key", 150);
+    if (reason.length < 8 || key.length < 8 || !Number.isSafeInteger(args.expectedFinancialRevision) || args.expectedFinancialRevision < 0) throw new Error("Provide reviewed amounts, a reason of eight characters, and a unique transaction key.");
+    const hash = await tokenHash(JSON.stringify(["teamTransfer", args.studentId, args.amountCents, args.expectedFinancialRevision, reason]));
+    const existing = await ctx.db.query("financialOperationJobs").withIndex("by_originalActorId_and_idempotencyKey", q => q.eq("originalActorId", actor._id).eq("idempotencyKey", key)).unique();
+    if (existing) {
+      if (existing.kind !== "teamTransfer" || existing.operationHash !== hash || !existing.operationId) throw new Error("Transaction key is already used for a different financial command.");
+      return existing.operationId;
+    }
+    const account = await ensureFinancialAccount(ctx, args.studentId);
+    if (account.revision !== args.expectedFinancialRevision) throw new Error("Financial records changed; refresh the team transfer preview.");
+    if (args.amountCents > account.fundraisingAvailableCents) throw new Error("Amount exceeds available fundraising credit. Personal payments cannot transfer to the team.");
+    const now = Date.now();
+    const operationId = await ctx.db.insert("financeOperations", { kind: "teamTransfer", destination: "team", studentId: args.studentId, amountCents: args.amountCents, reason, recordedBy: actor._id, recordedAt: now, idempotencyKey: `team:${actor._id}:${key}`, state: "running", committedCents: 0 });
+    const jobId = await ctx.db.insert("financialOperationJobs", { kind: "teamTransfer", destination: "team", studentId: args.studentId, actorId: actor._id, originalActorId: actor._id, generation: account.generation, state: "running", step: 0, amountCents: args.amountCents, committedCents: 0, idempotencyKey: key, operationHash: hash, operationId, chargeCursor: null, reason, updatedAt: now });
+    await ctx.db.patch(operationId, { jobId }); account.state = "posting"; account.operationJobId = jobId; await saveFinancialAccount(ctx, account);
+    await audit(ctx, actor, "financeOperations", operationId, "startTeamTransfer", { fundraisingAvailableCents: account.fundraisingAvailableCents }, { destination: "team", requestedCents: args.amountCents, committedCents: 0, jobId }, reason);
+    await ctx.runMutation(makeFunctionReference<"mutation">("financialOperationsWorker:processPage"), { jobId, step: 0 });
     return operationId;
   },
 });

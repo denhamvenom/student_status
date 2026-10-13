@@ -1,3 +1,4 @@
+import { effectiveChargeCents } from "./chargeObligation";
 import { enrollmentPending } from "./eventEnrollmentState";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx, MutationCtx } from "../_generated/server";
@@ -22,7 +23,7 @@ export async function studentReadiness(ctx: Ctx, event: Doc<"events">, student: 
   if (financialAccount?.state !== "ready") open.push("Financial records require review or are updating");
   const eventCharges = await ctx.db.query("charges").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(101);
   if (eventCharges.length > 100) open.push("Event financial records require review");
-  if (eventCharges.some(x => x.appliedCents < x.amountCents - (x.cancelledCents ?? 0))) open.push("Required payment");
+  if (eventCharges.some(x => x.appliedCents < effectiveChargeCents(x))) open.push("Required payment");
   if (event.permissionRequired && !(await permissionAccepted(ctx, student._id, event._id))) open.push("Permission accepted");
   const completions = await ctx.db.query("requirementCompletions").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(101);
   if (event.firstRequired && !completions.some(x => x.key === "first")) open.push("FIRST registration");
