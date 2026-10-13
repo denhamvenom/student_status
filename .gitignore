@@ -32,6 +32,7 @@ blob-report/
 logs/
 tmp/
 temp/
+.local-test-temp*/
 exports/
 backups/
 private-data/

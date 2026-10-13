@@ -376,3 +376,18 @@ No numbered G1–G7 item is complete from this incremental checkpoint.
 Parent Status/Attendance live pages now load in the user-opened browser. Coach rebuild discovered4sessions; Parent verified totals and individual session minutes now load. This is live behavior evidence with a private screenshot, not completed four-combination visual comparison. Shared family copy encoding corrected.
 - [x] Pass full bun run check with174tests/29files; complete live fictional Parent form submission, Coach acceptance and reactive receipt status. Empty event selection rejected; all medication choices initially unselected. Correction/re-sign/paper/export and visual matrix remain open.
 - [x] Publish and remotely verify permission checkpoint11d04d2; update draft PR10. Final badge-only CSS correction verified in the live receipt screenshot after the full check.
+
+### Active financial integration evidence — October 13
+- [x] Verify focused reader behavior: pending financial jobs withhold totals; older charges/history remain paginated and access-controlled beyond 500 ledger entries.
+- [x] Verify focused report rebuild and application boundaries against the new financial projection contracts.
+- [ ] Finish and review every financial writer, durable operation, fundraiser posting/correction/history and all related regression migrations before full validation and development synchronization.
+- [ ] Rehearse these financial changes live and compare their finished screens to the prototype in all required viewport/theme combinations.
+
+### October 13 financial integration verification update
+
+- Whole Team regression coverage passes 10/10 with rebuilt source balances and scheduled allocation across 100 upcoming events.
+- Full serial suite reached 187/193 passing across 34 files. Six failures identified legacy financial fixtures in withdrawal and travel tests; this is not a passing full checkpoint. Travel fixture migration subsequently passed with financial-reader and app tests (17/17 combined). Withdrawal migration remains assigned to the financial implementation owner.
+- Astra review identified immutable retry identity, partial-operation audit accuracy, and gross-only fundraising timestamps; corrections are in progress. Readiness now refuses to claim completion when event evidence exceeds its supported read bound. Financial detail queries cap native page read budgets.
+- Development client type generation succeeded. Financial application synchronization, reviewed Git publication, live financial rehearsal and prototype visual comparison remain pending. G1–G7 remain open.
+
+October 13 10:00 update: all 194 tests across 34 files, lint, strict types and build passed. Withdrawal and travel fixture migrations are now verified. Financial code is awaiting final Astra review, development synchronization and live/visual rehearsal; none of G1–G7 closes on automated evidence alone. Subsequent finance first-page loading guard passed typecheck and scoped lint.

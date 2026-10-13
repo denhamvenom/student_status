@@ -3,7 +3,8 @@ import { mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { activeSeason, audit, viewer } from "./lib/access";
 import { refreshStudentFinance } from "./lib/financeSummaries";
-import { allocateUnapplied, financialEntries, sourceBalances } from "./lib/money";
+import { ensureFinancialAccount, financialAccount, saveFinancialAccount } from "./lib/financialSources";
+import { makeFunctionReference } from "convex/server";
 
 const method = v.union(v.literal("cash"), v.literal("check"), v.literal("other"));
 type Method = "cash" | "check" | "other";
@@ -22,20 +23,6 @@ function validAmount(amountCents: number) {
   if (!Number.isSafeInteger(amountCents) || amountCents <= 0) throw new Error("Enter a positive amount in cents.");
 }
 
-function sourcePlan(sources: ReturnType<typeof sourceBalances>, kind: "payment" | "fundraiser", amountCents: number) {
-  let remaining = amountCents;
-  const plan: { source: (typeof sources)[number]; cents: number }[] = [];
-  for (const source of sources) {
-    if (source.entry.kind !== kind || source.available <= 0) continue;
-    const cents = Math.min(remaining, source.available);
-    if (cents > 0) plan.push({ source, cents });
-    remaining -= cents;
-    if (remaining === 0) break;
-  }
-  if (remaining > 0) throw new Error(kind === "payment" ? "Amount exceeds unallocated personal payments." : "Amount exceeds available fundraising credits.");
-  return plan;
-}
-
 async function activeStudent(ctx: Parameters<typeof activeSeason>[0], studentId: Id<"students">) {
   const season = await activeSeason(ctx);
   const student = await ctx.db.get(studentId);
@@ -45,18 +32,18 @@ async function activeStudent(ctx: Parameters<typeof activeSeason>[0], studentId:
 
 export const operationOptions = query({
   args: { studentId: v.id("students") },
-  returns: v.object({ personalAvailableCents: v.number(), fundraisingAvailableCents: v.number(), recipients: v.array(v.object({ _id: v.id("students"), name: v.string() })) }),
+  returns: v.object({ personalAvailableCents: v.number(), fundraisingAvailableCents: v.number(), state: v.union(v.literal("ready"), v.literal("updating"), v.literal("failed")), sourceCount: v.number(), chargeCount: v.number(), recipients: v.array(v.object({ _id: v.id("students"), name: v.string() })) }),
   handler: async (ctx, args) => {
     financialEditor(await viewer(ctx));
     const student = await activeStudent(ctx, args.studentId);
-    const entries = await ctx.db.query("ledgerEntries").withIndex("by_studentId_and_recordedAt", q => q.eq("studentId", student._id)).take(501);
-    if (entries.length > 500) throw new Error("Financial record limit reached; contact an administrator.");
-    const sources = sourceBalances(entries);
+    const account = await financialAccount(ctx, student._id);
+    if (!account) throw new Error("Financial records need a Coach rebuild before operation options are available.");
     const recipients = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", student.seasonId)).take(501);
     if (recipients.length > 500) throw new Error("Student selection limit reached; contact an administrator.");
     return {
-      personalAvailableCents: sources.filter(x => x.entry.kind === "payment").reduce((n, x) => n + x.available, 0),
-      fundraisingAvailableCents: sources.filter(x => x.entry.kind === "fundraiser").reduce((n, x) => n + x.available, 0),
+      state: account.state === "ready" ? "ready" as const : account.state === "failed" ? "failed" as const : "updating" as const, sourceCount: account.sourceCount, chargeCount: account.chargeCount,
+      personalAvailableCents: account.personalAvailableCents,
+      fundraisingAvailableCents: account.fundraisingAvailableCents,
       recipients: recipients.filter(x => x.active && x._id !== student._id).map(x => ({ _id: x._id, name: x.preferredName || x.legalName })),
     };
   },
@@ -78,17 +65,18 @@ export const recordPayout = mutation({
       if (existing.kind !== "payout" || existing.studentId !== args.studentId || existing.amountCents !== args.amountCents || existing.method !== args.method || existing.reference !== reference || existing.occurredAt !== args.occurredAt || existing.reason !== reason) throw new Error("Transaction key is already used for a different operation.");
       return existing._id;
     }
-    const entries = await financialEntries(ctx, args.studentId);
-    const balances = sourceBalances(entries);
-    const beforePersonal = balances.filter(x => x.entry.kind === "payment").reduce((n, x) => n + x.available, 0);
-    const plan = sourcePlan(balances, "payment", args.amountCents);
-    if (entries.length + plan.length > 500) throw new Error("Financial record limit reached; payout was not recorded.");
+    const account = await ensureFinancialAccount(ctx, args.studentId);
+    const beforePersonal = account.personalAvailableCents;
+    if (args.amountCents > beforePersonal) throw new Error("Amount exceeds unallocated personal payments.");
     const recordedAt = Date.now();
-    const operationId = await ctx.db.insert("financeOperations", { kind: "payout", studentId: args.studentId, amountCents: args.amountCents, reason, method: args.method as Method, reference, occurredAt: args.occurredAt, recordedBy: actor._id, recordedAt, idempotencyKey: key });
-    for (const [index, { source, cents }] of plan.entries()) {
-      await ctx.db.insert("ledgerEntries", { studentId: args.studentId, kind: "payout", sourceEntryId: source.entry._id, sourceKind: "payment", amountCents: cents, previousCents: source.available, newCents: source.available - cents, reason, method: args.method, reference, occurredAt: args.occurredAt, operationId, recordedBy: actor._id, recordedAt, idempotencyKey: `${key}:payout:${index}` });
-    }
-    await audit(ctx, actor, "financeOperations", operationId, "recordPayout", { personalAvailableCents: beforePersonal }, { personalAvailableCents: beforePersonal - args.amountCents, amountCents: args.amountCents, method: args.method, reference, occurredAt: args.occurredAt }, reason);
+    const operationId = await ctx.db.insert("financeOperations", { kind: "payout", studentId: args.studentId, amountCents: args.amountCents, reason, method: args.method as Method, reference, occurredAt: args.occurredAt, recordedBy: actor._id, recordedAt, idempotencyKey: key, state: "running", committedCents: 0 });
+    const jobId = await ctx.db.insert("financialOperationJobs", { kind: "payout", studentId: args.studentId, actorId: actor._id, generation: account.generation, state: "running", step: 0, amountCents: args.amountCents, committedCents: 0, idempotencyKey: key, operationId, chargeCursor: null, reason, method: args.method, reference, occurredAt: args.occurredAt, updatedAt: recordedAt });
+    await ctx.db.patch(operationId, { jobId });
+    account.state = "posting"; account.operationJobId = jobId; await saveFinancialAccount(ctx, account);
+    await ctx.runMutation(makeFunctionReference<"mutation">("financialOperationsWorker:processPage"), { jobId, step: 0 });
+    const observed = await ctx.db.get(operationId);
+    const afterPersonal = (await financialAccount(ctx, args.studentId))!.personalAvailableCents;
+    await audit(ctx, actor, "financeOperations", operationId, "recordPayout", { personalAvailableCents: beforePersonal }, { personalAvailableCents: afterPersonal, requestedCents: args.amountCents, committedCents: observed?.committedCents ?? 0, state: observed?.state, method: args.method, reference, occurredAt: args.occurredAt }, reason);
     await refreshStudentFinance(ctx, args.studentId);
     return operationId;
   },
@@ -111,24 +99,23 @@ export const transferFundraising = mutation({
       if (existing.kind !== "transfer" || existing.studentId !== args.studentId || existing.recipientStudentId !== args.recipientStudentId || existing.amountCents !== args.amountCents || existing.reason !== reason) throw new Error("Transaction key is already used for a different operation.");
       return existing._id;
     }
-    const senderEntries = await financialEntries(ctx, sender._id);
-    const recipientEntries = await financialEntries(ctx, recipient._id);
-    const senderBalances = sourceBalances(senderEntries);
-    const recipientBalances = sourceBalances(recipientEntries);
-    const senderBefore = senderBalances.filter(x => x.entry.kind === "fundraiser").reduce((n, x) => n + x.available, 0);
-    const recipientBefore = recipientBalances.filter(x => x.entry.kind === "fundraiser").reduce((n, x) => n + x.available, 0);
-    const plan = sourcePlan(senderBalances, "fundraiser", args.amountCents);
-    if (senderEntries.length + plan.length > 500 || recipientEntries.length + plan.length > 500) throw new Error("Financial record limit reached; transfer was not recorded.");
+    const senderAccount = await ensureFinancialAccount(ctx, sender._id);
+    const recipientAccount = await ensureFinancialAccount(ctx, recipient._id);
+    const senderBefore = senderAccount.fundraisingAvailableCents;
+    const recipientBefore = recipientAccount.fundraisingAvailableCents;
+    if (args.amountCents > senderBefore) throw new Error("Amount exceeds available fundraising credits.");
     const recordedAt = Date.now();
-    const operationId = await ctx.db.insert("financeOperations", { kind: "transfer", studentId: sender._id, recipientStudentId: recipient._id, amountCents: args.amountCents, reason, recordedBy: actor._id, recordedAt, idempotencyKey: key });
-    for (const [index, { source, cents }] of plan.entries()) {
-      await ctx.db.insert("ledgerEntries", { studentId: sender._id, kind: "transferOut", sourceEntryId: source.entry._id, sourceKind: "fundraiser", counterpartyStudentId: recipient._id, amountCents: cents, previousCents: source.available, newCents: source.available - cents, reason, operationId, recordedBy: actor._id, recordedAt, idempotencyKey: `${key}:out:${index}` });
-      await ctx.db.insert("ledgerEntries", { studentId: recipient._id, kind: "fundraiser", originEntryId: source.entry.originEntryId ?? source.entry._id, sourceKind: "fundraiser", counterpartyStudentId: sender._id, amountCents: cents, previousCents: 0, newCents: cents, reason, operationId, recordedBy: actor._id, recordedAt, idempotencyKey: `${key}:in:${index}` });
-    }
-    await allocateUnapplied(ctx, actor, recipient._id, `auto:transfer:${key}`);
-    const recipientAfterEntries = await financialEntries(ctx, recipient._id);
-    const recipientAfter = sourceBalances(recipientAfterEntries).filter(x => x.entry.kind === "fundraiser").reduce((n, x) => n + x.available, 0);
-    await audit(ctx, actor, "financeOperations", operationId, "transferFundraising", { from: sender._id, fundraisingAvailableCents: senderBefore, to: recipient._id, recipientFundraisingAvailableCents: recipientBefore }, { from: sender._id, fundraisingAvailableCents: senderBefore - args.amountCents, to: recipient._id, recipientFundraisingAvailableCents: recipientAfter, amountCents: args.amountCents }, reason);
+    const operationId = await ctx.db.insert("financeOperations", { kind: "transfer", studentId: sender._id, recipientStudentId: recipient._id, amountCents: args.amountCents, reason, recordedBy: actor._id, recordedAt, idempotencyKey: key, state: "running", committedCents: 0 });
+    const jobId = await ctx.db.insert("financialOperationJobs", { kind: "transfer", studentId: sender._id, recipientStudentId: recipient._id, actorId: actor._id, generation: senderAccount.generation, recipientGeneration: recipientAccount.generation, state: "running", step: 0, amountCents: args.amountCents, committedCents: 0, idempotencyKey: key, operationId, chargeCursor: null, reason, updatedAt: recordedAt });
+    await ctx.db.patch(operationId, { jobId });
+    senderAccount.state = "posting"; senderAccount.operationJobId = jobId;
+    recipientAccount.state = "posting"; recipientAccount.operationJobId = jobId;
+    await saveFinancialAccount(ctx, senderAccount); await saveFinancialAccount(ctx, recipientAccount);
+    await ctx.runMutation(makeFunctionReference<"mutation">("financialOperationsWorker:processPage"), { jobId, step: 0 });
+    const recipientAfter = (await financialAccount(ctx, recipient._id))!.fundraisingAvailableCents;
+    const observed = await ctx.db.get(operationId);
+    const senderAfter = (await financialAccount(ctx, sender._id))!.fundraisingAvailableCents;
+    await audit(ctx, actor, "financeOperations", operationId, "transferFundraising", { from: sender._id, fundraisingAvailableCents: senderBefore, to: recipient._id, recipientFundraisingAvailableCents: recipientBefore }, { from: sender._id, fundraisingAvailableCents: senderAfter, to: recipient._id, recipientFundraisingAvailableCents: recipientAfter, requestedCents: args.amountCents, committedCents: observed?.committedCents ?? 0, state: observed?.state }, reason);
     await refreshStudentFinance(ctx, args.studentId);
     return operationId;
   },

@@ -4,23 +4,28 @@ import { query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { activeSeason, requireRole, studentAccess, viewer } from "./lib/access";
-import { financeFor } from "./lib/readModels";
-import { FINANCE_SUMMARY_VERSION } from "./lib/financeSummaries";
+import { calculateStudentFinance, FINANCE_SUMMARY_VERSION } from "./lib/financeSummaries";
+import { financialAccount } from "./lib/financialSources";
 import { attendanceEvidence } from "./lib/attendanceReports";
 import { attendanceNamespace, studentAttendanceNamespace, reportAggregate, readFinanceAggregates } from "./lib/reportAggregates";
 export { correctedIntervals } from "./lib/attendanceReports";
 
 const nullableNumber = v.union(v.number(), v.null());
-const financeValidator = v.object({ chargedCents: v.number(), paidCents: v.number(), dueCents: v.number(), travelBalanceCents: v.number(), personalAvailableCents: v.number(), fundraisingAvailableCents: v.number(), raisedCents: v.null(), travelShareCents: v.number(), transferredInCents: v.number(), updatedAt: nullableNumber });
+const financeValidator = v.object({ chargedCents: v.number(), paidCents: v.number(), dueCents: v.number(), travelBalanceCents: v.number(), personalAvailableCents: v.number(), fundraisingAvailableCents: v.number(), raisedCents: nullableNumber, travelShareCents: v.number(), transferredInCents: v.number(), updatedAt: nullableNumber });
 
-/** Gross fundraiser proceeds are not stored: do not relabel awarded credit as Raised. */
+/** Only verified current projections can supply financial totals. */
 async function financialProjection(ctx: QueryCtx, studentId: Id<"students">) {
-  const data = await financeFor(ctx, studentId);
-  return { ...data.summary, raisedCents: null, travelShareCents: data.entries.filter(e => e.kind === "fundraiser" && !e.originEntryId).reduce((sum, e) => sum + e.amountCents, 0), transferredInCents: data.entries.filter(e => e.kind === "fundraiser" && !!e.originEntryId).reduce((sum, e) => sum + e.amountCents, 0), updatedAt: data.entries.length ? Math.max(...data.entries.map(e => e.recordedAt)) : null };
+  const account = await financialAccount(ctx, studentId);
+  if (account?.state !== "ready") return { state: account?.state === "failed" ? "failed" as const : "updating" as const };
+  const data = await calculateStudentFinance(ctx, studentId);
+  return { state: "ready" as const, chargedCents: data.chargedCents, paidCents: data.paidCents, dueCents: data.dueCents,
+    travelBalanceCents: data.travelBalanceCents, personalAvailableCents: data.personalAvailableCents,
+    fundraisingAvailableCents: data.fundraisingAvailableCents, raisedCents: data.raisedComplete ? data.knownRaisedCents : null,
+    travelShareCents: data.travelShareCents, transferredInCents: data.transferredInCents, updatedAt: data.updatedAt };
 }
 
 export const familyFinance = query({
-  args: { studentId: v.id("students") }, returns: financeValidator,
+  args: { studentId: v.id("students") }, returns: v.union(v.object({ ...financeValidator.fields, state: v.literal("ready") }), v.object({ state: v.union(v.literal("updating"), v.literal("failed")) })),
   handler: async (ctx, args) => {
     const user = await viewer(ctx);
     requireRole(user, "student", "parent", "coach", "mentor");
@@ -85,10 +90,19 @@ export const team = query({
     if (students.length > 500) throw new Error("Dashboard roster limit reached; totals are unavailable.");
     const backfill = await ctx.db.query("financeSummaryBackfills").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).unique();
     const summaries = await ctx.db.query("studentFinanceSummaries").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(501);
+    const readyAccounts = await ctx.db.query("financialAccounts").withIndex("by_seasonId_and_state", q => q.eq("seasonId", season._id).eq("state", "ready")).take(501);
+    const failedAccount = await ctx.db.query("financialAccounts").withIndex("by_seasonId_and_state", q => q.eq("seasonId", season._id).eq("state", "failed")).first();
+    const readyIds = new Set(readyAccounts.map(account => account.studentId));
     const roster = { activeStudents: students.filter(s => s.active).length, inactiveStudents: students.filter(s => !s.active).length, travelTeamStudents: students.filter(s => s.active && s.travelTeam).length };
+    if (readyAccounts.length !== students.length || students.some(student => !readyIds.has(student._id))) return {
+      state: failedAccount ? "failed" as const : "updating" as const, ...roster, finance: null,
+      processed: backfill?.processed ?? 0, rebuildRunning: backfill?.state === "running", canRebuild: user.role === "coach" && backfill?.state !== "running",
+      message: failedAccount ? "A financial operation or rebuild requires Coach review before team totals can be verified." : "Financial records are being prepared or transactions are still processing.",
+    };
     if (backfill?.state !== "complete" || summaries.length > 500 || summaries.length !== students.length || summaries.some(summary => summary.version !== FINANCE_SUMMARY_VERSION || !students.some(student => student._id === summary.studentId)) || students.some(student => !summaries.some(summary => summary.studentId === student._id))) return { state: backfill?.state === "failed" ? "failed" as const : "updating" as const, ...roster, finance: null, processed: backfill?.processed ?? 0, rebuildRunning: backfill?.state === "running", canRebuild: user.role === "coach" && backfill?.state !== "running", message: backfill?.lastError ?? "Financial reports are updating; rebuild reports before viewing totals." };
     // Finance includes inactive current-season accounts: archiving never erases debt or credit.
-    const totals = { ...await readFinanceAggregates(ctx,season._id), raisedCents: null, updatedAt: null as number | null };
+    const { knownRaisedCents, unknownRaisedAccounts, ...aggregated } = await readFinanceAggregates(ctx,season._id);
+    const totals = { ...aggregated, raisedCents: unknownRaisedAccounts === 0 ? knownRaisedCents : null, updatedAt: null as number | null };
     for (const finance of summaries) {
       if (finance.updatedAt !== null) totals.updatedAt = Math.max(totals.updatedAt ?? finance.updatedAt, finance.updatedAt);
     }

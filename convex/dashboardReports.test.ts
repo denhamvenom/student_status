@@ -8,7 +8,7 @@ import { makeFunctionReference } from "convex/server";
 import schema from "./schema";
 import type { ApiFromModules, FunctionArgs, FunctionReturnType } from "convex/server";
 import type * as reports from "./dashboardReports";
-import { refreshStudentFinance } from "./lib/financeSummaries";
+import type * as sourceModule from "./financialSources";
 
 const modules = import.meta.glob("./**/*.ts");
 type Reports = ApiFromModules<{ dashboardReports: typeof reports }>["dashboardReports"];
@@ -41,13 +41,25 @@ async function fixture() {
     const session = await ctx.db.insert("timeclockSessions", { seasonId: season, occurrenceId, state: "closed", scheduledStart: start, scheduledEnd: start + 2 * hour, effectiveEnd: start + 3 * hour, extensionMs: hour, revision: 1, openedAt: start, openedBy: coach.id, closedAt: start + 3 * hour, needsReview: false });
     const interval = await ctx.db.insert("timeclockIntervals", { sessionId: session, studentId: sid, inAt: start, outAt: start + hour / 2, openedBy: coach.id, openCommandKey: "original", scheduleRevision: 1 });
     await ctx.db.insert("timeclockCorrections", { sessionId: session, studentId: sid, originalIntervalId: interval, kind: "replace", inAt: start - hour / 2, outAt: start + hour, reason: "PRIVATE CORRECTION REASON", actorId: coach.id, at: start + 3 * hour, commandKey: "correct" });
-    await refreshStudentFinance(ctx, sid);
-    await refreshStudentFinance(ctx, other);
     await ctx.db.insert("financeSummaryBackfills", { seasonId: season, state: "complete", cursor: null, processed: 2, updatedAt: 4 });
     await ctx.db.insert("attendanceReportBackfills", { seasonId: season, state: "complete", cursor: null, processed: 1, updatedAt: start+4*hour });
     await invalidateAttendanceSession(ctx,session);
     return { coach, mentor, lead, parent, student, sid, other, session };
   });
+  const coachClient = t.withIdentity({ subject: `${ids.coach.auth}|session` });
+  type Sources = ApiFromModules<{ financialSources: typeof sourceModule }>["financialSources"];
+  const rebuild = makeFunctionReference<"mutation", FunctionArgs<Sources["rebuild"]>, FunctionReturnType<Sources["rebuild"]>>("financialSources:rebuild");
+  const run = makeFunctionReference<"mutation", { accountId: Id<"financialAccounts"> }, null>("financialSources:run");
+  for (const studentId of [ids.sid, ids.other]) {
+    const accountId = await coachClient.mutation(rebuild, { studentId });
+    for (let step = 0; step < 30; step++) {
+      const account = await t.run(ctx => ctx.db.get(accountId));
+      if (account?.state === "ready") break;
+      if (account?.state !== "rebuilding") throw new Error("Synthetic finance rebuild failed.");
+      await t.mutation(run, { accountId });
+    }
+    expect((await t.run(ctx => ctx.db.get(accountId)))?.state).toBe("ready");
+  }
   await settleSession(t,ids.session);
   const as = (account: typeof ids.coach) => t.withIdentity({ subject: `${account.auth}|session` });
   return { t, ids, coach: as(ids.coach), mentor: as(ids.mentor), lead: as(ids.lead), parent: as(ids.parent), student: as(ids.student) };
@@ -118,12 +130,15 @@ describe("role-scoped dashboard reports", () => {
     await settleSession(f.t,f.ids.session);
     expect((await f.student.query(attendanceRef, { studentId: f.ids.sid, asOf: start + 4 * hour })).verified?.sessionsHeld).toBe(0);
   });
-  it("fails closed instead of returning truncated finance totals", async () => {
+  it("withholds verified family and team totals while financial processing is incomplete", async () => {
     const f = await fixture();
-    await f.t.run(async ctx => {
-      for (let index = 0; index < 498; index++) await ctx.db.insert("ledgerEntries", { studentId: f.ids.sid, kind: "payment", amountCents: 1, previousCents: 0, newCents: 1, recordedBy: f.ids.coach.id, recordedAt: 5, idempotencyKey: `limit-${index}` });
-    });
-    await expect(f.student.query(financeRef, { studentId: f.ids.sid })).rejects.toThrow("Financial record limit reached");
-    await expect(f.t.run(ctx => refreshStudentFinance(ctx, f.ids.sid))).rejects.toThrow("Financial record limit reached");
+    for (const state of ["rebuilding", "allocating", "posting", "failed"] as const) {
+      await f.t.run(async ctx => {
+        const account = await ctx.db.query("financialAccounts").withIndex("by_studentId", q => q.eq("studentId", f.ids.sid)).unique();
+        await ctx.db.patch(account!._id, { state });
+      });
+      expect(await f.student.query(financeRef, { studentId: f.ids.sid })).toEqual({ state: state === "failed" ? "failed" : "updating" });
+      expect(await f.coach.query(teamRef, {})).toMatchObject({ state: state === "failed" ? "failed" : "updating", finance: null });
+    }
   });
 });

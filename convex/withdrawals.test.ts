@@ -1,6 +1,10 @@
 /// <reference types="vite/client" />
 import { describe, expect, it } from "vitest";
 import { createTest as convexTest } from "../testUtils";
+import { makeFunctionReference } from "convex/server";
+import type { Id } from "./_generated/dataModel";
+import { startFinancialRebuild } from "./financialSources";
+import { financialAccount } from "./lib/financialSources";
 import { api } from "./_generated/api";
 import schema from "./schema";
 
@@ -37,8 +41,33 @@ async function fixture(ambiguous = false) {
     await ctx.db.insert("ledgerEntries", { studentId: student, chargeId: extra, eventId: event, kind: "allocation", amountCents: 1000, previousCents: 0, newCents: 1000, sourceEntryId: fundraiser, sourceKind: "fundraiser", recordedBy: coach.user, recordedAt: 8, idempotencyKey: "alloc-c" });
     return { coach, lead, mentor, studentUser, otherUser, season, student, otherStudent, event, participant, group, main, extra, other };
   });
+  if (!ambiguous) await prepare(t, ids.coach.user, ids.student);
   const as = (auth: typeof ids.coach.auth) => t.withIdentity({ subject: `${auth}|session` });
   return { t, ids, coach: as(ids.coach.auth), lead: as(ids.lead.auth), mentor: as(ids.mentor.auth), student: as(ids.studentUser.auth), other: as(ids.otherUser.auth) };
+}
+
+async function prepare(t: ReturnType<typeof convexTest>, actorId: Id<"appUsers">, studentId: Id<"students">) {
+  await t.run(ctx => startFinancialRebuild(ctx, studentId, actorId));
+  for (let i = 0; i < 120; i++) {
+    const account = await t.run(ctx => financialAccount(ctx, studentId));
+    if (!account || account.state !== "rebuilding") return;
+    await t.mutation(makeFunctionReference<"mutation">("financialSources:processPage"), { accountId: account._id, generation: account.generation, phase: account.phase, cursor: account.cursor });
+  }
+  throw new Error("Fixture rebuild did not finish");
+}
+async function finish(f: Awaited<ReturnType<typeof fixture>>) {
+  for (let i = 0; i < 120; i++) {
+    const account = await f.t.run(ctx => financialAccount(ctx, f.ids.student));
+    if (!account) throw new Error("Missing financial account");
+    if (account.operationJobId) {
+      const job = await f.t.run(ctx => ctx.db.get(account.operationJobId!)); if (!job) throw new Error("Missing disposition job");
+      await f.t.mutation(makeFunctionReference<"mutation">("financialOperationsWorker:processPage"), { jobId: job._id, step: job.step });
+    } else if (account.allocationJobId) {
+      const job = await f.t.run(ctx => ctx.db.get(account.allocationJobId!)); if (!job) throw new Error("Missing allocation job");
+      await f.t.mutation(makeFunctionReference<"mutation">("financialAllocation:processPage"), { jobId: job._id, step: job.step });
+    } else return;
+  }
+  throw new Error("Disposition did not finish");
 }
 
 describe("withdrawal decisions", () => {
@@ -54,6 +83,9 @@ describe("withdrawal decisions", () => {
     expect((await f.t.run(ctx => ctx.db.get(f.ids.participant)))?.status).toBe("confirmed");
     const request2 = await f.student.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.event, idempotencyKey: "request-two" });
     await f.coach.mutation(api.withdrawals.reviewWithdrawal, { requestId: request2, decision: "full", cancelUnpaidMain: false, reason: "Approved travel change", expectedRevision: revision });
+    expect((await f.t.run(ctx => ctx.db.get(request2)))?.status).toBe("processing");
+    expect((await f.t.run(ctx => ctx.db.get(f.ids.participant)))?.status).toBe("confirmed");
+    await finish(f);
     const state = await f.t.run(async ctx => ({ participant: await ctx.db.get(f.ids.participant), main: await ctx.db.get(f.ids.main), extra: await ctx.db.get(f.ids.extra), other: await ctx.db.get(f.ids.other), group: await ctx.db.get(f.ids.group), memberships: await ctx.db.query("roomMemberships").withIndex("by_eventId_and_studentId", q => q.eq("eventId", f.ids.event).eq("studentId", f.ids.student)).take(2), requests: await ctx.db.query("roomRequests").withIndex("by_eventId_and_studentId", q => q.eq("eventId", f.ids.event).eq("studentId", f.ids.student)).take(2), entries: await ctx.db.query("ledgerEntries").withIndex("by_studentId_and_recordedAt", q => q.eq("studentId", f.ids.student)).take(100) }));
     expect(state.participant?.status).toBe("withdrawn");
     expect(state.main).toMatchObject({ appliedCents: 0, cancelledCents: 8000 });
@@ -75,7 +107,8 @@ describe("withdrawal decisions", () => {
     const requestId = await f.student.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.event, idempotencyKey: "request-ambiguous" });
     const expectedRevision = (await f.coach.query(api.withdrawals.withdrawalPreview, { eventId: f.ids.event, studentId: f.ids.student })).revision;
     await expect(f.coach.mutation(api.withdrawals.reviewWithdrawal, { requestId, decision: "partial", returnCents: 9001, cancelUnpaidMain: false, reason: "Too many cents", expectedRevision })).rejects.toThrow("eligible paid");
-    await expect(f.coach.mutation(api.withdrawals.reviewWithdrawal, { requestId, decision: "full", cancelUnpaidMain: false, reason: "Unknown source", expectedRevision })).rejects.toThrow("ambiguous funding sources");
+    await expect(prepare(f.t, f.ids.coach.user, f.ids.student)).rejects.toThrow("ambiguous funding sources");
+    await expect(f.coach.mutation(api.withdrawals.reviewWithdrawal, { requestId, decision: "full", cancelUnpaidMain: false, reason: "Unknown source", expectedRevision })).rejects.toThrow("updating");
     expect((await f.t.run(ctx => ctx.db.get(f.ids.participant)))?.status).toBe("confirmed");
     expect((await f.t.run(ctx => ctx.db.get(f.ids.main)))?.cancelledCents).toBeUndefined();
     await expect(f.student.mutation(api.participation.withdraw, { eventId: f.ids.event })).rejects.toThrow("Submit a withdrawal request");
@@ -90,6 +123,7 @@ describe("withdrawal decisions", () => {
     await f.lead.mutation(api.withdrawals.reviewWithdrawal, args);
     await f.lead.mutation(api.withdrawals.reviewWithdrawal, args);
     await expect(f.coach.mutation(api.withdrawals.reviewWithdrawal, { ...args, decision: "full" })).rejects.toThrow("already decided differently");
+    await finish(f);
     const charges = await f.t.run(async ctx => ({ main: await ctx.db.get(f.ids.main), extra: await ctx.db.get(f.ids.extra) }));
     expect(charges.main).toMatchObject({ appliedCents: 8000, cancelledCents: 2000 });
     expect(charges.extra).toMatchObject({ appliedCents: 1000, cancelledCents: 1000 });
@@ -100,6 +134,7 @@ describe("withdrawal decisions", () => {
     const requestId = await f.student.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.event, idempotencyKey: "partial-request" });
     const expectedRevision = (await f.coach.query(api.withdrawals.withdrawalPreview, { eventId: f.ids.event, studentId: f.ids.student })).revision;
     await f.coach.mutation(api.withdrawals.reviewWithdrawal, { requestId, decision: "partial", returnCents: 7000, cancelUnpaidMain: false, reason: "Approved partial return", expectedRevision });
+    await finish(f);
     const finances = await f.student.query(api.app.studentFinances, { studentId: f.ids.student });
     expect(finances.summary).toMatchObject({ dueCents: 2000, personalAvailableCents: 1000, fundraisingAvailableCents: 1000 });
     const state = await f.t.run(async ctx => ({ main: await ctx.db.get(f.ids.main), extra: await ctx.db.get(f.ids.extra), other: await ctx.db.get(f.ids.other), entries: await ctx.db.query("ledgerEntries").withIndex("by_studentId_and_recordedAt", q => q.eq("studentId", f.ids.student)).take(100) }));
@@ -124,14 +159,16 @@ describe("withdrawal decisions", () => {
     expect((await f.t.run(ctx => ctx.db.get(requestId)))?.status).toBe("pending");
   });
 
-  it("rolls back cancellation when it would exceed the ledger limit", async () => {
+  it("finishes a reviewed disposition beyond 500 historical rows without truncation", async () => {
     const f = await fixture();
     const requestId = await f.student.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.event, idempotencyKey: "cap-request" });
     const expectedRevision = (await f.coach.query(api.withdrawals.withdrawalPreview, { eventId: f.ids.event, studentId: f.ids.student })).revision;
-    await f.t.run(async ctx => { for (let i=0;i<494;i++) await ctx.db.insert("ledgerEntries", { studentId: f.ids.student, kind: "adjustment", amountCents: 0, previousCents: 0, newCents: 0, recordedBy: f.ids.coach.user, recordedAt: 100+i, idempotencyKey: `filler:${i}` }); });
-    await expect(f.coach.mutation(api.withdrawals.reviewWithdrawal, { requestId, decision: "retain", cancelUnpaidMain: true, reason: "Retain and cancel unpaid", expectedRevision })).rejects.toThrow("Financial record limit");
-    expect((await f.t.run(ctx => ctx.db.get(f.ids.participant)))?.status).toBe("confirmed");
-    expect((await f.t.run(ctx => ctx.db.get(requestId)))?.status).toBe("pending");
-    expect((await f.t.run(ctx => ctx.db.get(f.ids.main)))?.cancelledCents).toBeUndefined();
+    await f.t.run(async ctx => { for (let i=0;i<620;i++) await ctx.db.insert("ledgerEntries", { studentId: f.ids.student, kind: "adjustment", amountCents: 0, previousCents: 0, newCents: 0, recordedBy: f.ids.coach.user, recordedAt: 100+i, idempotencyKey: `filler:${i}` }); });
+    await prepare(f.t, f.ids.coach.user, f.ids.student);
+    await f.coach.mutation(api.withdrawals.reviewWithdrawal, { requestId, decision: "retain", cancelUnpaidMain: true, reason: "Retain and cancel unpaid", expectedRevision });
+    await finish(f);
+    expect((await f.t.run(ctx => ctx.db.get(f.ids.participant)))?.status).toBe("withdrawn");
+    expect((await f.t.run(ctx => ctx.db.get(requestId)))?.status).toBe("approved");
+    expect((await f.t.run(ctx => ctx.db.get(f.ids.main)))?.cancelledCents).toBe(2000);
   });
 });

@@ -4,6 +4,8 @@ import { internalMutation, mutation, query } from "./_generated/server";
 import { activeSeason, requireRole, viewer } from "./lib/access";
 import { FINANCE_SUMMARY_VERSION, refreshStudentFinance } from "./lib/financeSummaries";
 import type { Id } from "./_generated/dataModel";
+import { startFinancialRebuild } from "./financialSources";
+import { ensureFinancialAccount, financialAccount } from "./lib/financialSources";
 
 const statusValidator = v.object({ state: v.union(v.literal("running"), v.literal("failed"), v.literal("complete")), processed: v.number(), updatedAt: v.number(), lastError: v.union(v.string(), v.null()) });
 
@@ -21,17 +23,24 @@ export const status = query({
 export const start = mutation({
   args: {}, returns: v.id("financeSummaryBackfills"),
   handler: async ctx => {
-    requireRole(await viewer(ctx), "coach");
+    const actor = await viewer(ctx); requireRole(actor, "coach");
     const season = await activeSeason(ctx);
     const previous = await ctx.db.query("financeSummaryBackfills").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).unique();
     if (previous?.state === "running") return previous._id;
     const resume = previous?.state === "failed";
     const cursor = resume ? previous.cursor : null;
+    if (resume) {
+      const page = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).paginate({ numItems: 5, cursor });
+      for (const student of page.page) {
+        const account = await financialAccount(ctx, student._id);
+        if (account?.state === "failed") await startFinancialRebuild(ctx, student._id, actor._id);
+      }
+    }
     let backfillId: Id<"financeSummaryBackfills">;
     if (previous) {
       backfillId = previous._id;
-      await ctx.db.patch(backfillId, { state: "running", cursor, processed: resume ? previous.processed : 0, updatedAt: Date.now(), lastError: undefined });
-    } else backfillId = await ctx.db.insert("financeSummaryBackfills", { seasonId: season._id, state: "running", cursor: null, processed: 0, updatedAt: Date.now() });
+      await ctx.db.patch(backfillId, { actorId: actor._id, state: "running", cursor, processed: resume ? previous.processed : 0, updatedAt: Date.now(), lastError: undefined });
+    } else backfillId = await ctx.db.insert("financeSummaryBackfills", { actorId: actor._id, seasonId: season._id, state: "running", cursor: null, processed: 0, updatedAt: Date.now() });
     await ctx.scheduler.runAfter(0, internal.financeReportMaintenance.continueBackfill, { backfillId, expectedCursor: cursor });
     return backfillId;
   },
@@ -44,7 +53,26 @@ export const continueBackfill = internalMutation({
     if (!state || state.state !== "running" || state.cursor !== args.expectedCursor) return null;
     let verifyingCoverage = false;
     try {
+      const actor = state.actorId ? await ctx.db.get(state.actorId) : null;
+      if (!actor?.active || actor.role !== "coach" || (await activeSeason(ctx))._id !== state.seasonId) throw new Error("Report rebuild authorization changed.");
       const page = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", state.seasonId)).paginate({ numItems: 5, cursor: state.cursor });
+      let waiting = false;
+      for (const student of page.page) {
+        const account = await financialAccount(ctx, student._id);
+        if (!account) {
+          const entry = await ctx.db.query("ledgerEntries").withIndex("by_studentId_and_recordedAt", q => q.eq("studentId", student._id)).first();
+          const charge = await ctx.db.query("charges").withIndex("by_studentId_and_priority", q => q.eq("studentId", student._id)).first();
+          if (!entry && !charge) await ensureFinancialAccount(ctx, student._id);
+          else { await startFinancialRebuild(ctx, student._id, actor._id); waiting = true; }
+        }
+        else if (account.state === "uninitialized") { await startFinancialRebuild(ctx, student._id, actor._id); waiting = true; }
+        else if (account.state === "failed") throw new Error("Student financial processing failed.");
+        else if (account.state !== "ready") waiting = true;
+      }
+      if (waiting) {
+        await ctx.scheduler.runAfter(250, internal.financeReportMaintenance.continueBackfill, { backfillId: state._id, expectedCursor: state.cursor });
+        return null;
+      }
       for (const student of page.page) await refreshStudentFinance(ctx, student._id);
       if (page.isDone) {
         verifyingCoverage = true;

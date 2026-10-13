@@ -1,7 +1,8 @@
 export const reportCopy = {
+  moreCharges: 'More charges', moreHistory: 'Older transactions',
   loading: 'Loading report…', unavailable: 'Unavailable', details: 'Details', updated: 'Updated',
   raised: 'Raised', travelShare: 'Your travel share', transfersReceived: 'Transfers received',
-  funding: 'Fundraising', grossUnavailable: 'Gross fundraising proceeds are not recorded yet. Your travel share shows earned fundraising credit.',
+  funding: 'Fundraising', grossUnavailable: 'Some historical fundraising credits do not include gross proceeds. Your travel share shows earned fundraising credit.',
   attendance: 'Attendance', attendanceDescription: 'Attendance from Timeclock sessions and legacy records.',
   verified: 'Verified Timeclock attendance', legacy: 'Legacy attendance', legacyNote: 'Legacy checkmarks are separate from verified Timeclock intervals.',
   verifiedNote: 'Closed sessions count after one uninterrupted scheduled hour. Open sessions and sessions needing review are excluded from totals.',

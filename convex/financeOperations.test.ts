@@ -1,6 +1,10 @@
 /// <reference types="vite/client" />
 import { describe, expect, it } from "vitest";
 import { createTest as convexTest } from "../testUtils";
+import { makeFunctionReference } from "convex/server";
+import type { Id } from "./_generated/dataModel";
+import { startFinancialRebuild } from "./financialSources";
+import { financialAccount } from "./lib/financialSources";
 import { api } from "./_generated/api";
 import schema from "./schema";
 
@@ -33,8 +37,26 @@ async function fixture() {
     await ctx.db.insert("ledgerEntries", { studentId: student, chargeId: charge, kind: "allocation", amountCents: 4000, previousCents: 0, newCents: 4000, sourceEntryId: payment, sourceKind: "payment", recordedBy: coach.user, recordedAt: 4, idempotencyKey: "fixture-allocation" });
     return { coach, lead, ungrantedLead, mentor, studentUser, student, recipient, inactive, old, payment, fundraisingA, fundraisingB };
   });
+  await rebuildStudent(t, ids.coach.user, ids.student);
+  await rebuildStudent(t, ids.coach.user, ids.recipient);
   const as = (auth: typeof ids.coach.auth) => t.withIdentity({ subject: `${auth}|session` });
   return { t, ids, coach: as(ids.coach.auth), lead: as(ids.lead.auth), ungrantedLead: as(ids.ungrantedLead.auth), mentor: as(ids.mentor.auth), student: as(ids.studentUser.auth) };
+}
+
+async function rebuildStudent(t: ReturnType<typeof convexTest>, actorId: Id<"appUsers">, studentId: Id<"students">) {
+  await t.run(ctx => startFinancialRebuild(ctx, studentId, actorId));
+  for (let i = 0; i < 100; i++) {
+    const account = await t.run(ctx => financialAccount(ctx, studentId));
+    if (!account || account.state !== "rebuilding") return;
+    await t.mutation(makeFunctionReference<"mutation">("financialSources:processPage"), { accountId: account._id, generation: account.generation, phase: account.phase, cursor: account.cursor });
+  }
+  throw new Error("Fixture rebuild did not finish");
+}
+async function finances(f: Awaited<ReturnType<typeof fixture>>, studentId: Id<"students">) {
+  const result = await f.coach.query(api.app.studentFinances, { studentId });
+  if (result.state !== "ready" || !result.summary) throw new Error("Expected prepared finances");
+  const history = await f.coach.query(api.financeDetails.history, { studentId, paginationOpts: { numItems: 25, cursor: null } });
+  return { summary: result.summary, entries: history.page };
 }
 
 describe("financial operations", () => {
@@ -45,24 +67,25 @@ describe("financial operations", () => {
     const id = await f.coach.mutation(api.financeOperations.recordPayout, args);
     expect(await f.coach.mutation(api.financeOperations.recordPayout, args)).toBe(id);
     await expect(f.coach.mutation(api.financeOperations.recordPayout, { ...args, amountCents: 500 })).rejects.toThrow("different operation");
-    const finances = await f.coach.query(api.app.studentFinances, { studentId: f.ids.student });
-    expect(finances.summary).toMatchObject({ personalAvailableCents: 0, fundraisingAvailableCents: 7000 });
-    const payouts = finances.entries.filter((entry: { kind: string }) => entry.kind === "payout");
+    const money = await finances(f, f.ids.student);
+    expect(money.summary).toMatchObject({ personalAvailableCents: 0, fundraisingAvailableCents: 7000 });
+    const payouts = money.entries.filter((entry: { kind: string }) => entry.kind === "payout");
     expect(payouts).toHaveLength(1);
     expect(payouts[0]).toMatchObject({ sourceEntryId: f.ids.payment, sourceKind: "payment", method: "check", reference: "synthetic-check", amountCents: 1000 });
     await f.coach.mutation(api.finance.recordFunds, { studentId: f.ids.student, kind: "payment", amountCents: 100, reason: "New payment", idempotencyKey: "after-payout-payment" });
-    const updated = await f.coach.query(api.app.studentFinances, { studentId: f.ids.student });
+    const updated = await finances(f, f.ids.student);
     expect(updated.entries.find((entry: { idempotencyKey: string }) => entry.idempotencyKey === "after-payout-payment")).toMatchObject({ previousCents: 11000, newCents: 11100 });
   });
 
   it("moves mixed fundraising sources atomically and conserves credit after recipient allocation", async () => {
     const f = await fixture();
     await f.t.run(async ctx => { await ctx.db.insert("charges", { studentId: f.ids.recipient, label: "Recipient fee", amountCents: 2000, appliedCents: 0, priority: 1, createdBy: f.ids.coach.user, createdAt: 1 }); });
+    await rebuildStudent(f.t, f.ids.coach.user, f.ids.recipient);
     const args = { studentId: f.ids.student, recipientStudentId: f.ids.recipient, amountCents: 5000, reason: "Authorized travel share transfer", idempotencyKey: key };
     const id = await f.lead.mutation(api.financeOperations.transferFundraising, args);
     expect(await f.lead.mutation(api.financeOperations.transferFundraising, args)).toBe(id);
-    const sender = await f.coach.query(api.app.studentFinances, { studentId: f.ids.student });
-    const recipient = await f.coach.query(api.app.studentFinances, { studentId: f.ids.recipient });
+    const sender = await finances(f, f.ids.student);
+    const recipient = await finances(f, f.ids.recipient);
     expect(sender.summary.fundraisingAvailableCents).toBe(2000);
     expect(recipient.summary.fundraisingAvailableCents).toBe(3000);
     expect(recipient.summary.paidCents).toBe(2000);
@@ -88,9 +111,9 @@ describe("financial operations", () => {
 
   it("rolls back both transfer sides if recipient allocation cannot complete", async () => {
     const f = await fixture();
-    await f.t.run(async ctx => { await ctx.db.insert("charges", { studentId: f.ids.recipient, label: "Inconsistent charge", amountCents: 1000, appliedCents: 1001, priority: 1, createdBy: f.ids.coach.user, createdAt: 1 }); });
+    await f.t.run(async ctx => { await ctx.db.insert("charges", { studentId: f.ids.recipient, label: "Inconsistent charge", amountCents: 1000, appliedCents: 1001, outstanding: true, priority: 1, createdBy: f.ids.coach.user, createdAt: 1 }); });
     await expect(f.coach.mutation(api.financeOperations.transferFundraising, { studentId: f.ids.student, recipientStudentId: f.ids.recipient, amountCents: 1000, reason: "Attempt", idempotencyKey: key })).rejects.toThrow("inconsistent");
-    const sender = await f.coach.query(api.app.studentFinances, { studentId: f.ids.student });
+    const sender = await finances(f, f.ids.student);
     expect(sender.summary.fundraisingAvailableCents).toBe(7000);
     const operation = await f.t.run(ctx => ctx.db.query("financeOperations").withIndex("by_idempotencyKey", q => q.eq("idempotencyKey", key)).unique());
     expect(operation).toBeNull();
@@ -101,6 +124,7 @@ describe("financial operations", () => {
   it("keeps transferred credits in fundraising after deallocation", async () => {
     const f = await fixture();
     const charge = await f.t.run(ctx => ctx.db.insert("charges", { studentId: f.ids.recipient, label: "Fee", amountCents: 1000, appliedCents: 0, priority: 1, createdBy: f.ids.coach.user, createdAt: 1 }));
+    await rebuildStudent(f.t, f.ids.coach.user, f.ids.recipient);
     await f.coach.mutation(api.financeOperations.transferFundraising, { studentId: f.ids.student, recipientStudentId: f.ids.recipient, amountCents: 1000, reason: "Transfer", idempotencyKey: key });
     const allocation = await f.t.run(async ctx => (await ctx.db.query("ledgerEntries").withIndex("by_studentId_and_recordedAt", q => q.eq("studentId", f.ids.recipient)).take(20)).find(x => x.kind === "allocation"));
     expect(allocation?.sourceKind).toBe("fundraiser");
@@ -108,8 +132,9 @@ describe("financial operations", () => {
       await ctx.db.patch(charge, { appliedCents: 0, cancelledCents: 1000 });
       await ctx.db.insert("ledgerEntries", { studentId: f.ids.recipient, chargeId: charge, kind: "deallocation", amountCents: 1000, previousCents: 1000, newCents: 0, sourceEntryId: allocation!.sourceEntryId, sourceKind: "fundraiser", recordedBy: f.ids.coach.user, recordedAt: 5, idempotencyKey: "synthetic-reversal" });
     });
-    const finances = await f.coach.query(api.app.studentFinances, { studentId: f.ids.recipient });
-    expect(finances.summary).toMatchObject({ personalAvailableCents: 0, fundraisingAvailableCents: 1000 });
+    await rebuildStudent(f.t, f.ids.coach.user, f.ids.recipient);
+    const money = await finances(f, f.ids.recipient);
+    expect(money.summary).toMatchObject({ personalAvailableCents: 0, fundraisingAvailableCents: 1000 });
     await expect(f.coach.mutation(api.financeOperations.recordPayout, { studentId: f.ids.recipient, amountCents: 1000, method: "check", reference: "not-allowed", occurredAt: 1, reason: "No fundraising cashout", idempotencyKey: "no-fundraising-payout" })).rejects.toThrow("unallocated personal");
   });
 
@@ -121,9 +146,39 @@ describe("financial operations", () => {
     const results = await Promise.allSettled([first, second]);
     expect(results.filter(result => result.status === "fulfilled")).toHaveLength(1);
     expect(results.filter(result => result.status === "rejected")).toHaveLength(1);
-    const sender = await f.coach.query(api.app.studentFinances, { studentId: f.ids.student });
-    const recipient = await f.coach.query(api.app.studentFinances, { studentId: f.ids.recipient });
+    const sender = await finances(f, f.ids.student);
+    const recipient = await finances(f, f.ids.recipient);
     expect(sender.summary.fundraisingAvailableCents).toBe(2000);
     expect(recipient.summary.fundraisingAvailableCents).toBe(5000);
   });
+  it("retains both locks after a partially committed transfer loses authorization and retries without duplicate money", async () => {
+    const f = await fixture();
+    await f.t.run(async ctx => {
+      for (let i = 0; i < 40; i++) await ctx.db.insert("ledgerEntries", { studentId: f.ids.student, kind: "fundraiser", amountCents: 1, previousCents: 0, newCents: 1, recordedBy: f.ids.coach.user, recordedAt: 100 + i, idempotencyKey: `fragment:${i}` });
+    });
+    await rebuildStudent(f.t, f.ids.coach.user, f.ids.student);
+    const operationId = await f.lead.mutation(api.financeOperations.transferFundraising, { studentId: f.ids.student, recipientStudentId: f.ids.recipient, amountCents: 7040, reason: "Many original funding fragments", idempotencyKey: "fragmented-transfer" });
+    const operation = await f.t.run(ctx => ctx.db.get(operationId));
+    if (!operation?.jobId) throw new Error("Missing durable operation");
+    expect(operation.state).toBe("running");
+    expect(operation.committedCents).toBe(7018);
+    await f.t.run(ctx => ctx.db.patch(f.ids.lead.user, { active: false }));
+    await f.t.mutation(makeFunctionReference<"mutation">("financialOperationsWorker:run"), { jobId: operation.jobId });
+    const before = await f.t.run(async ctx => ({ sender: await financialAccount(ctx, f.ids.student), recipient: await financialAccount(ctx, f.ids.recipient), job: await ctx.db.get(operation.jobId!) }));
+    expect(before.job?.state).toBe("failed");
+    for (const studentId of [f.ids.student, f.ids.recipient]) await expect(f.coach.mutation(makeFunctionReference<"mutation">("financialSources:rebuild"), { studentId })).rejects.toThrow("existing financial job");
+    expect(await f.t.run(async ctx => ({ sender: await financialAccount(ctx, f.ids.student), recipient: await financialAccount(ctx, f.ids.recipient), job: await ctx.db.get(operation.jobId!) }))).toEqual(before);
+    await f.coach.mutation(makeFunctionReference<"mutation">("financialOperationsWorker:retry"), { jobId: operation.jobId, reason: "Coach authorized continuation" });
+    for (let i = 0; i < 10; i++) {
+      const job = await f.t.run(ctx => ctx.db.get(operation.jobId!));
+      if (!job || job.state !== "running") break;
+      const args = { jobId: job._id, step: job.step };
+      await f.t.mutation(makeFunctionReference<"mutation">("financialOperationsWorker:processPage"), args);
+      await f.t.mutation(makeFunctionReference<"mutation">("financialOperationsWorker:processPage"), args);
+    }
+    expect(await f.t.run(ctx => ctx.db.get(operationId))).toMatchObject({ state: "complete", committedCents: 7040 });
+    expect(await f.t.run(ctx => financialAccount(ctx, f.ids.student))).toMatchObject({ state: "ready", fundraisingAvailableCents: 0 });
+    expect(await f.t.run(ctx => financialAccount(ctx, f.ids.recipient))).toMatchObject({ state: "ready", fundraisingAvailableCents: 7040 });
+  });
+
 });

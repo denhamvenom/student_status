@@ -108,7 +108,7 @@ describe("Whole Team enrollment", () => {
     expect(rows.map(p => p.eventId)).toEqual([upcoming]);
   });
 
-  it("enrolls in 100 upcoming events using one financial history read per table", async () => {
+  it("enrolls in 100 upcoming events using rebuilt funding without rescanning financial history", async () => {
     const f = await fixture();
     await f.t.run(async ctx => {
       for (let i = 0; i < 100; i++) {
@@ -118,6 +118,13 @@ describe("Whole Team enrollment", () => {
       await ctx.db.insert("ledgerEntries", { studentId: f.ids.students[2], kind: "payment", amountCents: 5000, previousCents: 0, newCents: 5000, recordedBy: f.ids.coach, recordedAt: Date.now(), idempotencyKey: "scale-payment" });
       await ctx.db.insert("ledgerEntries", { studentId: f.ids.students[2], kind: "fundraiser", amountCents: 5000, previousCents: 0, newCents: 5000, recordedBy: f.ids.coach, recordedAt: Date.now(), idempotencyKey: "scale-fundraiser" });
     });
+    const accountId = await f.coach.mutation(api.financialSources.rebuild, { studentId: f.ids.students[2] });
+    for (let page = 0; page < 20; page++) {
+      const account = await f.t.run(ctx => ctx.db.get(accountId));
+      if (account?.state === "ready") break;
+      await f.t.mutation(internal.financialSources.run, { accountId });
+    }
+    expect(await f.t.run(ctx => ctx.db.get(accountId))).toMatchObject({ state: "ready" });
     const queries = await f.t.run(async ctx => {
       await ctx.db.patch(f.ids.students[2], { active: true });
       const student = await ctx.db.get(f.ids.students[2]); const actor = await ctx.db.get(f.ids.coach);
@@ -132,7 +139,15 @@ describe("Whole Team enrollment", () => {
       await syncWholeTeamMembership({ ...ctx, db }, actor!, student!);
       return counts;
     });
-    expect(queries).toEqual({ charges: 1, ledgerEntries: 101, participants: 100 });
+    // Ledger reads here are indexed idempotency checks, never lifetime-history scans.
+    expect(queries.ledgerEntries).toBe(100);
+    expect(queries.participants).toBe(100);
+    for (let step = 0; step < 120; step++) {
+      const jobs = await f.t.run(ctx => ctx.db.query("financialAllocationJobs").withIndex("by_studentId_and_state", q => q.eq("studentId", f.ids.students[2]).eq("state", "running")).take(2));
+      if (!jobs.length) break;
+      for (const job of jobs) await f.t.mutation(internal.financialAllocation.run, { jobId: job._id });
+    }
+    expect(await f.t.run(ctx => ctx.db.get(accountId))).toMatchObject({ state: "ready", paidCents: 10000 });
     const rows = await f.t.run(async ctx => ({ participants: await ctx.db.query("participants").withIndex("by_studentId", q => q.eq("studentId", f.ids.students[2])).collect(), entries: await ctx.db.query("ledgerEntries").withIndex("by_studentId_and_recordedAt", q => q.eq("studentId", f.ids.students[2])).collect() }));
     expect(rows.participants).toHaveLength(100);
     expect(rows.entries.filter(e => e.kind === "charge")).toHaveLength(100);

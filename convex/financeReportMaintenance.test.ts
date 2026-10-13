@@ -34,9 +34,9 @@ describe("source-authoritative finance report maintenance",()=>{
     await f.t.run(async ctx=>{
       const source=await financeFor(ctx,studentId);
       const summary=await ctx.db.query("studentFinanceSummaries").withIndex("by_studentId",q=>q.eq("studentId",studentId)).unique();
-      expect(summary).toMatchObject({...source.summary,travelShareCents:1000,transferredInCents:0,version:2});
+      expect(summary).toMatchObject({...source.summary,travelShareCents:1000,transferredInCents:0,version:3});
       expect(summary).toMatchObject({chargedCents:2500,paidCents:2500,dueCents:0,personalAvailableCents:500,fundraisingAvailableCents:0});
-      expect(await calculateStudentFinance(ctx,studentId,{charges:source.charges,entries:source.entries})).toMatchObject({...source.summary,travelShareCents:1000});
+      expect(await calculateStudentFinance(ctx,studentId)).toMatchObject({...source.summary,travelShareCents:1000});
     });
   });
   it("backfills durably by cursor, ignores duplicate workers and gates team totals",async()=>{
@@ -59,10 +59,21 @@ describe("source-authoritative finance report maintenance",()=>{
     const bad=await f.t.run(ctx=>ctx.db.insert("charges",{studentId,label:"Synthetic invalid fee",amountCents:100,appliedCents:200,priority:0,createdBy:f.ids.coach,createdAt:1}));
     const id=await f.coach.mutation(start,{});
     await f.t.mutation(worker,{backfillId:id,expectedCursor:null});
+    for (let step=0; step<10; step++) {
+      const account=await f.t.run(ctx=>ctx.db.query("financialAccounts").withIndex("by_studentId",q=>q.eq("studentId",studentId)).unique());
+      if(account?.state!=="rebuilding")break;
+      await f.t.mutation(makeFunctionReference<"mutation">("financialSources:run"),{accountId:account._id});
+    }
+    await f.t.mutation(worker,{backfillId:id,expectedCursor:null});
     expect(await f.coach.query(status,{})).toMatchObject({state:"failed",processed:0});
     expect(await f.coach.query(api.dashboardReports.team,{})).toMatchObject({finance:null});
     await f.t.run(ctx=>ctx.db.patch(bad,{appliedCents:0}));
     await f.coach.mutation(start,{});
+    for (let step=0; step<10; step++) {
+      const account=await f.t.run(ctx=>ctx.db.query("financialAccounts").withIndex("by_studentId",q=>q.eq("studentId",studentId)).unique());
+      if(account?.state!=="rebuilding")break;
+      await f.t.mutation(makeFunctionReference<"mutation">("financialSources:run"),{accountId:account._id});
+    }
     await f.t.mutation(worker,{backfillId:id,expectedCursor:null});
     expect(await f.coach.query(status,{})).toMatchObject({state:"complete",processed:1});
     expect(await f.coach.query(api.dashboardReports.team,{})).toMatchObject({finance:{chargedCents:100,dueCents:100}});

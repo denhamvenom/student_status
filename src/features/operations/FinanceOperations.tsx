@@ -25,12 +25,21 @@ function chicagoStartOfDay(date: string) {
 function cents(value: string) {
   if (!/^\d+(?:\.\d{1,2})?$/.test(value)) return null
   const [dollars, fraction = ''] = value.split('.')
-  const result = Number(dollars) * 100 + Number(fraction.padEnd(2, '0'))
-  return Number.isSafeInteger(result) && result > 0 ? result : null
+  const result = BigInt(dollars) * 100n + BigInt(fraction.padEnd(2, '0'))
+  return result > 0n && result <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(result) : null
 }
 
 export function FinanceOperations({ studentId }: { studentId: Id<'students'> }) {
+  return <FinanceOperationsForStudent key={studentId} studentId={studentId} />
+}
+
+function FinanceOperationsForStudent({ studentId }: { studentId: Id<'students'> }) {
   const options = useQuery(api.financeOperations.operationOptions, { studentId })
+  const [operationId, setOperationId] = useState<Id<'financeOperations'> | null>(null)
+  const activeOperation = useQuery(api.financialOperationsWorker.status, { studentId })
+  const receipt = useQuery(api.financialOperationsWorker.status, operationId ? { studentId, operationId } : 'skip')
+  const operation = activeOperation?.job ? activeOperation : receipt ?? activeOperation
+  const retry = useMutation(api.financialOperationsWorker.retry)
   const payout = useMutation(api.financeOperations.recordPayout)
   const transfer = useMutation(api.financeOperations.transferFundraising)
   const [mode, setMode] = useState<'payout' | 'transfer'>('payout')
@@ -43,12 +52,13 @@ export function FinanceOperations({ studentId }: { studentId: Id<'students'> }) 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState('')
+  const [retryReason, setRetryReason] = useState('')
   const pendingKey = useRef<string | null>(null)
   const change = (setter: (value: string) => void, value: string) => { pendingKey.current = null; setter(value); setError(''); setSaved('') }
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
-    if (busy) return
+    if (busy || options?.state !== 'ready') return
     const amountCents = cents(amount)
     if (amountCents === null) { setError(operationsCopy.finance.enterAPositiveAmountWithAtMostTwoDecimalPlaces); return }
     if (!reason.trim()) { setError(operationsCopy.finance.enterAReason); return }
@@ -60,11 +70,11 @@ export function FinanceOperations({ studentId }: { studentId: Id<'students'> }) 
     try {
       if (mode === 'payout') {
         const occurredAt = chicagoStartOfDay(occurredDate)
-        await payout({ studentId, amountCents, reason: reason.trim(), method, reference: reference.trim(), occurredAt, idempotencyKey })
-        setSaved(operationsCopy.finance.cashCheckRefundRecordedThisRecordDoesNotSendMoney)
+        setOperationId(await payout({ studentId, amountCents, reason: reason.trim(), method, reference: reference.trim(), occurredAt, idempotencyKey }))
+        setSaved('Refund record submitted. Financial processing must finish before this account is available again.')
       } else {
-        await transfer({ studentId, recipientStudentId: recipient as Id<'students'>, amountCents, reason: reason.trim(), idempotencyKey })
-        setSaved(operationsCopy.finance.fundraisingCreditTransferredAndAppliedToTheRecipientSChargesWhereDue)
+        setOperationId(await transfer({ studentId, recipientStudentId: recipient as Id<'students'>, amountCents, reason: reason.trim(), idempotencyKey }))
+        setSaved('Transfer submitted. Committed amounts and remaining work are shown below while processing continues.')
       }
       pendingKey.current = null; setAmount(''); setReason(''); setReference('')
     } catch (cause) { setError(errorText(cause)) } finally { setBusy(false) }
@@ -74,13 +84,15 @@ export function FinanceOperations({ studentId }: { studentId: Id<'students'> }) 
     <h2>{operationsCopy.finance.moneyReturnedAndFundraisingTransfers}</h2>
     <p className={styles.note}>{operationsCopy.finance.recordMoneyAlreadyGivenToAFamilyThisAppRecordsTheRefundItDoesNotTransferMoneyFun}</p>
     {options === undefined ? <p>{operationsCopy.finance.loadingAvailableFunds}</p> : <>
+      {options.state !== 'ready' && <p role="status" className={styles.note}>{options.state === 'failed' ? 'Financial processing stopped. A Coach must review and retry the remaining work.' : 'Financial processing is updating. These are committed balances; this account is not ready for another operation.'}</p>}
       <div className={styles.balances}><span>{operationsCopy.finance.unallocatedPersonal} <strong>{usd(options.personalAvailableCents)}</strong></span><span>{operationsCopy.finance.availableFundraising} <strong>{usd(options.fundraisingAvailableCents)}</strong></span></div>
+      {operation?.job && <section aria-label="Financial processing status"><h3>{operation.job.kind === 'payout' ? 'Refund recording' : operation.job.kind === 'transfer' ? 'Travel credit transfer' : 'Withdrawal processing'} · {operation.job.state}</h3><p role="status">Committed {usd(operation.job.committedCents)} of {usd(operation.job.amountCents)}. {operation.job.state !== 'complete' && 'Remaining amounts have not been committed.'}</p>{operation.job.lastError && <p className={styles.error}>{operation.job.lastError}</p>}{operation.canRetry && <form className={styles.form} onSubmit={async event => { event.preventDefault(); if (!operation.job || busy || retryReason.trim().length < 8) return; setBusy(true); setError(''); try { await retry({ jobId: operation.job._id, reason: retryReason.trim() }); setRetryReason('') } catch (cause) { setError(errorText(cause)) } finally { setBusy(false) } }}><label>Reason for retry<Input value={retryReason} onChange={event => setRetryReason(event.target.value)} minLength={8} maxLength={1000} required disabled={busy} /></label><Button disabled={busy || retryReason.trim().length < 8}>Retry remaining work</Button></form>}</section>}
       <div className={styles.switch} role="group" aria-label={operationsCopy.finance.chooseFinancialOperation}>
         <Button type="button" disabled={busy} variant={mode === 'payout' ? 'default' : 'outline'} onClick={() => { setMode('payout'); pendingKey.current = null; setError(''); setSaved('') }}>{operationsCopy.finance.recordCashCheckRefund}</Button>
         <Button type="button" disabled={busy} variant={mode === 'transfer' ? 'default' : 'outline'} onClick={() => { setMode('transfer'); pendingKey.current = null; setError(''); setSaved('') }}>{operationsCopy.finance.transferFundraisingCredit}</Button>
       </div>
       <form className={styles.form} onSubmit={event => void submit(event)}>
-        <fieldset className={styles.fields} disabled={busy}>
+        <fieldset className={styles.fields} disabled={busy || options.state !== 'ready'}>
         <label>{operationsCopy.finance.amountUSD}<Input type="text" inputMode="decimal" value={amount} onChange={event => change(setAmount, event.target.value)} placeholder="0.00" required /></label>
         {mode === 'payout' ? <>
           <label>{operationsCopy.finance.howWasMoneyReturned}<NativeSelect value={method} onChange={event => { setMethod(event.target.value as 'cash' | 'check' | 'other'); pendingKey.current = null }}><NativeSelectOption value="check">{operationsCopy.finance.check}</NativeSelectOption><NativeSelectOption value="cash">{operationsCopy.finance.cash}</NativeSelectOption><NativeSelectOption value="other">{operationsCopy.finance.otherExternalMethod}</NativeSelectOption></NativeSelect></label>
@@ -92,7 +104,7 @@ export function FinanceOperations({ studentId }: { studentId: Id<'students'> }) 
         </fieldset>
       </form>
       {error && <p role="alert" className={styles.error}>{error}</p>}
-      {saved && <p role="status" className={styles.success}>{saved}</p>}
+      {saved && <p role="status" className={styles.success}>{receipt?.operation && (receipt.operation.state ?? 'complete') === 'complete' ? receipt.operation.kind === 'payout' ? operationsCopy.finance.cashCheckRefundRecordedThisRecordDoesNotSendMoney : 'Travel credit transfer recorded. Recipient allocations may still be processing; check the recipient account for readiness.' : saved}</p>}
     </>}
   </section>
 }

@@ -1,3 +1,4 @@
+import { ensureFinancialAccount, recordProjectedEntry } from "./lib/financialSources";
 import { refreshStudentFinance } from "./lib/financeSummaries";
 import { v } from "convex/values";
 import { env, internalMutation } from "./_generated/server";
@@ -66,8 +67,11 @@ export const ensure = internalMutation({
     await ctx.db.insert("participants", { eventId, studentId: studentIds[1], status: "waitlist", createdAt: now + 1, updatedAt: now + 1 });
     for (const [i, person] of PEOPLE.entries()) {
       const studentId = studentIds[i];
-      await ctx.db.insert("ledgerEntries", { studentId, kind: "payment", amountCents: person.paymentCents, previousCents: 0, newCents: person.paymentCents, reason: REASON, recordedBy: coach._id, recordedAt: now, idempotencyKey: `dev-rehearsal:${season._id}:${i}:payment` });
-      await ctx.db.insert("ledgerEntries", { studentId, kind: "fundraiser", amountCents: person.fundraiserCents, previousCents: person.paymentCents, newCents: person.paymentCents + person.fundraiserCents, reason: REASON, recordedBy: coach._id, recordedAt: now + 1, idempotencyKey: `dev-rehearsal:${season._id}:${i}:fundraiser` });
+      const projection = await ensureFinancialAccount(ctx, studentId);
+      const paymentId = await ctx.db.insert("ledgerEntries", { studentId, kind: "payment", amountCents: person.paymentCents, previousCents: 0, newCents: person.paymentCents, reason: REASON, recordedBy: coach._id, recordedAt: now, idempotencyKey: `dev-rehearsal:${season._id}:${i}:payment` });
+      await recordProjectedEntry(ctx, paymentId, projection);
+      const fundraisingId = await ctx.db.insert("ledgerEntries", { studentId, kind: "fundraiser", amountCents: person.fundraiserCents, previousCents: person.paymentCents, newCents: person.paymentCents + person.fundraiserCents, reason: REASON, recordedBy: coach._id, recordedAt: now + 1, idempotencyKey: `dev-rehearsal:${season._id}:${i}:fundraiser` });
+      await recordProjectedEntry(ctx, fundraisingId, projection);
       await audit(ctx, coach, "ledger", studentId, "seedFictionalRehearsalFunds", null, { paymentCents: person.paymentCents, fundraiserCents: person.fundraiserCents }, REASON);
     }
     await audit(ctx, coach, MARKER_ENTITY, season._id, "create", null, { studentIds, eventId }, REASON);

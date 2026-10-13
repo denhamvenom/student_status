@@ -9,6 +9,104 @@ const report = v.object({ state: v.union(v.literal("unknown"), v.literal("none")
 
 export default defineSchema({
   ...authTables,
+  financialOperationJobs: defineTable({
+    kind: v.union(v.literal("payout"), v.literal("transfer"), v.literal("withdrawal")), studentId: v.id("students"),
+    recipientStudentId: v.optional(v.id("students")), actorId: v.id("appUsers"), generation: v.number(), recipientGeneration: v.optional(v.number()),
+    state: v.union(v.literal("running"), v.literal("failed"), v.literal("complete")), step: v.number(), amountCents: v.number(), committedCents: v.number(),
+    idempotencyKey: v.string(), operationId: v.optional(v.id("financeOperations")), withdrawalRequestId: v.optional(v.id("withdrawalRequests")),
+    eventId: v.optional(v.id("events")), decision: v.optional(v.union(v.literal("retain"), v.literal("full"), v.literal("partial"))),
+    returnCents: v.optional(v.number()), cancelUnpaidMain: v.optional(v.boolean()), chargeCursor: v.union(v.string(), v.null()), reason: v.string(),
+    method: v.optional(v.union(v.literal("cash"), v.literal("check"), v.literal("other"))), reference: v.optional(v.string()),
+    occurredAt: v.optional(v.number()), updatedAt: v.number(), lastError: v.optional(v.string()),
+  }).index("by_studentId_and_state", ["studentId", "state"]).index("by_idempotencyKey", ["idempotencyKey"]),
+  financialWithdrawalCharges: defineTable({
+    jobId: v.id("financialOperationJobs"), chargeId: v.id("charges"), refundCents: v.number(), returnedCents: v.number(),
+    cancelUnpaidCents: v.number(), state: v.union(v.literal("pending"), v.literal("complete")),
+  }).index("by_jobId", ["jobId"]),
+  fundraisers: defineTable({
+    seasonId: v.id("seasons"), name: v.string(), nameKey: v.string(), teamBps: v.number(), studentBps: v.number(),
+    state: v.union(v.literal("draft"), v.literal("posting"), v.literal("posted"), v.literal("held"), v.literal("failed"), v.literal("closed")),
+    revision: v.number(), createdBy: v.id("appUsers"), createdAt: v.number(), updatedAt: v.number(),
+    postingJobId: v.optional(v.id("fundraiserPostingJobs")), creationIdempotencyKey: v.string(), creationHash: v.string(),
+  }).index("by_seasonId_and_nameKey", ["seasonId", "nameKey"])
+    .index("by_seasonId_and_updatedAt", ["seasonId", "updatedAt"])
+    .index("by_createdBy_and_creationIdempotencyKey", ["createdBy", "creationIdempotencyKey"]),
+  fundraiserStudentTotals: defineTable({
+    fundraiserId: v.id("fundraisers"), seasonId: v.id("seasons"), studentId: v.id("students"),
+    grossCents: v.number(), teamCents: v.number(), travelCreditCents: v.number(), revision: v.number(),
+    latestRevisionId: v.id("fundraiserAmountRevisions"), updatedAt: v.number(),
+  }).index("by_fundraiserId_and_studentId", ["fundraiserId", "studentId"])
+    .index("by_seasonId_and_studentId", ["seasonId", "studentId"]),
+  fundraiserAmountRevisions: defineTable({
+    fundraiserId: v.id("fundraisers"), seasonId: v.id("seasons"), studentId: v.id("students"),
+    previousGrossCents: v.number(), grossCents: v.number(), previousTeamCents: v.number(), teamCents: v.number(),
+    previousTravelCreditCents: v.number(), travelCreditCents: v.number(), teamBps: v.number(), studentBps: v.number(),
+    recordedBy: v.id("appUsers"), recordedAt: v.number(), reason: v.string(),
+    jobId: v.id("fundraiserPostingJobs"), rowId: v.id("fundraiserPostingRows"), awardSourceEntryId: v.optional(v.id("ledgerEntries")),
+  }).index("by_fundraiserId_and_studentId", ["fundraiserId", "studentId"])
+    .index("by_studentId_and_recordedAt", ["studentId", "recordedAt"]).index("by_jobId", ["jobId"]),
+  fundraiserPostingJobs: defineTable({
+    fundraiserId: v.id("fundraisers"), actorId: v.id("appUsers"), originalActorId: v.id("appUsers"),
+    state: v.union(v.literal("running"), v.literal("held"), v.literal("failed"), v.literal("complete")),
+    cursor: v.union(v.string(), v.null()), processed: v.number(), committed: v.number(), held: v.number(),
+    idempotencyKey: v.string(), operationHash: v.string(), reason: v.string(), createdAt: v.number(), updatedAt: v.number(),
+    lastError: v.optional(v.string()),
+  }).index("by_fundraiserId", ["fundraiserId"]).index("by_actorId_and_idempotencyKey", ["actorId", "idempotencyKey"])
+    .index("by_originalActorId_and_idempotencyKey", ["originalActorId", "idempotencyKey"]),
+  fundraiserPostingRows: defineTable({
+    jobId: v.id("fundraiserPostingJobs"), studentId: v.id("students"), grossCents: v.number(),
+    expectedRowRevision: v.number(), expectedFinancialRevision: v.number(),
+    state: v.union(v.literal("pending"), v.literal("committed"), v.literal("held"), v.literal("failed")),
+    revisionId: v.optional(v.id("fundraiserAmountRevisions")),
+    pendingRevisionId: v.optional(v.id("fundraiserAmountRevisions")), reversedCents: v.optional(v.number()),
+    holdCode: v.optional(v.union(v.literal("spentOrTransferred"), v.literal("financialStateChanged"), v.literal("projectionUnavailable"))),
+    message: v.optional(v.string()),
+  }).index("by_jobId", ["jobId"]).index("by_jobId_and_studentId", ["jobId", "studentId"]),
+  financialAccounts: defineTable({
+    studentId: v.id("students"), seasonId: v.id("seasons"),
+    state: v.union(v.literal("uninitialized"), v.literal("rebuilding"), v.literal("ready"), v.literal("failed"), v.literal("allocating"), v.literal("posting")),
+    generation: v.number(), revision: v.number(),
+    phase: v.union(v.literal("sources"), v.literal("movements"), v.literal("charges"), v.literal("raised"), v.literal("verify")),
+    cursor: v.union(v.string(), v.null()), processed: v.number(), updatedAt: v.number(), lastError: v.optional(v.string()),
+    chargedCents: v.number(), paidCents: v.number(), personalAvailableCents: v.number(), fundraisingAvailableCents: v.number(),
+    travelShareCents: v.number(), transferredInCents: v.number(), knownRaisedCents: v.number(), unknownGrossSourceCount: v.number(),
+    ledgerCount: v.number(), sourceCount: v.number(), chargeCount: v.number(), lastLedgerAt: v.union(v.number(), v.null()),
+    lastFinancialChangeAt: v.optional(v.union(v.number(), v.null())),
+    allocationJobId: v.optional(v.id("financialAllocationJobs")),
+    operationJobId: v.optional(v.id("financialOperationJobs")),
+    rebuildActorId: v.optional(v.id("appUsers")),
+    fundraiserJobId: v.optional(v.id("fundraiserPostingJobs")), fundraiserRowId: v.optional(v.id("fundraiserPostingRows")),
+  }).index("by_studentId", ["studentId"]).index("by_seasonId_and_state", ["seasonId", "state"]),
+  financialSources: defineTable({
+    studentId: v.id("students"), seasonId: v.id("seasons"), generation: v.number(), sourceEntryId: v.id("ledgerEntries"),
+    kind: v.union(v.literal("payment"), v.literal("fundraiser")), rootOriginEntryId: v.id("ledgerEntries"),
+    receivedCents: v.number(), availableCents: v.number(), revision: v.number(), status: v.union(v.literal("available"), v.literal("exhausted")),
+    sourceCreatedAt: v.number(), createdAt: v.number(),
+    fundraiserId: v.optional(v.id("fundraisers")), fundraiserRevisionId: v.optional(v.id("fundraiserAmountRevisions")),
+  }).index("by_studentId_and_generation_and_sourceEntryId", ["studentId", "generation", "sourceEntryId"])
+    .index("by_studentId_and_generation_and_kind_and_status", ["studentId", "generation", "kind", "status"])
+    .index("by_studentId_and_generation_and_fundraiserId_and_status", ["studentId", "generation", "fundraiserId", "status"])
+    .index("by_studentId_and_generation_and_sourceCreatedAt", ["studentId", "generation", "sourceCreatedAt"])
+    .index("by_studentId_and_generation_and_status_and_sourceCreatedAt", ["studentId", "generation", "status", "sourceCreatedAt"])
+    .index("by_studentId_and_generation", ["studentId", "generation"]),
+  financialAllocations: defineTable({
+    studentId: v.id("students"), generation: v.number(), chargeId: v.id("charges"), sourceEntryId: v.id("ledgerEntries"),
+    sourceKind: v.union(v.literal("payment"), v.literal("fundraiser")), appliedCents: v.number(), revision: v.number(),
+    status: v.union(v.literal("applied"), v.literal("returned")),
+  }).index("by_studentId_and_generation_and_chargeId", ["studentId", "generation", "chargeId"])
+    .index("by_studentId_and_generation_and_sourceEntryId", ["studentId", "generation", "sourceEntryId"])
+    .index("by_studentId_and_generation_and_chargeId_and_sourceEntryId", ["studentId", "generation", "chargeId", "sourceEntryId"])
+    .index("by_studentId_and_generation_and_chargeId_and_status", ["studentId", "generation", "chargeId", "status"]),
+  financialChargeAllocations: defineTable({
+    studentId: v.id("students"), generation: v.number(), chargeId: v.id("charges"), appliedCents: v.number(), verified: v.boolean(),
+  }).index("by_studentId_and_generation_and_chargeId", ["studentId", "generation", "chargeId"])
+    .index("by_studentId_and_generation_and_verified", ["studentId", "generation", "verified"]),
+  financialAllocationJobs: defineTable({
+    studentId: v.id("students"), actorId: v.id("appUsers"), generation: v.number(),
+    state: v.union(v.literal("running"), v.literal("failed"), v.literal("complete")), chargeCursor: v.union(v.string(), v.null()),
+    step: v.number(), processed: v.number(), idempotencyPrefix: v.string(), excludedEventId: v.optional(v.id("events")),
+    updatedAt: v.number(), lastError: v.optional(v.string()),
+  }).index("by_studentId_and_state", ["studentId", "state"]),
   appUsers: defineTable({ authUserId: v.id("users"), email: v.string(), name: v.string(), role, travelLead: v.boolean(), financialEdit: v.boolean(), healthExport: v.optional(v.boolean()), phone: v.optional(v.string()), shirtSize: v.optional(v.string()), emergencyName: v.optional(v.string()), emergencyRelationship: v.optional(v.string()), emergencyPhone: v.optional(v.string()), archivedAt: v.optional(v.number()), accessRevision: v.optional(v.number()), active: v.boolean(), theme: v.optional(v.union(v.literal("light"), v.literal("dark"), v.literal("system"))) })
     .index("by_authUserId", ["authUserId"]).index("by_email", ["email"]).index("by_role", ["role"]),
   adultInvitations: defineTable({ email: v.string(), role: v.union(v.literal("coach"), v.literal("mentor")), travelLead: v.boolean(), financialEdit: v.boolean(), healthExport: v.boolean(), tokenHash: v.string(), status: v.union(v.literal("pending"), v.literal("accepted"), v.literal("revoked"), v.literal("replaced")), createdBy: v.id("appUsers"), createdAt: v.number(), expiresAt: v.number(), acceptedBy: v.optional(v.id("appUsers")), acceptedAt: v.optional(v.number()) }).index("by_tokenHash", ["tokenHash"]).index("by_email_and_status", ["email", "status"]),
@@ -33,20 +131,20 @@ export default defineSchema({
     .index("by_seasonId_and_startsAt", ["seasonId", "startsAt"]).index("by_seasonId_and_assignmentScope", ["seasonId", "assignmentScope"]).index("by_seasonId_and_assignmentScope_and_archived_and_startsAt", ["seasonId", "assignmentScope", "archived", "startsAt"]),
   eventEnrollmentMembers: defineTable({ jobId: v.id("eventEnrollmentJobs"), studentId: v.id("students") }).index("by_jobId", ["jobId"]),
   eventEnrollmentJobs: defineTable({ eventId: v.id("events"), actorId: v.id("appUsers"), state: v.union(v.literal("running"), v.literal("failed"), v.literal("complete")), cursor: v.union(v.string(), v.null()), processed: v.number(), lastError: v.optional(v.string()), startedAt: v.number(), updatedAt: v.number() }).index("by_eventId", ["eventId"]),
-  studentFinanceSummaries: defineTable({ studentId: v.id("students"), seasonId: v.id("seasons"), chargedCents: v.number(), paidCents: v.number(), dueCents: v.number(), personalAvailableCents: v.number(), fundraisingAvailableCents: v.number(), travelBalanceCents: v.number(), travelShareCents: v.number(), transferredInCents: v.number(), updatedAt: v.union(v.number(), v.null()), version: v.union(v.literal(1), v.literal(2)) }).index("by_studentId", ["studentId"]).index("by_seasonId", ["seasonId"]),
-  financeSummaryBackfills: defineTable({ seasonId: v.id("seasons"), state: v.union(v.literal("running"), v.literal("failed"), v.literal("complete")), cursor: v.union(v.string(), v.null()), processed: v.number(), updatedAt: v.number(), lastError: v.optional(v.string()) }).index("by_seasonId", ["seasonId"]),
+  studentFinanceSummaries: defineTable({ studentId: v.id("students"), seasonId: v.id("seasons"), chargedCents: v.number(), paidCents: v.number(), dueCents: v.number(), personalAvailableCents: v.number(), fundraisingAvailableCents: v.number(), travelBalanceCents: v.number(), travelShareCents: v.number(), transferredInCents: v.number(), updatedAt: v.union(v.number(), v.null()), knownRaisedCents: v.optional(v.number()), raisedComplete: v.optional(v.boolean()), version: v.union(v.literal(1), v.literal(2), v.literal(3)) }).index("by_studentId", ["studentId"]).index("by_seasonId", ["seasonId"]),
+  financeSummaryBackfills: defineTable({ actorId: v.optional(v.id("appUsers")), seasonId: v.id("seasons"), state: v.union(v.literal("running"), v.literal("failed"), v.literal("complete")), cursor: v.union(v.string(), v.null()), processed: v.number(), updatedAt: v.number(), lastError: v.optional(v.string()) }).index("by_seasonId", ["seasonId"]),
   participants: defineTable({ eventId: v.id("events"), studentId: v.id("students"), status: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("waitlist"), v.literal("withdrawn")), independentTravel: v.optional(v.boolean()), createdAt: v.number(), updatedAt: v.number() })
     .index("by_eventId", ["eventId"]).index("by_studentId", ["studentId"]).index("by_eventId_and_studentId", ["eventId", "studentId"]),
   requirements: defineTable({ eventId: v.id("events"), key: v.string(), label: v.string(), instructions: v.optional(v.string()), url: v.optional(v.string()), dueAt: v.optional(v.number()) })
     .index("by_eventId", ["eventId"]).index("by_eventId_and_key", ["eventId", "key"]),
   requirementCompletions: defineTable({ eventId: v.id("events"), studentId: v.id("students"), key: v.string(), completedBy: v.id("appUsers"), completedAt: v.number() })
     .index("by_eventId_and_studentId", ["eventId", "studentId"]).index("by_eventId_and_studentId_and_key", ["eventId", "studentId", "key"]),
-  charges: defineTable({ studentId: v.id("students"), eventId: v.optional(v.id("events")), label: v.string(), category: v.optional(v.union(v.literal("main"), v.literal("extra"))), cancelledCents: v.optional(v.number()), amountCents: v.number(), appliedCents: v.number(), priority: v.number(), createdBy: v.id("appUsers"), createdAt: v.number() })
-    .index("by_studentId_and_priority", ["studentId", "priority"]).index("by_eventId_and_studentId", ["eventId", "studentId"]),
-  ledgerEntries: defineTable({ studentId: v.id("students"), chargeId: v.optional(v.id("charges")), eventId: v.optional(v.id("events")), kind: v.union(v.literal("charge"), v.literal("payment"), v.literal("fundraiser"), v.literal("allocation"), v.literal("adjustment"), v.literal("deallocation"), v.literal("cancellation"), v.literal("payout"), v.literal("transferOut")), counterpartyStudentId: v.optional(v.id("students")), originEntryId: v.optional(v.id("ledgerEntries")), method: v.optional(v.union(v.literal("cash"), v.literal("check"), v.literal("other"))), reference: v.optional(v.string()), occurredAt: v.optional(v.number()), operationId: v.optional(v.id("financeOperations")), sourceEntryId: v.optional(v.id("ledgerEntries")), sourceKind: v.optional(v.union(v.literal("payment"), v.literal("fundraiser"))), amountCents: v.number(), previousCents: v.number(), newCents: v.number(), reason: v.optional(v.string()), recordedBy: v.id("appUsers"), recordedAt: v.number(), idempotencyKey: v.string() })
-    .index("by_studentId_and_recordedAt", ["studentId", "recordedAt"]).index("by_idempotencyKey", ["idempotencyKey"]),
-  financeOperations: defineTable({ kind: v.union(v.literal("payout"), v.literal("transfer")), studentId: v.id("students"), recipientStudentId: v.optional(v.id("students")), amountCents: v.number(), reason: v.string(), method: v.optional(v.union(v.literal("cash"), v.literal("check"), v.literal("other"))), reference: v.optional(v.string()), occurredAt: v.optional(v.number()), recordedBy: v.id("appUsers"), recordedAt: v.number(), idempotencyKey: v.string() }).index("by_idempotencyKey", ["idempotencyKey"]),
-  withdrawalRequests: defineTable({ eventId: v.id("events"), studentId: v.id("students"), participantId: v.id("participants"), status: v.union(v.literal("pending"), v.literal("approved"), v.literal("denied")), requestedBy: v.id("appUsers"), requestedAt: v.number(), decidedBy: v.optional(v.id("appUsers")), decidedAt: v.optional(v.number()), decision: v.optional(v.union(v.literal("full"), v.literal("retain"), v.literal("partial"), v.literal("deny"))), returnCents: v.optional(v.number()), retainedCents: v.optional(v.number()), cancelUnpaidMain: v.optional(v.boolean()), reason: v.optional(v.string()), idempotencyKey: v.string() })
+  charges: defineTable({ studentId: v.id("students"), eventId: v.optional(v.id("events")), label: v.string(), category: v.optional(v.union(v.literal("main"), v.literal("extra"))), cancelledCents: v.optional(v.number()), outstanding: v.optional(v.boolean()), amountCents: v.number(), appliedCents: v.number(), priority: v.number(), createdBy: v.id("appUsers"), createdAt: v.number() })
+    .index("by_studentId_and_priority", ["studentId", "priority"]).index("by_studentId_and_outstanding_and_priority", ["studentId", "outstanding", "priority"]).index("by_eventId_and_studentId", ["eventId", "studentId"]),
+  ledgerEntries: defineTable({ studentId: v.id("students"), chargeId: v.optional(v.id("charges")), eventId: v.optional(v.id("events")), kind: v.union(v.literal("charge"), v.literal("payment"), v.literal("fundraiser"), v.literal("allocation"), v.literal("adjustment"), v.literal("deallocation"), v.literal("cancellation"), v.literal("payout"), v.literal("transferOut"), v.literal("awardReversal")), fundraiserId: v.optional(v.id("fundraisers")), fundraiserRevisionId: v.optional(v.id("fundraiserAmountRevisions")), counterpartyStudentId: v.optional(v.id("students")), originEntryId: v.optional(v.id("ledgerEntries")), method: v.optional(v.union(v.literal("cash"), v.literal("check"), v.literal("other"))), reference: v.optional(v.string()), occurredAt: v.optional(v.number()), operationId: v.optional(v.id("financeOperations")), sourceEntryId: v.optional(v.id("ledgerEntries")), sourceKind: v.optional(v.union(v.literal("payment"), v.literal("fundraiser"))), amountCents: v.number(), previousCents: v.number(), newCents: v.number(), reason: v.optional(v.string()), recordedBy: v.id("appUsers"), recordedAt: v.number(), idempotencyKey: v.string() })
+    .index("by_studentId", ["studentId"]).index("by_studentId_and_recordedAt", ["studentId", "recordedAt"]).index("by_idempotencyKey", ["idempotencyKey"]),
+  financeOperations: defineTable({ state: v.optional(v.union(v.literal("running"), v.literal("failed"), v.literal("complete"))), jobId: v.optional(v.id("financialOperationJobs")), committedCents: v.optional(v.number()), kind: v.union(v.literal("payout"), v.literal("transfer")), studentId: v.id("students"), recipientStudentId: v.optional(v.id("students")), amountCents: v.number(), reason: v.string(), method: v.optional(v.union(v.literal("cash"), v.literal("check"), v.literal("other"))), reference: v.optional(v.string()), occurredAt: v.optional(v.number()), recordedBy: v.id("appUsers"), recordedAt: v.number(), idempotencyKey: v.string() }).index("by_idempotencyKey", ["idempotencyKey"]),
+  withdrawalRequests: defineTable({ eventId: v.id("events"), studentId: v.id("students"), participantId: v.id("participants"), jobId: v.optional(v.id("financialOperationJobs")), status: v.union(v.literal("pending"), v.literal("processing"), v.literal("approved"), v.literal("denied")), requestedBy: v.id("appUsers"), requestedAt: v.number(), decidedBy: v.optional(v.id("appUsers")), decidedAt: v.optional(v.number()), decision: v.optional(v.union(v.literal("full"), v.literal("retain"), v.literal("partial"), v.literal("deny"))), returnCents: v.optional(v.number()), retainedCents: v.optional(v.number()), cancelUnpaidMain: v.optional(v.boolean()), reason: v.optional(v.string()), idempotencyKey: v.string() })
     .index("by_eventId_and_studentId", ["eventId", "studentId"]).index("by_status", ["status"]).index("by_idempotencyKey", ["idempotencyKey"]),
   permissionSubmissions: defineTable({ studentId: v.id("students"), seasonId: v.id("seasons"), signedBy: v.optional(v.id("appUsers")), typedName: v.string(), wordingVersion: v.string(), eventIds: v.array(v.id("events")), answersJson: v.string(), signedAt: v.number(),
     versionId: v.optional(v.id("permissionVersions")), draftId: v.optional(v.id("permissionDrafts")), source: v.optional(v.union(v.literal("electronic"), v.literal("paper"))), synthetic: v.optional(v.boolean()), snapshotFormat: v.optional(v.literal(1)), snapshotJson: v.optional(v.string()), snapshotHash: v.optional(v.string()), recordedBy: v.optional(v.id("appUsers")), signerName: v.optional(v.string()), signerEmail: v.optional(v.string()), supersedesSubmissionId: v.optional(v.id("permissionSubmissions")), idempotencyKey: v.optional(v.string()), operationHash: v.optional(v.string()), paperReference: v.optional(v.string()), paperSignedAt: v.optional(v.number()), paperAttestation: v.optional(v.boolean()) })

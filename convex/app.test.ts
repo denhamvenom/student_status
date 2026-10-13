@@ -60,12 +60,12 @@ describe("server boundaries", () => {
     const f = await fixture();
     expect(await f.student.mutation(api.participation.signUp, { eventId: f.ids.event })).toBe("pending");
     expect(await f.other.mutation(api.participation.signUp, { eventId: f.ids.event })).toBe("waitlist");
-    expect((await f.student.query(api.app.studentFinances, { studentId: f.ids.student })).charges).toHaveLength(0);
+    expect((await f.student.query(api.financeDetails.charges, { studentId: f.ids.student, paginationOpts: { cursor: null, numItems: 25 } })).page).toHaveLength(0);
     await expect(f.mentor.mutation(api.finance.recordFunds, { studentId: f.ids.student, kind: "payment", amountCents: 1000, reason: "Cash", idempotencyKey: "pay-123456" })).rejects.toThrow("Financial editing");
     await f.coach.mutation(api.participation.setParticipation, { eventId: f.ids.event, studentId: f.ids.student, status: "confirmed" });
     const money = await f.student.query(api.app.studentFinances, { studentId: f.ids.student });
-    expect(money.summary.chargedCents).toBe(45000);
-    expect(money.summary.dueCents).toBe(45000);
+    expect(money.summary!.chargedCents).toBe(45000);
+    expect(money.summary!.dueCents).toBe(45000);
   });
 
   it("blocks draft legal consent in live functions", async () => {
@@ -114,8 +114,8 @@ describe("server boundaries", () => {
     const eventId = await f.coach.mutation(api.admin.createEvent, { name: "Required Regional", type: "Competition", startsAt: 3000000, endsAt: 4000000, destination: "City", travel: "Vehicles", overnight: false, roomingEnabled: false, feeCents: 2500, signupMode: "assigned", assignmentScope: "travelTeam", allowWithdrawal: false, permissionRequired: false, firstRequired: false, requirements: [] });
     const view = await f.student.query(api.app.eventDetail, { eventId, studentId: f.ids.student });
     expect(view.participation).toBe("confirmed");
-    const finances = await f.student.query(api.app.studentFinances, { studentId: f.ids.student });
-    expect(finances.charges.find((x: { eventId?: string }) => x.eventId === eventId)?.amountCents).toBe(2500);
+    const finances = await f.student.query(api.financeDetails.charges, { studentId: f.ids.student, paginationOpts: { cursor: null, numItems: 25 } });
+    expect(finances.page.find((x: { eventId?: string }) => x.eventId === eventId)?.amountCents).toBe(2500);
   });
 
   it("rejects overcapacity pending reservations and confirmed downgrades without changing debt", async () => {
@@ -126,7 +126,7 @@ describe("server boundaries", () => {
     await expect(f.coach.mutation(api.participation.setParticipation, { eventId: f.ids.event, studentId: f.ids.student, status: "waitlist" })).rejects.toThrow("Reconcile");
     const detail = await f.student.query(api.app.eventDetail, { eventId: f.ids.event, studentId: f.ids.student });
     expect(detail.participation).toBe("confirmed");
-    expect((await f.student.query(api.app.studentFinances, { studentId: f.ids.student })).summary.dueCents).toBe(45000);
+    expect((await f.student.query(api.app.studentFinances, { studentId: f.ids.student })).summary!.dueCents).toBe(45000);
   });
 
   it("rejects withdrawal from an archived event without changing participation", async () => {
@@ -138,7 +138,7 @@ describe("server boundaries", () => {
     expect(row?.status).toBe("pending");
   });
 
-  it("rolls back a payment whose planned allocations exceed the ledger limit", async () => {
+  it("does not record a payment before historical financial records are prepared", async () => {
     const f = await fixture();
     await f.t.run(async ctx => {
       const coach = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", f.ids.authCoach)).unique();
@@ -146,10 +146,10 @@ describe("server boundaries", () => {
       for (let i = 0; i < 498; i++) await ctx.db.insert("ledgerEntries", { studentId: f.ids.student, kind: "adjustment", amountCents: 0, previousCents: 0, newCents: 0, reason: "fixture", recordedBy: coach._id, recordedAt: i, idempotencyKey: `fixture-${i}` });
       for (let i = 0; i < 2; i++) await ctx.db.insert("charges", { studentId: f.ids.student, label: `Charge ${i}`, amountCents: 100, appliedCents: 0, priority: i, createdBy: coach._id, createdAt: 0 });
     });
-    await expect(f.coach.mutation(api.finance.recordFunds, { studentId: f.ids.student, kind: "payment", amountCents: 200, reason: "Cash", idempotencyKey: "boundary-payment" })).rejects.toThrow("limit");
+    await expect(f.coach.mutation(api.finance.recordFunds, { studentId: f.ids.student, kind: "payment", amountCents: 200, reason: "Cash", idempotencyKey: "boundary-payment" })).rejects.toThrow("Coach rebuild");
     const rows = await f.t.run(ctx => ctx.db.query("ledgerEntries").withIndex("by_studentId_and_recordedAt", q => q.eq("studentId", f.ids.student)).take(501));
     expect(rows).toHaveLength(498);
     const finance = await f.student.query(api.app.studentFinances, { studentId: f.ids.student });
-    expect(finance.summary.dueCents).toBe(200);
+    expect(finance).toMatchObject({ state: "updating", summary: null });
   });
 });
