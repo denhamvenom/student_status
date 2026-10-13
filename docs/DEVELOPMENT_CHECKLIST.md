@@ -596,3 +596,6 @@ October 13 payment rehearsal: CSV import recorded one simulated cent with exact 
 - [x] Finance phone payment action now matches the hosted prototype's full-width primary Record payment treatment; rendered verification and Astra review complete. Existing financial functionality and desktop controls preserved.
 
 - [x] Representative phone-light inspection of lower Finance import/review, source totals, export explanation and history cards completed. No additional financial transactions or tests needed; account-details/sidebar and role boundaries remain separate.
+
+- [x] VC-006 Coach Finance representative presentation closed after Astra evidence reconciliation; independent Travel grant checks remain open.
+- [ ] Restore the complete Coach roster-to-student-record workflow: record links, truthful account status, financial balance, next-event readiness and missing-information summaries/filtering. This concrete gap was confirmed against the selected prototype; preserve existing membership controls and role boundaries.

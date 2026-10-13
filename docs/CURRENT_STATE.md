@@ -4,7 +4,7 @@ Updated October 13, 2026. Follow COMPLETION_WORKFLOW.md. G3 is functionally comp
 
 ## Workspace and boundaries
 
-- Checkout student-status-readiness-design; branch feature/student-status-completion; draft PR10. Published source/evidence checkpoint 80815b0. Root owns Git, shared backend/generated files and synchronization.
+- Checkout student-status-readiness-design; branch feature/student-status-completion; draft PR10. Published source/evidence checkpoint 697a7bd. Root owns Git, shared backend/generated files and synchronization.
 - Development only: daniel-eiland / denham-venom-student-status / dev:third-bandicoot-18. Latest sync 15:54:24. No production, main merge, real signing or deletion authorization.
 - All application records are synthetic. Account-specific evidence, screenshots, exports and secrets stay outside Git.
 
@@ -27,6 +27,6 @@ Updated October 13, 2026. Follow COMPLETION_WORKFLOW.md. G3 is functionally comp
 
 ## Next actions
 
-1. Continue representative visual comparisons against the user-selected hosted site; preserve later requirements and added features. Reference version differences no longer block visual work.
+1. Finish the newly confirmed Coach roster-to-student-record gap: minimized Coach-only row projections, real record route, balances/next-event/missing-information context and filters. Astra confirmed this is required G1/G4/G6, not optional polish. Preserve existing archive/reactivate controls. VC-006 Finance presentation is closed; roster VC-007 stays open. Reference version differences no longer block visual work.
 2. When new sessions become available, finish the remaining role journeys without redoing completed ones.
 3. Batch final review/checks and publish accurate checklist/evidence. User visual approval follows the ready candidate; production remains separate.
