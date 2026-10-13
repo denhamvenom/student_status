@@ -459,3 +459,12 @@ Checklist-linked scope estimates remain G1 85%, G2 55%, G3 90%, G4 90%, G5 80%, 
 Shared-fee backend and UI continue in parallel. Bulk preparation will preserve an immutable paginated review scope before committing financial changes. Last full integrated result remains 216 tests at the published charge/team-transfer checkpoint, not verification of the unfinished shared-fee/retention wave.
 
 October 13 follow-up: retention route connected under Coach Admin with a local query retry boundary; Astra integration review clear, 11 focused tests/types/scoped lint pass. It remains unsynchronized and live/visual unverified. Permission exports now show truthful completed collection/download-request feedback, verified live after five collector tests and review. Shared-fee work resumed after usage reset; isolated Mentor/Travel profile completion assigned in parallel. No change to overall 74% estimate.
+
+
+October 13 visual continuation: restored Parent Attendance metric-card hierarchy and shared child-context bar; source-reviewed, scoped lint/types and4existingreport/draft tests pass. Inspected phone light/dark and desktop dark against rendered reference, plus live desktop light. Rejected stale resized reference capture; full matrix remains open. Explicit remaining report contracts: Offseason/Build-season separation and Outreach categorization. Adult own-profile/reconciliation is now in isolated implementation; fee backend/UI source review underway. Overall estimate remains74%.
+
+
+- [x] Verify live zero-fee Whole Team event creation through all six wizard steps: all six active fictional students automatically confirmed. Native date entry works through the date control. Later-member live addition and four-combination states remain open.
+- [x] Agree build season begins on the official FIRST kickoff day automatically; current2027 date/source verified. Calendar helper implementation assigned; attendance grouping is not yet complete.
+
+Shared-fee Astra review found recovery/mapping/cancellation issues under correction; no source clearance or development sync is claimed for that wave. Adult profile reconciliation/audit fixes are ready for rereview. Production and automatic deletion remain unauthorized.

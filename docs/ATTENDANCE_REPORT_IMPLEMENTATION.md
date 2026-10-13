@@ -46,3 +46,8 @@ Source review confirmed nested rollback, revision/generation/cursor fences, canc
 Root reports full lint/build and 145 tests across 25 files passing for this wave. This reviewer inspected source and test cases; these suite results are attributed to their runners. The 500-plus-session test exercises aggregate reads and card pagination, not a measured production-scale backfill. Dedicated maximum-fanout/byte-limit load measurement and every possible Timeclock transition interleaving are not established by those tests.
 
 Development synchronization, live synthetic multi-role rehearsal, phone/desktop and light/dark visual checks remain distinct evidence steps owned by the integration agent. There is no production deployment, real signing approval, final visual approval or full G4/G5 completion implied by this document.
+
+
+## October 13 confirmed season boundary
+
+The Coach selected automatic FIRST kickoff day as the start of build season, superseding the proposed Coach-configured date. Official 2027 kickoff is January 9, 2027, verified October 13, 2026 from https://www.firstinspires.org/programs/frc/game-and-season . Use the kickoff calendar day in the application's America/Chicago reporting zone, with an explicit competition year and source provenance. Unknown future years must remain unavailable until an official date is verified; do not infer a recurring weekday rule or parse arbitrary season labels. Isolated calendar helper/tests are assigned; report/schema integration is not yet implemented. Outreach classification decision remains pending.
