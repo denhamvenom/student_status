@@ -204,3 +204,9 @@ Live-app copy consolidation and sticky-anchor/empty-state corrections completed 
 ## October 13 Whole Team decision and context audit
 
 Whole Team includes every active team member; new members joining after creation are automatically included in that event too. This supersedes the suggested creation-time snapshot/manual addition. Agreed only: implementation and verification remain pending separate backend-phase authorization. Inspect event lifecycle, membership and financial interactions before implementation; do not silently invent closed-event or reactivation policy. Start future work with CURRENT_STATE.md; older workspace/pause statements in this plan are historical snapshots.
+
+## October 13 reusable workflow checkpoint
+
+Created the two first-party project skills under .agents/skills and linked them from AGENTS.md. VISUAL_CHECKS.md owns current outstanding visual comparisons; FRONTEND_CONFORMANCE_LOG.md retains dated evidence. No application/backend implementation or new browser verification is part of this checkpoint.
+
+Validation for this workflow checkpoint: both skills passed the skill-creator format validator. Astra read-only scenario review confirmed correct handling of stale worktree instructions, partial/wrong-theme screenshots, unavailable Mentor-only identity and unimplemented Whole Team. No blocking findings; clarified unexpected clipping versus intentional viewport slices. Documentation diff checked; no application tests/browser checks rerun.

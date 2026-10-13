@@ -198,7 +198,7 @@ These are repeating steps for each future milestone, not unfinished tasks in the
 
 The October 12 fictional rehearsal and later follow-up passed 101 automated tests across 18 files, lint, strict types and build. Live Coach, Student and Parent checks verified approval/manual promotion, waitlist withdrawal with reactive parent updates, fictional personal payout/fundraising transfer, room finalization, vehicle capacity, and Timeclock automatic closure plus an audited correction preserving the original. Later ordinary Mentor and Travel Lead checks verified limited navigation, read-only finance and a saved transport adjustment. See [the rehearsal report](REHEARSAL_2026-10-12.md) for the exact coverage and fixes.
 
-**Current priority:** Context audit before resuming development. Representative screen and frontend rollout were approved; remaining conformance and evidence gaps are in FRONTEND_CONFORMANCE_LOG.md. Whole Team includes every active member and automatically includes later joiners (decision confirmed October 13; implementation pending). See CURRENT_STATE.md for scope and boundaries.
+**Current priority:** Complete the project workflow skills and consolidated visual-check table before resuming development. Representative screen and frontend rollout were approved; remaining conformance and evidence gaps are in FRONTEND_CONFORMANCE_LOG.md. Whole Team includes every active member and automatically includes later joiners (decision confirmed October 13; implementation pending). See CURRENT_STATE.md for scope and boundaries.
 
 Current frontend publication is draft PR #9 on feature/student-status-readiness-design (verified baseline 43a254b before the context audit). PR #7 is the earlier operations milestone. Timeclock remains separately coordinated. No main merge or production deployment is authorized.
 
@@ -271,7 +271,7 @@ Backend-dependent gaps remain separately deferred; no production action is autho
 - [x] Implement existing-data presentation changes for Status, Finances, roster, event setup/workspace, Drivers, invitations, permission draft, attendance, rooms and withdrawals.
 - [x] Astra final source review and full check: 101 tests, lint, strict types and build. Cloudflare dry run packaged successfully without upload (optional sandbox log-write warning).
 - [x] Compare New Event audience at phone/desktop in both themes; verify open-capacity control, six-step navigation and Cancel without saving.
-- [ ] Finish remaining role/state/theme matrix and shared-label migration; see the precise evidence limits in FRONTEND_CONFORMANCE_LOG.md.
+- [ ] Finish remaining role/state/theme checks in VISUAL_CHECKS.md. Live-app shared-label extraction is recorded complete in the later conformance follow-up; inspect specific residual copy during checks.
 - [ ] Coach final visual acceptance of the broader app.
 
 ### Copy and responsive verification follow-up
@@ -293,4 +293,13 @@ Backend-dependent gaps remain separately deferred; no production action is autho
 - [x] Agree: Whole Team includes every active team member, including automatic inclusion when new members join after event creation.
 - [ ] Implement and verify that rule after backend-phase authorization; inspect lifecycle and financial interactions first.
 - [x] Audit context recovery, add CURRENT_STATE.md, correct stale approval/current-branch/startup guidance, and distinguish historical reports from current status.
-- [ ] Consider project-specific context-handoff and prototype-verification skills; no new skill installed in this audit.
+- [x] Create repository-local context-checkpoint and prototype-verification skills; validate their SKILL.md format.
+
+
+## October 13 workflow checkpoint
+
+- [x] Route future agents to the two tracked project skills through AGENTS.md; vendor skill bundles remain ignored.
+- [x] Consolidate outstanding comparisons in [VISUAL_CHECKS.md](VISUAL_CHECKS.md); older conformance matrices remain historical evidence.
+- [ ] Complete the remaining checks in that table. Consolidation does not count as new browser verification or Coach acceptance.
+
+Shared live-app copy extraction is recorded in the October 12 conformance follow-up. Earlier broad shared-label migration tasks are superseded by that evidence; future checks should identify specific residual literals rather than repeat the completed migration. Legacy fixture-only preview remains outside this live-app pass.

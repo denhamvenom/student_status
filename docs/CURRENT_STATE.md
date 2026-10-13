@@ -2,8 +2,8 @@
 
 Updated October 13, 2026. Verify the actual Git/worktree state before using this snapshot. This short entry point links evidence rather than replacing it.
 
-- Active checkout: `student-status-readiness-design`; branch `feature/student-status-readiness-design`; draft PR #9. Baseline before this documentation audit: `43a254b`.
-- Current task: context audit and recording the Whole Team decision. Application development has not resumed in this checkpoint.
+- Active checkout: `student-status-readiness-design`; branch `feature/student-status-readiness-design`; draft PR #9. Last verified published context-audit checkpoint: `205cd1c`; this subsequent skill/matrix checkpoint is recorded in Git history.
+- Current task: create two project workflow skills and consolidate outstanding visual checks. Application development remains paused through this documentation checkpoint.
 - Frontend conformance authorized; next backend phase requires separate authorization. No main merge, production deployment or real signing authorized. Preserve sibling worktrees and paused backend drafts.
 - Astra coordinates/reviews; Sol implements independent file-owned tasks. One integration owner handles Git and shared backend changes.
 
@@ -17,6 +17,7 @@ Before implementing, inspect existing event lifecycle, membership, charging and 
 
 - Current human progress: [DEVELOPMENT_CHECKLIST.md](DEVELOPMENT_CHECKLIST.md).
 - Product/architecture: [PLAN.md](PLAN.md), [ARCHITECTURE.md](ARCHITECTURE.md), [FINANCE_AND_CONSENT_DECISIONS.md](FINANCE_AND_CONSENT_DECISIONS.md).
+- Current outstanding visual matrix: [VISUAL_CHECKS.md](VISUAL_CHECKS.md); maintain this table rather than competing current matrices.
 - Latest frontend evidence/limits: [FRONTEND_CONFORMANCE_LOG.md](FRONTEND_CONFORMANCE_LOG.md). Root design-drift-report is a historical pre-correction baseline.
 - Backend evidence: relevant dated sections of [REVIEW.md](REVIEW.md) and [REHEARSAL_2026-10-12.md](REHEARSAL_2026-10-12.md). Older test counts describe their milestones only.
 - Timeclock: [TIMECLOCK_BACKEND_HANDOFF.md](TIMECLOCK_BACKEND_HANDOFF.md), [TIMECLOCK_COORDINATION.md](TIMECLOCK_COORDINATION.md). Verify current other-worktree status before shared changes; handoffs are snapshots.
@@ -24,7 +25,7 @@ Before implementing, inspect existing event lifecycle, membership, charging and 
 
 ## Remaining work
 
-Frontend: modal/section presentation, shared copy and outstanding role/state/viewport checks. Backend dependencies: Whole Team, aggregate finance/roster, family Attendance, missing readiness/form/admin contracts. Inspect existing contracts before assuming each gap requires new schema.
+Frontend: modal/section presentation and outstanding role/state/viewport checks in VISUAL_CHECKS.md. Shared live-app copy extraction is recorded complete; flag specific residual literals during future checks rather than reopening wholesale migration. Backend dependencies: Whole Team, aggregate finance/roster, family Attendance, missing readiness/form/admin contracts. Inspect existing contracts before assuming each gap requires new schema.
 
 Last recorded full check: 101 tests across 18 files plus lint/types/build. Later label adjustment reran lint/types/build. No fresh application checks were run for this documentation audit. Visual coverage remains partial/scaled, not whole-app pixel parity. Keep screenshots and account-specific evidence outside Git.
 

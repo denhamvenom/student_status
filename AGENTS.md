@@ -42,3 +42,9 @@ Timeclock frontend work is scoped to `apps/timeclock/` in a separate branch/work
 - Never invent domain fields, options, completion values or unsupported actions to imitate a prototype. List missing backend contracts explicitly.
 - Frontend conformance work must not edit backend code, generated API, Timeclock, dependencies or deployment configuration without separate authorization.
 - Keep `docs/FRONTEND_CONFORMANCE_LOG.md` and the checklist current. Screenshots and account-specific browser evidence stay outside Git.
+
+## Project workflow skills
+
+- For resume, milestone handoff or context audit, read `.agents/skills/student-status-context-checkpoint/SKILL.md`.
+- For prototype comparisons or visual evidence review, read `.agents/skills/student-status-prototype-verification/SKILL.md`.
+- `docs/VISUAL_CHECKS.md` is the single current outstanding visual-check table. Older tables are historical evidence. These first-party skills are tracked; downloaded vendor skills remain ignored.

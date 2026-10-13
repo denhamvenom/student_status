@@ -1,5 +1,7 @@
 # Frontend conformance work log
 
+Current outstanding checks are maintained only in [VISUAL_CHECKS.md](VISUAL_CHECKS.md). Tables and pending statements below are dated historical evidence; later entries and the current matrix supersede them. No new visual verification was performed during the October 13 consolidation.
+
 ## October 12, 2026 — rollout authorized
 
 Coach approved representative Readiness and authorized remaining frontend conformance. Baseline: published PR9. The original design reference stays immutable in sibling student-status-operations/design-reference. Existing paused backend drafts are excluded.

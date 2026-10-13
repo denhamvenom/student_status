@@ -25,3 +25,5 @@ Policy preservation and detailed evidence are strong. Recovery of the latest sta
 Do not create another general Convex rules skill: existing docs/reviewer/authz/verify/deploy-guard skills already cover those workflows. New skills should describe repeatable procedure; current product facts belong in linked project documents. No skill installed by this audit; these are scoped recommendations.
 
 Next process improvement: keep the current handoff short and update it alongside relevant checklist/evidence at each milestone. Consolidate visual gaps on the next visual pass. Review skill effectiveness against a realistic resume task before depending on it.
+
+Follow-up implemented: the two project skills now live under .agents/skills and the outstanding visual table is consolidated in VISUAL_CHECKS.md. Earlier recommendations/no-install statements describe the initial audit. Application development remains paused.
