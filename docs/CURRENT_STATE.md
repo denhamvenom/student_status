@@ -4,14 +4,14 @@ Updated October 13, 2026. Verify Git and deployment state before continuing. Thi
 
 ## Published and synchronized
 
-- Checkout: `student-status-readiness-design`, branch `feature/student-status-completion`. HEAD `0990bd4` records documentation for implementation checkpoint `4a9ff62`; root verified the published branch. Draft [PR #10](https://github.com/denhamvenom/student_status/pull/10) remains open. No main merge or production deployment.
+- Checkout: `student-status-readiness-design`, branch `feature/student-status-completion`. Implementation checkpoint `11d04d2` and documentation checkpoint `27c3be2` are remotely verified; inspect Git for later documentation commits. Draft [PR #10](https://github.com/denhamvenom/student_status/pull/10) remains open. No main merge or production deployment.
 - Published code includes durable Whole Team enrollment, finance summaries/aggregates, materialized attendance reporting, integrated Timeclock checkpoint `753b236` through merge `3946b88`, student profile setup/corrections, and adult invitations/access controls.
-- Root verified 152 tests across 26 files, lint, types and build for that checkpoint. Development synchronization succeeded October 13 at 08:06 to `dev:third-bandicoot-18`. These results do not certify subsequent uncommitted permission work.
+- Root verified 152 tests across 26 files, lint, types and build for that checkpoint. Development synchronization succeeded October 13 at 08:06 to `dev:third-bandicoot-18`. Those are historical account/report results; the permission checkpoint validation below supersedes them for current source.
 - Astra source findings for the published wave are resolved. Live multi-role and full visual evidence remain incomplete. Prior smaller test counts describe older milestones only.
 
 ## Reviewed permission checkpoint — development synchronized
 
-The synthetic permission backend and UI are implemented and source-reviewed: immutable versions/snapshots, electronic preparation/signing, paper provenance, review/correction/re-sign, current coverage without historical acceptance fallback, receipts and bounded paginated exports. Root reports backend 169 tests across 28 files and UI collector five tests in one file passed separately; lint/types/build pass. Build retains a roughly 917 KB bundle warning. Development sync succeeded October 13 at 08:45:38. Commit/push is pending at this handoff; no new commit hash is asserted.
+The synthetic permission backend and UI are implemented and source-reviewed: immutable versions/snapshots, electronic preparation/signing, paper provenance, review/correction/re-sign, current coverage without historical acceptance fallback, receipts and bounded paginated exports. The complete bun run check passed 174 tests across29files, lint, strict types and build. A subsequent badge-only CSS correction passed source/diff review and live screenshot verification. Build retains a roughly 917 KB bundle warning. Development sync succeeded October 13 at 08:45:38. Implementation is published as11d04d2; draft PR10 reflects the current scope and evidence.
 
 The development-only fixture and authorized verified Parent link were created live. Registration uses module-created fictional IDs; no account roles changed and revoked access is not restored. Fixture tests cover this boundary. Real permission signing remains server-blocked.
 
