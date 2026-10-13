@@ -1,47 +1,42 @@
 # Current integration handoff
 
-Updated October 13, 2026. Verify the actual Git/worktree state before using this snapshot. This short entry point links evidence rather than replacing it.
+Updated October 13, 2026. Verify Git and deployment state before continuing. This is the current entry point; historical evidence remains in linked records.
 
-- Published integration checkpoint: `4a9ff62`, verified on remote `feature/student-status-completion`; draft PR10 https://github.com/denhamvenom/student_status/pull/10. Astra source review and152tests/lint/types/build pass. Development sync completed for the subsequent account/report wave; live rehearsal remains pending.
-- Active checkout: `student-status-readiness-design`; branch `feature/student-status-completion`, based on published frontend5343092/PR9. Completion branch is a new development integration branch; no main merge.
-- Active goal: complete checklist1–7 until ready for Coach visual approval. Read GOAL_ACCEPTANCE.md for full requirements. Frontend and backend development are now authorized; work is ongoing in parallel. No numbered item is yet claimed fully complete.
-- User now authorizes all allowable frontend/backend work and Timeclock coordination toward review readiness. No main merge, production deployment or real signing authorized. Preserve sibling worktrees and paused backend drafts.
-- Astra coordinates/reviews; Sol implements independent file-owned tasks. One integration owner handles Git and shared backend changes.
+## Published and synchronized
 
-## Latest decision
+- Checkout: `student-status-readiness-design`, branch `feature/student-status-completion`. HEAD `0990bd4` records documentation for implementation checkpoint `4a9ff62`; root verified the published branch. Draft [PR #10](https://github.com/denhamvenom/student_status/pull/10) remains open. No main merge or production deployment.
+- Published code includes durable Whole Team enrollment, finance summaries/aggregates, materialized attendance reporting, integrated Timeclock checkpoint `753b236` through merge `3946b88`, student profile setup/corrections, and adult invitations/access controls.
+- Root verified 152 tests across 26 files, lint, types and build for that checkpoint. Development synchronization succeeded October 13 at 08:06 to `dev:third-bandicoot-18`. These results do not certify subsequent uncommitted permission work.
+- Astra source findings for the published wave are resolved. Live multi-role and full visual evidence remain incomplete. Prior smaller test counts describe older milestones only.
 
-Whole Team means every active team member. New members joining after event creation are automatically included in that event too. Confirmed October 13; supersedes the proposed creation-time snapshot/manual-add recommendation. User confirmed upcoming events only for later joiners. Whole Team implementation/UI is local and source-reviewed with durable provisioning and focused synthetic tests; live development rehearsal and visual evidence remain pending.
+## Reviewed permission checkpoint — development synchronized
 
-Before implementing, inspect existing event lifecycle, membership, charging and participation contracts. Apply upcoming-only additions and preserve existing participation/withdrawal decisions during reactivation.
+The synthetic permission backend and UI are implemented and source-reviewed: immutable versions/snapshots, electronic preparation/signing, paper provenance, review/correction/re-sign, current coverage without historical acceptance fallback, receipts and bounded paginated exports. Root reports backend 169 tests across 28 files and UI collector five tests in one file passed separately; lint/types/build pass. Build retains a roughly 917 KB bundle warning. Development sync succeeded October 13 at 08:45:38. Commit/push is pending at this handoff; no new commit hash is asserted.
 
-## Context map
+The development-only fixture and authorized verified Parent link were created live. Registration uses module-created fictional IDs; no account roles changed and revoked access is not restored. Fixture tests cover this boundary. Real permission signing remains server-blocked.
 
-- Current human progress: [DEVELOPMENT_CHECKLIST.md](DEVELOPMENT_CHECKLIST.md).
-- Product/architecture: [PLAN.md](PLAN.md), [ARCHITECTURE.md](ARCHITECTURE.md), [FINANCE_AND_CONSENT_DECISIONS.md](FINANCE_AND_CONSENT_DECISIONS.md).
-- Current outstanding visual matrix: [VISUAL_CHECKS.md](VISUAL_CHECKS.md); maintain this table rather than competing current matrices.
-- Latest frontend evidence/limits: [FRONTEND_CONFORMANCE_LOG.md](FRONTEND_CONFORMANCE_LOG.md). Root design-drift-report is a historical pre-correction baseline.
-- Backend evidence: relevant dated sections of [REVIEW.md](REVIEW.md) and [REHEARSAL_2026-10-12.md](REHEARSAL_2026-10-12.md). Older test counts describe their milestones only.
-- Timeclock: [TIMECLOCK_BACKEND_HANDOFF.md](TIMECLOCK_BACKEND_HANDOFF.md), [TIMECLOCK_COORDINATION.md](TIMECLOCK_COORDINATION.md). Verify current other-worktree status before shared changes; handoffs are snapshots.
-- Git/privacy: [REPOSITORY.md](REPOSITORY.md). Runtime: [DEVELOPMENT.md](DEVELOPMENT.md), using the verified active checkout.
+Ownership: root handles schema, generated code, readiness/routing, fixtures, Git and synchronization. Sol `whole_team_goal` owns consent backend/helpers/tests; Sol `dashboard_goal` owns permission UI/copy; Astra `goal_manager` coordinates requirements and source review, editing only assigned documentation. Current consent source is frozen for checkpoint publication/live rehearsal. The finance/administration document is a proposal for the next wave, not implementation evidence.
 
-## Remaining work
+## Goal and policy
 
-Frontend: modal/section/invitation presentation implemented; remaining role/state/viewport checks in VISUAL_CHECKS.md. Shared live-app copy extraction is recorded complete; flag specific residual literals during future checks rather than reopening wholesale migration. Backend dependencies: Whole Team, aggregate finance/roster, family Attendance, missing readiness/form/admin contracts. Inspect existing contracts before assuming each gap requires new schema.
+G1–G7 remain open: frontend alignment, visual checks, Whole Team, dashboard data, accounts/permission forms, administration/reporting/fundraising/season/retention, and final multi-role verification. Target: **READY FOR USER VISUAL APPROVAL**. That user approval remains a separate gate. Full scope and evidence requirements are in [GOAL_ACCEPTANCE.md](GOAL_ACCEPTANCE.md) and [DEVELOPMENT_CHECKLIST.md](DEVELOPMENT_CHECKLIST.md).
 
-October13 final serial backend suite passed126/126 across22files. Full lint, typecheck and Vite build passed. The old100/101 failure is resolved by the scoped clock fixture fix. Astra accepted this incremental source checkpoint; live and visual evidence remain separate. Visual coverage remains partial/scaled, not whole-app pixel parity. Keep screenshots and account-specific evidence outside Git.
+Whole Team includes all active students at event creation; later joining/reactivated members are added only to upcoming nonarchived events. Preserve existing participation/withdrawal and financial dispositions. The implementation is published; its remaining live/visual checks keep G3 open.
 
-At milestones update this handoff's scope, decision pointers, validation limits and publication status. Do not copy long histories into it.
+Build the complete synthetic permission workflow while retaining server denial of real signing. Exact medication/administration wording still requires user approval. No main merge, production deployment, real signing or automatic retention deletion is authorized. Retention review/hold scaffolding must not invent unresolved policy. Gross fundraising Raised remains unavailable until its authoritative source model exists; awarded travel credit is not gross proceeds.
 
-## Active integration ownership and next evidence
+## Current live evidence and next checks
 
-- Astra goal_manager: full acceptance map and scale architecture/review. Sol whole_team_goal: enrollment/admin/event operations plus proposed batch money helper. Sol dashboard_goal: reporting queries/tests and DashboardReports connections (LiveApp released). Root owns schema/generated/Git/sync.
-- WholeTeam durable snapshot provisioning, atomic member/fee/cursor processing, retry, participant counters and batched money implemented.10worker/enrollment and4cross-module gate tests pass. Astra findings on readiness display and legacy driver gate fixed; live rehearsal/visual checks still required for item3.
-- Finance summaries and resumable verified backfill now replace raw team ledger fan-out; structured updating/failed states and Coach rebuild UI added. Aggregate component and generation-fenced attendance projections/pagination are implemented locally; final review fixes and live evidence remain before item4 completion. Gross Raised needs fundraising source model; do not label null complete.
-- Timeclock coordinator thread01a13097-bbb3-7712-ac06-fb4737daf269 reports latest branch checkpoint753b236, own clean worktree. Integrated locally by merge3946b88; combined Timeclock lint/types/build pass. Merge publication verified in4a9ff62. Synthetic PIN/transfer/independent-browser rehearsal passed, actual separate-device and deterministic live race remain limited.
-- Codegen regenerated local API on configured personaldev; CLI logged component upload. Reviewed development sync completed October13 to dev:third-bandicoot-18; reportAggregates and its batchWorker installed. Do not run a watcher on unfinished future source.
+The user opened an actual Coach session and root verified its role. A Coach-triggered attendance rebuild discovered four sessions; the Parent view now loads verified totals and session minutes. A private screenshot records this observation. Earlier updating-state DOM evidence remains valid for that earlier state. The separate staff tab was a Travel Lead; do not infer role from tab labels.
 
-Current local slice includes enrollment notice on event, readiness and direct room routes; server guards prevent changes while enrollment is incomplete. See GOAL_ACCEPTANCE and forthcoming checkpoint validation. G5 accounts/profile implementation is local after contract review. Permission snapshots/signing remain proposed in ACCOUNTS_PERMISSION_IMPLEMENTATION.md.
+Live electronic/paper permission journeys and the four phone/desktop × light/dark visual combinations remain pending. No visual conformance or final acceptance is claimed. Continue these synthetic journeys after checkpoint publication; keep screenshots and account-specific evidence outside Git. Separate-device and deterministic live-race evidence remain limited.
 
+## Evidence map
 
-Current reviewed wave: profile setup/corrections, adult invitations/access, finance aggregates and attendance projections. Astra review findings are resolved. Lint/types/build and152tests across26files pass; sandbox test import failure was rerun outside sandbox, and a mixed-encoding label was corrected. Development sync succeeded October13 at08:06; live and visual acceptance remain pending. G1–G7 remain open.
-Live browser continuation: old-tab reload was rejected by browser URL policy. User asked to reopen http://localhost:5173/ manually; do not work around the blocked action. Source/tests and next permission work can continue independently.
+- [ACCOUNTS_PERMISSION_IMPLEMENTATION.md](ACCOUNTS_PERMISSION_IMPLEMENTATION.md): frozen next-slice schema and consent invariants; distinguish proposed contracts from implemented code.
+- [ATTENDANCE_REPORT_IMPLEMENTATION.md](ATTENDANCE_REPORT_IMPLEMENTATION.md): materialized reporting, native pagination bounds and evidence limits.
+- [VISUAL_CHECKS.md](VISUAL_CHECKS.md) and [FRONTEND_CONFORMANCE_LOG.md](FRONTEND_CONFORMANCE_LOG.md): current visual matrix and frontend evidence. Root design-drift report is historical.
+- [REVIEW.md](REVIEW.md), [REHEARSAL_2026-10-12.md](REHEARSAL_2026-10-12.md), [TIMECLOCK_BACKEND_HANDOFF.md](TIMECLOCK_BACKEND_HANDOFF.md), [TIMECLOCK_COORDINATION.md](TIMECLOCK_COORDINATION.md): dated review/rehearsal evidence; handoffs are snapshots.
+- [PLAN.md](PLAN.md), [ARCHITECTURE.md](ARCHITECTURE.md), [FINANCE_AND_CONSENT_DECISIONS.md](FINANCE_AND_CONSENT_DECISIONS.md), [REPOSITORY.md](REPOSITORY.md), [DEVELOPMENT.md](DEVELOPMENT.md): product, policy, repository and runtime context. Later user decisions take precedence.
+
+Latest verification: full bun run check174/174 across29files passes. Live fictional Parent submission and Coach acceptance now verified, including reactive receipt status. Remaining consent evidence is correction/re-signing, paper/export and four-combination comparison. Implementation checkpoint publication is being prepared.

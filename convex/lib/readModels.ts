@@ -3,6 +3,8 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx, MutationCtx } from "../_generated/server";
 import { privateStudent, publicStudent } from "./access";
 import { effectiveChargeCents, sourceBalances } from "./money";
+import { permissionAccepted } from "./permissionCoverage";
+export { permissionAccepted } from "./permissionCoverage";
 
 type Ctx = QueryCtx | MutationCtx;
 
@@ -16,16 +18,6 @@ export async function financeFor(ctx: Ctx, studentId: Id<"students">) {
   const personalAvailableCents = sources.filter(x => x.entry.kind === "payment").reduce((sum, x) => sum + x.available, 0);
   const fundraisingAvailableCents = sources.filter(x => x.entry.kind === "fundraiser").reduce((sum, x) => sum + x.available, 0);
   return { charges, entries, summary: { chargedCents, paidCents: appliedCents, dueCents: chargedCents - appliedCents, travelBalanceCents: personalAvailableCents + fundraisingAvailableCents, personalAvailableCents, fundraisingAvailableCents } };
-}
-
-export async function permissionAccepted(ctx: Ctx, studentId: Id<"students">, eventId: Id<"events">) {
-  const signed = await ctx.db.query("permissionSubmissions").withIndex("by_studentId_and_signedAt", q => q.eq("studentId", studentId)).order("desc").take(30);
-  for (const submission of signed) {
-    if (!submission.eventIds.includes(eventId)) continue;
-    const reviews = await ctx.db.query("permissionReviews").withIndex("by_submissionId", q => q.eq("submissionId", submission._id)).order("desc").take(1);
-    if (reviews[0]?.status === "accepted") return true;
-  }
-  return false;
 }
 
 export async function studentReadiness(ctx: Ctx, event: Doc<"events">, student: Doc<"students">) {

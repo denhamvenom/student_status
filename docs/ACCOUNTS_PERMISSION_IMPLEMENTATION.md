@@ -1,8 +1,12 @@
-# Accounts and permission implementation proposal
+# Accounts and permission implementation contract
 
-Read-only design checkpoint, October 13, 2026. This document proposes contracts for G5 in `GOAL_ACCEPTANCE.md`; it does not claim these workflows are implemented or approved for real signing. Root owns shared schema, generated API, access helpers, UI integration, Git and development synchronization. No G5 implementation should begin until root freezes the additive contracts below.
+Current status, October 13, 2026: accounts/profile workflows and the full synthetic consent backend/UI are implemented and source-reviewed. Root synchronized this permission checkpoint to development at 08:45:38. Backend 169 tests across 28 files and UI five tests in one file passed separately; lint/types/build pass with a roughly 917 KB bundle warning. Commit/push is pending at this update; no new hash is asserted. Live permission journeys and four-combination visual verification remain pending, so G5 and all other numbered goal items remain open.
 
-## Existing facts
+Implemented consent includes immutable version authoring and typed snapshots, electronic/paper workflows, current coverage, correction/re-sign, receipts, compact acceptance markers and exports collected in pages of ten with collection-range timestamps. Snapshots have a 128 KiB UTF-8 cap. Export grants are checked per page; denial/cancellation yields no partial download. The development-only fictional fixture and explicit verified Parent link have been created live without changing roles. Real signing remains server-blocked; wording approval and production release remain separate gates.
+
+The following baseline and design sections preserve the rationale and frozen contracts. Historical deficiencies are not claims about current source. Exact account reassignment/archival and remaining G5 scope still follow GOAL_ACCEPTANCE; this checkpoint does not close the whole goal.
+
+## Historical baseline before implementation
 
 - `convex/permissions.ts:submit` rejects every submission after parent and student-scope checks. A season permission-version label cannot enable signing.
 - `src/PermissionDraft.tsx` is a static draft. Existing `permissionSubmissions` store signer, version label, event IDs and arbitrary answers JSON; these fields do not prove an immutable exact wording/contact/health/event snapshot.
@@ -130,3 +134,38 @@ Bulk export is Coach-only unless Travel Lead has the separate health-export gran
 ### Required integration tests
 
 Test old accepted A then correction/new submission B cannot fall back to A; partial event supersession preserves other event coverage; explicit re-sign requirement rejects later review of the old receipt; new events remain uncovered; stale profile/event/version/coverage draft rejects; wrong/revoked parent and real/unregistered subjects reject; paper cannot bypass the real gate; duplicate retries do not create extra submissions/reviews; full typed snapshots stay byte-stable after live edits; cross-role health-export denial and immediate grant revocation. Readiness must use authoritative coverage throughout.
+
+## Frozen schema contract (now implemented for synthetic consent)
+
+October 13, 2026, after development checkpoint `4a9ff62` was published and synchronized by root. That earlier accounts/profile and attendance checkpoint did not implement these permission tables; the subsequent permission checkpoint now does. Root owns schema/generated integration. No goal item is closed. Root subsequently confirmed the live browser tab is working again; browser rehearsal can proceed through the supported connection.
+
+Use existing Convex `v` validators; all new fields on populated tables are optional. Required invariants for new-format records are enforced by common server helpers. `number` revisions must also pass nonnegative safe-integer validation. New table content and per-operation event arrays must have explicit handler bounds.
+
+### Existing table changes
+
+- `seasons.activePermissionVersionId`: optional `id(permissionVersions)`.
+- Widen `permissionSubmissions.signedBy` to optional `id(appUsers)`, preserving old records. New electronic submissions require the verified parent ID. New paper submissions omit it and require a separate recorder and actual named paper signer. Never put the Coach recorder in `signedBy` to satisfy a legacy validator. Receipt readers must branch by source and tolerate an absent account signer.
+- Optional `permissionSubmissions` fields: `versionId: id(permissionVersions)`, `draftId: id(permissionDrafts)`, `source: electronic|paper`, `synthetic: boolean`, `snapshotFormat: literal(1)`, `snapshotJson: string`, `snapshotHash: string`, `recordedBy: id(appUsers)`, `signerName: string`, `signerEmail: string`, `supersedesSubmissionId: id(permissionSubmissions)`, `idempotencyKey: string`, `operationHash: string`, `paperReference: string`, `paperSignedAt: number`, `paperAttestation: boolean`. Retain required `typedName`, `wordingVersion`, `eventIds`, `answersJson` and `signedAt` for compatibility, deriving their new values server-side. Add indexes `by_draftId [draftId]` and `by_recordedBy_and_idempotencyKey [recordedBy,idempotencyKey]`; preserve existing indexes. Paper retry identity is recorder-scoped.
+- Optional `permissionReviews` fields: `field: general|emergencyName|emergencyPhone|allergies|medications|medicationChoices`, `controlledCoverage: array({eventId:id(events),priorRevision:number})`, `idempotencyKey:string`, `operationHash:string`. Add `by_reviewedBy_and_idempotencyKey [reviewedBy,idempotencyKey]`. Reviews stay append-only; no mutable supersededBy field is needed because current coverage governs readiness.
+
+### New tables
+
+| Table | Required fields | Optional fields | Indexes |
+| --- | --- | --- | --- |
+| `permissionVersions` | `seasonId:id(seasons)`, `version:string`, `title:string`, `wording:string`, `schoolName:string`, `teamName:string`, `medications:array({key:pain\|allergy\|cold,label:string,productsText:string,exceptionsText:string})`, `administrationText:string`, `acknowledgmentText:string`, `createdBy:id(appUsers)`, `createdAt:number` | `approvedBy:id(appUsers)`, `approvedAt:number` | `by_seasonId_and_version [seasonId,version]` |
+| `syntheticConsentSubjects` | `studentId:id(students)`, `enabled:boolean`, `createdBy:id(appUsers)`, `createdAt:number` | `parentId:id(appUsers)`; absent means a paper-only registration | `by_studentId_and_parentId [studentId,parentId]` |
+| `permissionDrafts` | `studentId:id(students)`, `seasonId:id(seasons)`, `parentId:id(appUsers)`, `versionId:id(permissionVersions)`, `snapshotJson:string`, `snapshotHash:string`, `profileRevision:number`, `eventFingerprint:string`, `expectedCoverage:array({eventId:id(events),revision:number})`, `createdAt:number`, `expiresAt:number` | `usedSubmissionId:id(permissionSubmissions)` | `by_studentId_and_parentId [studentId,parentId]` |
+| `permissionCoverage` | `seasonId:id(seasons)`, `studentId:id(students)`, `eventId:id(events)`, `state:required\|pending\|accepted\|correction`, `revision:number`, `updatedAt:number`, `updatedBy:id(appUsers)` | `latestSubmissionId:id(permissionSubmissions)`, `versionId:id(permissionVersions)`, `latestReviewId:id(permissionReviews)`, `signatureRequestedAt:number`, `reason:string`, `correctionField` using the review field union | `by_studentId_and_eventId [studentId,eventId]`, `by_seasonId_and_eventId [seasonId,eventId]`, `by_latestSubmissionId [latestSubmissionId]` |
+| `permissionSignatureRequests` | `studentId:id(students)`, `seasonId:id(seasons)`, `eventIds:array(id(events))`, `requestedBy:id(appUsers)`, `requestedAt:number`, `reason:string`, `priorCoverage:array({eventId:id(events),revision:number,submissionId:optional(id(permissionSubmissions))})` | None | `by_studentId [studentId]` |
+
+Exactly three unique medication keys are required; text lengths are bounded in handlers. Version content is immutable. Approval metadata never enables real signing. Only a development-deployment-bound internal fixture initializer may register fictional consent subjects; no public synthetic switch exists.
+
+Missing coverage uses expected revision zero, while the first materialized row begins at revision one. Coverage uniqueness uses indexed transactional lookup. Signing, review and signature requests compare the complete expected scope/revisions before any state transition. Legacy arbitrary answers JSON cannot establish accepted coverage. Existing accepted snapshots remain original evidence when a version changes; an explicit request-new-signature transition governs any re-sign requirement.
+
+`consentSnapshot.ts` must define and validate the complete bounded typed snapshot described above before JSON serialization. The JSON field validator alone is insufficient. Electronic account signer, paper named signer, recorder, source, synthetic provenance, original event scope and exact wording must remain distinguishable in receipts and exports.
+
+### Coordinated implementation ownership
+
+Root integrated the additive schema; Astra verified its fields/indexes against this contract. The reviewed permission slice was subsequently synchronized to development at 08:45:38. Root integrates generated references and freezes common snapshot/coverage helper contracts. The consent backend owner implements version/workspace/prepare/submit/paper/review/re-sign/receipt/export operations and focused authorization, immutable-evidence, retry and supersession tests. The UI owner implements parent preparation/signing/receipt and operator paper/review/re-sign/export surfaces against those frozen return validators. Root owns shared readiness replacement, routing, generated code, development synchronization, Git and final multi-role integration.
+
+Backend and UI may progress in parallel after return contracts freeze; neither owner independently changes schema or shared readiness semantics. Review must verify the old accepted fallback is gone everywhere and paper cannot bypass the same real-signing gate. Synthetic complete-flow evidence is required before this slice can be called implemented; production and real signing remain gated on explicit later approval.

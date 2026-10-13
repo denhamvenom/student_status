@@ -340,14 +340,14 @@ No G1–G7 completion is claimed by these substeps. Real signing, production and
 
 Validation at this incremental checkpoint: lint, strict typecheck, Vite build and22test files/126tests pass. Astra source review accepted; build retains an833KB chunk warning. No new live backend sync or browser acceptance is claimed.
 
-### October 13 next integration wave (in progress)
+### October 13 next integration wave (historical interim snapshot; superseded below)
 - [x] Merge reviewed Timeclock frontend753b236 into completion branch; combined Timeclock lint/types/build pass. No main merge.
 - [x] Implement initial profile setup, locked room category, revision-checked ordinary edits and Coach correction requests; frontend integration present locally.
 - [x] Implement verified adult invitation and role/grant backend; frontend work in progress.
 - [ ] Finish reviewed aggregate and attendance worker integration, including failure rollback and request bounds.
 - [ ] Verify account/profile/adult invitation screens against prototype and exercise synthetic live journeys.
 - [ ] Complete permission signing/receipts/corrections/export behind real-signing gate; current first account slice does not close G5.
-Interim synthetic regression suite135/135 passed before final attendance worker tests. Current wave is not yet published or live-synchronized.
+Interim synthetic regression suite135/135 passed before final attendance worker tests. At that interim snapshot the wave was not yet published or live-synchronized; the reviewed account/report checkpoint below supersedes this status.
 
 Review checkpoint: combined lint/build and145/145 tests across25files passed before final review fixes. Attendance page size is now bounded at10; Astra is checking total fanout. Adult invitation fragment/token-free OAuth handling and paginated, duplicate-protected correction requests are being finalized. Source validation does not close live or visual checks.
 
@@ -358,3 +358,12 @@ Review checkpoint: combined lint/build and145/145 tests across25files passed bef
 - [ ] Exercise live profile/account/report journeys and finish four-combination visual evidence.
 - [x] Publish reviewed wave4a9ff62 and verify remote commit; update draft PR10 scope.
 No numbered G1–G7 item is complete from this incremental checkpoint.
+
+### Permission workflow slice (reviewed and development-synchronized)
+- [x] Add reviewed additive schema for exact wording versions, prepared drafts, immutable submissions, event coverage and signature requests; preserve paper signer/recorder distinction.
+- [x] Implement development-only fictional consent fixture and explicit verified test-Parent linkage; 6 tests pass for provenance, safe retries, wrong-deployment denial, rejected identity adoption, verified-account requirements, and no revoked-access restoration. Reviewed and synchronized to development October 13.
+- [x] Integrate permission backend/UI, authoritative readiness coverage, electronic fixture linking and negative-access/snapshot tests. Combined backend suite169/169 and frontend export suite5/5 pass; Astra backend/UI source review clear.
+- [x] Review, lint, typecheck, build and synchronize to development at08:45 October13; real signing stays blocked. Bundle warning is917KB.
+- [ ] Complete live synthetic signing, receipt, correction/re-signing, paper and export rehearsal and four-combination prototype checks.
+Parent Status/Attendance live pages now load in the user-opened browser. Coach rebuild discovered4sessions; Parent verified totals and individual session minutes now load. This is live behavior evidence with a private screenshot, not completed four-combination visual comparison. Shared family copy encoding corrected.
+- [x] Pass full bun run check with174tests/29files; complete live fictional Parent form submission, Coach acceptance and reactive receipt status. Empty event selection rejected; all medication choices initially unselected. Correction/re-sign/paper/export and visual matrix remain open.
