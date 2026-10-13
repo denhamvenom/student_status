@@ -485,3 +485,8 @@ Active: source-separated Coach financial table and change feed backend; table pr
 Remaining before visual approval: full conditional phone/desktop light/dark comparisons; later-join/reactivation WholeTeam live check; ordinary Mentor-only access; new fee/profile/retention live workflows; attendance kickoff/category report integration; financial table/feed/export, historical corrections and season carryover; final combined rehearsal and Astra review. Production remains separate.
 
 October 13 scope audit: verified the active goal still explicitly requires all G1-G7 through readiness for user visual approval. Current financial backend work is part of G6 and supports G1/G4; it does not replace the visual queue, role rehearsal, attendance integration or season transition requirements. Sol reports28focused v4 backend tests passing; feed/backfill remains in progress and unsynchronized. Overall estimate stays76%; all seven remain open.
+
+October 13 Finance presentation checkpoint: Astra cleared unmounted table and history components after recording-time progress wording, method-neutral refund wording and actual nullable coverage dates were corrected. Eight focused tests across two files and scoped lint pass13:00:44. Live query integration, full backend review and four-view prototype verification remain open; no G1/G6 closure.
+
+- [x] Rehearse reasoned shared-fee priority reorder with fictional records; confirm new order and unchanged previously applied amounts/team balances. Both ambiguous historical mappings resolved explicitly.
+- [ ] Complete shared-fee bulk/held recovery live checks and the required four-view comparisons. The priority rehearsal does not close the full administration/visual scope.
