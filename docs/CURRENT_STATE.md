@@ -4,14 +4,14 @@ Updated October 13, 2026. Verify Git and deployment before continuing.
 
 ## Checkout and boundaries
 
-- App: student-status-readiness-design; branch feature/student-status-completion. Latest remotely verified checkpoint f9282db (financial recovery and genuine fundraising totals); draft PR #10 remains open. No main merge or production deployment authorized.
+- App: student-status-readiness-design; branch feature/student-status-completion. Latest remotely verified source checkpoint 04c14d7 (fundraiser submit controls and live rehearsal); draft PR #10 remains open and its description is updated. No main merge or production deployment authorized.
 - Development only: dev:third-bandicoot-18, team daniel-eiland. Full financial synchronization succeeded October 13 at 10:08:14; financial recovery follow-up synchronized at 10:21:13. Current administration changes are local work in progress.
 - Synthetic student data only. Real permission signing and automatic retention deletion remain blocked. Student records, secrets, screenshots and exports never enter GitHub.
 - G1–G7 remain open. Full scope: GOAL_ACCEPTANCE.md; human checklist: DEVELOPMENT_CHECKLIST.md; visual queue: VISUAL_CHECKS.md.
 
 ## Active financial checkpoint
 
-The financial source model, bounded rebuild/allocation/withdrawal/transfer jobs, paginated evidence, fundraiser creation/preview/posting/history/retry/splits/closure and matching UI are implemented and published. Coach financial rebuild is now verified live. Fictional fundraiser posting is verified: 1001 cents gross, 251 team and 750 student travel, completed with one committed row and no held rows. A missing explicit submit type was fixed locally in posting/retry forms; only posting has live verification so far.
+The financial source model, bounded rebuild/allocation/withdrawal/transfer jobs, paginated evidence, fundraiser creation/preview/posting/history/retry/splits/closure and matching UI are implemented and published. Coach financial rebuild is now verified live. Fictional fundraiser posting is verified: 1001 cents gross, 251 team and 750 student travel, completed with one committed row and no held rows. Parent finance independently shows gross1001/travel750/available750, with no team proceeds credited to the student. Explicit submit fixes are published; only posting has live verification so far. Charge/team API generation and strict typecheck pass; final source review and integrated validation remain pending before full application sync.
 
 Full bun run check passed 194 tests across 34 files, lint, strict types and build at 10:00. The build reports a roughly 947 KB bundle warning. The subsequent FinancePage first-page loading guard passed strict types and scoped lint. Earlier 187/193 failures were legacy fixture mismatches corrected before the full passing run; do not treat them as current failures.
 

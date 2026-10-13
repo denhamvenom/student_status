@@ -222,3 +222,7 @@ Complete all allowable frontend/backend checklist work to readiness for Coach vi
 ## Accounts and report integration review — October 13
 
 Whole Team source checkpoint is published; upcoming-only live rehearsal remains pending. Timeclock frontend753b236 is integrated locally through3946b88, with combined Timeclock checks passing. Account setup/corrections/adult management and aggregate-backed finance/attendance are now implemented locally. Final review fixes cover token handling, query fanout and correction queue scaling. Combined145tests/lint/build passed before those fixes; rerun affected checks and review before development sync. Permission signing, administration, full visual matrix and final multirole acceptance remain open in GOAL_ACCEPTANCE.md.
+
+## October 13 administration and live financial continuation
+
+Published fundraiser submit correction04c14d7 and verified Parent gross/travel/available reconciliation. Current charge correction/cancellation and fundraising-to-team slice is in parallel backend/UI implementation with Astra review; generated types and strict typecheck pass. Complete this slice's integrated validation before development synchronization. Shared season-wide fees/priorities, season transition/carryover and retention preview/holds remain required, followed by outstanding live roles and VISUAL_CHECKS. Skills remain mandatory at context and visual checkpoints. No G1–G7 closure or production authorization follows from this milestone.
