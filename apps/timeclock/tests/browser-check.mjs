@@ -33,6 +33,49 @@ async function setup(width, theme) {
   return { context, page };
 }
 try {
+  const usability = await setup(320, 'light');
+  const u = usability.page;
+  await u.setViewportSize({ width: 320, height: 480 });
+  const createButton = u.getByRole('button', { name: 'Create unscheduled event', exact: true });
+  await createButton.focus();
+  await u.keyboard.press('Enter');
+  const modal = u.getByRole('dialog');
+  await expect(modal.getByLabel('Event name')).toBeFocused();
+  for (let i = 0; i < 8; i++) {
+    await u.keyboard.press('Tab');
+    expect(await modal.evaluate(node => node.contains(document.activeElement))).toBe(true);
+  }
+  await modal.getByLabel('Event name').focus();
+  await u.keyboard.press('Shift+Tab');
+  await expect(modal.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
+  await u.keyboard.press('Escape');
+  await expect(createButton).toBeFocused();
+  results.push('Keyboard dialog entry, Tab containment, Escape and focus return');
+  await u.getByRole('article').filter({ hasText: 'Synthetic build meeting' }).getByRole('button').click();
+  await u.getByRole('button', { name: 'Group', exact: true }).click();
+  const checkbox = u.getByRole('checkbox', { name: 'Select Alex A.', exact: true });
+  await checkbox.focus();
+  await u.keyboard.press('Space');
+  await expect(checkbox).toBeChecked();
+  await expect(u.getByRole('checkbox', { name: /Select Casey C/ })).toBeDisabled();
+  const smallTargets = await u.locator('button:visible, .tc-check:visible').evaluateAll(nodes => nodes.filter(node => {
+    const box = node.getBoundingClientRect();
+    return box.width < 44 || box.height < 44;
+  }).map(node => node.textContent));
+  expect(smallTargets).toEqual([]);
+  expect(await u.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+  results.push('320px touch targets, keyboard group selection and collision blocking');
+  await u.getByRole('button', { name: 'Extend event', exact: true }).click();
+  await expect(modal).toBeVisible();
+  expect(await modal.evaluate(node => node.scrollWidth > node.clientWidth)).toBe(false);
+  await modal.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(u.getByRole('button', { name: 'Extend event', exact: true })).toBeFocused();
+  results.push('Short mobile dialog scroll and Cancel focus return');
+  // Presentation stress case: the backend permits long event titles.
+  await u.getByRole('heading', { name: 'Synthetic build meeting', exact: true }).evaluate(node => { node.textContent = 'X'.repeat(160); });
+  expect(await u.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+  results.push('Long unbroken event title stays within narrow viewport');
+  await usability.context.close();
   for (const width of [390, 1440]) {
     for (const theme of ['light', 'dark']) {
       const { context, page } = await setup(width, theme);

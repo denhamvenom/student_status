@@ -1,6 +1,6 @@
 # Timeclock development checklist
 
-Status: frontend implemented; development rehearsal advanced October 13, 2026. Visual approval and production release remain separate. Source checkpoint fbb4148 on feature/timeclock-frontend, draft PR 6.
+Status: frontend implemented; development rehearsal and keyboard/touch checks advanced October 13, 2026. Visual approval and production release remain separate. Follow-up checkpoints are on feature/timeclock-frontend, draft PR 6.
 
 ## 1. Foundation — complete
 - [x] Isolated frontend worktree and branch; Student Status remains at repository root.
@@ -28,6 +28,14 @@ Status: frontend implemented; development rehearsal advanced October 13, 2026. V
 
 The browser harness intercepts transport only inside Playwright and does not ship a production fixture bypass. It is not live backend evidence. One known React development warning from next-themes initialization is recorded separately; no runtime errors occurred. Screenshots/results stay in ignored test-results/timeclock. On October 13 the backend owner identified a dated all-day regression fixture in the old baseline and owns its repair and current integrated regression run; this frontend chat did not duplicate that work.
 
+### October 13 frontend usability follow-up
+- [x] Reproduced and fixed dialog Tab escape and lost focus after dismissal. Tab/Shift+Tab now cycle within the dialog; Escape and Cancel return focus to the original control when it still exists.
+- [x] Keyboard Space selects a group checkbox; unresolved name collisions remain disabled.
+- [x] At 320px width, visible buttons and checkbox labels meet the 44px touch-target check; a short 480px viewport keeps dialog actions reachable by scrolling.
+- [x] Reproduced overflow from a 160-character unbroken event title; text now wraps within the narrow viewport.
+- [x] Updated synthetic harness: 38 checks pass with no runtime errors. Timeclock lint, strict types and build pass. These are browser simulation checks, not physical-device or assistive-technology certification.
+- [ ] User visual approval and physical-device rehearsal remain pending.
+
 ## 4. Live development evidence
 ### Reported by Student Status integration on October 12
 - [x] Coach Google sign-in, reviewed fictional name, live clock-in and same-profile cross-tab status.
@@ -51,7 +59,8 @@ The browser harness intercepts transport only inside Playwright and does not shi
 - [x] Frontend implementation c73a6a3 and publication documentation fbb4148 pushed to feature/timeclock-frontend.
 - [x] Draft PR: https://github.com/denhamvenom/student_status/pull/6, based on feature/timeclock-backend.
 - [x] Direct implementation and live-rehearsal handoffs sent to Student Status integration.
-- [ ] Integration owner merges frontend into the reviewed development integration branch and runs combined checks. Never merge main or independently sync shared Convex from this frontend checkout.
+- [x] Integration owner reported original frontend integration in merge 3946b88 and subsequent combined checks (216 root tests plus Timeclock lint/types/build). This is owner-reported evidence, not a rerun against this older frontend worktree.
+- [ ] Integration owner incorporates the October 13 usability follow-up and checks the combined branch. Never merge main or independently sync shared Convex from this frontend checkout.
 
 ## 6. Remaining scope
 - Other synthetic names still require explicit Coach review; do not infer surnames or reseed.
