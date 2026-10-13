@@ -245,3 +245,7 @@ Shared fees, retention preview/holds and Mentor profile/Coach driver reconciliat
 ## October 13 source-separated Finance continuation
 
 Continue the reviewed FINANCE_ADMIN_IMPLEMENTATION contract: Sol owns shared schema and all monetary writer/projection changes; root owns the unmounted Finance table/feed presentation and later integration; Astra reviews each slice before synchronization. The table presentation has four focused tests and source clearance; the feed has two focused tests and review pending. Backend owner reports28focused v4 tests passing, with feed emission/backfill still in progress. No new development sync is claimed. Reviewed SEASON_ADMIN_IMPLEMENTATION is planning only, including the superseding no-family-authorization departure policy. Preserve all G1-G7 acceptance requirements and the single VISUAL_CHECKS queue.
+
+## Completion-first working policy — October 13
+
+The Coach requested explicit protection against minutiae and context churn. Follow COMPLETION_WORKFLOW.md for workflow-sized delivery, blocking-versus-follow-up decisions, convergent reviews, proportionate verification and concise handoffs. Finish connected Finance next; retain all G1-G7 requirements and privacy/production gates. This supersedes habits of fragment-sized repeated reviews and per-step narrative updates, not required acceptance evidence.

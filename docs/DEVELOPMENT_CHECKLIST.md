@@ -490,3 +490,12 @@ October 13 Finance presentation checkpoint: Astra cleared unmounted table and hi
 
 - [x] Rehearse reasoned shared-fee priority reorder with fictional records; confirm new order and unchanged previously applied amounts/team balances. Both ambiguous historical mappings resolved explicitly.
 - [ ] Complete shared-fee bulk/held recovery live checks and the required four-view comparisons. The priority rehearsal does not close the full administration/visual scope.
+
+October13 in-progress integration: unmounted Finance wrappers preserve native20-row pagination, independent query recovery and server history-preparation permissions. Eleven focused UI tests pass13:07:01. Wrapper review and backend freeze are pending; no runtime integration claim. Season-scoped identity helpers/tests advance independently under Sol ownership without switching current callers.
+
+October13 integration verification:12focused Finance UI tests pass. Full lint/types pass; integrated tests286/288 with two500-member5-second timeouts. Both files pass isolated21/21; do not call the full suite green or claim build completion. Astra backend findings remain under correction, including legacy-job continuation and complete history coverage. Timeclock season-cutover requirements recorded; no G1-G7 closure.
+
+### Completion-first process adopted — October 13
+
+- [x] Add mandatory completion-first policy to AGENTS.md and docs/COMPLETION_WORKFLOW.md: usable workflow milestones, concrete blocking criteria, batched reviews/tests and less context churn.
+- [ ] Deliver the connected Finance workflow and its necessary evidence before optional polish. All seven goal outcomes remain open.
