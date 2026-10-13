@@ -45,6 +45,7 @@ import type * as financialSources from "../financialSources.js";
 import type * as fundraiserPosting from "../fundraiserPosting.js";
 import type * as fundraisers from "../fundraisers.js";
 import type * as historicalCorrections from "../historicalCorrections.js";
+import type * as historicalFinancialCorrections from "../historicalFinancialCorrections.js";
 import type * as historicalRoster from "../historicalRoster.js";
 import type * as http from "../http.js";
 import type * as lib_access from "../lib/access.js";
@@ -144,6 +145,7 @@ declare const fullApi: ApiFromModules<{
   fundraiserPosting: typeof fundraiserPosting;
   fundraisers: typeof fundraisers;
   historicalCorrections: typeof historicalCorrections;
+  historicalFinancialCorrections: typeof historicalFinancialCorrections;
   historicalRoster: typeof historicalRoster;
   http: typeof http;
   "lib/access": typeof lib_access;

@@ -43,6 +43,7 @@ export const processPage = internalMutation({
   handler: async (ctx, args) => {
     const job = await ctx.db.get(args.jobId);
     if (!job || job.state !== "running" || job.step !== args.step) return null;
+    if (job.historicalCorrectionSessionId) return ctx.runMutation(makeFunctionReference<"mutation">("historicalFinancialCorrections:processPage"), args);
     if (job.kind === "paymentCorrection") return ctx.runMutation(makeFunctionReference<"mutation">("paymentAdministration:correctionPage"), args);
     const actor = await ctx.db.get(job.actorId); const season = await activeSeason(ctx);
     await requireSeasonTransitionFinancialAccess(ctx, season._id, true);

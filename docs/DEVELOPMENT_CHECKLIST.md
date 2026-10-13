@@ -557,3 +557,11 @@ These implementation and verification claims do not close G1-G7, authorize produ
 - [ ] Finish historical financial corrections.
 
 October13 batch verification: integrated lint/types/324tests/build passed, Astra cleared payment/attendance/historical attendance/roster, and development sync completed14:43:39. Publication and representative live/visual evidence remain pending. No season activation or production deployment occurred.
+
+### Build meeting naming decision — October 13
+- [x] Agreed: titles containing Build identify Build meetings; calendar dates distinguish weekdays from Saturdays. Case-insensitive title matching and team-local calendar dates apply.
+- [x] Implement/source-review Build weekday/Saturday counts using calendar dates; focused checks passed. Development sync/live report rebuild pending. Outreach classification remains.
+
+Historical finance candidate: prepared archived accounts without downstream carry/transfer lineage support audited charge correction/cancellation and source-preserving reallocation. Focused checks pass; review/sync pending. Linked balances and legacy unprepared projections remain held and are not claimed complete.
+
+October13 historical-finance/Build checkpoint: scoped implementation and Astra review complete; focused checks/types/build pass; development sync14:54:21. Supported archived charge corrections preserve source/audit evidence. Linked financial records remain held under the approved contract, not silently changed. Publication and live/visual evidence pending. Prior synthetic signing/resigning/paper/export evidence is accepted and should not be repeated.

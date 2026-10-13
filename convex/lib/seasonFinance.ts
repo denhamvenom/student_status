@@ -53,9 +53,23 @@ export async function seasonFinancialDrain(ctx: Ctx, seasonId: Id<"seasons">) {
   return { ready: true, blocked: false, message: null };
 }
 
+/** Archived work is authorized by a persisted actor/season grant, never a public bypass flag. */
+export async function historicalFinancialContinuation(ctx: Ctx, seasonId: Id<"seasons">, originId: FinancialContinuationId) {
+  const origin = await ctx.db.get(originId);
+  if (!origin || !("historicalCorrectionSessionId" in origin) || !origin.historicalCorrectionSessionId) return false;
+  if (origin.kind !== "chargeCorrection" || !origin.chargeId) throw new Error("Historical financial continuation lost its scoped charge correction.");
+  const grant = await ctx.db.get(origin.historicalCorrectionSessionId);
+  const actor = await ctx.db.get(origin.actorId);
+  const season = await ctx.db.get(seasonId);
+  const student = await ctx.db.get(origin.studentId);
+  if (!grant || grant.actorId !== actor?._id || grant.seasonId !== seasonId || grant.closedAt !== undefined || grant.expiresAt <= Date.now() || !actor?.active || actor.role !== "coach" || season?.status !== "archived" || student?.seasonId !== seasonId) throw new Error("Historical financial access has ended. Open correction mode again and retry with the fresh grant.");
+  return true;
+}
+
 /** Called only by trusted workers; no client-provided continuation bypass exists. */
 export async function requireSeasonFinancialContinuation(ctx: Ctx, seasonId: Id<"seasons">, originId: FinancialContinuationId) {
   await requireSeasonTransitionFinancialAccess(ctx, seasonId, true);
+  if (await historicalFinancialContinuation(ctx, seasonId, originId)) return;
   const origin = await ctx.db.get(originId);
   if (origin && "targetSeasonId" in origin) {
     const actor = await ctx.db.get(origin.updatedBy);

@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { createTest } from "../testUtils";
 import { internal } from "./_generated/api";
-import { invalidateAttendanceSession } from "./lib/attendanceReports";
+import { invalidateAttendanceSession, buildDayFromTitle } from "./lib/attendanceReports";
 import type { Id } from "./_generated/dataModel";
 import { makeFunctionReference } from "convex/server";
 import schema from "./schema";
@@ -108,10 +108,10 @@ describe("role-scoped dashboard reports", () => {
     expect(report.sessions[0]).toMatchObject({ totalMs: 1.5 * hour, earlyMs: hour / 2, scheduledMs: hour, qualifies: true, provisional: false });
     expect(report.legacy.tuesdayHeld).toBe(0);
     expect(report.phases?.buildSeason).toMatchObject({tuesdayHeld:1,tuesdayAttended:1,outreachAttended:0});
-    await f.t.run(async ctx=>{const student=await ctx.db.get(f.ids.sid);await ctx.db.patch(student!.seasonId,{year:2027});const session=await ctx.db.get(f.ids.session);await ctx.db.patch(session!.occurrenceId,{title:"Synthetic OUTREACH Tuesday"});await invalidateAttendanceSession(ctx,f.ids.session);});
+    await f.t.run(async ctx=>{const student=await ctx.db.get(f.ids.sid);await ctx.db.patch(student!.seasonId,{year:2027});const session=await ctx.db.get(f.ids.session);await ctx.db.patch(session!.occurrenceId,{title:"Synthetic OUTREACH BUILD Tuesday"});await invalidateAttendanceSession(ctx,f.ids.session);});
     await settleSession(f.t,f.ids.session);
     const split=await f.parent.query(attendanceRef,{studentId:f.ids.sid,asOf:start+4*hour});
-    expect(split.phases?.offseason).toMatchObject({tuesdayHeld:1,tuesdayAttended:1,outreachAttended:1});
+    expect(split.phases?.offseason).toMatchObject({tuesdayHeld:1,tuesdayAttended:1,outreachAttended:1,buildWeekdayHeld:1,buildWeekdayAttended:1,buildSaturdayHeld:0,buildSundayHeld:0});
     expect(split.phases?.buildSeason).toMatchObject({sessionsHeld:0,sessionsAttended:0,tuesdayPercent:null,outreachAttended:0});
     await f.t.run(async ctx=>{const state=await ctx.db.query("timeclockSessionReportStates").withIndex("by_sessionId",q=>q.eq("sessionId",f.ids.session)).unique();await ctx.db.patch(state!._id,{outreach:undefined});});
     expect(await f.parent.query(attendanceRef,{studentId:f.ids.sid,asOf:start+4*hour})).toMatchObject({state:"updating",verified:null,phases:null});
@@ -120,11 +120,18 @@ describe("role-scoped dashboard reports", () => {
     const unknown=await f.parent.query(attendanceRef,{studentId:f.ids.sid,asOf:start+4*hour});
     expect(unknown.phaseBoundary).toMatchObject({state:"unavailable",competitionYear:2028});expect(unknown.phases).toBeNull();
     await f.t.run(async ctx=>{const student=await ctx.db.get(f.ids.sid);await ctx.db.patch(student!.seasonId,{year:2026});});
+    expect(buildDayFromTitle("bUiLd",Date.parse("2027-01-10T05:59:59Z"))).toBe("saturday");
+    expect(buildDayFromTitle("Build",Date.parse("2027-01-10T06:00:00Z"))).toBe("sunday");
+    expect(buildDayFromTitle("Ordinary meeting",Date.parse("2027-01-10T06:00:00Z"))).toBeNull();
+    const weekend=await f.t.run(async ctx=>{const student=await ctx.db.get(f.ids.sid);const sessions=[];for(const at of [Date.parse("2026-10-17T21:00:00Z"),Date.parse("2026-10-18T21:00:00Z")]){const occurrenceId=await ctx.db.insert("timeclockOccurrences",{seasonId:student!.seasonId,source:"manual",sourceKey:`synthetic-build-${at}`,title:"Synthetic Build meeting",allDay:false,scheduledStart:at,scheduledEnd:at+2*hour,cancelled:false,observedAt:at,revision:1,needsReview:false});const id=await ctx.db.insert("timeclockSessions",{seasonId:student!.seasonId,occurrenceId,state:"closed",scheduledStart:at,scheduledEnd:at+2*hour,effectiveEnd:at+2*hour,extensionMs:0,revision:1,openedAt:at,openedBy:f.ids.coach.id,closedAt:at+2*hour,needsReview:false});await ctx.db.insert("timeclockIntervals",{sessionId:id,studentId:f.ids.sid,inAt:at,outAt:at+hour,openedBy:f.ids.coach.id,openCommandKey:`synthetic-weekend-${at}`,scheduleRevision:1});await invalidateAttendanceSession(ctx,id);sessions.push(id);}return sessions;});
+    for(const id of weekend)await settleSession(f.t,id);
+    const weekendReport=await f.parent.query(attendanceRef,{studentId:f.ids.sid,asOf:Date.parse("2026-10-19T00:00:00Z")});
+    expect(weekendReport.phases?.buildSeason).toMatchObject({buildWeekdayHeld:1,buildWeekdayAttended:1,buildSaturdayHeld:1,buildSaturdayAttended:1,buildSundayHeld:1});
     expect(JSON.stringify(report)).not.toContain("PRIVATE CORRECTION REASON");
     expect(JSON.stringify(report)).not.toContain("SECRET HEALTH");
     await f.t.run(async ctx => {await ctx.db.patch(f.ids.session, { needsReview: true });await invalidateAttendanceSession(ctx,f.ids.session)});
     await settleSession(f.t,f.ids.session);
-    expect((await f.student.query(attendanceRef, { studentId: f.ids.sid, asOf: start + 4 * hour })).verified?.sessionsHeld).toBe(0);
+    expect((await f.student.query(attendanceRef, { studentId: f.ids.sid, asOf: start + 4 * hour })).verified?.sessionsHeld).toBe(2);
   });
   it("does not combine split visits to meet one uninterrupted hour or count open/cancelled sessions", async () => {
     const f = await fixture();

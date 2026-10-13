@@ -162,3 +162,6 @@ After development sync13:21:10, Coach prepared six fictional accounts and histor
 
 ### October 13 Finance desktop hierarchy checkpoint
 Coach Finance dark at verified inner viewport1440x1000 (document width1425 with scrollbar): restored account-table/fee-sidebar layout, added missing prototype spacing tokens, and wrapped fee actions below names at narrow container widths. Valid CUA screenshot inspected; debugger screenshot was scaled incorrectly and rejected. Phone/light/lower states remain in VISUAL_CHECKS. Private evidence stays outside Git. Temporary viewport override reset.
+
+### October 13 payment import live preview
+Current checkout frontend restarted after cached-page connection failure. Coach Finance loads primary table, fee sidebar and new bulk/CSV entry. CSV preview for one fictional cent matched the test account and displayed ready,1 reviewed/0 receipts recorded; no posting attempted. Wide dark view inspected with readable form/preview hierarchy. Phone DOM at390x844 reported375px document width/no horizontal overflow, but both screenshot APIs returned distorted scaled images; reject those images as visual evidence. Viewport restored. Private screenshot under ignored private-data/visual-checks; no account data copied into this log. Representative phone visual and prototype comparison remain open.
