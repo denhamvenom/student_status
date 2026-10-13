@@ -4,7 +4,7 @@ Updated October 13, 2026
 
 ### Current completion status
 
-G3 (Whole Team functional enrollment) is complete following Astra evidence review. G1, G2 and G4–G7 remain open. Latest published source is `e62b3ef`, synchronized to development at 15:20:40. The synthetic season activation completed: prior records and held balances were preserved, returning profiles and Parent links carried forward, and new-season Finance/Attendance readiness was verified. CSV payment import and receipt correction completed live with original receipt/history retained and exact totals restored. Historical roster correction was verified without changing the current profile. Remaining work includes account lifecycle and role journeys, supported historical attendance/charge corrections, selected-scope download evidence and representative prototype comparisons. Production, real signing and deletion remain gated. See CURRENT_STATE.md for evidence and COMPLETION_WORKFLOW.md for the reduced, risk-based verification policy.
+G3 (Whole Team functional enrollment) is complete after Astra review. Published source/evidence checkpoint: 80815b0; latest development sync15:54:24. Finance, season, supported historical corrections, selected export and retention/lifecycle rehearsals are complete within their recorded scope. G1, G2 and G4–G7 remain open for remaining account/role journeys, representative visual comparisons and final integrated review. Coach and Parent sessions are accessible; Student and ordinary Mentor sessions still need browser connection. The hosted prototype renders, but its version must be reconciled with the immutable design reference. See CURRENT_STATE.md and GOAL_ACCEPTANCE.md. Production, real signing and deletion remain gated.
 
 ### Latest decisions and active work
 
@@ -590,3 +590,5 @@ October 13 payment rehearsal: CSV import recorded one simulated cent with exact 
 
 - [x] October 13 selected-scope Finance export: actual downloaded JSON manifest verified with selected scope, one expected fictional member, zero charges, scope hash and collection bounds. The earlier missing-file claim was a CSV-only search limitation; no export code change or repeat needed.
 - [x] October 13 supported historical financial correction: isolated development-only archived fixture, original one-dollar charge retained, effective and paid amounts corrected to ninety-nine cents, one cent released to personal available funds, zero due, no payout. UI reported reconciliation and correction access returned to read-only. Existing transferred-source account correctly refused the same adjustment. Helper guard/idempotency suite five cases, scoped lint/types and Astra review passed; development sync 15:54:24.
+
+- [x] Record the Coach's hosted-reference clarification: use the public prototype for visual styling, preserve added features and later decisions, and flag conflicts instead of deleting functionality. Project instructions now enforce this boundary.

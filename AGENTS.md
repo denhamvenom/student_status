@@ -54,3 +54,7 @@ Timeclock frontend work is scoped to `apps/timeclock/` in a separate branch/work
 - Follow `docs/COMPLETION_WORKFLOW.md`: finish usable workflows, batch reviews/tests, and conserve context. This is a direct user-requested working policy.
 - Block on concrete correctness, privacy, data-integrity, required-workflow and material design problems; log optional refinements once for follow-up. Do not pursue perfection or silently reduce G1-G7 acceptance.
 - Keep CURRENT_STATE concise and report completed outcomes. Avoid repeated whole-app reviews, redundant tests/captures and tiny narrative-only checkpoints. Escalate stalled review loops to root/Astra for a direct resolution.
+
+## Hosted visual reference clarification — October 13
+
+The user explicitly selected https://denhamvenom.github.io/student_status/ for visual reference. Use its visual language (typography, colors, spacing, navigation, cards, tables and dialogs). Preserve later-added features and explicit user decisions even when absent from that prototype. Never delete functionality or regress approved behavior to imitate it. Style additions consistently; flag actual conflicts. Known differences from the preserved v2 reference are context, not a blocker to visual work and not permission to undo implemented requirements.
