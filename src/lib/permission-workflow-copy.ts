@@ -42,6 +42,7 @@ export const permissionWorkflowCopy = {
   chooseStudent: 'Choose a student', noStudents: 'No students are available in the current season.',
   export: 'Export permission records', exportEvent: 'Event to export', manifest: 'Permission manifest', healthPacket: 'Permission and health packet', includeHealth: 'Include permission snapshots and health records',
   exportDescription: 'The default manifest omits health information and full signed snapshots. Health packets require a separate export grant.', exportFailed: 'Unable to export permission records.',
+  exportPrepared: (count:number)=>'Prepared '+count+' '+(count===1?'record':'records')+'. Download requested; check your browser downloads.',
   downloading: 'Preparing export…', download: 'Download JSON', exportedAt: 'Exported', exportSynthetic: 'Synthetic records remain labeled in exports.',
   collectionSemantics: 'Records reflect current state when each page was collected; this is not one instantaneous snapshot.', exportProgress: (count:number)=>`${count} records collected. The file downloads only after collection finishes.`, cancelExport: 'Cancel export', exportCancelled: 'Export cancelled. No partial file was downloaded.', exportScopeChanged: 'Export scope or records changed unexpectedly. Start collection again.', exportCursorFailed: 'Export collection could not advance. No partial file was downloaded.',
   chooseEvent: 'Choose an event', healthGrantRequired: 'Permission and health packet export is not enabled for this account.',

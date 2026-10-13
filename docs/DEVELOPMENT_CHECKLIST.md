@@ -457,3 +457,5 @@ Checklist-linked scope estimates remain G1 85%, G2 55%, G3 90%, G4 90%, G5 80%, 
 - [ ] Complete Coach Finance prototype structure, shared fees/bulk operations, remaining accounts/roles, season carryover and visual matrix.
 
 Shared-fee backend and UI continue in parallel. Bulk preparation will preserve an immutable paginated review scope before committing financial changes. Last full integrated result remains 216 tests at the published charge/team-transfer checkpoint, not verification of the unfinished shared-fee/retention wave.
+
+October 13 follow-up: retention route connected under Coach Admin with a local query retry boundary; Astra integration review clear, 11 focused tests/types/scoped lint pass. It remains unsynchronized and live/visual unverified. Permission exports now show truthful completed collection/download-request feedback, verified live after five collector tests and review. Shared-fee work resumed after usage reset; isolated Mentor/Travel profile completion assigned in parallel. No change to overall 74% estimate.

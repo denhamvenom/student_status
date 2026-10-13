@@ -46,3 +46,5 @@ Additional independent ownership: Sol retention owns new retention-specific back
 
 
 Retention incremental Astra source review is clear after active-state fingerprint and native read-budget fixes; owner reports 11 tests/types/lint passing. Its UI remains unmounted and live/visual verification pending. Shared fee preparation/commit contracts remain under parallel implementation, with no application synchronization of this wave.
+
+Retention /retention is now connected in Coach-only navigation with local query recovery; types, scoped lint and 11 tests pass and Astra route review is clear. Do not visit for acceptance until reviewed backend sync. Root also added and live-verified permission export completion feedback (five collector tests). Independent Sol profile task owns new AdultProfile files and must confirm prototype/existing schema contracts before additions.
