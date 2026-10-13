@@ -356,5 +356,5 @@ Review checkpoint: combined lint/build and145/145 tests across25files passed bef
 - [x] Validate152 tests across26files, lint/types/build. Sandbox temporary-file import failure required outside-sandbox rerun; mixed-encoding label fixed. Build retains867KB bundle warning.
 - [x] Sync reviewed source to development third-bandicoot-18; aggregate components installed successfully.
 - [ ] Exercise live profile/account/report journeys and finish four-combination visual evidence.
-- [ ] Publish this reviewed wave and verify remote commit.
+- [x] Publish reviewed wave4a9ff62 and verify remote commit; update draft PR10 scope.
 No numbered G1–G7 item is complete from this incremental checkpoint.
