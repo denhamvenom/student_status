@@ -25,7 +25,7 @@ export const uiCopy = {
   wizard: { steps: reference.options.newEventSteps, cancel: 'Cancel', back: 'Back', continue: 'Continue', create: 'Create event' },
   // Three categories supersede the reference's older four-choice workflow.
   audiences: { travelTeam: 'Travel Team', wholeTeam: 'Whole Team', open: 'Open Registration' },
-  errors: { signIn: 'Sign-in could not be completed. Please try again.', rooming: 'Room selection is unavailable for this view. Return to the event or try again.', retry: 'Try again', returnEvent: 'Return to event' },
+  errors: { pageTitle: 'Something went wrong', pageBody: 'The page could not load. Please try again.', reload: 'Reload page', signIn: 'Sign-in could not be completed. Please try again.', rooming: 'Room selection is unavailable for this view. Return to the event or try again.', retry: 'Try again', returnEvent: 'Return to event' },
 } as const
 
 export function statusLabel(value: string | null | undefined): string {
