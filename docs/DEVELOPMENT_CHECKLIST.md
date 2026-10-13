@@ -1,30 +1,67 @@
 # Student Status Development Checklist
 
-Updated October 13, 2026
+Updated October 13, 2026. Reconciled at the integration handoff against source checkpoint `3ef3d45` and the latest recorded evidence.
 
-### Current completion status
+## Current completion status
 
-G3 (Whole Team functional enrollment) is complete after Astra review. Published source/evidence checkpoint: 80815b0; latest development sync15:54:24. Finance, season, supported historical corrections, selected export and retention/lifecycle rehearsals are complete within their recorded scope. G1, G2 and G4–G7 remain open for remaining account/role journeys, representative visual comparisons and final integrated review. Coach and Parent sessions are accessible; Student and ordinary Mentor sessions still need browser connection. The hosted prototype renders, but its version must be reconciled with the immutable design reference. See CURRENT_STATE.md and GOAL_ACCEPTANCE.md. Production, real signing and deletion remain gated.
+G3 Whole Team enrollment is functionally complete. G1, G2 and G4–G7 remain open. The goal is the full original G1–G7 scope through **READY FOR COACH VISUAL APPROVAL**; actual Coach approval and production are separate gates. CURRENT_STATE.md is the concise handoff; GOAL_ACCEPTANCE.md defines scope; VISUAL_CHECKS.md is the sole remaining visual queue.
 
-### Latest decisions and active work
+### Completed work and evidence to preserve
 
-- [x] Agree: build season begins automatically on the official FIRST kickoff calendar day (America/Chicago). Kickoff phase reporting is implemented, reviewed and synchronized; scoped Parent report readiness is live-verified.
-- [x] Implement and source-review shared fee priorities, historical identity review, immutable bulk scopes, recovery controls, Mentor profile/driver ownership review, and retention preview/holds. Synced to development October 13 at 12:30:56 after lint, types, 266 tests and build passed; final enrollment retry guard passed its targeted regression.
-- [ ] Complete essential live rehearsal and representative visual checks for the newly synchronized administration/profile controls. Implementation and source clearance do not close this item.
-- [x] Integrate reviewed Timeclock dialog focus and narrow-screen fixes; its local lint/types/build pass. Live Group race and physical-device evidence remain open.
+- [x] Whole Team creation and later reactivation, with existing withdrawals preserved.
+- [x] Finance administration, fundraising, priorities, source transfers, CSV import, immutable receipt correction and verified selected export.
+- [x] Supported historical finance, attendance and roster corrections; transferred/linked financial records remain protected by existing gates.
+- [x] Synthetic season activation, source-preserving carryover and retained Parent links/original records.
+- [x] Roster archive/reactivate and retention preview, hold and release.
+- [x] Synthetic permission signing, correction, re-signing, paper provenance and restricted export journeys.
+- [x] Parent child switching and attendance projections; unavailable future kickoff date remains explicitly unknown.
+- [x] VC-006 representative Coach Finance presentation.
 
-- [x] Agree: fundraising reductions affecting spent/transferred credits wait for Coach resolution without changing balances (October 13).
-- [x] Agree: reactivation followed by another archive restarts five-year retention from the latest archive date; automatic deletion remains unauthorized.
-- [x] Implement and source-review the latest-archive clock with before/after audit evidence; 13 focused account/profile tests pass; development synchronization is complete. Live archive/reactivation/rearchive checks remain pending.
-- [ ] Complete the ordinary Mentor-only Google rehearsal using the newly supplied owner-controlled test account. Identity and role assignment remain to be verified; account details stay outside this checklist.
-- [x] Implement, review and publish materialized financial balances, bounded allocation jobs and fundraiser posting; development sync and fictional posting/rebuild are verified. Remaining financial workflows and live cases are listed below.
+### Required feature status
 
-The app has a working foundation, Google sign-in, and a tested parent-invitation process. Several other features have working pieces, but the full app is not ready for real student records or public launch.
+- [x] Complete Coach roster → student record: record navigation, validated balances, bounded genuine next-event readiness, missing-information summaries/filters and truthful account linkage/access status. Membership controls and Coach-only data boundaries preserved. Reviewed and synchronized at 18:21:30; targeted and integrated checks passed, followed by representative live layout/navigation/filter/recovery verification.
 
-This checklist is the plain-language progress guide. The phases below show the recommended order of remaining work, not promised delivery dates. Some independent work can happen at the same time.
+- [ ] Connect the reachable Coach/Travel Lead Reports route to usable role-scoped reporting; current `/reports` navigation still reaches the unfinished fallback. Retain existing finance/attendance report implementations.
 
-**How to read it:** A checked box means the specific step is complete. For software, that means implemented and verified within our development environment. Items explicitly labeled Agree record a confirmed decision, not a built feature. An unchecked box means work remains. All testing so far uses fictional student information, including tests with owner-controlled Google accounts.
+### Missing evidence
 
+- [ ] Student required setup and locked-room correction journey.
+- [ ] Ordinary Mentor invitation acceptance, profile and report journey.
+- [ ] Independent adult finance/health grants and immediate revocation boundaries.
+- [ ] No-linked Parent state.
+- [ ] Remaining representative visual comparisons in VISUAL_CHECKS.md, preserving hosted prototype styling and later feature decisions.
+- [ ] Final coherent integrated validation and Astra review against all G1–G7 requirements.
+
+### User dependencies and separate gates
+
+- Student and ordinary Mentor browser sessions were unavailable at handoff; invitation acceptance remains pending. Park inaccessible checks without repetitive polling or convenience role grants.
+- Real signing, automatic retention deletion, main merge and production remain unauthorized.
+- Coach visual acceptance remains pending until the ready candidate is presented.
+- Timeclock physical-device/concurrent live evidence remains coordinated separately; preserve its existing checks and shared IDs/contracts.
+
+### Follow-up and efficiency limits
+
+Optional cosmetic refinements and the existing bundle-size advisory do not replace required acceptance. Finish coherent workflows; use Sol for implementation and Astra for consequential/final reviews. Reuse valid evidence, test changed risks, and perform representative visual checks instead of a full state/theme matrix. Batch documentation and publication at completed milestones.
+
+## Release checklist — after the visual-review candidate
+
+These are separate launch gates, not authorization to deploy.
+
+- [ ] Obtain Coach visual approval of the completed candidate and documented intentional differences.
+- [ ] Confirm organizational ownership and administrators for GitHub, Convex, Google and Cloudflare.
+- [ ] Confirm Student Status production domain, separate production configuration, Google sign-in and allowed origins.
+- [ ] Approve privacy/access rules and final permission/medication wording, products and exceptions before real signatures.
+- [ ] Resolve retention coverage, holds and backup/export treatment; keep automatic deletion disabled pending explicit authorization.
+- [ ] Review realistic team-volume limits, performance and remaining material usability/accessibility issues.
+- [ ] Establish monitoring, backups, demonstrated restoration and deployment rollback.
+- [ ] Prepare production account/roster onboarding without promoting synthetic development records.
+- [ ] Plan the existing GitHub Pages demo transition before a merge affecting it.
+- [ ] Obtain explicit production-deployment approval.
+- [ ] Publish the approved release with release notes; verify sign-in, permissions and core workflows at the production address in a controlled launch.
+- [ ] Coordinate Timeclock's separate visual approval, authorized concurrent Group rehearsal and physical-device evidence at an approved reachable origin.
+## Historical phase plan and dated evidence
+
+The sections below retain prior decisions and evidence. Their older unchecked boxes, checkpoint IDs, estimates and phrases such as “pending,” “no activation,” or “all seven open” describe their original date, not a second current queue. The reconciled status above and later dated evidence supersede those historical claims. Do not repeat completed journeys merely to close historical boxes.
 ## Phase 1 Establish the foundation
 
 **Status: Completed for development.**

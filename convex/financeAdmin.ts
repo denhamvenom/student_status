@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { activeSeason, viewer } from "./lib/access";
 import { feeMaintenanceProjection, feeMaintenanceValidator } from "./lib/seasonFinance";
-import { verifyAppliedSources } from "./lib/financialSources";
+import { financeRow } from "./lib/financeRow";
 
 const nullable = v.union(v.number(), v.null());
 const row = v.object({ studentId: v.id("students"), name: v.string(), active: v.boolean(), state: v.union(v.literal("ready"), v.literal("updating"), v.literal("failed"), v.literal("uninitialized")), chargedCents: nullable, personalAppliedCents: nullable, fundraisingAppliedCents: nullable, dueCents: nullable, fundraisingAvailableCents: nullable, personalAvailableCents: nullable, generation: nullable, financialRevision: nullable, updatedAt: nullable, canRecord: v.boolean(), canView: v.boolean(), canRebuild: v.boolean() });
@@ -17,21 +17,9 @@ export const students = query({
     const result = await ctx.db.query("students").withIndex("by_seasonId_and_active", q => q.eq("seasonId", season._id).eq("active", args.active ?? true)).paginate(opts);
     if (result.page.length > 20) throw new Error("Finance roster page exceeded its supported size.");
     const page = await Promise.all(result.page.map(async student => {
-      const [account, summary] = await Promise.all([
-        ctx.db.query("financialAccounts").withIndex("by_studentId", q => q.eq("studentId", student._id)).unique(),
-        ctx.db.query("studentFinanceSummaries").withIndex("by_studentId", q => q.eq("studentId", student._id)).unique(),
-      ]);
-      let state: "ready" | "updating" | "failed" | "uninitialized" = !account || account.state === "uninitialized" ? "uninitialized" : account.state === "failed" ? "failed" : "updating";
-      if (account?.state === "ready" && !account.operationJobId && !account.allocationJobId && !account.fundraiserJobId && summary?.version === 4 && summary.financialGeneration === account.generation && summary.financialRevision === account.revision) {
-        try {
-          verifyAppliedSources(account);
-          const fields = [summary.chargedCents, summary.paidCents, summary.personalAppliedCents, summary.fundraisingAppliedCents, summary.dueCents, summary.fundraisingAvailableCents, summary.personalAvailableCents];
-          if (fields.some(value => value === undefined || !Number.isSafeInteger(value) || value < 0) || BigInt(summary.personalAppliedCents!) + BigInt(summary.fundraisingAppliedCents!) !== BigInt(summary.paidCents) || BigInt(summary.chargedCents) - BigInt(summary.paidCents) !== BigInt(summary.dueCents) || summary.paidCents !== account.paidCents || summary.chargedCents !== account.chargedCents || summary.personalAppliedCents !== account.personalAppliedCents || summary.fundraisingAppliedCents !== account.fundraisingAppliedCents || summary.personalAvailableCents !== account.personalAvailableCents || summary.fundraisingAvailableCents !== account.fundraisingAvailableCents) throw new Error("Projection needs review.");
-          state = "ready";
-        } catch { state = "failed"; }
-      }
-      const ready = state === "ready"; const writable = !maintenance || maintenance.state === "ready";
-      return { studentId: student._id, name: student.preferredName || student.legalName, active: student.active, state, chargedCents: ready ? summary!.chargedCents : null, personalAppliedCents: ready ? summary!.personalAppliedCents! : null, fundraisingAppliedCents: ready ? summary!.fundraisingAppliedCents! : null, dueCents: ready ? summary!.dueCents : null, fundraisingAvailableCents: ready ? summary!.fundraisingAvailableCents : null, personalAvailableCents: ready ? summary!.personalAvailableCents : null, generation: account?.generation ?? null, financialRevision: account?.revision ?? null, updatedAt: ready ? summary!.updatedAt : null, canRecord: ready && writable && student.active && (actor.role === "coach" || actor.financialEdit), canView: student.active, canRebuild: actor.role === "coach" && (!maintenance || ["ready", "failed"].includes(maintenance.state)) && (!account || ["ready", "failed", "uninitialized"].includes(account.state) && !account.operationJobId && !account.allocationJobId && !account.fundraiserJobId) };
+      const { account, ...projection } = await financeRow(ctx, student._id);
+      const writable = !maintenance || maintenance.state === "ready";
+      return { studentId: student._id, name: student.preferredName || student.legalName, active: student.active, ...projection, canRecord: projection.state === "ready" && writable && student.active && (actor.role === "coach" || actor.financialEdit), canView: student.active, canRebuild: actor.role === "coach" && (!maintenance || ["ready", "failed"].includes(maintenance.state)) && (!account || ["ready", "failed", "uninitialized"].includes(account.state) && !account.operationJobId && !account.allocationJobId && !account.fundraiserJobId) };
     }));
     return { ...result, page, seasonId: season._id, maintenance };
   },

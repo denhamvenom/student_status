@@ -4,8 +4,8 @@ Updated October 13, 2026. Follow COMPLETION_WORKFLOW.md. G3 is functionally comp
 
 ## Workspace and boundaries
 
-- Checkout student-status-readiness-design; branch feature/student-status-completion; draft PR10. Published source/evidence checkpoint 697a7bd. Root owns Git, shared backend/generated files and synchronization.
-- Development only: daniel-eiland / denham-venom-student-status / dev:third-bandicoot-18. Latest sync 15:54:24. No production, main merge, real signing or deletion authorization.
+- Checkout student-status-readiness-design; branch feature/student-status-completion; draft PR10. Prior published checkpoint 3ef3d45 (remote reverified); Coach roster milestone is recorded in the current commit. Root owns Git, shared backend/generated files and synchronization.
+- Development only: daniel-eiland / denham-venom-student-status / dev:third-bandicoot-18. Latest development sync 18:21:30 (Coach roster queries and shared unchanged finance projection). No production, main merge, real signing or deletion authorization.
 - All application records are synthetic. Account-specific evidence, screenshots, exports and secrets stay outside Git.
 
 ## Completed outcomes to retain
@@ -25,8 +25,11 @@ Updated October 13, 2026. Follow COMPLETION_WORKFLOW.md. G3 is functionally comp
 - Hosted prototype discovered in user Chrome at https://denhamvenom.github.io/student_status/index.html and rendered successfully. Local file navigation remains blocked; do not bypass. The user now explicitly authorizes the hosted site as visual reference while preserving later-added functionality and decisions. Version context: documented Pages main/demo differs from immutable sibling student-status-operations/design-reference/prototype. Sol found Adults markup/handlers/assets unchanged between preserved demo and immutable reference; Status and Readiness materially differ. Use the hosted visual language without regressing later Status/Readiness requirements or removing added features.
 - Latest visual pass: Users & Roles phone dark and desktop light, lower phone controls, separate access dialog disabled without reason, Escape returning focus to Edit access. Valid images saved privately; no permissions changed. Document widths375/1425 at requested390/1440, no horizontal overflow. This is scoped evidence, not full VC-018/021 closure.
 
-## Next actions
+## Resumed workflow — October 13, 2026
 
-1. Finish the newly confirmed Coach roster-to-student-record gap: minimized Coach-only row projections, real record route, balances/next-event/missing-information context and filters. Astra confirmed this is required G1/G4/G6, not optional polish. Preserve existing archive/reactivate controls. VC-006 Finance presentation is closed; roster VC-007 stays open. Reference version differences no longer block visual work.
-2. When new sessions become available, finish the remaining role journeys without redoing completed ones.
-3. Batch final review/checks and publish accurate checklist/evidence. User visual approval follows the ready candidate; production remains separate.
+User resumed the full remaining G1–G7 goal with this chat as integration owner. Sol implements; Astra reviews consequential changes and final milestones. The current checklist is reconciled once; historical phase entries retain their original evidence. Timeclock confirms no conflicting backend work.
+
+1. Coach roster → student record is implemented, reviewed and development-synchronized. Coach-only paginated rows, current-season active/inactive detail, validated balances, account linkage/access, missing fields, bounded next-event readiness and preserved archive controls are integrated. Targeted permission/projection/coverage tests and integrated lint/types/tests/build passed. Representative desktop-dark and phone-light layouts, balance filter, record/back navigation, error recovery and disabled archive/focus were observed. Final scoped layout fixes and error copy passed lint/types as applicable. No repeated financial, season or membership mutation rehearsal.
+2. Connect the reachable Coach/Travel Lead Reports placeholder to usable role-scoped reporting, reusing existing finance/attendance projections. This concrete route gap is not optional polish.
+3. Finish remaining role journeys when connected sessions are available; no repeated sign-in polling. Complete remaining representative visual queue and final G1–G7 review.
+4. User visual approval, production ownership/configuration/policy/backup/monitoring/rollback and explicit deployment approval remain separate gates in the checklist.

@@ -21,7 +21,7 @@ export function AppShell({ children, viewer, familyContext, role = "coach" }: { 
   const { signOut } = useAuthActions()
   const [more, setMore] = useState(false)
   const { pathname } = useLocation()
-  const activePath = pathname.startsWith('/events/') ? '/events' : pathname
+  const activePath = pathname.startsWith('/events/') ? '/events' : role === 'coach' && (pathname === '/team' || pathname.startsWith('/team/')) ? '/' : pathname
   const [chosenGroup, setChosenGroup] = useState<string | null>(null)
   const [previousPath, setPreviousPath] = useState(pathname)
   if (previousPath !== pathname) { setPreviousPath(pathname); setChosenGroup(null); setMore(false) }

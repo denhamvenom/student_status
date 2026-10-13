@@ -1,0 +1,92 @@
+import { paginationOptsValidator, paginationResultValidator } from "convex/server";
+import { v } from "convex/values";
+import { query } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
+import type { QueryCtx } from "./_generated/server";
+import { activeSeason, requireRole, viewer } from "./lib/access";
+import { studentReadiness } from "./lib/readModels";
+import { financeRow } from "./lib/financeRow";
+import { boundedFinancePage } from "./financeAdmin";
+import { enrollmentPending } from "./lib/eventEnrollmentState";
+
+const nullableMoney = v.union(v.number(), v.null());
+const balanceValidator = v.object({ state: v.union(v.literal("ready"), v.literal("updating"), v.literal("failed"), v.literal("uninitialized")), dueCents: nullableMoney, personalAvailableCents: nullableMoney, fundraisingAvailableCents: nullableMoney, updatedAt: nullableMoney });
+const accountValidator = v.object({ linkage: v.union(v.literal("linked"), v.literal("unlinked"), v.literal("unavailable")), access: v.union(v.literal("active"), v.literal("inactive"), v.literal("unknown")) });
+const eventValidator = v.union(v.null(), v.object({ eventId: v.id("events"), name: v.string(), startsAt: v.number(), participation: v.union(v.literal("confirmed"), v.literal("pending"), v.literal("waitlist"), v.literal("withdrawn"), v.null()), state: v.union(v.literal("ready"), v.literal("open"), v.literal("unknown")), open: v.array(v.string()) }));
+const rowValidator = v.object({ studentId: v.id("students"), name: v.string(), subteam: v.string(), travelTeam: v.boolean(), active: v.boolean(), profileRevision: v.number(), account: accountValidator, balance: balanceValidator, nextEvent: eventValidator, readinessCoverage: v.union(v.literal("complete"), v.literal("unknown"), v.literal("notApplicable")), missingSummary: v.array(v.string()) });
+
+function missingInformation(student: Doc<"students">) {
+  const missing: string[] = [];
+  if (student.profileCompletedAt === undefined) missing.push("Profile setup");
+  if (!student.shirtSize?.trim()) missing.push("Shirt size");
+  if (!student.roomCategory) missing.push("Room category");
+  if (!student.guardianName?.trim() || !student.guardianPhone?.trim()) missing.push("Guardian contact");
+  if (!student.emergencyName?.trim() || !student.emergencyPhone?.trim()) missing.push("Emergency contact");
+  if (student.allergies.state === "unknown" || student.medications.state === "unknown" || !student.otcAuthorization) missing.push("Health information");
+  return missing;
+}
+
+async function accountStatus(ctx: QueryCtx, student: Doc<"students">) {
+  if (!student.userId) return { linkage: "unlinked" as const, access: "unknown" as const };
+  const account = await ctx.db.get(student.userId);
+  if (!account || account.role !== "student") return { linkage: "unavailable" as const, access: "unknown" as const };
+  return { linkage: "linked" as const, access: account.active ? "active" as const : "inactive" as const };
+}
+
+type Upcoming = { events: Doc<"events">[]; truncated: boolean };
+async function upcomingEvents(ctx: QueryCtx, seasonId: Doc<"seasons">["_id"], asOf: number): Promise<Upcoming> {
+  const page = await ctx.db.query("events").withIndex("by_seasonId_and_startsAt", q => q.eq("seasonId", seasonId).gte("startsAt", asOf)).take(11);
+  return { events: page.slice(0, 10).filter(event => !event.archived), truncated: page.length > 10 };
+}
+
+async function nextEvent(ctx: QueryCtx, student: Doc<"students">, upcoming: Upcoming, financeState: string) {
+  if (!student.active) return { nextEvent: null, readinessCoverage: "notApplicable" as const };
+  for (const event of upcoming.events) {
+    const participant = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
+    if (enrollmentPending(event) && event.assignmentScope === "wholeTeam") return { nextEvent: { eventId: event._id, name: event.name, startsAt: event.startsAt, participation: participant?.status ?? null, state: "unknown" as const, open: ["Whole Team enrollment is not complete"] }, readinessCoverage: "unknown" as const };
+    if (!participant || participant.status === "withdrawn") continue;
+    if (participant.status !== "confirmed") return { nextEvent: { eventId: event._id, name: event.name, startsAt: event.startsAt, participation: participant.status, state: "open" as const, open: ["Participation is not confirmed"] }, readinessCoverage: "complete" as const };
+    const readiness = await studentReadiness(ctx, event, student);
+    const state = financeState !== "ready" || readiness.open.includes("Event financial records require review") || readiness.open.includes("Event requirements require review") ? "unknown" as const : readiness.state === "ready" ? "ready" as const : "open" as const;
+    return { nextEvent: { eventId: event._id, name: event.name, startsAt: event.startsAt, participation: participant.status, state, open: readiness.open }, readinessCoverage: "complete" as const };
+  }
+  return { nextEvent: null, readinessCoverage: upcoming.truncated ? "unknown" as const : "complete" as const };
+}
+
+async function rosterRow(ctx: QueryCtx, student: Doc<"students">, upcoming: Upcoming) {
+  const [finance, account] = await Promise.all([financeRow(ctx, student._id), accountStatus(ctx, student)]);
+  const event = await nextEvent(ctx, student, upcoming, finance.state);
+  return { studentId: student._id, name: student.preferredName || student.legalName, subteam: student.subteam, travelTeam: student.travelTeam, active: student.active, profileRevision: student.profileRevision ?? 0, account, balance: { state: finance.state, dueCents: finance.dueCents, personalAvailableCents: finance.personalAvailableCents, fundraisingAvailableCents: finance.fundraisingAvailableCents, updatedAt: finance.updatedAt }, ...event, missingSummary: missingInformation(student) };
+}
+
+export const list = query({
+  args: { paginationOpts: paginationOptsValidator, active: v.optional(v.boolean()), asOf: v.number() },
+  returns: paginationResultValidator(rowValidator).extend({ seasonId: v.id("seasons") }),
+  handler: async (ctx, args) => {
+    requireRole(await viewer(ctx), "coach");
+    if (!Number.isFinite(args.asOf)) throw new Error("A valid current time is required.");
+    const season = await activeSeason(ctx);
+    const page = await ctx.db.query("students").withIndex("by_seasonId_and_active", q => q.eq("seasonId", season._id).eq("active", args.active ?? true)).paginate(boundedFinancePage(args.paginationOpts));
+    const upcoming = await upcomingEvents(ctx, season._id, args.asOf);
+    return { ...page, page: await Promise.all(page.page.map(student => rosterRow(ctx, student, upcoming))), seasonId: season._id };
+  },
+});
+
+const detailValidator = v.object({ ...rowValidator.fields, legalName: v.string(), preferredName: v.string(), email: v.string(), shirtSize: v.union(v.string(), v.null()), roomCategory: v.union(v.string(), v.null()), guardianName: v.union(v.string(), v.null()), guardianRelationship: v.union(v.string(), v.null()), guardianPhone: v.union(v.string(), v.null()), emergencyName: v.union(v.string(), v.null()), emergencyRelationship: v.union(v.string(), v.null()), emergencyPhone: v.union(v.string(), v.null()), allergies: v.object({ state: v.string(), text: v.optional(v.string()) }), medications: v.object({ state: v.string(), text: v.optional(v.string()) }), otcAuthorization: v.union(v.string(), v.null()), profileSetupRequired: v.boolean(), parents: v.array(v.object({name:v.string(),linked:v.boolean(),access:v.union(v.literal("active"),v.literal("inactive"),v.literal("unknown"))})), parentCoverage:v.union(v.literal("complete"),v.literal("unknown")) });
+export const detail = query({
+  args: { studentId: v.id("students"), asOf: v.number() }, returns: detailValidator,
+  handler: async (ctx, args) => {
+    requireRole(await viewer(ctx), "coach");
+    if (!Number.isFinite(args.asOf)) throw new Error("A valid current time is required.");
+    const season = await activeSeason(ctx);
+    const student = await ctx.db.get(args.studentId);
+    if (!student || student.seasonId !== season._id) throw new Error("Student is unavailable in the current season.");
+    const row = await rosterRow(ctx, student, await upcomingEvents(ctx, season._id, args.asOf));
+    const links = await ctx.db.query("familyLinks").withIndex("by_studentId", q => q.eq("studentId", student._id)).take(21);
+    const parents = await Promise.all(links.slice(0,20).filter(link => !link.seasonId || link.seasonId === season._id).map(async link => {
+      const parent = await ctx.db.get(link.parentUserId);
+      return { name: parent?.name ?? "Parent account unavailable", linked: link.active, access: !parent || parent.role !== "parent" ? "unknown" as const : parent.active ? "active" as const : "inactive" as const };
+    }));
+    return { ...row, legalName: student.legalName, preferredName: student.preferredName, email: student.email, shirtSize: student.shirtSize ?? null, roomCategory: student.roomCategory ?? null, guardianName: student.guardianName ?? null, guardianRelationship: student.guardianRelationship ?? null, guardianPhone: student.guardianPhone ?? null, emergencyName: student.emergencyName ?? null, emergencyRelationship: student.emergencyRelationship ?? null, emergencyPhone: student.emergencyPhone ?? null, allergies: student.allergies, medications: student.medications, otcAuthorization: student.otcAuthorization ?? null, profileSetupRequired: student.profileCompletedAt === undefined, parents, parentCoverage:links.length>20?"unknown" as const:"complete" as const };
+  },
+});
