@@ -63,6 +63,7 @@ The browser harness intercepts transport only inside Playwright and does not shi
 - [ ] Integration owner incorporates the October 13 usability follow-up and checks the combined branch. Never merge main or independently sync shared Convex from this frontend checkout.
 
 ## 6. Remaining scope
+- [x] Added plain-language SEASON_TRANSITION response explaining paused actions and continued clock-out access. Backend transition guards and live cutover verification remain with Student Status integration.
 - Other synthetic names still require explicit Coach review; do not infer surnames or reseed.
 - Student Status owns reporting, name review, correction UI and shared backend readiness.
 - Historical Sheets import, production domain/configuration, physical-device rehearsal and release approval remain separate work.
