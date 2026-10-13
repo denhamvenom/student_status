@@ -10,7 +10,7 @@ export const permissionWorkflowCopy = {
   unapprovedWording: 'This wording and medication administration policy are unapproved development drafts. The synthetic form grants no real consent.',
   currentCoverage: 'Current event coverage', originalScope: 'Included at signing', laterEvents: 'Other eligible events outside this receipt',
   status: { required: 'Not submitted', pending: 'Awaiting review', accepted: 'Accepted', correction: 'Needs correction', legacy: 'Legacy record' },
-  start: 'Prepare synthetic form', startAgain: 'Prepare another form', viewReceipt: 'View receipt', receipt: 'Receipt', history: 'Receipt history', noHistory: 'No permission receipts yet.',
+  start: 'Prepare synthetic form', startAgain: 'Prepare another form', viewReceipt: 'View receipt', receipt: 'Receipt', history: 'Receipt history', parentHistory: 'Current-season receipt history', noHistory: 'No permission receipts yet.', parentNoHistory: 'No permission receipts for this student in the current season. Prior-season records are retained, but are not available through Parent access. Contact a Coach for assistance.',
   step: (step:number) => `Step ${step} of 4`,
   steps: ['Student and parent identification', 'Covered events', 'Emergency contact and health', 'Parent approval'],
   student: 'Student', parent: 'Parent / guardian', account: 'Verified Google account', subteam: 'Subteam',

@@ -27,7 +27,8 @@ G3 Whole Team enrollment is functionally complete. G1, G2 and G4–G7 remain ope
 
 - [ ] Confirm Reports CSV file delivery in the browser and its Travel Lead live presentation. CSV scope, Draft metadata and injection protection pass automated checks; browser download observation timed out, and browser policy blocked the downloads-page inspection. Do not retry through a workaround.
 
-- [ ] Student required setup and locked-room correction journey.
+- [ ] Student required setup and locked-room correction journey, active room invitation/acceptance or deadline, and withdrawn-room recovery.
+- [ ] Live paid-withdrawal decision with fee/return consequences (existing implementation; do not repeat completed financial workflows).
 - [ ] Ordinary Mentor invitation acceptance, profile and report journey.
 - [ ] Independent adult finance/health grants and immediate revocation boundaries.
 - [ ] No-linked Parent state.
