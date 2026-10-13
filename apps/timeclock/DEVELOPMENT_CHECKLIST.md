@@ -1,71 +1,65 @@
-# Timeclock frontend development checklist
+# Timeclock development checklist
 
-Status: frontend implemented and verified for development; published in draft PR #6. No production deployment.
+Status: frontend implemented; development rehearsal advanced October 13, 2026. Visual approval and production release remain separate. Source checkpoint fbb4148 on feature/timeclock-frontend, draft PR 6.
 
-## 1. Shared foundation
-- [x] Read backend handoff and repository instructions.
-- [x] Isolate frontend branch/worktree from Student Status.
-- [x] Confirm backend ownership and available port 5174.
-- [x] Assign Sol implementation/design and Astra review.
+## 1. Foundation — complete
+- [x] Isolated frontend worktree and branch; Student Status remains at repository root.
+- [x] One shared Convex backend, exclusively maintained/synchronized by Student Status integration.
+- [x] Frontend changes confined to apps/timeclock; root dependencies and generated files unchanged here.
+- [x] Sol implementation/design and Astra source review.
 
-## 2. Design and access
-- [x] Adapt Student Status branding, responsive layout and light/dark themes.
-- [x] Google sign-in, authorized access and recoverable error screens.
-- [x] PIN-protected sign-out and event switching.
-
-## 3. Event selection
-- [x] Today's calendar events, finished states and sync freshness.
+## 2. Interface — implemented and checked
+- [x] Student Status branding, phone/desktop layouts and light/dark themes.
+- [x] Google operator access gate and explicit connection errors.
+- [x] Calendar selection, finished states and calendar freshness.
 - [x] All-day end-time setup and unscheduled name/duration.
-- [x] One browser-profile console shared across tabs.
+- [x] Shared browser-profile console selection across tabs.
+- [x] Active reviewed roster, chosen-name display, surname ordering supplied by backend, duplicate-name handling.
+- [x] Individual and Group clocking with reactive status.
+- [x] PIN-gated transfers, extensions, event switching and sign-out.
+- [x] Same-key uncertain-request retry, offline control disabling and reactive closing.
+- [ ] User visual approval; no speculative redesign or production approval implied.
 
-## 4. Clocking
-- [x] Live roster status and Individual/Group modes.
-- [x] Previewed atomic commands and PIN-confirmed transfers.
-- [x] Duplicate prevention and safe uncertain-request retry.
-- [x] PIN-protected extensions and automatic closing UI.
+## 3. Automated verification — passed at published frontend checkpoint
+- [x] Root lint, strict types, 77 backend tests across 12 suites and Student Status build.
+- [x] Timeclock lint/types/build and Cloudflare packaging dry-run.
+- [x] 34 synthetic browser scenarios: phone/desktop light/dark, clocking, group selection, PIN rejection/success, transfer, creation, automatic return, revoked access, disconnection, retry and two-tab profile identity.
+- [x] Astra final source/harness review accepted; no blocking source findings.
 
-## 5. Verification
-- [x] Astra source review and fixes.
-- [x] Workspace lint, strict types and build.
-- [x] Root regression checks and Cloudflare packaging dry-run.
-- [x] Responsive light/dark and keyboard/dialog browser checks.
-- [x] Synthetic UI interaction checks (34) and backend concurrency regression tests (77 total backend tests).
-- [ ] Full live multi-device clocking rehearsal after Coach-reviewed synthetic names.
+The browser harness intercepts transport only inside Playwright and does not ship a production fixture bypass. It is not live backend evidence. One known React development warning from next-themes initialization is recorded separately; no runtime errors occurred. Screenshots/results stay in ignored test-results/timeclock. On October 13 the backend owner identified a dated all-day regression fixture in the old baseline and owns its repair and current integrated regression run; this frontend chat did not duplicate that work.
 
-## 6. Handoff
-- [x] Review staged changes for secrets/student data.
-- [x] Publish reviewed development checkpoint and draft PR.
-- [x] Send implementation evidence and remaining limitations to backend owner.
+## 4. Live development evidence
+### Reported by Student Status integration on October 12
+- [x] Coach Google sign-in, reviewed fictional name, live clock-in and same-profile cross-tab status.
+- [x] Browser-independent scheduled closure at the exact end; sub-hour interval did not qualify attendance.
+- [x] Coach append-only correction preserved original evidence and updated duration.
+- [x] Mentor clock-in/out and preserved role boundaries.
 
-## Boundaries and remaining external work
-- Only apps/timeclock is frontend-owned. Shared backend/root tooling belongs to Student Status integration.
-- Existing synthetic student structured names require explicit Coach review before live clocking; do not infer surnames or reseed.
-- Production hosting, reporting/admin UI and historical import are separate milestones.
-- Backend baseline: 6bf4b71750cc9c235e75e52fdf2ce37f0a75ab43.
+### Directly verified by Timeclock on October 13
+- [x] Existing Mentor session created explicitly synthetic unscheduled events.
+- [x] Wrong extension PIN rejected; correct PIN added one half-hour while keeping original scheduled window visible.
+- [x] Event switch required PIN and returned to selection.
+- [x] Student already IN elsewhere showed conflict; named confirmation and PIN transferred to the selected event.
+- [x] Independent Mentor Chrome and Coach in-app browser sessions on the same computer observed each other's IN/OUT changes.
+- [x] Wrong sign-out PIN rejected; correct PIN returned Mentor to Operator sign-in.
+- [x] Synthetic student left OUT; no production or real student records used. Coach browser identity preserved.
+- [ ] Deterministic live simultaneous-request proof: an attempted pair of UI clicks was inconclusive because controls can change between clicks. Do not count it as a passed concurrency test. Automated transactional tests remain the concurrency evidence.
+- [ ] Physical separate-device/network rehearsal. Localhost origins do not establish this; coordinate approved staging/origin setup before testing another device.
 
-## Paused checkpoint — October 12, 2026
-User requested a hold before leaving wireless coverage. Do not resume until explicit continue.
+## 5. Publication and integration
+- [x] Source/fixtures reviewed for secrets and student records.
+- [x] Frontend implementation c73a6a3 and publication documentation fbb4148 pushed to feature/timeclock-frontend.
+- [x] Draft PR: https://github.com/denhamvenom/student_status/pull/6, based on feature/timeclock-backend.
+- [x] Direct implementation and live-rehearsal handoffs sent to Student Status integration.
+- [ ] Integration owner merges frontend into the reviewed development integration branch and runs combined checks. Never merge main or independently sync shared Convex from this frontend checkout.
 
-Implemented: Student Status visual style and branding; Google access gate; calendar event selection; all-day and unscheduled dialogs; Individual/Group clocking; live status; PIN transfer/extension/switch/sign-out; shared browser-profile console; preserved uncertain-command retry.
+## 6. Remaining scope
+- Other synthetic names still require explicit Coach review; do not infer surnames or reseed.
+- Student Status owns reporting, name review, correction UI and shared backend readiness.
+- Historical Sheets import, production domain/configuration, physical-device rehearsal and release approval remain separate work.
+- Keep account addresses, PIN, credentials, record IDs and live screenshots out of Git/GitHub.
 
-Verified: Sol reports `bun run check:timeclock` passes lint, strict types and build. Astra source review accepted after fixes to session-bound previews, duplicate-name labels, retry locks, modal feedback and StrictMode dialog behavior. Root has not yet completed independent final checks.
+## Resume and run instructions
+Worktree: Development Version/student-status-timeclock-ui. Frontend source base: 6bf4b71; the integrated backend has since advanced under its owner. Do not run old backend codegen/watchers/syncs here.
 
-Pending: browser harness, root regression checks, Cloudflare packaging, final staged review, commit/push and draft PR. No publication or production deployment performed.
-
-Browser harness at tests/browser-check.mjs and tests/mock-client.mjs uses synthetic transport interception only. First runs failed due test infrastructure, not established product failures: sandbox Edge/preview isolation was fixed by running owned preview and checks outside sandbox. Remaining harness issue: mock imports React without Vite's version query, creating a second React copy. Capture the exact React import URL from intercepted transformed main.tsx and substitute it into mock-client when fulfilling the test route. Do not add a production test bypass. Retry full browser checks after repair; screenshots/results remain ignored under root test-results/timeclock.
-
-Local dependency installation required repair of missing node_modules/@auth/core from this checkout's own locked .bun cache. Root package/lockfile unchanged. Own Vite preview on port5174 was started in exec session84524; Student Status5173 untouched. Root will stop owned preview for this hold; restart frontend only after resume.
-
-Worktree: Development Version/student-status-timeclock-ui; branch feature/timeclock-frontend; baseline6bf4b71. Changes currently uncommitted, confined to apps/timeclock. Other chat is working independently in student-status-operations; do not alter its checkout or sync backend. Frontend/design/review agents finished. Student Status remains exclusive backend/root-tooling owner. Existing synthetic names still require Coach review; no live data written here.
-
-## Resumed verification — October 12, 2026
-The user explicitly resumed development. Astra accepted final source and test-harness review. Root verified 77 backend tests across 12 suites, lint/types and Student Status build; Timeclock lint/types/build and Cloudflare packaging dry-run pass. Browser suite passes 34 synthetic scenarios at phone/desktop sizes in light/dark: reactive closing, individual/group clocking, same-key retry after a lost response, PIN rejection/success, transfer confirmation, event creation, revoked access, disconnected controls, and shared profile identity across two tabs. Screenshots visually inspected; no horizontal overflow. Test artifacts are ignored and contain fictional names only.
-
-Browser checks intercept module imports in Playwright; the production app has no fixture bypass. These checks do not establish real multi-device backend integration. A known React development warning from the existing next-themes initialization script is recorded separately; no runtime errors were observed. Root backend/auth/schema/tooling and lockfile remain unchanged.
-
-Commands: from repository root, bun run dev:timeclock; bun run check:timeclock; node apps/timeclock/tests/browser-check.mjs (requires local preview and installed Edge); bun run check; bun run cloudflare:timeclock. Windows sandbox temporary-file/Edge isolation failures require running these checks in the host environment, not weakening tests.
-
-Remaining: Coach-reviewed synthetic names and live multi-device rehearsal; Student Status reporting/correction UI in its owning chat; historical import; production domain/deployment. Timeclock preview: http://localhost:5174/ while owned server runs. No production approval implied.
-
-## Publication
-Implementation checkpoint c73a6a3fb6a29f0495c462810af5d5b3f733dd4a is pushed to feature/timeclock-frontend. Draft PR: https://github.com/denhamvenom/student_status/pull/6, targeting feature/timeclock-backend. Remote branch verified. The Student Status integration chat received the direct handoff and owns subsequent shared integration. This documentation-only follow-up records publication; all live-rehearsal and production boundaries above remain.
+From repository root: bun run dev:timeclock; bun run check:timeclock; node apps/timeclock/tests/browser-check.mjs; bun run cloudflare:timeclock. Browser checks require the local preview and installed Edge. Use the host environment for Windows sandbox temporary-module/browser failures without weakening tests. Preview uses http://localhost:5174/ for exact Google redirect matching. Local preview restarted October 13 for rehearsal. Earlier October 12 pause was explicitly superseded by the user's resume; current work is active within the agreed ownership boundaries.
