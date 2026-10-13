@@ -6,6 +6,7 @@ import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { Checkbox } from './components/ui/checkbox'
 import { NativeSelect, NativeSelectOption } from './components/ui/native-select'
+import styles from './features/operations/Operations.module.css'
 
 const usd = (cents:number) => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(cents/100)
 const message = (error:unknown) => error instanceof Error ? error.message : String(error)
@@ -20,7 +21,7 @@ export function StudentWithdrawal({eventId,studentId}:{eventId:Id<'events'>;stud
   if (!data) return <p>Loading withdrawal status…</p>
   if (data.status === 'withdrawn') return <p role="status">Withdrawal approved. Your place has been released.</p>
   if (!data.allowWithdrawal) return null
-  return <section className="card" aria-labelledby="withdraw-title"><h2 id="withdraw-title">Withdrawal</h2>
+  return <section className={`${styles.root} card`} aria-labelledby="withdraw-title"><h2 id="withdraw-title">Withdrawal</h2>
     {data.requestStatus === 'pending' ? <p role="status">Your withdrawal request is awaiting Coach or Travel Lead review. Your participation status and any reserved room place remain unchanged until a decision.</p> : <><p>Request to leave {data.eventName}. Your participation status and any reserved room place remain unchanged until a decision.</p>{data.requestStatus === 'denied' && <p role="status">A previous request was denied. You may submit another request.</p>}<Button className="button button-outline" disabled={busy} onClick={()=>void submit()}>{busy?'Submitting…':'Request withdrawal'}</Button></>}
     {error && <p role="alert" className="open-text">{error}</p>}
   </section>
@@ -41,9 +42,9 @@ function Review({requestId,eventId,studentId}:{requestId:Id<'withdrawalRequests'
   const returned = choice === 'full' ? paid : choice === 'partial' ? parsed : 0
   const valid = choice !== 'partial' || Number.isSafeInteger(parsed) && parsed > 0 && parsed <= paid
   const submit = async (event:FormEvent) => {event.preventDefault();if (!valid || reason.trim().length < 8) return;setBusy(true);setError('');try{await decide({requestId,decision:choice,...(choice==='partial'?{returnCents:parsed}:{}),cancelUnpaidMain:choice==='deny'?false:cancelMain,reason:reason.trim(),expectedRevision:data.revision})}catch(e){setError(message(e))}finally{setBusy(false)}}
-  return <section className="card" aria-labelledby={`withdraw-review-${requestId}`}><h2 id={`withdraw-review-${requestId}`}>{data.studentName} · {data.eventName}</h2>
+  return <section className={`${styles.root} card`} aria-labelledby={`withdraw-review-${requestId}`}><h2 id={`withdraw-review-${requestId}`}>{data.studentName} · {data.eventName}</h2>
     <p className="muted">Participation status and any reserved room place remain unchanged while this request is pending.</p>
-    <div className="table-wrap"><table><thead><tr><th>Charge</th><th>Category</th><th>Charged</th><th>Paid</th><th>Unpaid</th></tr></thead><tbody>{data.charges.map(c=><tr key={c.id}><td>{c.label}</td><td>{c.category==='extra'?'Extra':'Main event/travel'}</td><td>{usd(c.chargedCents)}</td><td>{usd(c.paidCents)}</td><td>{usd(c.unpaidCents)}</td></tr>)}</tbody></table></div>
+    <div className="table-wrap"><table><thead><tr><th>Charge</th><th>Category</th><th>Charged</th><th>Paid</th><th>Unpaid</th></tr></thead><tbody>{data.charges.map(c=><tr key={c.id}><td data-label="Charge">{c.label}</td><td data-label="Category">{c.category==='extra'?'Extra':'Main event/travel'}</td><td data-label="Charged">{usd(c.chargedCents)}</td><td data-label="Paid">{usd(c.paidCents)}</td><td data-label="Unpaid">{usd(c.unpaidCents)}</td></tr>)}</tbody></table></div>
     <p>Paid: main {usd(data.paidMainCents)} · extras {usd(data.paidExtraCents)} · total {usd(paid)}</p>
     <p>Unpaid: main {usd(data.unpaidMainCents)} · extras {usd(data.unpaidExtraCents)}</p>
     <form onSubmit={e=>void submit(e)} className="form-grid">
@@ -61,8 +62,8 @@ function Review({requestId,eventId,studentId}:{requestId:Id<'withdrawalRequests'
 
 export function WithdrawalQueue() {
   const queue = useQuery(api.withdrawals.pendingWithdrawals,{})
-  if (!queue) return <section className="card"><h2>Withdrawal requests</h2><p>Loading requests…</p></section>
-  return <section aria-labelledby="withdraw-queue-title"><h2 id="withdraw-queue-title">Withdrawal requests · {queue.length}</h2>{queue.length===0?<p>No requests are waiting.</p>:<div className="two-col">{queue.map(row=><Review key={row.requestId} {...row}/>)}</div>}</section>
+  if (!queue) return <section className="card"><h2>Pending review</h2><p>Loading requests…</p></section>
+  return <section className={`${styles.root} ${styles.queue}`} aria-labelledby="withdraw-queue-title"><h2 id="withdraw-queue-title">Pending review · {queue.length}</h2>{queue.length===0?<p className={styles.notice}>No requests are waiting.</p>:<div className="two-col">{queue.map(row=><Review key={row.requestId} {...row}/>)}</div>}</section>
 }
 
 export function ChargeEditor({studentId}:{studentId:Id<'students'>}) {
@@ -82,7 +83,7 @@ export function ChargeEditor({studentId}:{studentId:Id<'students'>}) {
   const priorityNumber = Number(priority)
   const valid = label.trim().length>0 && Number.isSafeInteger(cents) && cents>0 && Number.isSafeInteger(priorityNumber) && priority.trim()!==''
   const submit = async (event:FormEvent) => {event.preventDefault();if(!valid||pending.current.busy)return;const idempotencyKey=pending.current.key??key();pending.current.key=idempotencyKey;pending.current.busy=true;setBusy(true);setError('');setSaved(false);try{await create({studentId,...(eventId?{eventId:eventId as Id<'events'>,category}:{}),label:label.trim(),amountCents:cents,priority:priorityNumber,idempotencyKey});pending.current.key=null;setLabel('');setAmount('');setSaved(true)}catch(e){setError(message(e))}finally{pending.current.busy=false;setBusy(false)}}
-  return <section className="card" aria-labelledby="charge-editor-title"><h2 id="charge-editor-title">Add a charge</h2><p>Classify event charges as the main event/travel fee or an extra, such as lunch. Outstanding credits will apply by priority.</p><form className="form-grid" onSubmit={e=>void submit(e)}>
+  return <section className={`${styles.root} card`} aria-labelledby="charge-editor-title"><h2 id="charge-editor-title">Add a charge</h2><p>Classify event charges as the main event/travel fee or an extra, such as lunch. Outstanding credits will apply by priority.</p><form className="form-grid" onSubmit={e=>void submit(e)}>
     <label>Event <NativeSelect value={eventId} disabled={busy} onChange={e=>{changed();setEventId(e.target.value)}}><NativeSelectOption value="">Standalone charge</NativeSelectOption>{events?.map(row=><NativeSelectOption key={row.event._id} value={row.event._id}>{row.event.name}</NativeSelectOption>)}</NativeSelect></label>
     {eventId && <label>Fee category <NativeSelect value={category} disabled={busy} onChange={e=>{changed();setCategory(e.target.value as typeof category)}}><NativeSelectOption value="main">Main event/travel</NativeSelectOption><NativeSelectOption value="extra">Extra</NativeSelectOption></NativeSelect></label>}
     <label>Charge label <Input value={label} disabled={busy} maxLength={150} onChange={e=>{changed();setLabel(e.target.value)}} required placeholder="Lunch"/></label>
