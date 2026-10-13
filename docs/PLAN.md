@@ -191,4 +191,8 @@ See [the rehearsal report](REHEARSAL_2026-10-12.md) for the current evidence, su
 
 ## Representative design review
 
-Coach authorized one screen before broader corrections. The isolated Coach Readiness candidate uses the existing backend with screen-scoped presentation. All four viewport/theme comparisons, Astra review and local checks are recorded in [READINESS_DESIGN_REVIEW.md](READINESS_DESIGN_REVIEW.md). Coach acceptance is pending; other screens, paused backend drafts and production remain outside this step.
+Coach authorized one screen before broader corrections. The isolated Coach Readiness candidate uses the existing backend with screen-scoped presentation. All four viewport/theme comparisons, Astra review and local checks are recorded in [READINESS_DESIGN_REVIEW.md](READINESS_DESIGN_REVIEW.md). Coach subsequently accepted this representative screen and authorized the frontend rollout below. Paused backend drafts and production remain excluded.
+
+## October 12 approved frontend rollout
+
+Coach approved representative Readiness and authorized frontend alignment across existing screens. Work runs on `feature/student-status-readiness-design`, draft PR9, excluding paused backend draft ancestry. See `FRONTEND_CONFORMANCE_LOG.md` for implementation, review and evidence limits. Sol agents own separate presentation areas; Astra reviews integration. Whole Team backend semantics, aggregate Coach finance views, missing states and real consent remain separate dependencies. No production or main merge authorization.

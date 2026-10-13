@@ -238,10 +238,11 @@ Timeclock parallel handoff: frontend owner reports Astra review, 34 synthetic in
 - [x] Consolidate visual comparisons for available Coach, Student, Parent and Travel screens at phone/desktop in both themes, with Astra review and parallel Sol image review. The report explicitly distinguishes valid observations, invalid captures, unimplemented screens and unavailable states; this is not visual acceptance.
 - [x] Complete `design-drift-report.md` with role/state coverage, prioritized findings, added-feature styling guidance and separate functional dependencies.
 - [ ] Close remaining evidence limits during correction verification: ordinary Mentor-only account, active room invitations/paid withdrawal, multiple linked children, invitation variants, and invalid Student Parents desktop captures. No permissions or domain records were changed to manufacture those states.
-- [ ] Obtain Coach approval of the report before making design corrections.
+- [x] Coach authorized representative corrections and then approved wider frontend rollout.
 - [ ] Implement approved shared labels, tokens/components and screen corrections; preserve backend and access rules.
 - [ ] Recompare corrected screens, document intentional differences and obtain final visual review.
-- [ ] Append design-conformance instructions to existing AGENTS.md and publish reviewed design checkpoints under the existing development workflow.
+- [x] Append design-conformance instructions to existing AGENTS.md.
+- [ ] Publish and verify the broader reviewed frontend checkpoint.
 
 No backend work, Timeclock changes, real consent, production deployment or main merge is included in this design task. Newer features without an exact prototype screen inherit its typography, colors, spacing, layout patterns and component states; do not invent a separate visual style.
 
@@ -250,8 +251,25 @@ No backend work, Timeclock changes, real consent, production deployment or main 
 - [x] Coach authorized one representative screen, then review before wider rollout.
 - [x] Prepare Coach Readiness at 390px and 1440px in both themes, with explicit existing-data limitations.
 - [x] Validate four visual comparisons, navigation/event selection/keyboard behavior, Astra review, lint/types, 101 tests and build. See [the representative review](READINESS_DESIGN_REVIEW.md).
-- [ ] Obtain Coach approval before applying this design to other screens.
+- [x] Coach approved representative Readiness and authorized applying its design across the app.
 
 This branch excludes paused backend drafts and earlier broad frontend drafts. No backend, Timeclock or production changes are authorized.
 
-Representative Readiness checkpoint `ed69bbb` is published and verified in draft [PR #9](https://github.com/denhamvenom/student_status/pull/9). Coach review remains pending.
+Representative Readiness checkpoint `ed69bbb` is published and verified in draft [PR #9](https://github.com/denhamvenom/student_status/pull/9). Coach approved the representative screen; broader conformance verification is in progress.
+
+## Approved frontend rollout — October 12
+
+- [x] Coach approved representative Readiness and authorized frontend conformance across the app.
+- [ ] Complete existing-data presentation and verify role/viewport/theme coverage.
+- [ ] Keep [the work log](FRONTEND_CONFORMANCE_LOG.md), evidence limitations and Git checkpoints current.
+
+Backend-dependent gaps remain separately deferred; no production action is authorized.
+
+### Frontend implementation checkpoint
+
+- [x] Implement shared role shell, reference copy helpers and consistent Base UI tokens/controls.
+- [x] Implement existing-data presentation changes for Status, Finances, roster, event setup/workspace, Drivers, invitations, permission draft, attendance, rooms and withdrawals.
+- [x] Astra final source review and full check: 101 tests, lint, strict types and build. Cloudflare dry run packaged successfully without upload (optional sandbox log-write warning).
+- [x] Compare New Event audience at phone/desktop in both themes; verify open-capacity control, six-step navigation and Cancel without saving.
+- [ ] Finish remaining role/state/theme matrix and shared-label migration; see the precise evidence limits in FRONTEND_CONFORMANCE_LOG.md.
+- [ ] Coach final visual acceptance of the broader app.
