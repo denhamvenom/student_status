@@ -61,6 +61,9 @@ describe("parent invitations", () => {
     const links = await f.student.query(api.parentInvites.listFamilyLinks, { studentId: f.ids.student });
     expect(links).toHaveLength(1);
     expect(links[0].active).toBe(true);
+    const storedLink = await f.t.run(ctx => ctx.db.get(links[0]._id));
+    const storedStudent = await f.t.run(ctx => ctx.db.get(f.ids.student));
+    expect(storedLink?.seasonId).toBe(storedStudent?.seasonId);
     const parentView = await f.parent.query(api.app.viewer, {});
     expect(parentView.user?.role).toBe("parent");
     expect(parentView.students.map((x: { _id: string }) => x._id)).toEqual([f.ids.student]);
@@ -109,9 +112,13 @@ describe("parent invitations", () => {
     const link = (await f.student.query(api.parentInvites.listFamilyLinks, { studentId: f.ids.student }))[0];
     await expect(f.student.mutation(api.parentInvites.revokeFamilyLink, { linkId: link._id })).rejects.toThrow("permission");
     await f.coach.mutation(api.parentInvites.revokeFamilyLink, { linkId: link._id });
+    await f.t.run(ctx => ctx.db.patch(link._id, { seasonId: undefined }));
     await expect(f.parent.query(api.app.studentProfile, { studentId: f.ids.student })).rejects.toThrow("permission");
     await expect(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" })).rejects.toThrow("revoked family link");
     await f.coach.mutation(api.parentInvites.restoreFamilyLink, { linkId: link._id, reason: "Verified by Coach" });
+    const restoredLink = await f.t.run(ctx => ctx.db.get(link._id));
+    const restoredStudent = await f.t.run(ctx => ctx.db.get(f.ids.student));
+    expect(restoredLink?.seasonId).toBe(restoredStudent?.seasonId);
     expect((await f.parent.query(api.app.studentProfile, { studentId: f.ids.student }))._id).toBe(f.ids.student);
     const audits = await f.t.run(ctx => ctx.db.query("audit").withIndex("by_entity_and_entityId", q => q.eq("entity", "familyLinks").eq("entityId", link._id)).take(10));
     expect(audits.map(x => x.action)).toContain("restore");

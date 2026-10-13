@@ -159,3 +159,6 @@ Coach Finance, fictional records, dark theme at the existing desktop viewport: e
 ## October13 connected Finance rehearsal
 
 After development sync13:21:10, Coach prepared six fictional accounts and historical coverage. Source-separated rows and team totals reconciled. A fictional one-cent payment through the named modal disabled submit/close while pending, then showed success and returned focus to its row Record button; row paid1.00→1.01/due9.00→8.99 and team applied31.00→31.01. Fee-order history includes definition labels and actual preparation timestamps. Private finance-table-payment-verified.png inspected at existing wide dark viewport; this is live behavior and scoped desktop evidence, not the required390/1440 light/dark matrix. Account-details rehearsal and remaining action/visual scope stay open.
+
+### October 13 Finance desktop hierarchy checkpoint
+Coach Finance dark at verified inner viewport1440x1000 (document width1425 with scrollbar): restored account-table/fee-sidebar layout, added missing prototype spacing tokens, and wrapped fee actions below names at narrow container widths. Valid CUA screenshot inspected; debugger screenshot was scaled incorrectly and rejected. Phone/light/lower states remain in VISUAL_CHECKS. Private evidence stays outside Git. Temporary viewport override reset.

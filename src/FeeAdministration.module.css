@@ -1,4 +1,4 @@
-.root{display:grid;gap:18px;min-width:0;color:var(--text-body);font:15px/1.5 'Segoe UI',system-ui,sans-serif}
+.root{display:grid;gap:18px;min-width:0;color:var(--text-body);font:15px/1.5 'Segoe UI',system-ui,sans-serif;container-type:inline-size}
 .card{min-width:0;padding:18px;gap:16px;background:var(--surface-card);color:var(--text-body);border-color:var(--border-default);box-shadow:var(--shadow-sm)}
 .card :global([data-slot=card-title]){margin:0;font:400 20px/1.15 Anton,Impact,sans-serif}
 .formCard :global([data-slot=card-title]){font-size:24px}
@@ -9,6 +9,7 @@
 .rank{flex-shrink:0;min-width:28px;max-width:8ch;overflow-wrap:anywhere;padding-top:8px;font:400 20px/1.1 Anton,Impact,sans-serif}
 .feeName{display:grid;gap:4px;flex:1;min-width:0;padding-top:7px;overflow-wrap:anywhere}
 .feeActions{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+@container(max-width:400px){.fee{flex-wrap:wrap}.feeActions{flex-basis:100%;justify-content:flex-start;padding-left:40px}}
 .form{display:grid;gap:14px;min-width:0;margin:0;border:0;padding:0}
 .fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:14px}
 .field{display:grid;gap:5px;min-width:0;font-size:14px;font-weight:600}

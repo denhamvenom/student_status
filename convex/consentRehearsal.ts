@@ -72,9 +72,14 @@ export const linkParent = internalMutation({
     if (!coach?.active || coach.role !== "coach") throw new Error("Expected active Coach not found.");
     const registry = await ctx.db.query("syntheticConsentSubjects").withIndex("by_studentId_and_parentId", q => q.eq("studentId", fixture.studentId).eq("parentId", parent._id)).unique();
     const link = await ctx.db.query("familyLinks").withIndex("by_parentUserId_and_studentId", q => q.eq("parentUserId", parent._id).eq("studentId", fixture.studentId)).unique();
+    const student = await ctx.db.get(fixture.studentId);
+    const season = await ctx.db.query("seasons").withIndex("by_status", q => q.eq("status", "active")).unique();
+    if (!student || !season || student.seasonId !== season._id) throw new Error("Rehearsal student season changed; manual review required.");
     if (registry && !registry.enabled || link && !link.active) throw new Error("Rehearsal access was revoked; manual review required.");
     if (registry && !link) throw new Error("Rehearsal linkage changed; manual review required.");
-    if (!link) await ctx.db.insert("familyLinks", { parentUserId: parent._id, studentId: fixture.studentId, active: true, createdBy: coach._id });
+    if (link?.seasonId && link.seasonId !== student.seasonId) throw new Error("Rehearsal family link season changed; manual review required.");
+    if (link && !link.seasonId) await ctx.db.patch(link._id, { seasonId: student.seasonId });
+    if (!link) await ctx.db.insert("familyLinks", { parentUserId: parent._id, studentId: fixture.studentId, seasonId: student.seasonId, active: true, createdBy: coach._id });
     if (!registry) {
       await ctx.db.insert("syntheticConsentSubjects", { studentId: fixture.studentId, parentId: parent._id, enabled: true, createdBy: coach._id, createdAt: Date.now() });
       await audit(ctx, coach, MARKER, fixture.studentId, "linkParent", null, { parentId: parent._id }, "Explicit test Parent linked to module-created fictional subject only; no account role changes.");

@@ -507,3 +507,8 @@ October13 integration verification:12focused Finance UI tests pass. Full lint/ty
 - [ ] Complete Finance responsive reference comparisons and account-detail action rehearsal; scoped export/import/payment corrections remain required.
 
 Full integrated289tests/54files lint/types/build passed before final refinements; final13UI tests, strict types, scoped lint/build and owner9backend tests after refinement pass. Bundle-size warning remains a follow-up. This completes a connected slice, not G1/G6/G7 in full.
+
+October 13 completion-first batch in progress: scoped Finance export backend and in-memory collector implemented; four collector tests pass. Download UI, consolidated review, live rehearsal and publication remain pending. Finance account/fee sidebar hierarchy updated in source, visual checks pending. Season-link migration is under review; current Parent access has not switched. No G1-G7 completion claimed.
+
+October 13 export integration: CSV/manifest controls connected, including local retry and cancellation. Full lint/types/304 tests/production build pass; build bundle warning remains follow-up. Astra backend/collector review clear and both final UI corrections applied. Desktop dark Finance hierarchy/spacing visually inspected at actual1440x1000; phone/light/lower controls and live export remain pending. Development sync is in progress; no G1-G7 closure.
+Development export/link synchronization completed13:42:46. Live migration and export rehearsal remain pending; Parent consumers have not switched.

@@ -129,7 +129,9 @@ export const acceptParentInvite = mutation({
     }
     const link = await ctx.db.query("familyLinks").withIndex("by_parentUserId_and_studentId", q => q.eq("parentUserId", parent._id).eq("studentId", student._id)).unique();
     if (link && !link.active) throw new Error("A Coach must resolve this revoked family link.");
-    if (!link) await ctx.db.insert("familyLinks", { parentUserId: parent._id, studentId: student._id, active: true, createdBy: parent._id });
+    if (link?.seasonId && link.seasonId !== student.seasonId) throw new Error("Family link season changed; a Coach must review it.");
+    if (link && !link.seasonId) await ctx.db.patch(link._id, { seasonId: student.seasonId });
+    if (!link) await ctx.db.insert("familyLinks", { parentUserId: parent._id, studentId: student._id, seasonId: student.seasonId, active: true, createdBy: parent._id });
     const now = Date.now();
     await ctx.db.patch(row._id, { status: "accepted", acceptedBy: parent._id, acceptedAt: now, relationship, attestationVersion: ATTESTATION_VERSION, attestationText: ATTESTATION_TEXT, attestedAt: now });
     await audit(ctx, parent, "parentInvitations", row._id, "accept", { status: "pending" }, { studentId: student._id, parentEmail: row.parentEmail, relationship, attestationVersion: ATTESTATION_VERSION, attestationText: ATTESTATION_TEXT, attestedAt: now });
@@ -223,7 +225,8 @@ export const restoreFamilyLink = mutation({
     const student = await eligibleStudent(ctx, link.studentId);
     const parent = await ctx.db.get(link.parentUserId);
     if (!parent || !parent.active || parent.role !== "parent" || parent.email === student.email) throw new Error("This family link cannot be restored.");
-    await ctx.db.patch(link._id, { active: true, revokedAt: undefined, revokedBy: undefined });
+    if (link.seasonId && link.seasonId !== student.seasonId) throw new Error("Family link season changed; a Coach must review it.");
+    await ctx.db.patch(link._id, { active: true, seasonId: student.seasonId, revokedAt: undefined, revokedBy: undefined });
     await audit(ctx, actor, "familyLinks", link._id, "restore", false, true, args.reason.trim());
     return null;
   },

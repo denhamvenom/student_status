@@ -1,4 +1,6 @@
 import { CoachFinanceAccounts, CoachFinanceChanges } from './CoachFinanceWorkspace'
+import { FinanceExport } from './FinanceExport'
+import financeLayoutStyles from './CoachFinanceTable.module.css'
 import { financeWorkspaceCopy } from './lib/finance-admin-copy'
 import { AdultProfile } from './AdultProfile'
 import { DriverOwnerReconciliation } from './DriverOwnerReconciliation'
@@ -167,14 +169,17 @@ function AdminFinance({viewer}:{viewer:Viewer}) {
   }
   return <>
     <Heading title={familyCopy.finance.title} description={financeWorkspaceCopy.description}/>
-    <CoachFinanceAccounts onOpen={(id,name)=>open(id,name,'details')} onRecord={(id,name)=>open(id,name,'record')}/>
+    <div className={financeLayoutStyles.workspace}>
+      <CoachFinanceAccounts onOpen={(id,name)=>open(id,name,'details')} onRecord={(id,name)=>open(id,name,'record')}/>
+      <aside><FeeAdministration isCoach={viewer.user?.role==='coach'}/></aside>
+    </div>
     {details&&<section aria-label={financeWorkspaceCopy.accountDetails}>
       <h2>{details.name} · {financeWorkspaceCopy.accountDetails}</h2>
       <FinancePage key={details.id} studentId={details.id} showHeading={false} allowChargeEditing={viewer.user?.role==='coach'}/>
       {canEdit&&<><ChargeEditor key={`charge:${details.id}`} studentId={sid(details.id)}/><FinanceOperations key={`finance:${details.id}`} studentId={sid(details.id)}/></>}
     </section>}
     <TeamFinanceOverview/>
-    <FeeAdministration isCoach={viewer.user?.role==='coach'}/>
+    <FinanceExport selectedStudentId={details?sid(details.id):undefined} selectedStudentName={details?.name}/>
     <CoachFinanceChanges/>
     <Dialog open={!!selection} onOpenChange={value=>{if(!value&&!pending.current.busy)setSelection(null)}}>
       <DialogPortal><DialogOverlay className={newEventStyles.overlay}/><DialogPrimitive.Popup className={newEventStyles.panel}>

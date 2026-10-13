@@ -1,4 +1,7 @@
 .root{min-width:0;display:grid;gap:var(--space-4);color:var(--text-body)}
+.workspace{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,1fr);gap:var(--space-4);align-items:start}
+.workspace>aside{min-width:0}
+@media(max-width:1023px){.workspace{grid-template-columns:minmax(0,1fr)}}
 .root h2,.root h3{margin:0;font-family:var(--font-heading);font-weight:400;line-height:var(--leading-tight)}
 .root h2{font-size:var(--text-xl)}
 .root h3{font-size:var(--text-lg)}

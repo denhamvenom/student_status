@@ -120,8 +120,25 @@ export default defineSchema({
     .index("by_status", ["status"]).index("by_year", ["year"]),
   students: defineTable({ seasonId: v.id("seasons"), userId: v.optional(v.id("appUsers")), profileCompletedAt: v.optional(v.number()), profileRevision: v.optional(v.number()), guardianName: v.optional(v.string()), guardianRelationship: v.optional(v.string()), guardianPhone: v.optional(v.string()), guardianEmail: v.optional(v.string()), archivedAt: v.optional(v.number()), legalName: v.string(), preferredName: v.string(), firstName: v.optional(v.string()), lastName: v.optional(v.string()), structuredNameReviewed: v.optional(v.boolean()), email: v.string(), subteam: v.string(), active: v.boolean(), travelTeam: v.boolean(), shirtSize: v.optional(v.string()), roomCategory: v.optional(category), roomCategoryLocked: v.boolean(), emergencyName: v.optional(v.string()), emergencyRelationship: v.optional(v.string()), emergencyPhone: v.optional(v.string()), allergies: report, medications: report, otcAuthorization: v.optional(v.union(v.literal("yes"), v.literal("contact"), v.literal("no"))) })
     .index("by_seasonId_and_active", ["seasonId", "active"]).index("by_seasonId", ["seasonId"]).index("by_userId", ["userId"]).index("by_seasonId_and_userId", ["seasonId", "userId"]).index("by_seasonId_and_email", ["seasonId", "email"]).index("by_active_and_archivedAt", ["active", "archivedAt"]),
-  familyLinks: defineTable({ parentUserId: v.id("appUsers"), studentId: v.id("students"), active: v.boolean(), createdBy: v.id("appUsers"), revokedAt: v.optional(v.number()), revokedBy: v.optional(v.id("appUsers")) })
-    .index("by_parentUserId", ["parentUserId"]).index("by_studentId", ["studentId"]).index("by_parentUserId_and_studentId", ["parentUserId", "studentId"]),
+  familyLinks: defineTable({ parentUserId: v.id("appUsers"), studentId: v.id("students"), seasonId: v.optional(v.id("seasons")), active: v.boolean(), createdBy: v.id("appUsers"), revokedAt: v.optional(v.number()), revokedBy: v.optional(v.id("appUsers")) })
+    .index("by_parentUserId", ["parentUserId"]).index("by_studentId", ["studentId"]).index("by_parentUserId_and_studentId", ["parentUserId", "studentId"])
+    .index("by_parentUserId_and_seasonId_and_active", ["parentUserId", "seasonId", "active"]),
+  familyLinkSeasonBackfill: defineTable({
+    key: v.literal("team"), state: v.union(v.literal("pending"), v.literal("running"), v.literal("failed"), v.literal("complete")),
+    phase: v.union(v.literal("backfill"), v.literal("verify")), cursor: v.union(v.string(), v.null()),
+    scanned: v.number(), unresolved: v.number(), generation: v.number(), startedBy: v.id("appUsers"),
+    updatedAt: v.number(), lastError: v.optional(v.string()),
+  }).index("by_key", ["key"]),
+  financeExportJobs: defineTable({
+    createdBy: v.id("appUsers"), seasonId: v.id("seasons"), scope: v.union(v.literal("allActive"), v.literal("selected")),
+    state: v.union(v.literal("preparing"), v.literal("ready"), v.literal("failed"), v.literal("expired")),
+    createdAt: v.number(), expiresAt: v.number(), completedAt: v.optional(v.number()), cursor: v.union(v.string(), v.null()),
+    memberCount: v.number(), scopeHash: v.string(), idempotencyKey: v.string(), requestHash: v.string(), lastError: v.optional(v.string()),
+  }).index("by_createdBy_and_idempotencyKey", ["createdBy", "idempotencyKey"]),
+  financeExportMembers: defineTable({
+    jobId: v.id("financeExportJobs"), studentId: v.id("students"), generation: v.optional(v.number()),
+    financialRevision: v.optional(v.number()), chargeCount: v.optional(v.number()), collectedAt: v.optional(v.number()),
+  }).index("by_jobId", ["jobId"]).index("by_jobId_and_studentId", ["jobId", "studentId"]),
   parentInvitationSettings: defineTable({ key: v.literal("team"), enabled: v.boolean(), updatedBy: v.id("appUsers"), updatedAt: v.number() })
     .index("by_key", ["key"]),
   parentInvitations: defineTable({ studentId: v.id("students"), parentEmail: v.string(), tokenHash: v.string(), status: v.union(v.literal("pending"), v.literal("accepted"), v.literal("revoked"), v.literal("replaced")), createdBy: v.id("appUsers"), createdAt: v.number(), expiresAt: v.number(), acceptedBy: v.optional(v.id("appUsers")), acceptedAt: v.optional(v.number()), relationship: v.optional(v.string()), attestationVersion: v.optional(v.string()), attestationText: v.optional(v.string()), attestedAt: v.optional(v.number()) })
