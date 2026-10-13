@@ -64,3 +64,43 @@ Parent invitation and permission-draft wording now uses `family-copy.ts`; Dashbo
 Local reviewed implementation commits: `2cdcd34` shared controls; `db738e1` operations cards; `b4ef144` role shell/reference labels; `24aa091` family/event views and shared copy. Final lint, typecheck and build after copy extraction pass; bundle advisory is approximately 796 kB minified. Astra accepted the final copy-only review. Publication is recorded separately after remote verification.
 
 Published and verified: `2bb7eee` on `feature/student-status-readiness-design`, draft [PR9](https://github.com/denhamvenom/student_status/pull/9), still based on the audit-report branch. Remote PR head matched that commit. Main was not merged; no production deployment occurred. This publication note is a subsequent documentation-only checkpoint.
+
+## Follow-up: remaining copy and responsive checks — October 12
+
+### Changes completed
+
+- Live route copy now lives in `live-copy.ts` and `family-copy.ts`; role navigation is centralized in `navigation-copy.ts` and derives reference labels where defined. Shirt/subteam/theme labels retain explicit unchanged submitted values.
+- Driver, transport, withdrawal, attendance, event, room and finance-operation copy is centralized in `operations-copy.ts`, including typed sentence formatters for dynamic amounts, counts, dates and names. Domain enums and backend error text remain data. The separate legacy fixture-only review app is not rewritten by this live-app pass.
+- Root error-boundary text uses shared copy. New Event and permission/invitation text retain their existing shared modules. Numeric chart ticks, record names and domain values are not treated as translatable UI prose.
+- Added the prototype's All events shortcut to Status. Blank Profile subteam now says Not completed. Roster filters show No students match these filters instead of an unexplained empty table.
+- Corrected the shared small-control radius to 4px. Fixed sticky event anchors: Transport originally landed at -0.36px beneath the phone nav (bottom140px); after correction target155.64px. Desktop target232.26px clears nav215px. Tablet navigation uses the compact-header offset too.
+
+### Review and checks
+
+Astra accepted final source review, including AST comparisons of mutation arguments, guards, enabled states and route targets. No backend, generated API, dependency, Timeclock or deployment changes. Full `bun run check` passed after all code edits: lint, strict TypeScript, 101 tests in18 files and build. The unchanged bundle-size advisory remains (~818kB minified). No production deployment.
+
+The browser capture pipeline required recovery: full-page and raw debugger captures sometimes returned stale pages, incorrect theme frames or distorted dimensions. All unprefixed `followup/` images are rejected. Only individually reviewed `verified-*` files count. Browser DOM viewport was measured at390×844 (375px document area plus scrollbar); the tool scales some saved screenshots to375×812. These support responsive layout review, not pixel-exact screenshot matching. Desktop tested at1440×1000; some outputs are likewise scaled. Screenshots remain outside Git.
+
+| Additional review | Result | Remaining limit |
+| --- | --- | --- |
+| Student Status | Loaded phone/desktop light/dark reviewed against prototype card/nav/type patterns | Team-raised/travel-share and update metadata unavailable; no fabricated figures |
+| Student Profile | Loaded desktop themes and recaptured phone top/lower controls both themes reviewed; Save has room above nav | Missing guardian/emergency/authorization workflow remains functional gap |
+| Student Finances/Parents | Loaded themes checked; incorrect theme captures replaced and reviewed | Viewport slices do not prove every lower row/state |
+| Parent Status/permission draft | Both sizes/themes reviewed; Viewing context and no-signing draft clear | Some captures are scrolled; multiple-child/signature states not available |
+| Driver Add/Edit | Complete desktop forms reviewed; phone stacked forms and light lower Save/Cancel visible | Dark phone lower capture stops early; no save/validation-result claim |
+| Coach Finance | Correct dark desktop/phone summaries and lower light/dark payment/refund form slices reviewed; buttons above nav | Middle of long form not covered by these slices; aggregate overview still unsupported |
+| Roster empty search | Search returned explicit no-matches state; cleared afterward | No domain records changed |
+
+### Backend-dependent gaps (unchanged, not implemented here)
+
+1. Whole Team enrollment semantics and persistence; current choice stays visibly unavailable.
+2. Team-wide finance/roster aggregates and source-accurate raised/travel-share/update projections.
+3. Family Attendance and unsupported detailed readiness projections.
+4. Full guardian/emergency-contact/permission-signing workflow, approved wording/version snapshots and export contracts.
+5. Missing report/export and other unsupported admin workflows described in the original drift report.
+
+Separate state/visual rehearsal remains for ordinary Mentor-only access, multiple linked children, active room invitations, paid withdrawal decisions and invitation variants. These are evidence gaps, not assertions that every case needs new backend code. No grants or fixtures were changed to manufacture them. Existing query/mutation tests remain intact.
+
+Final Event dark viewport slices were reviewed at both widths: transport and rooming headings, cards and visible controls are readable without sideways clipping. Desktop transport shows existing capacity/vehicle/student data; desktop rooming shows the create form and finalized occupied room. Phone lower sections continue below the viewport and are not claimed as fully inspected. A clarity finding was fixed: already-finalized rooms with no review flag show a disabled Finalized action; rooms needing review retain Review and finalize under the prior guards. Astra checked the existing re-finalization contract; no backend edit was needed. Browser confirmed the completed-room button disabled. Final label placement was corrected after TypeScript caught it in the formatter object; final lint/type/build were rerun.
+
+Available visual checks were completed within the listed states; unsupported or unexercised states remain explicit. All account theme preferences were restored to System and the browser viewport override was reset. The Coach workspace remains open. No driver, financial, invitation, room or event records were saved during this pass.

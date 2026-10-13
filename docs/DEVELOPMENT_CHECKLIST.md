@@ -273,3 +273,16 @@ Backend-dependent gaps remain separately deferred; no production action is autho
 - [x] Compare New Event audience at phone/desktop in both themes; verify open-capacity control, six-step navigation and Cancel without saving.
 - [ ] Finish remaining role/state/theme matrix and shared-label migration; see the precise evidence limits in FRONTEND_CONFORMANCE_LOG.md.
 - [ ] Coach final visual acceptance of the broader app.
+
+### Copy and responsive verification follow-up
+
+- [x] Consolidate live route, role navigation and operation wording into shared copy modules; preserve domain values and later approved policies.
+- [x] Add Status All events link, missing-subteam fallback and roster no-matches state.
+- [x] Correct 4px small-control corners and verify event anchor offsets below sticky navigation at phone/desktop.
+- [x] Review additional Student/Parent layouts, desktop driver forms and lower finance controls; record exact capture/state limits in FRONTEND_CONFORMANCE_LOG.md.
+- [x] Astra final source review and complete local check: 101 tests, lint/types/build pass.
+- [ ] Finish restricted/unavailable-state rehearsals and remaining viewport slices; full pixel parity and final Coach acceptance are not claimed.
+- [ ] Resolve flagged backend dependencies in a separately authorized phase.
+- [ ] Publish and verify this follow-up Git checkpoint.
+
+- [x] Review dark event transport/rooming viewport slices and clarify completed-room Finalized action while preserving required re-finalization.

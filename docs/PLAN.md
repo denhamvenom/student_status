@@ -196,3 +196,7 @@ Coach authorized one screen before broader corrections. The isolated Coach Readi
 ## October 12 approved frontend rollout
 
 Coach approved representative Readiness and authorized frontend alignment across existing screens. Work runs on `feature/student-status-readiness-design`, draft PR9, excluding paused backend draft ancestry. See `FRONTEND_CONFORMANCE_LOG.md` for implementation, review and evidence limits. Sol agents own separate presentation areas; Astra reviews integration. Whole Team backend semantics, aggregate Coach finance views, missing states and real consent remain separate dependencies. No production or main merge authorization.
+
+### Copy and visual-check follow-up
+
+Live-app copy consolidation and sticky-anchor/empty-state corrections completed with Astra review and101 passing tests. Updated available-role visual checks distinguish scaled viewport evidence from pixel parity and unsupported states. See FRONTEND_CONFORMANCE_LOG.md for the current table and explicit backend dependency list. Legacy fixture-only preview, new backend work and production remain outside this pass.
