@@ -592,3 +592,5 @@ October 13 payment rehearsal: CSV import recorded one simulated cent with exact 
 - [x] October 13 supported historical financial correction: isolated development-only archived fixture, original one-dollar charge retained, effective and paid amounts corrected to ninety-nine cents, one cent released to personal available funds, zero due, no payout. UI reported reconciliation and correction access returned to read-only. Existing transferred-source account correctly refused the same adjustment. Helper guard/idempotency suite five cases, scoped lint/types and Astra review passed; development sync 15:54:24.
 
 - [x] Record the Coach's hosted-reference clarification: use the public prototype for visual styling, preserve added features and later decisions, and flag conflicts instead of deleting functionality. Project instructions now enforce this boundary.
+
+- [x] Finance phone payment action now matches the hosted prototype's full-width primary Record payment treatment; rendered verification and Astra review complete. Existing financial functionality and desktop controls preserved.
