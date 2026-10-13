@@ -1,3 +1,4 @@
+import { operationsCopy } from '../../lib/operations-copy'
 import { useRef, useState, type FormEvent } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
@@ -49,10 +50,10 @@ export function FinanceOperations({ studentId }: { studentId: Id<'students'> }) 
     event.preventDefault()
     if (busy) return
     const amountCents = cents(amount)
-    if (amountCents === null) { setError('Enter a positive amount with at most two decimal places.'); return }
-    if (!reason.trim()) { setError('Enter a reason.'); return }
-    if (mode === 'payout' && (!reference.trim() || !occurredDate)) { setError('Enter the date and method reference.'); return }
-    if (mode === 'transfer' && !recipient) { setError('Choose a recipient student.'); return }
+    if (amountCents === null) { setError(operationsCopy.finance.enterAPositiveAmountWithAtMostTwoDecimalPlaces); return }
+    if (!reason.trim()) { setError(operationsCopy.finance.enterAReason); return }
+    if (mode === 'payout' && (!reference.trim() || !occurredDate)) { setError(operationsCopy.finance.enterTheDateAndMethodReference); return }
+    if (mode === 'transfer' && !recipient) { setError(operationsCopy.finance.chooseARecipientStudent); return }
     const idempotencyKey = pendingKey.current ?? crypto.randomUUID()
     pendingKey.current = idempotencyKey
     setBusy(true); setError(''); setSaved('')
@@ -60,34 +61,34 @@ export function FinanceOperations({ studentId }: { studentId: Id<'students'> }) 
       if (mode === 'payout') {
         const occurredAt = chicagoStartOfDay(occurredDate)
         await payout({ studentId, amountCents, reason: reason.trim(), method, reference: reference.trim(), occurredAt, idempotencyKey })
-        setSaved('Cash/check refund recorded. This record does not send money.')
+        setSaved(operationsCopy.finance.cashCheckRefundRecordedThisRecordDoesNotSendMoney)
       } else {
         await transfer({ studentId, recipientStudentId: recipient as Id<'students'>, amountCents, reason: reason.trim(), idempotencyKey })
-        setSaved('Fundraising credit transferred and applied to the recipient’s charges where due.')
+        setSaved(operationsCopy.finance.fundraisingCreditTransferredAndAppliedToTheRecipientSChargesWhereDue)
       }
       pendingKey.current = null; setAmount(''); setReason(''); setReference('')
     } catch (cause) { setError(errorText(cause)) } finally { setBusy(false) }
   }
 
-  return <section className={styles.panel} aria-label="Financial operations">
-    <h2>Money returned and fundraising transfers</h2>
-    <p className={styles.note}>Record money already given to a family. This app records the refund; it does not transfer money. Fundraising credits cannot be paid out.</p>
-    {options === undefined ? <p>Loading available funds…</p> : <>
-      <div className={styles.balances}><span>Unallocated personal payments <strong>{usd(options.personalAvailableCents)}</strong></span><span>Available fundraising credits <strong>{usd(options.fundraisingAvailableCents)}</strong></span></div>
-      <div className={styles.switch} role="group" aria-label="Choose financial operation">
-        <Button type="button" disabled={busy} variant={mode === 'payout' ? 'default' : 'outline'} onClick={() => { setMode('payout'); pendingKey.current = null; setError(''); setSaved('') }}>Record cash/check refund</Button>
-        <Button type="button" disabled={busy} variant={mode === 'transfer' ? 'default' : 'outline'} onClick={() => { setMode('transfer'); pendingKey.current = null; setError(''); setSaved('') }}>Transfer fundraising credit</Button>
+  return <section className={styles.panel} aria-label={operationsCopy.finance.financialOperations}>
+    <h2>{operationsCopy.finance.moneyReturnedAndFundraisingTransfers}</h2>
+    <p className={styles.note}>{operationsCopy.finance.recordMoneyAlreadyGivenToAFamilyThisAppRecordsTheRefundItDoesNotTransferMoneyFun}</p>
+    {options === undefined ? <p>{operationsCopy.finance.loadingAvailableFunds}</p> : <>
+      <div className={styles.balances}><span>{operationsCopy.finance.unallocatedPersonal} <strong>{usd(options.personalAvailableCents)}</strong></span><span>{operationsCopy.finance.availableFundraising} <strong>{usd(options.fundraisingAvailableCents)}</strong></span></div>
+      <div className={styles.switch} role="group" aria-label={operationsCopy.finance.chooseFinancialOperation}>
+        <Button type="button" disabled={busy} variant={mode === 'payout' ? 'default' : 'outline'} onClick={() => { setMode('payout'); pendingKey.current = null; setError(''); setSaved('') }}>{operationsCopy.finance.recordCashCheckRefund}</Button>
+        <Button type="button" disabled={busy} variant={mode === 'transfer' ? 'default' : 'outline'} onClick={() => { setMode('transfer'); pendingKey.current = null; setError(''); setSaved('') }}>{operationsCopy.finance.transferFundraisingCredit}</Button>
       </div>
       <form className={styles.form} onSubmit={event => void submit(event)}>
         <fieldset className={styles.fields} disabled={busy}>
-        <label>Amount (USD)<Input type="text" inputMode="decimal" value={amount} onChange={event => change(setAmount, event.target.value)} placeholder="0.00" required /></label>
+        <label>{operationsCopy.finance.amountUSD}<Input type="text" inputMode="decimal" value={amount} onChange={event => change(setAmount, event.target.value)} placeholder="0.00" required /></label>
         {mode === 'payout' ? <>
-          <label>How was money returned?<NativeSelect value={method} onChange={event => { setMethod(event.target.value as 'cash' | 'check' | 'other'); pendingKey.current = null }}><NativeSelectOption value="check">Check</NativeSelectOption><NativeSelectOption value="cash">Cash</NativeSelectOption><NativeSelectOption value="other">Other external method</NativeSelectOption></NativeSelect></label>
-          <label>Date money was returned<Input type="date" value={occurredDate} max={chicagoDate()} onChange={event => change(setOccurredDate, event.target.value)} required /></label>
-          <label>Method reference<Input value={reference} maxLength={150} onChange={event => change(setReference, event.target.value)} placeholder="Check number or receipt reference" required /></label>
-        </> : <label>Recipient student<NativeSelect value={recipient} onChange={event => change(setRecipient, event.target.value)} required><NativeSelectOption value="">Choose an active student</NativeSelectOption>{options.recipients.map(student => <NativeSelectOption key={student._id} value={student._id}>{student.name}</NativeSelectOption>)}</NativeSelect></label>}
-        <label className={styles.wide}>Reason<Input value={reason} maxLength={500} onChange={event => change(setReason, event.target.value)} required /></label>
-        <Button type="submit" disabled={busy || (mode === 'payout' ? options.personalAvailableCents <= 0 : options.fundraisingAvailableCents <= 0)}>{busy ? 'Recording…' : mode === 'payout' ? 'Record money returned' : 'Transfer fundraising credit'}</Button>
+          <label>{operationsCopy.finance.howWasMoneyReturned}<NativeSelect value={method} onChange={event => { setMethod(event.target.value as 'cash' | 'check' | 'other'); pendingKey.current = null }}><NativeSelectOption value="check">{operationsCopy.finance.check}</NativeSelectOption><NativeSelectOption value="cash">{operationsCopy.finance.cash}</NativeSelectOption><NativeSelectOption value="other">{operationsCopy.finance.otherExternalMethod}</NativeSelectOption></NativeSelect></label>
+          <label>{operationsCopy.finance.dateMoneyWasReturned}<Input type="date" value={occurredDate} max={chicagoDate()} onChange={event => change(setOccurredDate, event.target.value)} required /></label>
+          <label>{operationsCopy.finance.methodReference}<Input value={reference} maxLength={150} onChange={event => change(setReference, event.target.value)} placeholder={operationsCopy.finance.checkNumberOrReceiptReference} required /></label>
+        </> : <label>{operationsCopy.finance.recipientStudent}<NativeSelect value={recipient} onChange={event => change(setRecipient, event.target.value)} required><NativeSelectOption value="">{operationsCopy.finance.chooseAnActiveStudent}</NativeSelectOption>{options.recipients.map(student => <NativeSelectOption key={student._id} value={student._id}>{student.name}</NativeSelectOption>)}</NativeSelect></label>}
+        <label className={styles.wide}>{operationsCopy.finance.reason}<Input value={reason} maxLength={500} onChange={event => change(setReason, event.target.value)} required /></label>
+        <Button type="submit" disabled={busy || (mode === 'payout' ? options.personalAvailableCents <= 0 : options.fundraisingAvailableCents <= 0)}>{busy ? operationsCopy.finance.recording : mode === 'payout' ? operationsCopy.finance.recordMoneyReturned : operationsCopy.finance.transferFundraisingCredit}</Button>
         </fieldset>
       </form>
       {error && <p role="alert" className={styles.error}>{error}</p>}
