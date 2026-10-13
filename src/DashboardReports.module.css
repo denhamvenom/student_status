@@ -20,3 +20,10 @@
 .sessionMetrics>div{min-width:0}
 .sectionTitle{margin:4px 0 0;font:400 26px/1.1 Anton,Impact,sans-serif}
 @media(max-width:767px){.card{padding:16px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 12px}.metrics strong{font-size:26px}.sessionGrid{grid-template-columns:1fr}}
+
+.attendanceSection{display:grid;gap:14px;min-width:0}
+.attendanceCards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.attendanceSection .attendanceCards .metricLabel{margin:0;color:var(--text-muted);font:700 12px/1.4 "Segoe UI",sans-serif;text-transform:uppercase;letter-spacing:.04em}
+.attendanceCards .card{gap:8px;border-radius:6px;padding:18px}
+.attendanceCards .unavailable{font:400 26px/1.2 Anton,Impact,sans-serif;overflow-wrap:anywhere}
+@media(max-width:767px){.attendanceCards{grid-template-columns:1fr}.attendanceCards .card{padding:16px}}

@@ -1,3 +1,4 @@
+import { requireSeasonFinanceReady } from "./lib/seasonFinance";
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
@@ -15,6 +16,7 @@ async function reserved(ctx: MutationCtx, eventId: Id<"events">) {
 export const signUp = mutation({
   args: { eventId: v.id("events") }, returns: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("waitlist")),
   handler: async (ctx, args) => {
+    await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const user = await viewer(ctx); const student = await ownStudent(ctx, user);
     const event = await ctx.db.get(args.eventId); const season = await activeSeason(ctx);
     if (!event || event.seasonId !== season._id || student.seasonId !== season._id || event.archived || event.signupMode === "assigned") throw new Error("Signup is unavailable.");
@@ -46,6 +48,7 @@ export const withdraw = mutation({
 export const setParticipation = mutation({
   args: { eventId: v.id("events"), studentId: v.id("students"), status: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("waitlist"), v.literal("withdrawn")), reason: v.optional(v.string()) }, returns: v.null(),
   handler: async (ctx, args) => {
+    await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const user = await viewer(ctx);
     if (user.role !== "coach" && !user.travelLead) throw new Error("Participation edit denied.");
     const event = await ctx.db.get(args.eventId); const student = await ctx.db.get(args.studentId); const season = await activeSeason(ctx);

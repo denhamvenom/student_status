@@ -1,3 +1,4 @@
+import { requireSeasonFinanceReady } from "./lib/seasonFinance";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { mutation, query } from "./_generated/server";
@@ -39,6 +40,7 @@ export const revokeJoinCode = mutation({
 export const approveJoin = mutation({
   args: { requestId: v.id("joinRequests"), approve: v.boolean(), existingStudentId: v.optional(v.id("students")) }, returns: v.null(),
   handler: async (ctx, args) => {
+    await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const actor = await viewer(ctx);
     if (actor.role !== "coach" && !actor.travelLead) throw new Error("Join review denied.");
     const request = await ctx.db.get(args.requestId); const season = await activeSeason(ctx);
@@ -76,6 +78,7 @@ export const approveJoin = mutation({
 export const createEvent = mutation({
   args: { name: v.string(), type: v.union(v.literal("Competition"), v.literal("Outreach"), v.literal("Team")), startsAt: v.number(), endsAt: v.number(), destination: v.string(), travel: v.string(), overnight: v.boolean(), roomingEnabled: v.boolean(), roomDeadline: v.optional(v.number()), feeCents: v.number(), signupMode: v.union(v.literal("assigned"), v.literal("open"), v.literal("approval")), assignmentScope: v.optional(v.union(v.literal("selected"), v.literal("travelTeam"), v.literal("wholeTeam"))), assignedStudentIds: v.optional(v.array(v.id("students"))), capacity: v.optional(v.number()), signupClosesAt: v.optional(v.number()), allowWithdrawal: v.boolean(), permissionRequired: v.boolean(), firstRequired: v.boolean(), requirements: v.array(v.object({ key: v.string(), label: v.string(), instructions: v.optional(v.string()), url: v.optional(v.string()), dueAt: v.optional(v.number()) })) }, returns: v.id("events"),
   handler: async (ctx, args) => {
+    await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const user = await viewer(ctx);
     if (user.role !== "coach" && !user.travelLead) throw new Error("Event creation denied.");
     const season = await activeSeason(ctx);
@@ -120,6 +123,7 @@ export const createEvent = mutation({
 export const updateRoster = mutation({
   args: { studentId: v.id("students"), expectedRevision: v.optional(v.number()), reason: v.optional(v.string()), legalName: v.optional(v.string()), preferredName: v.optional(v.string()), subteam: v.optional(v.string()), travelTeam: v.optional(v.boolean()), active: v.optional(v.boolean()), roomCategory: v.optional(v.union(v.literal("Boys"), v.literal("Girls"))) }, returns: v.null(),
   handler: async (ctx, args) => {
+    await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const user = await viewer(ctx); requireRole(user, "coach");
     const student = await ctx.db.get(args.studentId); const season = await activeSeason(ctx);
     if (!student || student.seasonId !== season._id) throw new Error("Student not found.");

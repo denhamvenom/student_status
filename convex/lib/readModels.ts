@@ -5,14 +5,17 @@ import type { QueryCtx, MutationCtx } from "../_generated/server";
 import { privateStudent, publicStudent } from "./access";
 import { calculateStudentFinance } from "./financeSummaries";
 import { permissionAccepted } from "./permissionCoverage";
+import { feeMaintenanceProjection } from "./seasonFinance";
 export { permissionAccepted } from "./permissionCoverage";
 
 type Ctx = QueryCtx | MutationCtx;
 
 export async function financeFor(ctx: Ctx, studentId: Id<"students">) {
   const account = await ctx.db.query("financialAccounts").withIndex("by_studentId", q => q.eq("studentId", studentId)).unique();
-  if (account?.state !== "ready") return { state: account?.state === "failed" ? "failed" as const : "updating" as const, summary: null };
-  return { state: "ready" as const, summary: await calculateStudentFinance(ctx, studentId) };
+  const student = await ctx.db.get(studentId);
+  const maintenance = student ? await feeMaintenanceProjection(ctx, student.seasonId) : null;
+  if (account?.state !== "ready") return { state: account?.state === "failed" ? "failed" as const : "updating" as const, summary: null, maintenance };
+  return { state: "ready" as const, summary: await calculateStudentFinance(ctx, studentId), maintenance };
 }
 export async function studentReadiness(ctx: Ctx, event: Doc<"events">, student: Doc<"students">) {
   const open: string[] = [];
@@ -20,6 +23,8 @@ export async function studentReadiness(ctx: Ctx, event: Doc<"events">, student: 
   if (enrollmentPending(event)) return { state: "open" as const, open: ["Whole Team enrollment is not complete."], participation: participant?.status ?? null };
   if (participant?.status !== "confirmed") return { state: "notApplicable" as const, open, participation: participant?.status ?? null };
   const financialAccount = await ctx.db.query("financialAccounts").withIndex("by_studentId", q => q.eq("studentId", student._id)).unique();
+  const maintenance = await feeMaintenanceProjection(ctx, event.seasonId);
+  if (maintenance && maintenance.state !== "ready") open.push("Season fee maintenance is not complete");
   if (financialAccount?.state !== "ready") open.push("Financial records require review or are updating");
   const eventCharges = await ctx.db.query("charges").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(101);
   if (eventCharges.length > 100) open.push("Event financial records require review");

@@ -1,3 +1,4 @@
+import { requireSeasonFinancialRetry } from "./lib/seasonFinance";
 import { makeFunctionReference, paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
@@ -86,7 +87,7 @@ export const processPage = internalMutation({
           await ctx.db.patch(row._id, { state: "committed", revisionId, holdCode: undefined, message: undefined });
           committed++;
           await audit(ctx, actor, "fundraiserStudentTotals", totalId, "postAmount", previous, fields, job.reason);
-          await allocateUnapplied(ctx, actor, row.studentId, `fundraiser:${row._id}:allocate`);
+          await allocateUnapplied(ctx, actor, row.studentId, `fundraiser:${row._id}:allocate`, undefined, job._id);
         }
         await refreshStudentFinance(ctx, row.studentId);
       }
@@ -161,6 +162,7 @@ export const retry = mutation({
     const actor = await viewer(ctx); const season = await activeSeason(ctx); const job = await ctx.db.get(args.jobId); const fundraiser = job ? await ctx.db.get(job.fundraiserId) : null;
     if (actor.role !== "coach") throw new Error("Only a Coach may retry fundraiser posting.");
     if (!job || !fundraiser || fundraiser.seasonId !== season._id || !["failed", "held"].includes(job.state) || fundraiser.postingJobId !== job._id) throw new Error("No held or failed fundraiser posting is available to retry.");
+    await requireSeasonFinancialRetry(ctx, season._id, job._id);
     if (args.reason.trim().length < 8 || args.reason.length > 1000 || args.rows.length > 500 || new Set(args.rows.map(r => r.studentId)).size !== args.rows.length) throw new Error("Provide a reason and unique reviewed rows.");
     for (const input of args.rows) {
       if (!Number.isSafeInteger(input.expectedRowRevision) || input.expectedRowRevision < 0 || !Number.isSafeInteger(input.expectedFinancialRevision) || input.expectedFinancialRevision < 0) throw new Error("Refresh reviewed row revisions before retrying.");

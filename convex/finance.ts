@@ -1,3 +1,4 @@
+import { requireSeasonFinanceReady } from "./lib/seasonFinance";
 import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
@@ -13,6 +14,7 @@ function financeEditor(user: Awaited<ReturnType<typeof viewer>>) {
 export const createCharge = mutation({
   args: { studentId: v.id("students"), eventId: v.optional(v.id("events")), category: v.optional(v.union(v.literal("main"), v.literal("extra"))), label: v.string(), amountCents: v.number(), priority: v.number(), idempotencyKey: v.string() }, returns: v.union(v.id("charges"), v.null()),
   handler: async (ctx, args) => {
+    await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const user = await viewer(ctx); financeEditor(user);
     const student = await ctx.db.get(args.studentId); const season = await activeSeason(ctx);
     if (!student || student.seasonId !== season._id) throw new Error("Student not found.");
@@ -31,6 +33,7 @@ export const createCharge = mutation({
 export const recordFunds = mutation({
   args: { studentId: v.id("students"), kind: v.union(v.literal("payment"), v.literal("fundraiser")), amountCents: v.number(), reason: v.string(), idempotencyKey: v.string() }, returns: v.null(),
   handler: async (ctx, args) => {
+    await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const user = await viewer(ctx); financeEditor(user);
     const season = await activeSeason(ctx); const student = await ctx.db.get(args.studentId);
     if (!student || student.seasonId !== season._id) throw new Error("Student not found.");

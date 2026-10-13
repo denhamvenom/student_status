@@ -1,3 +1,4 @@
+import { requireSeasonFinancialRetry, seasonFinancialRetryAvailable } from "./lib/seasonFinance";
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -6,14 +7,14 @@ import { assignWholeTeamMember } from "./lib/wholeTeam";
 
 export const status = query({
   args: { eventId: v.id("events") },
-  returns: v.union(v.null(), v.object({ state: v.union(v.literal("running"), v.literal("failed"), v.literal("complete")), processed: v.number(), assigned: v.number(), lastError: v.union(v.string(), v.null()) })),
+  returns: v.union(v.null(), v.object({ state: v.union(v.literal("running"), v.literal("failed"), v.literal("complete")), processed: v.number(), assigned: v.number(), canRetry: v.boolean(), lastError: v.union(v.string(), v.null()) })),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx);
     if (actor.role !== "coach" && !actor.travelLead) throw new Error("Enrollment status access denied.");
     const event = await ctx.db.get(args.eventId); const season = await activeSeason(ctx);
     if (!event || event.seasonId !== season._id) throw new Error("Event not found.");
     const job = await ctx.db.query("eventEnrollmentJobs").withIndex("by_eventId", q => q.eq("eventId", event._id)).unique();
-    return job ? { state: job.state, processed: job.processed, assigned: event.wholeTeamParticipantCount ?? 0, lastError: job.lastError ?? null } : null;
+    return job ? { state: job.state, processed: job.processed, assigned: event.wholeTeamParticipantCount ?? 0, canRetry: actor.role === "coach" && job.state === "failed" && !event.archived && await seasonFinancialRetryAvailable(ctx, event.seasonId, job._id), lastError: job.lastError ?? null } : null;
   },
 });
 
@@ -29,7 +30,7 @@ export const processPage = internalMutation({
     const page = await ctx.db.query("eventEnrollmentMembers").withIndex("by_jobId", q => q.eq("jobId", job._id)).paginate({ cursor: job.cursor, numItems: 1 });
     for (const member of page.page) {
       const student = await ctx.db.get(member.studentId);
-      if (student) await assignWholeTeamMember(ctx, actor, event, student);
+      if (student) await assignWholeTeamMember(ctx, actor, event, student, job._id);
     }
     const state = page.isDone ? "complete" as const : "running" as const;
     await ctx.db.patch(job._id, { cursor: page.continueCursor, processed: job.processed + page.page.length, state, updatedAt: Date.now(), lastError: undefined });
@@ -67,6 +68,7 @@ export const retry = mutation({
     if (!event || event.archived || event.seasonId !== season._id) throw new Error("Event is unavailable.");
     const job = await ctx.db.query("eventEnrollmentJobs").withIndex("by_eventId", q => q.eq("eventId", event._id)).unique();
     if (!job || job.state !== "failed") throw new Error("No failed enrollment is available to retry.");
+    await requireSeasonFinancialRetry(ctx, season._id, job._id);
     await ctx.db.patch(job._id, { actorId: actor._id, state: "running", lastError: undefined, updatedAt: Date.now() });
     await ctx.db.patch(event._id, { enrollmentState: "running" });
     await ctx.scheduler.runAfter(0, internal.eventEnrollment.run, { jobId: job._id });

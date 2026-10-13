@@ -1,3 +1,4 @@
+import { requireSeasonFinanceReady, seasonFinanceControl } from "./lib/seasonFinance";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -38,6 +39,7 @@ export const operationOptions = query({
     financialEditor(await viewer(ctx));
     const student = await activeStudent(ctx, args.studentId);
     const account = await financialAccount(ctx, student._id);
+    const maintenance = await seasonFinanceControl(ctx, student.seasonId);
     const uninitialized = !account || account.state === "uninitialized";
     const preparing = account?.state === "rebuilding" || account?.state === "failed" && !account.allocationJobId && !account.operationJobId && !account.fundraiserJobId;
     if (uninitialized || preparing) return {
@@ -48,7 +50,7 @@ export const operationOptions = query({
     const recipients = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", student.seasonId)).take(501);
     if (recipients.length > 500) throw new Error("Student selection limit reached; contact an administrator.");
     return {
-      state: account.state === "ready" ? "ready" as const : account.state === "failed" ? "failed" as const : "updating" as const, sourceCount: account.sourceCount, chargeCount: account.chargeCount,
+      state: maintenance && maintenance.state !== "ready" ? maintenance.state === "failed" ? "failed" as const : "updating" as const : account.state === "ready" ? "ready" as const : account.state === "failed" ? "failed" as const : "updating" as const, sourceCount: account.sourceCount, chargeCount: account.chargeCount,
       personalAvailableCents: account.personalAvailableCents,
       fundraisingAvailableCents: account.fundraisingAvailableCents,
       recipients: recipients.filter(x => x.active && x._id !== student._id).map(x => ({ _id: x._id, name: x.preferredName || x.legalName })),
@@ -60,6 +62,7 @@ export const recordPayout = mutation({
   args: { studentId: v.id("students"), amountCents: v.number(), method, reference: v.string(), occurredAt: v.number(), reason: v.string(), idempotencyKey: v.string() },
   returns: v.id("financeOperations"),
   handler: async (ctx, args) => {
+    await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const actor = await viewer(ctx); financialEditor(actor);
     await activeStudent(ctx, args.studentId);
     validAmount(args.amountCents);
@@ -93,6 +96,7 @@ export const transferFundraising = mutation({
   args: { studentId: v.id("students"), recipientStudentId: v.id("students"), amountCents: v.number(), reason: v.string(), idempotencyKey: v.string() },
   returns: v.id("financeOperations"),
   handler: async (ctx, args) => {
+    await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const actor = await viewer(ctx); financialEditor(actor);
     const sender = await activeStudent(ctx, args.studentId);
     const recipient = await activeStudent(ctx, args.recipientStudentId);
@@ -143,6 +147,7 @@ export const previewTeamTransfer = query({
 export const transferToTeam = mutation({
   args: { studentId: v.id("students"), amountCents: v.number(), expectedFinancialRevision: v.number(), reason: v.string(), idempotencyKey: v.string() }, returns: v.id("financeOperations"),
   handler: async (ctx, args) => {
+    await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const actor = await viewer(ctx); financialEditor(actor); await activeStudent(ctx, args.studentId); validAmount(args.amountCents);
     const reason = requiredText(args.reason, "Reason", 1000); const key = requiredText(args.idempotencyKey, "Transaction key", 150);
     if (reason.length < 8 || key.length < 8 || !Number.isSafeInteger(args.expectedFinancialRevision) || args.expectedFinancialRevision < 0) throw new Error("Provide reviewed amounts, a reason of eight characters, and a unique transaction key.");

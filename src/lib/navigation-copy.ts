@@ -1,3 +1,4 @@
+import { retentionCopy } from './retention-copy'
 import reference from './ui-copy.reference.json'
 import { readinessCopy } from '../features/design-review/readinessCopy'
 
@@ -26,7 +27,7 @@ const n = navigationCopy.labels
 export const menu: Record<string, [string, string][]> = {
   student: [[n.status,'/'],[n.events,'/events'],[n.finances,'/finances'],[n.attendance,'/attendance'],[n.profileHealth,'/profile'],[n.parents,'/parents'],[n.settings,'/settings']],
   parent: [[n.status,'/'],[n.events,'/events'],[n.finances,'/finances'],[n.attendance,'/attendance'],[n.profileHealth,'/profile'],[n.permissionForm,'/forms'],[n.settings,'/settings']],
-  coach: [[n.team,'/'],[n.events,'/events'],[n.readiness,'/readiness'],[n.withdrawals,'/withdrawals'],[n.drivers,'/drivers'],[n.finances,'/finances'],[n.fundraising,'/fundraising'],[n.permissionForms,'/permissions'],[n.reports,'/reports'],[n.joinRequests,'/enroll'],[n.usersRoles,'/adults'],[n.attendance,'/attendance'],[n.season,'/season'],[n.settings,'/settings']],
+  coach: [[n.team,'/'],[n.events,'/events'],[n.readiness,'/readiness'],[n.withdrawals,'/withdrawals'],[n.drivers,'/drivers'],[n.finances,'/finances'],[n.fundraising,'/fundraising'],[n.permissionForms,'/permissions'],[n.reports,'/reports'],[n.joinRequests,'/enroll'],[n.usersRoles,'/adults'],[n.attendance,'/attendance'],[n.season,'/season'],[retentionCopy.title,'/retention'],[n.settings,'/settings']],
   travelLead: [[n.team,'/'],[n.events,'/events'],[n.readiness,'/readiness'],[n.withdrawals,'/withdrawals'],[n.drivers,'/drivers'],[n.finances,'/finances'],[n.fundraising,'/fundraising'],[n.permissionForms,'/permissions'],[n.reports,'/reports'],[n.myProfile,'/myprofile'],[n.settings,'/settings']],
   mentor: [[n.teamReport,'/'],[n.myProfile,'/myprofile'],[n.settings,'/settings']],
 }

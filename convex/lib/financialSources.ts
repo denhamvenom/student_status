@@ -11,6 +11,13 @@ export function cents(value: number) {
   return value;
 }
 
+export function applyExactFinancialDelta(current: number, after: number, before: number) {
+  cents(current); cents(after); cents(before);
+  const next = BigInt(current) + BigInt(after) - BigInt(before);
+  if (next < 0n || next > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("Financial projection is inconsistent; request a Coach review.");
+  return Number(next);
+}
+
 export async function financialAccount(ctx: Ctx, studentId: Id<"students">) {
   return ctx.db.query("financialAccounts").withIndex("by_studentId", q => q.eq("studentId", studentId)).unique();
 }
@@ -161,8 +168,8 @@ export async function recordChargeChange(ctx: MutationCtx, account: FinancialAcc
   if (net) await ctx.db.patch(net._id, { verified: true });
   charge.revision = (charge.revision ?? 0) + 1;
   await ctx.db.patch(charge._id, { outstanding: effective > charge.appliedCents, revision: charge.revision });
-  account.chargedCents = cents(account.chargedCents + effective - previousEffective);
-  account.paidCents = cents(account.paidCents + charge.appliedCents - previousApplied);
+  account.chargedCents = applyExactFinancialDelta(account.chargedCents, effective, previousEffective);
+  account.paidCents = applyExactFinancialDelta(account.paidCents, charge.appliedCents, previousApplied);
   if (newlyCreated) account.chargeCount++;
   account.revision++;
   account.lastFinancialChangeAt = Date.now();

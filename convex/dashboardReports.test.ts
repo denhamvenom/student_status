@@ -130,6 +130,17 @@ describe("role-scoped dashboard reports", () => {
     await settleSession(f.t,f.ids.session);
     expect((await f.student.query(attendanceRef, { studentId: f.ids.sid, asOf: start + 4 * hour })).verified?.sessionsHeld).toBe(0);
   });
+  it("preserves verified committed totals while exposing season fee maintenance separately", async () => {
+    const f = await fixture();
+    const before = await f.student.query(financeRef, { studentId: f.ids.sid });
+    await f.t.run(async ctx => {
+      const student = await ctx.db.get(f.ids.sid);
+      await ctx.db.insert("seasonFinanceControls", { seasonId: student!.seasonId, revision: 4, state: "applying", updatedAt: 0 });
+    });
+    const after = await f.student.query(financeRef, { studentId: f.ids.sid });
+    expect(after).toEqual({ ...before, maintenance: { state: "applying", revision: 4 } });
+    expect(await f.coach.query(teamRef, {})).toMatchObject({ state: "ready", maintenance: { state: "applying", revision: 4 }, finance: { chargedCents: 1000, paidCents: 1000 } });
+  });
   it("withholds verified family and team totals while financial processing is incomplete", async () => {
     const f = await fixture();
     for (const state of ["rebuilding", "allocating", "posting", "failed"] as const) {
@@ -137,7 +148,7 @@ describe("role-scoped dashboard reports", () => {
         const account = await ctx.db.query("financialAccounts").withIndex("by_studentId", q => q.eq("studentId", f.ids.sid)).unique();
         await ctx.db.patch(account!._id, { state });
       });
-      expect(await f.student.query(financeRef, { studentId: f.ids.sid })).toEqual({ state: state === "failed" ? "failed" : "updating" });
+      expect(await f.student.query(financeRef, { studentId: f.ids.sid })).toEqual({ state: state === "failed" ? "failed" : "updating", maintenance: null });
       expect(await f.coach.query(teamRef, {})).toMatchObject({ state: state === "failed" ? "failed" : "updating", finance: null });
     }
   });

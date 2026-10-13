@@ -1,3 +1,4 @@
+import { requireSeasonFinanceReady, seasonFinanceControl, seasonFinancialRetryAvailable } from "./lib/seasonFinance";
 import { makeFunctionReference, paginationOptsValidator, paginationResultValidator } from "convex/server";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
@@ -36,10 +37,11 @@ function targetCents(target: number) {
 export const detail = query({
   args: { chargeId: v.id("charges") }, returns: v.object({ charge: schema.doc("charges"), amounts, financialState, financialRevision: v.union(v.number(), v.null()), canCorrect: v.boolean() }),
   handler: async (ctx, args) => {
-    const { actor, charge, event } = await accessibleCharge(ctx, args.chargeId);
+    const { actor, charge, student, event } = await accessibleCharge(ctx, args.chargeId);
+    const maintenance = await seasonFinanceControl(ctx, student.seasonId);
     const account = await financialAccount(ctx, charge.studentId);
     const state = !account || account.state === "uninitialized" ? "uninitialized" as const : account.state === "ready" ? "ready" as const : account.state === "failed" ? "failed" as const : "updating" as const;
-    return { charge, amounts: correctionSnapshot(charge), financialState: state, financialRevision: account?.state === "ready" ? account.revision : null, canCorrect: actor.role === "coach" && state === "ready" && !event?.archived };
+    return { charge, amounts: correctionSnapshot(charge), financialState: state, financialRevision: account?.state === "ready" ? account.revision : null, canCorrect: actor.role === "coach" && state === "ready" && !event?.archived && (!maintenance || maintenance.state === "ready") };
   },
 });
 
@@ -61,6 +63,7 @@ export const correct = mutation({
   args: { chargeId: v.id("charges"), kind, targetEffectiveCents: v.number(), expectedChargeRevision: v.number(), expectedFinancialRevision: v.number(), reason: v.string(), idempotencyKey: v.string() },
   returns: v.object({ jobId: v.id("financialOperationJobs"), state: v.union(v.literal("running"), v.literal("failed"), v.literal("complete")), chargeRevisionId: v.union(v.id("chargeRevisions"), v.null()) }),
   handler: async (ctx, args) => {
+    await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const { actor, charge, student, event } = await accessibleCharge(ctx, args.chargeId);
     if (actor.role !== "coach") throw new Error("Only a Coach may correct or cancel charges.");
     targetCents(args.targetEffectiveCents);
@@ -93,12 +96,12 @@ export const status = query({
   args: { chargeId: v.id("charges"), jobId: v.optional(v.id("financialOperationJobs")) },
   returns: v.object({ job: v.union(schema.doc("financialOperationJobs"), v.null()), financialState, canRetry: v.boolean(), originalActorName: v.union(v.string(), v.null()), processingActorName: v.union(v.string(), v.null()) }),
   handler: async (ctx, args) => {
-    const { actor, charge, event } = await accessibleCharge(ctx, args.chargeId);
+    const { actor, charge, student, event } = await accessibleCharge(ctx, args.chargeId);
     const account = await financialAccount(ctx, charge.studentId);
     const job = args.jobId ? await ctx.db.get(args.jobId) : await ctx.db.query("financialOperationJobs").withIndex("by_chargeId_and_updatedAt", q => q.eq("chargeId", charge._id)).order("desc").first();
     if (job && (job.kind !== "chargeCorrection" || job.chargeId !== charge._id || job.studentId !== charge.studentId)) throw new Error("Correction job is unavailable for this charge.");
     const original = job?.originalActorId ? await ctx.db.get(job.originalActorId) : null; const processor = job ? await ctx.db.get(job.actorId) : null;
-    return { job, financialState: !account || account.state === "uninitialized" ? "uninitialized" as const : account.state === "ready" ? "ready" as const : account.state === "failed" ? "failed" as const : "updating" as const, canRetry: actor.role === "coach" && job?.state === "failed" && !event?.archived, originalActorName: original?.name ?? null, processingActorName: processor?.name ?? null };
+    return { job, financialState: !account || account.state === "uninitialized" ? "uninitialized" as const : account.state === "ready" ? "ready" as const : account.state === "failed" ? "failed" as const : "updating" as const, canRetry: actor.role === "coach" && job?.state === "failed" && !event?.archived && await seasonFinancialRetryAvailable(ctx, student.seasonId, job._id), originalActorName: original?.name ?? null, processingActorName: processor?.name ?? null };
   },
 });
 

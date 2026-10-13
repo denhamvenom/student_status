@@ -15,7 +15,7 @@ type ShellViewer = { user: { name: string; email: string } | null; season: { nam
 export { menu }
 export const primaryPaths:Record<string,string[]>={student:['/','/events','/finances','/profile'],parent:['/','/events','/forms','/finances'],coach:['/','/events','/readiness','/finances'],travelLead:['/readiness','/events','/','/drivers'],mentor:['/','/myprofile','/settings']}
 
-export function AppShell({ children, viewer, role = "coach" }: { children: ReactNode; viewer: ShellViewer; role?: string }) {
+export function AppShell({ children, viewer, familyContext, role = "coach" }: { children: ReactNode; viewer: ShellViewer; familyContext?: ReactNode; role?: string }) {
   const { theme, resolvedTheme, setTheme } = useTheme()
   const saveTheme = useMutation(api.app.setTheme)
   const { signOut } = useAuthActions()
@@ -62,6 +62,7 @@ export function AppShell({ children, viewer, role = "coach" }: { children: React
       {staff ? <><nav className={styles.groupNav} aria-label={navigationCopy.main}><div className={styles.navInner}>{Object.keys(filteredGroups).map(label => <button key={label} type="button" aria-expanded={group === label} className={group === label ? styles.activeGroup : ''} onClick={() => setChosenGroup(label)}>{label}</button>)}</div></nav>
       <nav className={styles.subNav} aria-label={`${group} ${navigationCopy.subSuffix}`}><div className={styles.navInner}>{filteredGroups[group]?.map(([label, path]) => <Link key={path} to={path} aria-current={path === activePath ? 'page' : undefined}>{label}</Link>)}</div></nav></> : <nav className={styles.groupNav} aria-label={navigationCopy.main}><div className={styles.navInner}>{allowed.map(([label, path]) => <Link key={path} to={path} aria-current={path === activePath ? 'page' : undefined}>{label}</Link>)}</div></nav>}
 
+      {familyContext && <div className={styles.familyContext}>{familyContext}</div>}
     </header>
     {import.meta.env.DEV && <div className={styles.development} role="status">{copy.development}</div>}
     <main className={`${styles.main} app-content`}>{children}</main>

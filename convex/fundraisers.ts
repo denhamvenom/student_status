@@ -1,3 +1,4 @@
+import { requireSeasonFinanceReady, seasonFinanceControl } from "./lib/seasonFinance";
 import { makeFunctionReference, paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
@@ -43,6 +44,7 @@ export const list = query({
 export const create = mutation({
   args: { name: v.string(), teamBps: v.number(), studentBps: v.number(), idempotencyKey: v.string() }, returns: v.id("fundraisers"),
   handler: async (ctx, args) => {
+    await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const actor = await authorized(ctx);
     if (!fundraisingCapabilities(actor).canCreate) throw new Error("Only a Coach may create a fundraiser.");
     const season = await activeSeason(ctx); const name = args.name.trim();
@@ -69,7 +71,10 @@ export const workspace = query({
   handler: async (ctx, args) => {
     const actor = await authorized(ctx); const fundraiser = await currentFundraiser(ctx, args.fundraiserId);
     const job = fundraiser.postingJobId ? await ctx.db.get(fundraiser.postingJobId) : null;
-    return { fundraiser, capabilities: fundraisingCapabilities(actor), totals: await readFundraiserAggregates(ctx, fundraiser._id), job };
+    const maintenance = await seasonFinanceControl(ctx, fundraiser.seasonId);
+    const currentCapabilities = fundraisingCapabilities(actor);
+    if (maintenance && maintenance.state !== "ready") { currentCapabilities.canCreate = false; currentCapabilities.canPost = false; currentCapabilities.canChangePolicy = false; }
+    return { fundraiser, capabilities: currentCapabilities, totals: await readFundraiserAggregates(ctx, fundraiser._id), job };
   },
 });
 
@@ -120,6 +125,7 @@ export const preview = query({
 export const post = mutation({
   args: { fundraiserId: v.id("fundraisers"), expectedRevision: v.number(), rows: v.array(command), reason: v.string(), idempotencyKey: v.string() }, returns: v.id("fundraiserPostingJobs"),
   handler: async (ctx, args) => {
+    await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const actor = await authorized(ctx);
     if (!fundraisingCapabilities(actor).canPost) throw new Error("Financial editing is not enabled for this account.");
     const fundraiser = await currentFundraiser(ctx, args.fundraiserId);
@@ -149,6 +155,7 @@ export const post = mutation({
 export const updatePolicy = mutation({
   args: { fundraiserId: v.id("fundraisers"), expectedRevision: v.number(), teamBps: v.number(), studentBps: v.number(), reason: v.string() }, returns: v.null(),
   handler: async (ctx, args) => {
+    await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const actor = await authorized(ctx); const fundraiser = await currentFundraiser(ctx, args.fundraiserId);
     if (!fundraisingCapabilities(actor).canChangePolicy) throw new Error("Only a Coach may change the fundraiser split.");
     if (fundraiser.state !== "draft" || fundraiser.revision !== args.expectedRevision || fundraiser.postingJobId) throw new Error("A posted fundraiser split is immutable. Refresh the draft before editing.");
@@ -163,6 +170,7 @@ export const updatePolicy = mutation({
 export const close = mutation({
   args: { fundraiserId: v.id("fundraisers"), expectedRevision: v.number(), reason: v.string() }, returns: v.null(),
   handler: async (ctx, args) => {
+    await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const actor = await authorized(ctx); const fundraiser = await currentFundraiser(ctx, args.fundraiserId);
     if (!fundraisingCapabilities(actor).canChangePolicy) throw new Error("Only a Coach may close a fundraiser.");
     if (fundraiser.revision !== args.expectedRevision || ["posting", "failed", "held", "closed"].includes(fundraiser.state)) throw new Error("Fundraiser changed or has unfinished posting; resolve it before closing.");

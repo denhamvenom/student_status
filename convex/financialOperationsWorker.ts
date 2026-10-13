@@ -1,3 +1,4 @@
+import { requireSeasonFinancialRetry, seasonFinancialRetryAvailable } from "./lib/seasonFinance";
 import { makeFunctionReference } from "convex/server";
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
@@ -30,6 +31,7 @@ export const status = query({
       const event = await ctx.db.get(job.eventId);
       canRetry = !!event && !event.archived && event.seasonId === season._id;
     }
+    if (canRetry && job) canRetry = await seasonFinancialRetryAvailable(ctx, season._id, job._id);
     return { job, operation, canRetry };
   },
 });
@@ -58,7 +60,7 @@ export const processPage = internalMutation({
       await ctx.db.patch(job._id, { committedCents: result.committed, step: job.step + 1, state: result.done ? "complete" : "running", updatedAt: Date.now() });
       if (result.done) {
         sender.state = "ready"; sender.operationJobId = undefined; await saveFinancialAccount(ctx, sender);
-        await allocateUnapplied(ctx, actor, sender.studentId, `correction:${job._id}:reallocate`);
+        await allocateUnapplied(ctx, actor, sender.studentId, `correction:${job._id}:reallocate`, undefined, job._id);
       } else await ctx.scheduler.runAfter(0, runRef, { jobId: job._id });
       await refreshStudentFinance(ctx, sender.studentId);
       return null;
@@ -72,7 +74,7 @@ export const processPage = internalMutation({
       if (result.done) {
         await finalizeWithdrawal(ctx, { ...job, committedCents: result.committed }, actor);
         sender.state = "ready"; sender.operationJobId = undefined; await saveFinancialAccount(ctx, sender);
-        await allocateUnapplied(ctx, actor, sender.studentId, `withdraw:${job._id}:reallocate`, job.eventId);
+        await allocateUnapplied(ctx, actor, sender.studentId, `withdraw:${job._id}:reallocate`, job.eventId, job._id);
       } else await ctx.scheduler.runAfter(0, runRef, { jobId: job._id });
       await refreshStudentFinance(ctx, sender.studentId);
       return null;
@@ -103,7 +105,7 @@ export const processPage = internalMutation({
       sender.state = "ready"; sender.operationJobId = undefined; await saveFinancialAccount(ctx, sender);
       if (recipient) {
         recipient.state = "ready"; recipient.operationJobId = undefined; await saveFinancialAccount(ctx, recipient);
-        await allocateUnapplied(ctx, actor, recipient.studentId, `transfer:${job.idempotencyKey}`);
+        await allocateUnapplied(ctx, actor, recipient.studentId, `transfer:${job.idempotencyKey}`, undefined, job._id);
       }
       await audit(ctx, actor, "financeOperations", job.operationId ?? job._id, "completeOperation", { committedCents: job.committedCents }, { requestedCents: job.amountCents, committedCents: committed, state: "complete", senderAvailableCents: sender.personalAvailableCents + sender.fundraisingAvailableCents }, job.reason);
     } else await ctx.scheduler.runAfter(0, runRef, { jobId: job._id });
@@ -141,6 +143,7 @@ export const retry = mutation({
     const season = await activeSeason(ctx);
     const job = await ctx.db.get(args.jobId);
     if (!job || job.state !== "failed") throw new Error("No failed operation is available to retry.");
+    await requireSeasonFinancialRetry(ctx, season._id, job._id);
     if (job.kind === "chargeCorrection" && job.eventId) {
       const event = await ctx.db.get(job.eventId);
       if (!event || event.archived || event.seasonId !== season._id) throw new Error("Correction event is archived or unavailable; explicit historical review is required.");

@@ -1,3 +1,4 @@
+import { requireSeasonFinanceReady } from "./lib/seasonFinance";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -44,6 +45,7 @@ export const workspace = query({
 export const reviewSignup = mutation({
   args: { eventId: v.id("events"), studentId: v.id("students"), decision: v.union(v.literal("approve"), v.literal("decline"), v.literal("promote")), reason: v.optional(v.string()) }, returns: v.null(),
   handler: async (ctx, args) => {
+    await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const user = await viewer(ctx); requireOperations(user);
     const event = await currentEvent(ctx, args.eventId);
     requireEnrollmentComplete(event);
@@ -78,6 +80,7 @@ export const reviewSignup = mutation({
 export const updateSettings = mutation({
   args: { eventId: v.id("events"), capacity: v.optional(v.union(v.number(), v.null())), signupClosesAt: v.optional(v.union(v.number(), v.null())), roomDeadline: v.optional(v.union(v.number(), v.null())), allowWithdrawal: v.optional(v.boolean()) }, returns: v.null(),
   handler: async (ctx, args) => {
+    await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const user = await viewer(ctx);
     if (user.role !== "coach") throw new Error("Only a Coach can edit event settings.");
     const event = await currentEvent(ctx, args.eventId);

@@ -1,4 +1,4 @@
-import type { Doc } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { audit } from "./access";
 import { addCharge, addCharges, type ChargeDraft } from "./money";
@@ -21,8 +21,8 @@ async function enrollWholeTeamMember(ctx: MutationCtx, actor: Doc<"appUsers">, e
   return true;
 }
 
-export async function assignWholeTeamMember(ctx: MutationCtx, actor: Doc<"appUsers">, event: Doc<"events">, student: Doc<"students">) {
-  if (await enrollWholeTeamMember(ctx, actor, event, student) && event.feeCents > 0) await addCharge(ctx, actor, student._id, event.name, event.feeCents, event.startsAt, `eventFee:${event._id}:${student._id}`, event._id);
+export async function assignWholeTeamMember(ctx: MutationCtx, actor: Doc<"appUsers">, event: Doc<"events">, student: Doc<"students">, enrollmentJobId?: Id<"eventEnrollmentJobs">) {
+  if (await enrollWholeTeamMember(ctx, actor, event, student) && event.feeCents > 0) await addCharge(ctx, actor, student._id, event.name, event.feeCents, event.startsAt, `eventFee:${event._id}:${student._id}`, event._id, undefined, enrollmentJobId);
 }
 
 export async function syncWholeTeamMembership(ctx: MutationCtx, actor: Doc<"appUsers">, student: Doc<"students">) {

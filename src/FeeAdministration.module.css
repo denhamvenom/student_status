@@ -1,0 +1,31 @@
+.root{display:grid;gap:18px;min-width:0;color:var(--text-body);font:15px/1.5 'Segoe UI',system-ui,sans-serif}
+.card{min-width:0;padding:18px;gap:16px;background:var(--surface-card);color:var(--text-body);border-color:var(--border-default);box-shadow:var(--shadow-sm)}
+.card :global([data-slot=card-title]){margin:0;font:400 20px/1.15 Anton,Impact,sans-serif}
+.formCard :global([data-slot=card-title]){font-size:24px}
+.card p{margin:0}
+.muted{font-size:13px;color:var(--text-muted);overflow-wrap:anywhere}
+.order{display:grid;gap:0}
+.fee{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-top:1px solid var(--border-default);min-width:0}
+.rank{flex-shrink:0;min-width:28px;max-width:8ch;overflow-wrap:anywhere;padding-top:8px;font:400 20px/1.1 Anton,Impact,sans-serif}
+.feeName{display:grid;gap:4px;flex:1;min-width:0;padding-top:7px;overflow-wrap:anywhere}
+.feeActions{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.form{display:grid;gap:14px;min-width:0;margin:0;border:0;padding:0}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:14px}
+.field{display:grid;gap:5px;min-width:0;font-size:14px;font-weight:600}
+.field :global(input),.field :global(select){max-width:100%;min-height:44px;font-size:16px;border-radius:4px}
+.scope{display:flex;flex-wrap:wrap;gap:8px}
+.students{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:4px 12px;max-height:260px;overflow:auto;padding:8px 12px;border:1px solid var(--border-default);border-radius:6px}
+.checkbox{display:flex;align-items:center;gap:8px;min-height:44px;min-width:0;font-size:15px;overflow-wrap:anywhere}
+.checkbox :global([data-slot=checkbox]){flex-shrink:0}
+.actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.root :global([data-slot=button]){min-width:44px;min-height:44px;border-radius:4px;font-weight:700;white-space:normal}
+.root :global([data-slot=button][class*='bg-primary']){background:var(--gold-500);color:var(--primary-foreground)}
+.root :global([data-slot=button][class*='bg-primary']:hover){background:var(--gold-600)}
+.notice{padding:12px 14px;border:1px solid var(--gold-600);border-radius:6px;background:var(--gold-100);font-size:14px;overflow-wrap:anywhere}
+.error{padding:12px 14px;border:1px solid var(--stop-dot);border-radius:6px;color:var(--stop-dot);background:var(--stop-bg);font-size:14px;overflow-wrap:anywhere}
+.status{display:inline-flex;align-self:start;justify-self:start;padding:4px 10px;border-radius:18px;background:var(--surface-metal);font-size:12px;font-weight:700}
+.details{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 16px;margin:0;font-size:14px}
+.details dt{color:var(--text-muted)}
+.details dd{margin:0;text-align:right;overflow-wrap:anywhere}
+.historyRow{display:grid;gap:8px;padding:14px 0;border-top:1px solid var(--border-default);font-size:14px;min-width:0;overflow-wrap:anywhere}
+@media(max-width:767px){.card{padding:16px}.fee{flex-wrap:wrap}.feeActions{flex-basis:100%;justify-content:flex-start;padding-left:40px}.actions>:global(button){flex:1 1 140px}.students{grid-template-columns:1fr}.details{gap:8px 12px}}

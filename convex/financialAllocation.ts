@@ -5,6 +5,7 @@ import { activeSeason, audit, viewer } from "./lib/access";
 import { allocationStep } from "./lib/financialAllocation";
 import { financialAccount, saveFinancialAccount } from "./lib/financialSources";
 import { refreshStudentFinance } from "./lib/financeSummaries";
+import { requireSeasonFinancialContinuation, requireSeasonFinancialRetry, seasonFinanceControl } from "./lib/seasonFinance";
 
 const runRef = makeFunctionReference<"mutation">("financialAllocation:run");
 const pageRef = makeFunctionReference<"mutation">("financialAllocation:processPage");
@@ -20,6 +21,14 @@ export const processPage = internalMutation({
     if (!actor?.active) throw new Error("Allocation actor is unavailable; a Coach must retry.");
     const student = await ctx.db.get(job.studentId); const season = await ctx.db.get(account.seasonId);
     if (!student?.active || !season || season.status !== "active" || student.seasonId !== account.seasonId) throw new Error("Allocation student is unavailable in the active season.");
+    const control = await seasonFinanceControl(ctx, account.seasonId);
+    if (control && control.state !== "ready" && control.state !== "draining") {
+      const maintenance = control.priorityJobId ? await ctx.db.get(control.priorityJobId) : control.mappingJobId ? await ctx.db.get(control.mappingJobId) : control.bulkJobId ? await ctx.db.get(control.bulkJobId) : null;
+      if (maintenance?.phase !== "drain") {
+        if (!job.maintenanceOriginId) throw new Error("Allocation is outside the active shared fee maintenance operation.");
+        await requireSeasonFinancialContinuation(ctx, account.seasonId, job.maintenanceOriginId);
+      }
+    }
     const result = await allocationStep(ctx, actor, account, job);
     await ctx.db.patch(job._id, { step: job.step + 1, processed: job.processed + result.processed, chargeCursor: result.cursor, state: result.done ? "complete" : "running", updatedAt: Date.now() });
     if (result.done) { account.state = "ready"; account.allocationJobId = undefined; await saveFinancialAccount(ctx, account); }
@@ -55,6 +64,7 @@ export const retry = mutation({
     const account = await financialAccount(ctx, args.studentId);
     const job = account?.allocationJobId ? await ctx.db.get(account.allocationJobId) : null;
     if (!account || !job || account.state !== "failed" || job.state !== "failed" || job.generation !== account.generation) throw new Error("No failed allocation is available to retry.");
+    await requireSeasonFinancialRetry(ctx, season._id, job._id);
     await ctx.db.patch(job._id, { actorId: actor._id, state: "running", lastError: undefined, updatedAt: Date.now() });
     await ctx.db.patch(account._id, { state: "allocating", lastError: undefined, updatedAt: Date.now() });
     await audit(ctx, actor, "financialAllocationJobs", job._id, "retry", { actorId: job.actorId, step: job.step }, { actorId: actor._id, step: job.step }, args.reason.trim());

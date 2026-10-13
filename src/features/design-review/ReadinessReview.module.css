@@ -140,3 +140,9 @@
 @media(max-width:1023px){.headerInner{gap:12px}.brand{flex:1;min-width:0}.brandCopy{min-width:0}.headerActions{flex-shrink:0}.product{overflow-wrap:anywhere}}
 
 .review a:global(.button-primary){color:#222}.review a:global(.button-outline){color:var(--rr-accent)}
+
+.familyContext{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:6px 32px;background:var(--rr-metal);color:var(--rr-text);border-top:1px solid var(--rr-border)}
+.familyContext:empty{display:none}
+.familyContext :global(.viewing){order:-1;margin:0;padding:0;background:transparent;color:inherit}
+.familyContext :global(.student-switch){margin:0 0 0 auto}
+@media(max-width:767px){.familyContext{padding:8px 16px;flex-wrap:wrap;gap:8px}.familyContext :global(.student-switch){gap:6px}.familyContext :global(.student-switch button){padding:8px 12px}}

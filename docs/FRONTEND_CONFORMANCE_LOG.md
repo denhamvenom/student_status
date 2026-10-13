@@ -145,3 +145,9 @@ A fresh rendered Parent attendance reference showed three compact metric cards a
 Astra source review clear. Scoped lint passes; strict types pass after generated API refresh; existing report/draft tests4/4 pass. Actual live captures inspected at1440x1000 (1425px document, screenshot1425x990) and390x844 (375px document, screenshot375x812) in light/dark; phone dark lower legacy/session slice inspected. Reference was actually rendered at desktop dark and phone light/dark. A later desktop-light reference resize produced stale phone-sized content and was rejected; no full four-cell completion is claimed. Viewport overrides reset, original Parent dark preference restored. Private screenshots remain outside Git.
 
 Remaining contracts: the prototype separates Offseason from Build season and categorizes Outreach. Current verified reader does not expose that distinction; do not fabricate labels or classify all records as offseason. These remain explicit backend/reporting work. Lower-page and conditional/error/empty comparisons are still required under VC-017. No G1/G2 closure.
+
+## October 13 fee integration live smoke check
+
+After development sync12:30:56, Coach Finance loaded the new shared-fee controls. Historical preparation completed with an exact-origin shared fee and two ambiguous fictional charges awaiting explicit review. Displayed charged4000/applied3100/available6625/due900cents remained unchanged. This verifies loaded preparation/review behavior, not full mapping/bulk/priority recovery.
+
+Actual default wide dark screenshot exposed a long recorded priority overlapping the fee name. Changed rank layout to bounded wrapping and inspected a fresh capture showing separate rank and label. Private evidence coach-fee-mapping-review-fixed.png; no complete390/1440four-view claim. Mentor profile, retention and all new administrative conditional states remain in the visual queue.

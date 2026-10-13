@@ -5,6 +5,8 @@ import { audit } from "./access";
 import { refreshStudentFinance } from "./financeSummaries";
 import { ensureFinancialAccount, recordChargeChange, recordProjectedEntry, saveFinancialAccount } from "./financialSources";
 import { makeFunctionReference } from "convex/server";
+import { chargeFeeDefinition } from "./feeDefinitions";
+import { requireSeasonFinanceReady, requireSeasonFinancialContinuation, type FinancialContinuationId } from "./seasonFinance";
 
 type Entry = Doc<"ledgerEntries">;
 type Source = Extract<Entry["kind"], "payment" | "fundraiser">;
@@ -34,13 +36,13 @@ export function sourceBalances(entries: Entry[]) {
   return [...byId.values()];
 }
 
-export type ChargeDraft = { label: string; amountCents: number; priority: number; idempotencyKey: string; eventId?: Id<"events">; category?: "main" | "extra" };
+export type ChargeDraft = { label: string; amountCents: number; priority: number; idempotencyKey: string; eventId?: Id<"events">; category?: "main" | "extra"; feeDefinitionId?: Id<"feeDefinitions"> };
 
-export async function addCharge(ctx: MutationCtx, actor: AppUser, studentId: Id<"students">, label: string, amountCents: number, priority: number, idempotencyKey: string, eventId?: Id<"events">, category?: "main" | "extra") {
-  return (await addCharges(ctx, actor, studentId, [{ label, amountCents, priority, idempotencyKey, eventId, category }], `auto:${idempotencyKey}`))[0];
+export async function addCharge(ctx: MutationCtx, actor: AppUser, studentId: Id<"students">, label: string, amountCents: number, priority: number, idempotencyKey: string, eventId?: Id<"events">, category?: "main" | "extra", originId?: FinancialContinuationId) {
+  return (await addCharges(ctx, actor, studentId, [{ label, amountCents, priority, idempotencyKey, eventId, category }], `auto:${idempotencyKey}`, originId))[0];
 }
 
-export async function addCharges(ctx: MutationCtx, actor: AppUser, studentId: Id<"students">, drafts: ChargeDraft[], idempotencyPrefix: string) {
+export async function addCharges(ctx: MutationCtx, actor: AppUser, studentId: Id<"students">, drafts: ChargeDraft[], idempotencyPrefix: string, originId?: FinancialContinuationId) {
   if (drafts.length > 100 || new Set(drafts.map(d => d.idempotencyKey)).size !== drafts.length) throw new Error("Invalid charge batch.");
   if (!drafts.length) return [];
   const ids = new Map<string, Id<"charges">>();
@@ -55,9 +57,14 @@ export async function addCharges(ctx: MutationCtx, actor: AppUser, studentId: Id
   }
   if (!missing.length) return drafts.map(d => ids.get(d.idempotencyKey)!);
   const account = await ensureFinancialAccount(ctx, studentId);
+  const student = await ctx.db.get(studentId);
+  if (!student) throw new Error("Student is unavailable for fee assignment.");
+  if (originId) await requireSeasonFinancialContinuation(ctx, student.seasonId, originId);
+  else await requireSeasonFinanceReady(ctx, student.seasonId);
   for (const draft of missing) {
     const now = Date.now();
-    const chargeId = await ctx.db.insert("charges", { studentId, eventId: draft.eventId, label: draft.label, amountCents: draft.amountCents, appliedCents: 0, cancelledCents: 0, category: draft.category ?? "main", priority: draft.priority, createdBy: actor._id, createdAt: now, outstanding: draft.amountCents > 0 });
+    const definition = await chargeFeeDefinition(ctx, actor._id, student, draft);
+    const chargeId = await ctx.db.insert("charges", { studentId, eventId: draft.eventId, label: draft.label, amountCents: draft.amountCents, appliedCents: 0, cancelledCents: 0, category: draft.category ?? "main", priority: definition.priority, feeDefinitionId: definition._id, createdBy: actor._id, createdAt: now, outstanding: draft.amountCents > 0 });
     const entryId = await ctx.db.insert("ledgerEntries", { studentId, chargeId, eventId: draft.eventId, kind: "charge", amountCents: draft.amountCents, previousCents: 0, newCents: draft.amountCents, recordedBy: actor._id, recordedAt: now, idempotencyKey: draft.idempotencyKey });
     const charge = await ctx.db.get(chargeId);
     if (!charge) throw new Error("New charge is unavailable.");
@@ -66,15 +73,17 @@ export async function addCharges(ctx: MutationCtx, actor: AppUser, studentId: Id
     ids.set(draft.idempotencyKey, chargeId);
     await audit(ctx, actor, "charges", chargeId, "create", null, { label: draft.label, amountCents: draft.amountCents, eventId: draft.eventId, category: draft.category ?? "main" });
   }
-  await allocateUnapplied(ctx, actor, studentId, idempotencyPrefix);
+  await allocateUnapplied(ctx, actor, studentId, idempotencyPrefix, undefined, originId);
   return drafts.map(d => ids.get(d.idempotencyKey)!);
 }
 
 /** Bounded synchronous work; remaining allocation is durable and locks competing writers. */
-export async function allocateUnapplied(ctx: MutationCtx, actor: AppUser, studentId: Id<"students">, idempotencyPrefix: string, excludedEventId?: Id<"events">) {
+export async function allocateUnapplied(ctx: MutationCtx, actor: AppUser, studentId: Id<"students">, idempotencyPrefix: string, excludedEventId?: Id<"events">, originId?: FinancialContinuationId) {
   const account = await ensureFinancialAccount(ctx, studentId);
+  if (originId) await requireSeasonFinancialContinuation(ctx, account.seasonId, originId);
+  else await requireSeasonFinanceReady(ctx, account.seasonId);
   if (account.personalAvailableCents + account.fundraisingAvailableCents === 0) { await refreshStudentFinance(ctx, studentId); return; }
-  const jobId = await ctx.db.insert("financialAllocationJobs", { studentId, actorId: actor._id, generation: account.generation, state: "running", chargeCursor: null, step: 0, processed: 0, idempotencyPrefix, excludedEventId, updatedAt: Date.now() });
+  const jobId = await ctx.db.insert("financialAllocationJobs", { studentId, actorId: actor._id, generation: account.generation, state: "running", chargeCursor: null, step: 0, processed: 0, idempotencyPrefix, excludedEventId, maintenanceOriginId: originId, updatedAt: Date.now() });
   const job = await ctx.db.get(jobId);
   if (!job) throw new Error("Allocation job could not be created.");
   account.state = "allocating"; account.allocationJobId = jobId;

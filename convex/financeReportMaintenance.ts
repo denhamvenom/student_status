@@ -1,3 +1,4 @@
+import { seasonFinanceControl } from "./lib/seasonFinance";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalMutation, mutation, query } from "./_generated/server";
@@ -25,6 +26,8 @@ export const start = mutation({
   handler: async ctx => {
     const actor = await viewer(ctx); requireRole(actor, "coach");
     const season = await activeSeason(ctx);
+    const maintenance = await seasonFinanceControl(ctx, season._id);
+    if (maintenance && maintenance.state !== "ready" && maintenance.state !== "failed") throw new Error("Wait for shared fee maintenance before rebuilding reports.");
     const previous = await ctx.db.query("financeSummaryBackfills").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).unique();
     if (previous?.state === "running") return previous._id;
     const resume = previous?.state === "failed";

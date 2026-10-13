@@ -1,3 +1,4 @@
+import { seasonFinanceControl } from "./lib/seasonFinance";
 import { makeFunctionReference } from "convex/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
@@ -16,6 +17,8 @@ export const rebuild = mutation({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx);
     if (actor.role !== "coach") throw new Error("Only a Coach may rebuild financial records.");
+    const control = await seasonFinanceControl(ctx, (await activeSeason(ctx))._id);
+    if (control && control.state !== "ready" && control.state !== "failed") throw new Error("Wait for season fee maintenance before starting a financial rebuild.");
     return startFinancialRebuild(ctx, args.studentId, actor._id);
   },
 });

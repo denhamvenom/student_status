@@ -1,3 +1,4 @@
+import { feeMaintenanceProjection, feeMaintenanceValidator } from "./lib/seasonFinance";
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { query } from "./_generated/server";
@@ -15,17 +16,19 @@ const financeValidator = v.object({ chargedCents: v.number(), paidCents: v.numbe
 
 /** Only verified current projections can supply financial totals. */
 async function financialProjection(ctx: QueryCtx, studentId: Id<"students">) {
+  const student = await ctx.db.get(studentId);
+  const maintenance = student ? await feeMaintenanceProjection(ctx, student.seasonId) : null;
   const account = await financialAccount(ctx, studentId);
-  if (account?.state !== "ready") return { state: account?.state === "failed" ? "failed" as const : "updating" as const };
+  if (account?.state !== "ready") return { state: account?.state === "failed" ? "failed" as const : "updating" as const, maintenance };
   const data = await calculateStudentFinance(ctx, studentId);
-  return { state: "ready" as const, chargedCents: data.chargedCents, paidCents: data.paidCents, dueCents: data.dueCents,
+  return { state: "ready" as const, maintenance, chargedCents: data.chargedCents, paidCents: data.paidCents, dueCents: data.dueCents,
     travelBalanceCents: data.travelBalanceCents, personalAvailableCents: data.personalAvailableCents,
     fundraisingAvailableCents: data.fundraisingAvailableCents, raisedCents: data.raisedComplete ? data.knownRaisedCents : null,
     travelShareCents: data.travelShareCents, transferredInCents: data.transferredInCents, updatedAt: data.updatedAt };
 }
 
 export const familyFinance = query({
-  args: { studentId: v.id("students") }, returns: v.union(v.object({ ...financeValidator.fields, state: v.literal("ready") }), v.object({ state: v.union(v.literal("updating"), v.literal("failed")) })),
+  args: { studentId: v.id("students") }, returns: v.union(v.object({ ...financeValidator.fields, state: v.literal("ready"), maintenance: feeMaintenanceValidator }), v.object({ state: v.union(v.literal("updating"), v.literal("failed")), maintenance: feeMaintenanceValidator })),
   handler: async (ctx, args) => {
     const user = await viewer(ctx);
     requireRole(user, "student", "parent", "coach", "mentor");
@@ -79,8 +82,8 @@ export const familyAttendance=query({
 
 export const team = query({
   args: {}, returns: v.union(
-    v.object({ state: v.literal("ready"), activeStudents: v.number(), inactiveStudents: v.number(), travelTeamStudents: v.number(), finance: financeValidator }),
-    v.object({ state: v.union(v.literal("updating"), v.literal("failed")), activeStudents: v.number(), inactiveStudents: v.number(), travelTeamStudents: v.number(), finance: v.null(), processed: v.number(), rebuildRunning: v.boolean(), canRebuild: v.boolean(), message: v.string() }),
+    v.object({ state: v.literal("ready"), maintenance: feeMaintenanceValidator, activeStudents: v.number(), inactiveStudents: v.number(), travelTeamStudents: v.number(), finance: financeValidator }),
+    v.object({ state: v.union(v.literal("updating"), v.literal("failed")), maintenance: feeMaintenanceValidator, activeStudents: v.number(), inactiveStudents: v.number(), travelTeamStudents: v.number(), finance: v.null(), processed: v.number(), rebuildRunning: v.boolean(), canRebuild: v.boolean(), message: v.string() }),
   ),
   handler: async ctx => {
     const user = await viewer(ctx);
@@ -93,13 +96,14 @@ export const team = query({
     const readyAccounts = await ctx.db.query("financialAccounts").withIndex("by_seasonId_and_state", q => q.eq("seasonId", season._id).eq("state", "ready")).take(501);
     const failedAccount = await ctx.db.query("financialAccounts").withIndex("by_seasonId_and_state", q => q.eq("seasonId", season._id).eq("state", "failed")).first();
     const readyIds = new Set(readyAccounts.map(account => account.studentId));
-    const roster = { activeStudents: students.filter(s => s.active).length, inactiveStudents: students.filter(s => !s.active).length, travelTeamStudents: students.filter(s => s.active && s.travelTeam).length };
+    const maintenance = await feeMaintenanceProjection(ctx, season._id);
+    const roster = { maintenance, activeStudents: students.filter(s => s.active).length, inactiveStudents: students.filter(s => !s.active).length, travelTeamStudents: students.filter(s => s.active && s.travelTeam).length };
     if (readyAccounts.length !== students.length || students.some(student => !readyIds.has(student._id))) return {
       state: failedAccount ? "failed" as const : "updating" as const, ...roster, finance: null,
-      processed: backfill?.processed ?? 0, rebuildRunning: backfill?.state === "running", canRebuild: user.role === "coach" && backfill?.state !== "running",
+      processed: backfill?.processed ?? 0, rebuildRunning: backfill?.state === "running", canRebuild: user.role === "coach" && backfill?.state !== "running" && (!maintenance || maintenance.state === "ready" || maintenance.state === "failed"),
       message: failedAccount ? "A financial operation or rebuild requires Coach review before team totals can be verified." : "Financial records are being prepared or transactions are still processing.",
     };
-    if (backfill?.state !== "complete" || summaries.length > 500 || summaries.length !== students.length || summaries.some(summary => summary.version !== FINANCE_SUMMARY_VERSION || !students.some(student => student._id === summary.studentId)) || students.some(student => !summaries.some(summary => summary.studentId === student._id))) return { state: backfill?.state === "failed" ? "failed" as const : "updating" as const, ...roster, finance: null, processed: backfill?.processed ?? 0, rebuildRunning: backfill?.state === "running", canRebuild: user.role === "coach" && backfill?.state !== "running", message: backfill?.lastError ?? "Financial reports are updating; rebuild reports before viewing totals." };
+    if (backfill?.state !== "complete" || summaries.length > 500 || summaries.length !== students.length || summaries.some(summary => summary.version !== FINANCE_SUMMARY_VERSION || !students.some(student => student._id === summary.studentId)) || students.some(student => !summaries.some(summary => summary.studentId === student._id))) return { state: backfill?.state === "failed" ? "failed" as const : "updating" as const, ...roster, finance: null, processed: backfill?.processed ?? 0, rebuildRunning: backfill?.state === "running", canRebuild: user.role === "coach" && backfill?.state !== "running" && (!maintenance || maintenance.state === "ready" || maintenance.state === "failed"), message: backfill?.lastError ?? "Financial reports are updating; rebuild reports before viewing totals." };
     // Finance includes inactive current-season accounts: archiving never erases debt or credit.
     const { knownRaisedCents, unknownRaisedAccounts, ...aggregated } = await readFinanceAggregates(ctx,season._id);
     const totals = { ...aggregated, raisedCents: unknownRaisedAccounts === 0 ? knownRaisedCents : null, updatedAt: null as number | null };

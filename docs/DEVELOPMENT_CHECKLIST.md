@@ -4,6 +4,11 @@ Updated October 13, 2026
 
 ### Latest decisions and active work
 
+- [x] Agree: build season begins automatically on the official FIRST kickoff calendar day (America/Chicago). Tested date helper is implemented; attendance report integration remains pending.
+- [x] Implement and source-review shared fee priorities, historical identity review, immutable bulk scopes, recovery controls, Mentor profile/driver ownership review, and retention preview/holds. Synced to development October 13 at 12:30:56 after lint, types, 266 tests and build passed; final enrollment retry guard passed its targeted regression.
+- [ ] Complete live and four-view visual rehearsal for the newly synchronized administration/profile controls. Implementation and source clearance do not close this item.
+- [x] Integrate reviewed Timeclock dialog focus and narrow-screen fixes; its local lint/types/build pass. Live Group race and physical-device evidence remain open.
+
 - [x] Agree: fundraising reductions affecting spent/transferred credits wait for Coach resolution without changing balances (October 13).
 - [x] Agree: reactivation followed by another archive restarts five-year retention from the latest archive date; automatic deletion remains unauthorized.
 - [x] Implement and source-review the latest-archive clock with before/after audit evidence; 13 focused account/profile tests pass. Development synchronization and live checks remain pending.

@@ -13,6 +13,7 @@ export function EventEnrollmentNotice({ eventId, staff, coach, failed }: { event
   const [error, setError] = useState<string | null>(null)
   const copy = eventCopy.enrollment
   async function retryEnrollment() {
+    if (busy || !coach || !progress?.canRetry) return
     setBusy(true)
     setError(null)
     try { await retry({ eventId }) }
@@ -25,7 +26,7 @@ export function EventEnrollmentNotice({ eventId, staff, coach, failed }: { event
       <p>{copy.description}</p>
       {progress && <p>{copy.progress(progress.processed, progress.assigned)}</p>}
       {staff && progress?.lastError && <p role="alert">{progress.lastError}</p>}
-      {failed && coach && <Button disabled={busy} onClick={() => void retryEnrollment()}>{busy ? copy.retrying : copy.retry}</Button>}
+      {failed && coach && <Button type="button" disabled={busy || !progress?.canRetry} onClick={() => void retryEnrollment()}>{busy ? copy.retrying : copy.retry}</Button>}
       {error && <p role="alert">{error}</p>}
     </CardContent>
   </Card>

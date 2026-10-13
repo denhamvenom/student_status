@@ -1,3 +1,4 @@
+import { requireSeasonFinanceReady } from "./lib/seasonFinance";
 import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
@@ -67,6 +68,7 @@ export const pendingWithdrawals = query({
 export const requestWithdrawal = mutation({
   args: { eventId: v.id("events"), idempotencyKey: v.string() }, returns: v.id("withdrawalRequests"),
   handler: async (ctx, args) => {
+    await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const user = await viewer(ctx), student = await ownStudent(ctx, user);
     const data = await details(ctx, args.eventId, student._id);
     requireEnrollmentComplete(data.event);
@@ -107,6 +109,7 @@ async function removeRoomState(ctx: MutationCtx, eventId: Id<"events">, studentI
 export const reviewWithdrawal = mutation({
   args: { requestId: v.id("withdrawalRequests"), decision, returnCents: v.optional(v.number()), cancelUnpaidMain: v.boolean(), reason: v.string(), expectedRevision: v.string() }, returns: v.null(),
   handler: async (ctx, args) => {
+    await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const user = await viewer(ctx);
     if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new Error("Withdrawal review denied.");
     if (args.reason.trim().length < 8 || args.reason.length > 1000) throw new Error("Provide an explanation of at least eight characters.");
