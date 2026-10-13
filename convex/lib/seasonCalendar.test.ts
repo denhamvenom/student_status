@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSeasonStatusAt, chicagoCalendarDateAt, kickoffForCompetitionYear, REPORTING_TIME_ZONE } from "./seasonCalendar";
+import { buildSeasonStatusAt, chicagoCalendarDateAt, kickoffForCompetitionYear, REPORTING_TIME_ZONE, kickoffBoundaryForCompetitionYear } from "./seasonCalendar";
 
 describe("verified FIRST kickoff calendar", () => {
   it("uses an explicit competition year and carries official provenance", () => {
@@ -11,6 +11,7 @@ describe("verified FIRST kickoff calendar", () => {
   });
 
   it("starts at midnight on the Chicago kickoff calendar day, not at the broadcast hour", () => {
+    expect(kickoffBoundaryForCompetitionYear(2027)).toMatchObject({kickoffAt:Date.parse("2027-01-09T06:00:00Z")});
     expect(buildSeasonStatusAt(2027, Date.parse("2027-01-09T05:59:59.999Z"))).toMatchObject({ localDate: "2027-01-08", phase: "beforeKickoff" });
     expect(buildSeasonStatusAt(2027, Date.parse("2027-01-09T06:00:00.000Z"))).toMatchObject({ localDate: "2027-01-09", phase: "buildSeason" });
     expect(buildSeasonStatusAt(2027, Date.parse("2027-01-09T17:00:00.000Z"))).toMatchObject({ phase: "buildSeason" });

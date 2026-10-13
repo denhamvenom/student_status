@@ -27,3 +27,7 @@
 .attendanceCards .card{gap:8px;border-radius:6px;padding:18px}
 .attendanceCards .unavailable{font:400 26px/1.2 Anton,Impact,sans-serif;overflow-wrap:anywhere}
 @media(max-width:767px){.attendanceCards{grid-template-columns:1fr}.attendanceCards .card{padding:16px}}
+
+.phaseSection{display:grid;gap:12px;min-width:0}
+.phaseTitle{margin:4px 0 0;font:400 23px/1.15 Anton,Impact,sans-serif}
+.phaseLabel{margin:0;color:var(--text-muted);font-size:13px;font-weight:700}

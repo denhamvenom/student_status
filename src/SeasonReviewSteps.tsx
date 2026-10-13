@@ -1,3 +1,4 @@
+import { HistoricalAttendance } from './HistoricalAttendance'
 import { useState } from 'react'
 import { useMutation, usePaginatedQuery, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
@@ -60,5 +61,5 @@ function HistoricalRoster({seasonId}:{seasonId:Id<'seasons'>}){
 }
 export function SeasonHistory(){
  const rows=usePaginatedQuery(api.seasonHistory.seasons,{}, {initialNumItems:20});const [selected,setSelected]=useState<Id<'seasons'>|null>(null)
- return <section className={styles.section}><h2>Past seasons</h2><div className={styles.choices}>{rows.results.map(r=><Button key={r.id} variant={selected===r.id?'default':'outline'} onClick={()=>setSelected(r.id)}>{r.name}  /  Locked</Button>)}</div>{rows.status==='CanLoadMore'&&<Button onClick={()=>rows.loadMore(20)}>Load more seasons</Button>}{selected&&<HistoricalRoster key={selected} seasonId={selected}/>}</section>
+ return <section className={styles.section}><h2>Past seasons</h2><div className={styles.choices}>{rows.results.map(r=><Button key={r.id} variant={selected===r.id?'default':'outline'} onClick={()=>setSelected(r.id)}>{r.name}  /  Locked</Button>)}</div>{rows.status==='CanLoadMore'&&<Button onClick={()=>rows.loadMore(20)}>Load more seasons</Button>}{selected&&<div key={selected}><HistoricalRoster seasonId={selected}/><HistoricalAttendance seasonId={selected}/></div>}</section>
 }

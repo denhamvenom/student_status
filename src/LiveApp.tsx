@@ -1,3 +1,4 @@
+import { PaymentAdministration } from './PaymentAdministration'
 import { SeasonAdministration } from './SeasonAdministration'
 import { FamilyLinkMaintenance } from './FamilyLinkMaintenance'
 import { CoachFinanceAccounts, CoachFinanceChanges } from './CoachFinanceWorkspace'
@@ -178,8 +179,10 @@ function AdminFinance({viewer}:{viewer:Viewer}) {
     {details&&<section aria-label={financeWorkspaceCopy.accountDetails}>
       <h2>{details.name} · {financeWorkspaceCopy.accountDetails}</h2>
       <FinancePage key={details.id} studentId={details.id} showHeading={false} allowChargeEditing={viewer.user?.role==='coach'}/>
+      {viewer.user?.role==='coach'&&<PaymentAdministration key={`payment:${details.id}`} studentId={sid(details.id)} mode="correction"/>}
       {canEdit&&<><ChargeEditor key={`charge:${details.id}`} studentId={sid(details.id)}/><FinanceOperations key={`finance:${details.id}`} studentId={sid(details.id)}/></>}
     </section>}
+    {canEdit&&<PaymentAdministration mode="bulk"/>}
     <TeamFinanceOverview/>
     <FinanceExport selectedStudentId={details?sid(details.id):undefined} selectedStudentName={details?.name}/>
     <CoachFinanceChanges/>

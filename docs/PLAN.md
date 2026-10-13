@@ -1,5 +1,10 @@
 # Student Status implementation plan
 
+## Current completion checkpoint — October 13
+
+Follow CURRENT_STATE.md and GOAL_ACCEPTANCE.md for active G1-G7 scope. The six-step season transition is published as214cdfb and synchronized to development. The next local integrated batch covers payment import/receipt correction, kickoff attendance phases, Outreach classification from case-insensitive event titles, and historical attendance/roster corrections. Integrated lint, types,324tests and build pass; Astra review cleared and development synchronization completed14:43:39; publication and live evidence are next. Historical financial corrections, remaining live role evidence and representative prototype comparisons remain required. Production, real signing and automatic deletion remain separately gated.
+
+
 ## Scope and evidence
 
 Build a new application in this directory. Preserve the root Convex starter and every file in `../Devel_Vs_Handoff/design_handoff_student_status`.

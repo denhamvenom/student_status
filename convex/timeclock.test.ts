@@ -337,3 +337,33 @@ describe("timeclock transactions", () => {
     });
   });
 });
+
+
+describe("archived attendance correction", () => {
+  it("requires Coach correction mode, preserves original evidence, replays once and rejects closed access", async () => {
+    const f = await fixture();
+    const original = await f.t.run(async ctx => {
+      await ctx.db.patch(f.ids.season, { status: "archived" });
+      await ctx.db.patch(f.ids.sessionA, { state: "closed" });
+      const session = (await ctx.db.get(f.ids.sessionA))!;
+      return await ctx.db.insert("timeclockIntervals", { sessionId: session._id, studentId: f.ids.student, inAt: session.scheduledStart, outAt: session.scheduledStart + 60_000, openedBy: session.openedBy, closeReason: "synthetic", openCommandKey: "synthetic-original", scheduleRevision: 1 });
+    });
+    const request = { seasonId: f.ids.season, acknowledged: true, reason: "Synthetic historical correction" };
+    await expect(f.mentor.mutation(api.historicalCorrections.open, request)).rejects.toThrow("permission");
+    const grant = await f.coach.mutation(api.historicalCorrections.open, request);
+    const args = { correctionSessionId: grant.id, expectedRevision: 1, sessionId: f.ids.sessionA, studentId: f.ids.student, originalIntervalId: original, kind: "void" as const, reason: "Synthetic duplicate attendance", key: "historical-correction-test-01" };
+    vi.useFakeTimers();
+    const receipt = await f.coach.mutation(api.historicalCorrections.correctAttendance, args);
+    expect(await f.coach.mutation(api.historicalCorrections.correctAttendance, args)).toEqual(receipt);
+    expect(await f.t.run(ctx => ctx.db.get(original))).not.toBeNull();
+    const evidence = await f.coach.query(api.timeclock.correctionEvidence, { sessionId: f.ids.sessionA, studentId: f.ids.student });
+    expect(evidence.corrections).toHaveLength(1);
+    await f.t.finishAllScheduledFunctions(vi.runAllTimers);
+    vi.useRealTimers();
+    const report = await f.t.run(ctx => ctx.db.query("timeclockSessionReportStates").withIndex("by_sessionId", q => q.eq("sessionId", f.ids.sessionA)).unique());
+    expect(report?.state).toBe("ready");
+    expect(report?.sessionRevision).toBe(2);
+    await f.coach.mutation(api.historicalCorrections.close, { correctionSessionId: grant.id });
+    await expect(f.coach.mutation(api.historicalCorrections.correctAttendance, { ...args, key: "historical-correction-test-02" })).rejects.toThrow("ended");
+  });
+});

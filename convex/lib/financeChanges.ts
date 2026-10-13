@@ -14,12 +14,12 @@ export async function recordFinanceChange(ctx: MutationCtx, change: Change) {
 
 /** A ledger fact is a single committed movement, never the planned total of a pending job. */
 export async function recordLedgerChange(ctx: MutationCtx, entry: Doc<"ledgerEntries">, seasonId: Id<"seasons">, historical = false) {
-  const kinds: Record<string, string> = { charge: "charge", payment: "payment", fundraiser: "fundraisingCredit", allocation: "allocation", deallocation: "release", adjustment: "chargeAdjustment", cancellation: "chargeCancellation", payout: "payout", transferOut: "transferOut", awardReversal: "awardReversal" };
+  const kinds: Record<string, string> = { charge: "charge", payment: "payment", paymentCorrection: "paymentCorrection", fundraiser: "fundraisingCredit", allocation: "allocation", deallocation: "release", adjustment: "chargeAdjustment", cancellation: "chargeCancellation", payout: "payout", transferOut: "transferOut", awardReversal: "awardReversal" };
   const kind = kinds[entry.kind]; if (!kind || ["adjustment", "cancellation"].includes(entry.kind) && entry.idempotencyKey?.startsWith("correction:")) return;
-  const sourceKind = entry.kind === "payment" ? "payment" : entry.kind === "fundraiser" ? "fundraiser" : entry.sourceKind;
+  const sourceKind = entry.kind === "payment" || entry.kind === "paymentCorrection" ? "payment" : entry.kind === "fundraiser" ? "fundraiser" : entry.sourceKind;
   const meaning = entry.kind === "allocation" || entry.kind === "deallocation" ? "applied" as const
     : ["charge", "adjustment", "cancellation"].includes(entry.kind) ? "obligation" as const
-    : ["payment", "fundraiser"].includes(entry.kind) ? "receipt" as const
+    : ["payment", "fundraiser", "paymentCorrection"].includes(entry.kind) ? "receipt" as const
     : sourceKind === "payment" ? "personalAvailable" as const : "fundraisingAvailable" as const;
   // Legacy records may lack before/after evidence. Do not invent an account or charge balance.
   const receipt = entry.kind === "payment" || entry.kind === "fundraiser";

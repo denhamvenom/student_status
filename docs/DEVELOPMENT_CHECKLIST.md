@@ -536,9 +536,24 @@ Historical 14:04 milestone: October13 Coach direction was to complete functional
 - [x] Implement durable progress, pre-application return-to-review and resumable application; preserve original student/account/session IDs and historical evidence.
 - [x] Integrate automatic target allocation, monetary pair verification, shared writer locks, revocation preservation and Timeclock/calendar cutover fences.
 - [x] Astra review the coherent source batch; integrated lint, strict types and 319 tests passed. Build passed after the root encoding correction; development synchronization completed 14:21:33.
-- [ ] Publish the reviewed season batch. It remains uncommitted; latest published and remote-verified checkpoint is `314a4a9`.
+- [x] Publish the reviewed season batch: `214cdfb`, pushed and remote verified; draft PR10 updated.
 - [x] Narrow live Coach smoke: `/season` loaded six-step navigation and the new-season form, with Save disabled until input. Current `2026–27 Development` remained unchanged; no draft save or activation was attempted.
 - [ ] Rehearse the synchronized season candidate with synthetic data and complete representative visual comparison. No live activation has been performed.
-- [ ] Complete controlled historical corrections. Existing historical browsing is read-only.
+- [ ] Complete controlled historical corrections. Historical attendance is locally implemented/reviewed; roster and financial workflows remain in progress.
 
 These implementation and verification claims do not close G1-G7, authorize production or imply live cutover approval.
+
+### Outreach naming decision — October 13
+- [x] Agreed: events with Outreach in their title are outreach events (case-insensitive).
+- [x] Connect title-based outreach classification to attendance reporting in local source; review passed. Combined sync/live evidence remains below.
+
+### Current integration batch — October 13
+- [x] Implement and source-review kickoff-based Offseason/Build reporting with existing weekday rules.
+- [x] Implement and source-review Outreach title classification; old unclassified projections require the existing report rebuild.
+- [x] Implement and source-review Coach historical attendance correction with expiring access, original evidence, audit and retry protection; focused check verifies report rebuild completes.
+- [ ] Complete combined validation, development sync and representative live/visual evidence for this batch.
+- [x] Implement payment bulk/CSV entry and source-preserving receipt corrections; focused checks pass, review/sync/live evidence pending.
+- [x] Implement historical roster name/subteam corrections with Coach-scoped access and before/after audit; focused checks pass, review/sync/live evidence pending.
+- [ ] Finish historical financial corrections.
+
+October13 batch verification: integrated lint/types/324tests/build passed, Astra cleared payment/attendance/historical attendance/roster, and development sync completed14:43:39. Publication and representative live/visual evidence remain pending. No season activation or production deployment occurred.

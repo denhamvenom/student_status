@@ -39,3 +39,12 @@ export function buildSeasonStatusAt(competitionYear: number, epochMs: number) {
   if (kickoff.state === "unavailable") return kickoff;
   return { ...kickoff, localDate, phase: localDate < kickoff.kickoffDate ? "beforeKickoff" as const : "buildSeason" as const };
 }
+
+/** Verified FIRST kickoffs fall in January, when Chicago midnight is 06:00 UTC. */
+export function kickoffBoundaryForCompetitionYear(competitionYear: number) {
+  const kickoff = kickoffForCompetitionYear(competitionYear);
+  if (kickoff.state === "unavailable") return kickoff;
+  const kickoffAt = Date.parse(`${kickoff.kickoffDate}T06:00:00.000Z`);
+  if (chicagoCalendarDateAt(kickoffAt) !== kickoff.kickoffDate || chicagoCalendarDateAt(kickoffAt - 1) === kickoff.kickoffDate) throw new Error("Verified kickoff does not resolve to Chicago midnight.");
+  return { ...kickoff, kickoffAt };
+}

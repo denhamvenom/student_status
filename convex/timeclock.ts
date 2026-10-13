@@ -125,7 +125,10 @@ export const applyCalendarOccurrence = internalMutation({
     const nextAllDay = args.cancelled && args.scheduledStart === undefined ? existing.allDay : args.allDay;
     const changed = existing.scheduledStart !== nextStart || existing.scheduledEnd !== nextEnd || existing.cancelled !== args.cancelled || existing.allDay !== nextAllDay || existing.allDayStartDate !== (args.allDayStartDate ?? existing.allDayStartDate) || existing.allDayEndDate !== (args.allDayEndDate ?? existing.allDayEndDate);
     const revision = existing.revision + (changed ? 1 : 0);
-    await ctx.db.patch(existing._id, { title: args.cancelled && args.scheduledStart === undefined ? existing.title : args.title.trim(), allDay: nextAllDay, scheduledStart: nextStart, scheduledEnd: nextEnd, allDayStartDate: args.allDayStartDate ?? existing.allDayStartDate, allDayEndDate: args.allDayEndDate ?? existing.allDayEndDate, recurringEventId: args.recurringEventId ?? existing.recurringEventId, originalStartTime: args.originalStartTime ?? existing.originalStartTime, providerVersion: args.providerVersion, providerUpdatedAt: args.providerUpdatedAt, cancelled: args.cancelled, observedAt: args.observedAt, revision, lastSeenGeneration: args.generation });
+    const nextTitle = args.cancelled && args.scheduledStart === undefined ? existing.title : args.title.trim();
+    const titleChanged = nextTitle !== existing.title;
+    await ctx.db.patch(existing._id, { title: nextTitle, allDay: nextAllDay, scheduledStart: nextStart, scheduledEnd: nextEnd, allDayStartDate: args.allDayStartDate ?? existing.allDayStartDate, allDayEndDate: args.allDayEndDate ?? existing.allDayEndDate, recurringEventId: args.recurringEventId ?? existing.recurringEventId, originalStartTime: args.originalStartTime ?? existing.originalStartTime, providerVersion: args.providerVersion, providerUpdatedAt: args.providerUpdatedAt, cancelled: args.cancelled, observedAt: args.observedAt, revision, lastSeenGeneration: args.generation });
+    if (titleChanged && session && (!changed || session.state !== 'open' || now >= session.effectiveEnd)) await invalidateAttendanceSession(ctx, session._id);
     if (!changed) return existing._id;
     await ctx.db.insert("timeclockScheduleRevisions", { occurrenceId: existing._id, sessionId: session?._id, revision, observedAt: args.observedAt, previousStart: existing.scheduledStart, previousEnd: existing.scheduledEnd, newStart: nextStart, newEnd: nextEnd, cause: args.cancelled ? "cancellation" : "calendar" });
     if (!session || session.state !== "open" || now >= session.effectiveEnd) return existing._id;
@@ -455,17 +458,9 @@ export const correctionEvidence = query({
   },
 });
 
-export const correctInterval = mutation({
-  args: { sessionId, studentId, originalIntervalId: v.optional(v.id("timeclockIntervals")), targetCorrectionId: v.optional(v.id("timeclockCorrections")), kind: v.union(v.literal("add"), v.literal("replace"), v.literal("void")), inAt: v.optional(v.number()), outAt: v.optional(v.number()), reason: v.string(), key: v.string() }, returns: commandResult,
-  handler: async (ctx, args): Promise<Result> => {
-    const actor = await viewer(ctx); requireRole(actor, "coach");
-    // Check before command replay so an archived season cannot return a prior
-    // success as if a correction were still accepted.
-    const season = await activeSeason(ctx);
-    if (await timeclockTransitionLocked(ctx, season._id)) return fail("SEASON_TRANSITION");
-    const currentSession = await ctx.db.get(args.sessionId);
-    if (!currentSession || currentSession.seasonId !== season._id) return fail("INVALID_SESSION");
-    return await command(ctx, actor, args.key, JSON.stringify(["correct", args.sessionId, args.studentId, args.originalIntervalId, args.targetCorrectionId, args.kind, args.inAt, args.outAt, args.reason]), async () => {
+export const intervalCorrectionArgs = { sessionId, studentId, originalIntervalId: v.optional(v.id("timeclockIntervals")), targetCorrectionId: v.optional(v.id("timeclockCorrections")), kind: v.union(v.literal("add"), v.literal("replace"), v.literal("void")), inAt: v.optional(v.number()), outAt: v.optional(v.number()), reason: v.string(), key: v.string() };
+
+export async function applyIntervalCorrection(ctx: MutationCtx, actor: AppUser, args: Infer<typeof _intervalCorrectionValidator>): Promise<Result> {
       const session = await ctx.db.get(args.sessionId);
       if (!session || session.state === "open") return fail("SESSION_OPEN");
       const reason = args.reason.trim(); if (reason.length < 5 || reason.length > 1000) return fail("REASON_REQUIRED");
@@ -498,6 +493,21 @@ export const correctInterval = mutation({
       const id = await ctx.db.insert("timeclockCorrections", { sessionId: session._id, studentId: args.studentId, originalIntervalId: args.originalIntervalId, targetCorrectionId: args.targetCorrectionId, kind: args.kind, inAt: args.inAt, outAt: args.outAt, reason, actorId: actor._id, at: Date.now(), commandKey: args.key });
       await invalidateAttendanceSession(ctx, session._id);
       return good({ correctionId: id });
+}
+const _intervalCorrectionValidator = v.object(intervalCorrectionArgs);
+
+export const correctInterval = mutation({
+  args: intervalCorrectionArgs, returns: commandResult,
+  handler: async (ctx, args): Promise<Result> => {
+    const actor = await viewer(ctx); requireRole(actor, "coach");
+    // Check before command replay so an archived season cannot return a prior
+    // success as if a correction were still accepted.
+    const season = await activeSeason(ctx);
+    if (await timeclockTransitionLocked(ctx, season._id)) return fail("SEASON_TRANSITION");
+    const currentSession = await ctx.db.get(args.sessionId);
+    if (!currentSession || currentSession.seasonId !== season._id) return fail("INVALID_SESSION");
+    return await command(ctx, actor, args.key, JSON.stringify(["correct", args.sessionId, args.studentId, args.originalIntervalId, args.targetCorrectionId, args.kind, args.inAt, args.outAt, args.reason]), async () => {
+      return applyIntervalCorrection(ctx, actor, args);
     });
   },
 });

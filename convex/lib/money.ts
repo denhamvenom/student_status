@@ -24,7 +24,15 @@ export { effectiveChargeCents } from "./chargeObligation";
 export function sourceBalances(entries: Entry[]) {
   const sources = entries.filter((e): e is Entry & { kind: Source } => e.kind === "payment" || e.kind === "fundraiser");
   const byId = new Map(sources.map(s => [s._id, { entry: s, available: s.amountCents }]));
+  const receivedById = new Map(sources.map(source => [source._id, source.amountCents]));
   for (const entry of entries) {
+    if (entry.kind === "paymentCorrection") {
+      const source = entry.sourceEntryId ? byId.get(entry.sourceEntryId) : undefined;
+      if (!source || source.entry.kind !== "payment" || source.entry.originEntryId || receivedById.get(source.entry._id) !== entry.previousCents || !Number.isSafeInteger(entry.newCents) || entry.newCents < 0 || Math.abs(entry.newCents - entry.previousCents) !== entry.amountCents) throw new Error("Payment correction source is inconsistent.");
+      source.available += entry.newCents - entry.previousCents;
+      receivedById.set(source.entry._id, entry.newCents);
+      continue;
+    }
     if (entry.kind !== "allocation" && entry.kind !== "deallocation" && entry.kind !== "payout" && entry.kind !== "transferOut" && entry.kind !== "awardReversal") continue;
     const sourceId = allocationSourceId(entry, sources);
     const source = byId.get(sourceId);
@@ -32,7 +40,9 @@ export function sourceBalances(entries: Entry[]) {
     if (entry.studentId !== source.entry.studentId || entry.kind === "payout" && source.entry.kind !== "payment" || entry.kind === "transferOut" && source.entry.kind !== "fundraiser" && !entry.seasonTransitionPlanId) throw new Error("Financial source history is inconsistent.");
     source.available += entry.kind === "deallocation" ? entry.amountCents : -entry.amountCents;
   }
-  for (const source of byId.values()) if (source.available < 0 || source.available > source.entry.amountCents) throw new Error("Financial source balance is inconsistent.");
+  for (const source of byId.values()) {
+    if (!Number.isSafeInteger(source.available) || source.available < 0 || source.available > receivedById.get(source.entry._id)!) throw new Error("Financial source balance is inconsistent.");
+  }
   return [...byId.values()];
 }
 

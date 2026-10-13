@@ -7,8 +7,9 @@ import type { QueryCtx } from "./_generated/server";
 import { activeSeason, requireRole, studentAccess, viewer } from "./lib/access";
 import { calculateStudentFinance, FINANCE_SUMMARY_VERSION } from "./lib/financeSummaries";
 import { financialAccount } from "./lib/financialSources";
-import { attendanceEvidence } from "./lib/attendanceReports";
+import { attendanceEvidence, outreachFromTitle } from "./lib/attendanceReports";
 import { attendanceNamespace, studentAttendanceNamespace, reportAggregate } from "./lib/reportAggregates";
+import { kickoffBoundaryForCompetitionYear } from "./lib/seasonCalendar";
 export { correctedIntervals } from "./lib/attendanceReports";
 
 const nullableNumber = v.union(v.number(), v.null());
@@ -39,9 +40,23 @@ export const familyFinance = query({
 });
 
 const legacyValidator = v.object({ tuesdayHeld: v.number(), tuesdayAttended: v.number(), tuesdayPercent: nullableNumber, thursdayAttended: v.number(), outreachAttended: v.number() });
-const verifiedValidator = v.object({ sessionsHeld: v.number(), sessionsAttended: v.number(), tuesdayHeld: v.number(), tuesdayAttended: v.number(), tuesdayPercent: nullableNumber, thursdayAttended: v.number(), outreachAttended: v.null(), updatedAt: nullableNumber });
+const verifiedValidator = v.object({ sessionsHeld: v.number(), sessionsAttended: v.number(), tuesdayHeld: v.number(), tuesdayAttended: v.number(), tuesdayPercent: nullableNumber, thursdayAttended: v.number(), outreachAttended: v.number(), updatedAt: nullableNumber });
 const sessionValidator = v.object({ sessionId: v.id("timeclockSessions"), title: v.string(), scheduledStart: v.number(), state: v.union(v.literal("open"), v.literal("closed"), v.literal("cancelled")), totalMs: nullableNumber, scheduledMs: nullableNumber, earlyMs: nullableNumber, extendedMs: nullableNumber, longestScheduledMs: nullableNumber, qualifies: v.union(v.boolean(),v.null()), needsReview: v.boolean(), provisional: v.boolean(), reportState:v.union(v.literal("ready"),v.literal("updating"),v.literal("failed")) });
-const sharedAttendanceFields={sessions:v.array(sessionValidator),isDone:v.boolean(),continueCursor:v.string(),splitCursor:v.optional(v.union(v.string(),v.null())),pageStatus:v.optional(v.union(v.literal("SplitRequired"),v.literal("SplitRecommended"),v.null())),legacy:legacyValidator,totalsScope:v.literal("currentFinalized")};
+const phaseBoundaryValidator = v.union(v.object({state:v.literal("verified"),competitionYear:v.number(),kickoffDate:v.string(),kickoffAt:v.number(),currentPhase:v.union(v.literal("offseason"),v.literal("buildSeason"))}),v.object({state:v.literal("unavailable"),competitionYear:v.number(),reason:v.literal("kickoffDateNotVerified")}));
+const phasesValidator = v.union(v.null(),v.object({offseason:verifiedValidator,buildSeason:verifiedValidator}));
+async function phaseCounts(ctx: QueryCtx, seasonId: Id<"seasons">, studentId: Id<"students">, kickoffAt: number, phase: "offseason" | "buildSeason", updatedAt: number) {
+  const bounds = phase === "offseason" ? { upper: {key:kickoffAt,inclusive:false} } : {lower:{key:kickoffAt,inclusive:true}};
+  const [sessionsHeld,sessionsAttended,tuesdayHeld,tuesdayAttended,thursdayAttended,outreachAttended] = await Promise.all([
+    reportAggregate.count(ctx,{namespace:attendanceNamespace(seasonId,"held"),bounds}),
+    reportAggregate.count(ctx,{namespace:studentAttendanceNamespace(seasonId,studentId),bounds}),
+    reportAggregate.count(ctx,{namespace:attendanceNamespace(seasonId,"held","Tuesday"),bounds}),
+    reportAggregate.count(ctx,{namespace:studentAttendanceNamespace(seasonId,studentId,"Tuesday"),bounds}),
+    reportAggregate.count(ctx,{namespace:studentAttendanceNamespace(seasonId,studentId,"Thursday"),bounds}),
+    reportAggregate.count(ctx,{namespace:studentAttendanceNamespace(seasonId,studentId,"Outreach"),bounds}),
+  ]);
+  return {sessionsHeld,sessionsAttended,tuesdayHeld,tuesdayAttended,tuesdayPercent:tuesdayHeld?Math.round(100*tuesdayAttended/tuesdayHeld):null,thursdayAttended,outreachAttended,updatedAt};
+}
+const sharedAttendanceFields={phaseBoundary:phaseBoundaryValidator,phases:phasesValidator,sessions:v.array(sessionValidator),isDone:v.boolean(),continueCursor:v.string(),splitCursor:v.optional(v.union(v.string(),v.null())),pageStatus:v.optional(v.union(v.literal("SplitRequired"),v.literal("SplitRecommended"),v.null())),legacy:legacyValidator,totalsScope:v.literal("currentFinalized")};
 export const familyAttendance=query({
   args:{studentId:v.id("students"),asOf:v.number(),paginationOpts:v.optional(paginationOptsValidator)},
   returns:v.union(v.object({...sharedAttendanceFields,state:v.literal("ready"),verified:verifiedValidator}),v.object({...sharedAttendanceFields,state:v.union(v.literal("updating"),v.literal("failed")),verified:v.null(),canRebuild:v.boolean(),rebuildRunning:v.boolean(),processed:v.number(),message:v.string()})),
@@ -50,7 +65,11 @@ export const familyAttendance=query({
     if(args.paginationOpts && args.paginationOpts.numItems>10)throw new Error("Attendance pages support up to 10 sessions.");
     if(args.paginationOpts?.maximumRowsRead!==undefined&&(!Number.isSafeInteger(args.paginationOpts.maximumRowsRead)||args.paginationOpts.maximumRowsRead<1))throw new Error("Attendance row budgets must be positive integers.");
     const user=await viewer(ctx);requireRole(user,"student","parent","coach");const student=await studentAccess(ctx,user,args.studentId);
+    const season=await ctx.db.get(student.seasonId);if(!season)throw new Error("Attendance season unavailable.");
+    const kickoff=kickoffBoundaryForCompetitionYear(season.year);
+    const phaseBoundary=kickoff.state==="verified"?{state:"verified" as const,competitionYear:season.year,kickoffDate:kickoff.kickoffDate,kickoffAt:kickoff.kickoffAt,currentPhase:args.asOf<kickoff.kickoffAt?"offseason" as const:"buildSeason" as const}:kickoff;
     const backfill=await ctx.db.query("attendanceReportBackfills").withIndex("by_seasonId",q=>q.eq("seasonId",student.seasonId)).unique();
+    const unclassified=await ctx.db.query("timeclockSessionReportStates").withIndex("by_seasonId_and_outreach",q=>q.eq("seasonId",student.seasonId).eq("outreach",undefined)).first();
     const [pending,failed]=await Promise.all([reportAggregate.count(ctx,{namespace:attendanceNamespace(student.seasonId,"pending")}),reportAggregate.count(ctx,{namespace:attendanceNamespace(student.seasonId,"failed")})]);
     // Keep native endCursor/id/byte budgets; enforce a server row budget even when
     // an adaptive native page grows past its originally requested numItems.
@@ -62,7 +81,7 @@ export const familyAttendance=query({
       const occurrence=await ctx.db.get(session.occurrenceId);
       const report=await ctx.db.query("timeclockSessionReportStates").withIndex("by_sessionId",q=>q.eq("sessionId",session._id)).unique();
       const row=await ctx.db.query("timeclockAttendanceSummaries").withIndex("by_sessionId_and_studentId",q=>q.eq("sessionId",session._id).eq("studentId",student._id)).unique();
-      const fresh=report?.state==="ready"&&report.sessionRevision===session.revision&&report.sessionState===session.state&&report.needsReview===session.needsReview&&(!row||row.sessionRevision===session.revision&&row.reportGeneration===report.reportGeneration);
+      const fresh=report?.state==="ready"&&report.occurrenceTitle===occurrence?.title&&report.outreach===outreachFromTitle(occurrence?.title??"")&&report.sessionRevision===session.revision&&report.sessionState===session.state&&report.needsReview===session.needsReview&&(!row||row.sessionRevision===session.revision&&row.reportGeneration===report.reportGeneration&&row.outreach===report.outreach&&row.occurrenceTitle===report.occurrenceTitle);
       if(session.state!=="open"&&!fresh)pageStale=true;
       const math=session.state==="open"?await attendanceEvidence(ctx,session,student._id,args.asOf):fresh?row??{totalMs:0,earlyMs:0,scheduledMs:0,extendedMs:0,longestScheduledMs:0,qualifies:false}:null;
       sessions.push({sessionId:session._id,title:occurrence?.title??"Unavailable event",scheduledStart:session.scheduledStart,state:session.state,totalMs:math?.totalMs??null,scheduledMs:math?.scheduledMs??null,earlyMs:math?.earlyMs??null,extendedMs:math?.extendedMs??null,longestScheduledMs:math?.longestScheduledMs??null,qualifies:math?.qualifies??null,needsReview:session.needsReview,provisional:session.state==="open",reportState:session.state==="open"||fresh?"ready" as const:report?.state==="failed"?"failed" as const:"updating" as const});
@@ -72,11 +91,13 @@ export const familyAttendance=query({
     if(meetings.length>500||records.length>500)throw new Error("Legacy attendance limit reached; totals are unavailable.");
     const present=new Set(records.filter(r=>r.present).map(r=>r.meetingId));const held=meetings.filter(m=>!m.cancelled);const tuesdays=held.filter(m=>m.kind==="Tuesday");const attended=tuesdays.filter(m=>present.has(m._id)).length;
     const legacy={tuesdayHeld:tuesdays.length,tuesdayAttended:attended,tuesdayPercent:tuesdays.length?Math.round(100*attended/tuesdays.length):null,thursdayAttended:held.filter(m=>m.kind==="Thursday"&&present.has(m._id)).length,outreachAttended:held.filter(m=>m.kind==="Outreach"&&present.has(m._id)).length};
-    const shared={sessions,isDone:stored.isDone,continueCursor:stored.continueCursor,...(stored.splitCursor!==undefined?{splitCursor:stored.splitCursor}:{}),...(stored.pageStatus!==undefined?{pageStatus:stored.pageStatus}:{}),legacy,totalsScope:"currentFinalized" as const};
-    if(backfill?.state!=="complete"||pending>0||failed>0||pageStale)return{...shared,state:backfill?.state==="failed"||failed>0?"failed" as const:"updating" as const,verified:null,canRebuild:user.role==="coach"&&backfill?.state!=="running",rebuildRunning:backfill?.state==="running"||pending>0,processed:backfill?.processed??0,message:backfill?.lastError??(failed>0?"Attendance evidence needs Coach review.":"Attendance reports are updating. Verified totals will appear when rebuilding completes.")};
-    const [sessionsHeld,sessionsAttended,tuesdayHeld,tuesdayAttended,thursdayAttended]=await Promise.all([reportAggregate.count(ctx,{namespace:attendanceNamespace(student.seasonId,"held")}),reportAggregate.count(ctx,{namespace:studentAttendanceNamespace(student.seasonId,student._id)}),reportAggregate.count(ctx,{namespace:attendanceNamespace(student.seasonId,"held","Tuesday")}),reportAggregate.count(ctx,{namespace:studentAttendanceNamespace(student.seasonId,student._id,"Tuesday")}),reportAggregate.count(ctx,{namespace:studentAttendanceNamespace(student.seasonId,student._id,"Thursday")})]);
+    const shared={phaseBoundary,phases:null,sessions,isDone:stored.isDone,continueCursor:stored.continueCursor,...(stored.splitCursor!==undefined?{splitCursor:stored.splitCursor}:{}),...(stored.pageStatus!==undefined?{pageStatus:stored.pageStatus}:{}),legacy,totalsScope:"currentFinalized" as const};
+    if(backfill?.state!=="complete"||pending>0||failed>0||pageStale||!!unclassified)return{...shared,state:backfill?.state==="failed"||failed>0?"failed" as const:"updating" as const,verified:null,canRebuild:user.role==="coach"&&backfill?.state!=="running",rebuildRunning:backfill?.state==="running"||pending>0,processed:backfill?.processed??0,message:backfill?.lastError??(failed>0?"Attendance evidence needs Coach review.":"Attendance reports are updating. Verified totals will appear when rebuilding completes.")};
+    const [sessionsHeld,sessionsAttended,tuesdayHeld,tuesdayAttended,thursdayAttended,outreachAttended]=await Promise.all([reportAggregate.count(ctx,{namespace:attendanceNamespace(student.seasonId,"held")}),reportAggregate.count(ctx,{namespace:studentAttendanceNamespace(student.seasonId,student._id)}),reportAggregate.count(ctx,{namespace:attendanceNamespace(student.seasonId,"held","Tuesday")}),reportAggregate.count(ctx,{namespace:studentAttendanceNamespace(student.seasonId,student._id,"Tuesday")}),reportAggregate.count(ctx,{namespace:studentAttendanceNamespace(student.seasonId,student._id,"Thursday")}),reportAggregate.count(ctx,{namespace:studentAttendanceNamespace(student.seasonId,student._id,"Outreach")})]);
     const latest=await ctx.db.query("timeclockSessionReportStates").withIndex("by_seasonId_and_updatedAt",q=>q.eq("seasonId",student.seasonId)).order("desc").first();
-    return{...shared,state:"ready" as const,verified:{sessionsHeld,sessionsAttended,tuesdayHeld,tuesdayAttended,tuesdayPercent:tuesdayHeld?Math.round(100*tuesdayAttended/tuesdayHeld):null,thursdayAttended,outreachAttended:null,updatedAt:Math.max(backfill.updatedAt,latest?.updatedAt??0)}};
+    const updatedAt=Math.max(backfill.updatedAt,latest?.updatedAt??0);
+    const phases=kickoff.state==="verified"?{offseason:await phaseCounts(ctx,student.seasonId,student._id,kickoff.kickoffAt,"offseason",updatedAt),buildSeason:await phaseCounts(ctx,student.seasonId,student._id,kickoff.kickoffAt,"buildSeason",updatedAt)}:null;
+    return{...shared,phases,state:"ready" as const,verified:{sessionsHeld,sessionsAttended,tuesdayHeld,tuesdayAttended,tuesdayPercent:tuesdayHeld?Math.round(100*tuesdayAttended/tuesdayHeld):null,thursdayAttended,outreachAttended,updatedAt:Math.max(backfill.updatedAt,latest?.updatedAt??0)}};
   },
 });
 

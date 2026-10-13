@@ -83,7 +83,7 @@ export async function projectSource(ctx: MutationCtx, account: FinancialAccount,
   const sourceId = await ctx.db.insert("financialSources", {
     studentId: account.studentId, seasonId: account.seasonId, generation: account.generation,
     sourceEntryId: entry._id, kind: entry.kind, rootOriginEntryId: entry.originEntryId ?? entry._id,
-    receivedCents: entry.amountCents, availableCents: entry.amountCents, revision: 0,
+    receivedCents: entry.amountCents, availableCents: entry.amountCents, appliedCents: 0, revision: 0,
     status: entry.amountCents > 0 ? "available" : "exhausted", sourceCreatedAt: entry._creationTime, createdAt: Date.now(),
     fundraiserId: entry.fundraiserId ?? (entry.originEntryId ? (await ctx.db.get(entry.originEntryId))?.fundraiserId : undefined), fundraiserRevisionId: entry.fundraiserRevisionId ?? (entry.originEntryId ? (await ctx.db.get(entry.originEntryId))?.fundraiserRevisionId : undefined),
   });
@@ -116,9 +116,18 @@ export async function sourceForMovement(ctx: Ctx, account: FinancialAccount, ent
 }
 
 export async function projectMovement(ctx: MutationCtx, account: FinancialAccount, entry: Doc<"ledgerEntries">) {
-  if (!["allocation", "deallocation", "payout", "transferOut", "awardReversal"].includes(entry.kind)) return;
+  if (!["allocation", "deallocation", "payout", "transferOut", "awardReversal", "paymentCorrection"].includes(entry.kind)) return;
   if (cents(entry.amountCents) === 0) throw new Error("Financial movement must be positive.");
   const source = await sourceForMovement(ctx, account, entry);
+  if (entry.kind === "paymentCorrection") {
+    const delta = entry.newCents - entry.previousCents;
+    if (source.kind !== "payment" || source.rootOriginEntryId !== source.sourceEntryId || source.receivedCents !== entry.previousCents || !Number.isSafeInteger(delta) || Math.abs(delta) !== entry.amountCents) throw new Error("Payment correction receipt evidence is inconsistent.");
+    const received = cents(entry.newCents); const available = cents(source.availableCents + delta);
+    if (available > received || source.appliedCents !== undefined && source.appliedCents + available > received) throw new Error("Payment correction exceeds unconsumed receipt funds.");
+    await ctx.db.patch(source._id, { receivedCents: received, availableCents: available, status: available ? "available" : "exhausted", revision: source.revision + 1 });
+    account.personalAvailableCents = cents(account.personalAvailableCents + delta);
+    return;
+  }
   if (entry.originEntryId && entry.originEntryId !== source.rootOriginEntryId || entry.destination === "team" && (entry.kind !== "transferOut" || source.kind !== "fundraiser" && !entry.seasonTransitionPlanId)) throw new Error("Financial movement destination or root lineage is inconsistent.");
   if (entry.kind === "awardReversal" && (source.kind !== "fundraiser" || source.rootOriginEntryId !== source.sourceEntryId || !source.fundraiserId || source.fundraiserId !== entry.fundraiserId)) throw new Error("Award reduction must use its original fundraiser credit.");
   if (entry.kind === "awardReversal") {
@@ -128,7 +137,8 @@ export async function projectMovement(ctx: MutationCtx, account: FinancialAccoun
   const delta = entry.kind === "deallocation" ? entry.amountCents : -entry.amountCents;
   const available = cents(source.availableCents + delta);
   if (available > source.receivedCents) throw new Error("Financial source returns exceed its original receipt.");
-  await ctx.db.patch(source._id, { availableCents: available, status: available ? "available" : "exhausted", revision: source.revision + 1 });
+  const sourceApplied = source.appliedCents === undefined ? {} : { appliedCents: cents(source.appliedCents + (entry.kind === "allocation" ? entry.amountCents : entry.kind === "deallocation" ? -entry.amountCents : 0)) };
+  await ctx.db.patch(source._id, { ...sourceApplied, availableCents: available, status: available ? "available" : "exhausted", revision: source.revision + 1 });
   await updateFinancialSourceAggregate(ctx, source, { ...source, availableCents: available, status: available ? "available" : "exhausted", revision: source.revision + 1 });
   if (source.kind === "payment") account.personalAvailableCents = cents(account.personalAvailableCents + delta);
   else account.fundraisingAvailableCents = cents(account.fundraisingAvailableCents + delta);

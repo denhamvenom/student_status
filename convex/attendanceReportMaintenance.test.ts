@@ -123,7 +123,7 @@ describe("attendance projection maintenance",()=>{
       const source=await ctx.db.get(f.ids.session);
       for(let index=0;index<505;index++){
         const sessionId=await ctx.db.insert("timeclockSessions",{occurrenceId:f.ids.occurrenceId,seasonId:f.ids.season,state:"closed",scheduledStart:start-index-1,scheduledEnd:start+2*hour,effectiveEnd:start+2*hour,extensionMs:0,openedAt:start,openedBy:f.ids.coach,closedAt:start+2*hour,revision:1,needsReview:false});
-        const id=await ctx.db.insert("timeclockSessionReportStates",{sessionId,seasonId:f.ids.season,scheduledStart:start-index-1,weekday:"Tuesday",sessionState:"closed",needsReview:false,sessionRevision:1,reportGeneration:1,state:"ready",phase:"verify",cursor:null,processed:0,updatedAt:start+2*hour});
+        const id=await ctx.db.insert("timeclockSessionReportStates",{outreach:false,occurrenceTitle:"Synthetic session",sessionId,seasonId:f.ids.season,scheduledStart:start-index-1,weekday:"Tuesday",sessionState:"closed",needsReview:false,sessionRevision:1,reportGeneration:1,state:"ready",phase:"verify",cursor:null,processed:0,updatedAt:start+2*hour});
         const row=await ctx.db.get(id);await updateSessionAggregate(ctx,null,row!);
       }
       expect(source?.state).toBe("closed");

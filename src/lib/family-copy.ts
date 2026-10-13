@@ -16,7 +16,7 @@ export const familyCopy = {
     charges: 'Charges', chargesByEvent: 'Charges by event', otherCharges: 'Other charges', eventCharges: 'Event charges',
     charge: 'Charge', appliedShort: 'Applied', dueShort: 'Due', covered: 'Covered', canceled: 'Canceled', canceledLower: 'canceled', balanceDue: 'Balance due',
     noCharges: 'No charges yet.', history: 'Transaction history', noTransactions: 'No transactions yet.',
-    payment: 'Personal payment', deallocation: 'Returned to available funds', payout: 'Cash/check refund recorded',
+    payment: 'Personal payment', paymentCorrection: 'Payment receipt corrected', deallocation: 'Returned to available funds', payout: 'Cash/check refund recorded',
     transferOut: 'Fundraising transferred out', transferIn: 'Fundraising transfer received', fundraisingSource: 'Fundraising',
   },
   permissionDraft: {

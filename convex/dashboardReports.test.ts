@@ -104,9 +104,22 @@ describe("role-scoped dashboard reports", () => {
   it("uses corrected uninterrupted scheduled time and keeps legacy separate and evidence minimized", async () => {
     const f = await fixture();
     const report = await f.parent.query(attendanceRef, { studentId: f.ids.sid, asOf: start + 4 * hour });
-    expect(report.verified).toMatchObject({ sessionsHeld: 1, sessionsAttended: 1, tuesdayHeld: 1, tuesdayAttended: 1, tuesdayPercent: 100, outreachAttended: null });
+    expect(report.verified).toMatchObject({ sessionsHeld: 1, sessionsAttended: 1, tuesdayHeld: 1, tuesdayAttended: 1, tuesdayPercent: 100, outreachAttended: 0 });
     expect(report.sessions[0]).toMatchObject({ totalMs: 1.5 * hour, earlyMs: hour / 2, scheduledMs: hour, qualifies: true, provisional: false });
     expect(report.legacy.tuesdayHeld).toBe(0);
+    expect(report.phases?.buildSeason).toMatchObject({tuesdayHeld:1,tuesdayAttended:1,outreachAttended:0});
+    await f.t.run(async ctx=>{const student=await ctx.db.get(f.ids.sid);await ctx.db.patch(student!.seasonId,{year:2027});const session=await ctx.db.get(f.ids.session);await ctx.db.patch(session!.occurrenceId,{title:"Synthetic OUTREACH Tuesday"});await invalidateAttendanceSession(ctx,f.ids.session);});
+    await settleSession(f.t,f.ids.session);
+    const split=await f.parent.query(attendanceRef,{studentId:f.ids.sid,asOf:start+4*hour});
+    expect(split.phases?.offseason).toMatchObject({tuesdayHeld:1,tuesdayAttended:1,outreachAttended:1});
+    expect(split.phases?.buildSeason).toMatchObject({sessionsHeld:0,sessionsAttended:0,tuesdayPercent:null,outreachAttended:0});
+    await f.t.run(async ctx=>{const state=await ctx.db.query("timeclockSessionReportStates").withIndex("by_sessionId",q=>q.eq("sessionId",f.ids.session)).unique();await ctx.db.patch(state!._id,{outreach:undefined});});
+    expect(await f.parent.query(attendanceRef,{studentId:f.ids.sid,asOf:start+4*hour})).toMatchObject({state:"updating",verified:null,phases:null});
+    await f.t.run(ctx=>invalidateAttendanceSession(ctx,f.ids.session));await settleSession(f.t,f.ids.session);
+    await f.t.run(async ctx=>{const student=await ctx.db.get(f.ids.sid);await ctx.db.patch(student!.seasonId,{year:2028});});
+    const unknown=await f.parent.query(attendanceRef,{studentId:f.ids.sid,asOf:start+4*hour});
+    expect(unknown.phaseBoundary).toMatchObject({state:"unavailable",competitionYear:2028});expect(unknown.phases).toBeNull();
+    await f.t.run(async ctx=>{const student=await ctx.db.get(f.ids.sid);await ctx.db.patch(student!.seasonId,{year:2026});});
     expect(JSON.stringify(report)).not.toContain("PRIVATE CORRECTION REASON");
     expect(JSON.stringify(report)).not.toContain("SECRET HEALTH");
     await f.t.run(async ctx => {await ctx.db.patch(f.ids.session, { needsReview: true });await invalidateAttendanceSession(ctx,f.ids.session)});

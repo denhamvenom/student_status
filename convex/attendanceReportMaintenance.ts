@@ -29,6 +29,8 @@ export const processSessionPage=internalMutation({
     const state=await ctx.db.query("timeclockSessionReportStates").withIndex("by_sessionId",q=>q.eq("sessionId",args.sessionId)).unique();
     const session=await ctx.db.get(args.sessionId);
     if(!state||!session||state.state!=="rebuilding"||state.reportGeneration!==args.expectedGeneration||state.sessionRevision!==args.expectedSessionRevision||session.revision!==args.expectedSessionRevision||state.phase!==args.expectedPhase||state.cursor!==args.expectedCursor)return null;
+    const occurrence=await ctx.db.get(session.occurrenceId);if(!occurrence)throw new Error("Attendance source event is unavailable.");
+    if(state.occurrenceTitle!==occurrence.title){await invalidateAttendanceSession(ctx,session._id);return null;}
       let nextPhase=state.phase,nextCursor:string|null,done=false,processed=state.processed;
       if(state.phase==="originals"){
         const page=await ctx.db.query("timeclockIntervals").withIndex("by_sessionId_and_studentId",q=>q.eq("sessionId",session._id)).paginate({numItems:20,cursor:state.cursor});

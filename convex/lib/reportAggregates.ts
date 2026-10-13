@@ -55,25 +55,25 @@ export async function readFundraiserAggregates(ctx: QueryCtx | MutationCtx, fund
 }
 
 export type AttendanceWeekday = "Tuesday" | "Thursday" | "other";
-export const attendanceNamespace = (season: Id<"seasons">, metric: "held" | "pending" | "failed", weekday: AttendanceWeekday | "all" = "all") => `attendance:${season}:${metric}:${weekday}`;
-export const studentAttendanceNamespace = (season: Id<"seasons">, student: Id<"students">, weekday: AttendanceWeekday | "all" = "all") => `attendance:${season}:${student}:qualified:${weekday}`;
+export const attendanceNamespace = (season: Id<"seasons">, metric: "held" | "pending" | "failed", weekday: AttendanceWeekday | "Outreach" | "all" = "all") => `attendance:${season}:${metric}:${weekday}`;
+export const studentAttendanceNamespace = (season: Id<"seasons">, student: Id<"students">, weekday: AttendanceWeekday | "Outreach" | "all" = "all") => `attendance:${season}:${student}:qualified:${weekday}`;
 
 /** State rows account for session coverage, including sessions with no student evidence. */
 export async function updateSessionAggregate(ctx: MutationCtx, previous: Doc<"timeclockSessionReportStates"> | null, next: Doc<"timeclockSessionReportStates">) {
   const remove = async (row: Doc<"timeclockSessionReportStates">) => {
     if(row.sessionState==="open"||row.state==="ready"&&(row.sessionState!=="closed"||row.needsReview))return;
     const metric=row.state==="ready"?"held":row.state==="failed"?"failed":"pending";
-    for (const day of ["all",row.weekday] as const) await reportAggregate.deleteIfExists(ctx,{namespace:attendanceNamespace(row.seasonId,metric,day),key:row.scheduledStart,id:row.sessionId});
+    for (const day of ["all",row.weekday,...(row.outreach?["Outreach" as const]:[])] as const) await reportAggregate.deleteIfExists(ctx,{namespace:attendanceNamespace(row.seasonId,metric,day),key:row.scheduledStart,id:row.sessionId});
   };
   if (previous) await remove(previous);
   if (next.sessionState === "open" || next.state === "ready" && (next.sessionState !== "closed" || next.needsReview)) return;
   const metric = next.state === "ready" ? "held" : next.state === "failed" ? "failed" : "pending";
-  for (const day of ["all",next.weekday] as const) await reportAggregate.insertIfDoesNotExist(ctx,{namespace:attendanceNamespace(next.seasonId,metric,day),key:next.scheduledStart,id:next.sessionId,sumValue:1});
+  for (const day of ["all",next.weekday,...(next.outreach?["Outreach" as const]:[])] as const) await reportAggregate.insertIfDoesNotExist(ctx,{namespace:attendanceNamespace(next.seasonId,metric,day),key:next.scheduledStart,id:next.sessionId,sumValue:1});
 }
 
 /** Contributions can update during rebuilding; readers gate on any pending/failed session. */
 export async function updateStudentAttendanceAggregate(ctx: MutationCtx, previous: Doc<"timeclockAttendanceSummaries"> | null, next: Doc<"timeclockAttendanceSummaries">) {
-  if (previous) for (const day of ["all",previous.weekday] as const) await reportAggregate.deleteIfExists(ctx,{namespace:studentAttendanceNamespace(previous.seasonId,previous.studentId,day),key:previous.scheduledStart,id:previous.sessionId});
+  if (previous) for (const day of ["all",previous.weekday,...(previous.outreach?["Outreach" as const]:[])] as const) await reportAggregate.deleteIfExists(ctx,{namespace:studentAttendanceNamespace(previous.seasonId,previous.studentId,day),key:previous.scheduledStart,id:previous.sessionId});
   if (next.sessionState !== "closed" || next.needsReview || !next.qualifies) return;
-  for (const day of ["all",next.weekday] as const) await reportAggregate.insertIfDoesNotExist(ctx,{namespace:studentAttendanceNamespace(next.seasonId,next.studentId,day),key:next.scheduledStart,id:next.sessionId,sumValue:1});
+  for (const day of ["all",next.weekday,...(next.outreach?["Outreach" as const]:[])] as const) await reportAggregate.insertIfDoesNotExist(ctx,{namespace:studentAttendanceNamespace(next.seasonId,next.studentId,day),key:next.scheduledStart,id:next.sessionId,sumValue:1});
 }

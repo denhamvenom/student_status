@@ -43,6 +43,7 @@ export const processPage = internalMutation({
   handler: async (ctx, args) => {
     const job = await ctx.db.get(args.jobId);
     if (!job || job.state !== "running" || job.step !== args.step) return null;
+    if (job.kind === "paymentCorrection") return ctx.runMutation(makeFunctionReference<"mutation">("paymentAdministration:correctionPage"), args);
     const actor = await ctx.db.get(job.actorId); const season = await activeSeason(ctx);
     await requireSeasonTransitionFinancialAccess(ctx, season._id, true);
     if (!actor?.active || actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead && (job.kind === "withdrawal" || actor.financialEdit))) throw new Error("Financial editing permission is unavailable; a Coach must retry.");

@@ -44,6 +44,8 @@ import type * as financialOperationsWorker from "../financialOperationsWorker.js
 import type * as financialSources from "../financialSources.js";
 import type * as fundraiserPosting from "../fundraiserPosting.js";
 import type * as fundraisers from "../fundraisers.js";
+import type * as historicalCorrections from "../historicalCorrections.js";
+import type * as historicalRoster from "../historicalRoster.js";
 import type * as http from "../http.js";
 import type * as lib_access from "../lib/access.js";
 import type * as lib_attendanceReports from "../lib/attendanceReports.js";
@@ -79,6 +81,7 @@ import type * as lib_timeclockTransition from "../lib/timeclockTransition.js";
 import type * as lib_wholeTeam from "../lib/wholeTeam.js";
 import type * as parentInvites from "../parentInvites.js";
 import type * as participation from "../participation.js";
+import type * as paymentAdministration from "../paymentAdministration.js";
 import type * as permissionVersions from "../permissionVersions.js";
 import type * as permissions from "../permissions.js";
 import type * as profileSetup from "../profileSetup.js";
@@ -140,6 +143,8 @@ declare const fullApi: ApiFromModules<{
   financialSources: typeof financialSources;
   fundraiserPosting: typeof fundraiserPosting;
   fundraisers: typeof fundraisers;
+  historicalCorrections: typeof historicalCorrections;
+  historicalRoster: typeof historicalRoster;
   http: typeof http;
   "lib/access": typeof lib_access;
   "lib/attendanceReports": typeof lib_attendanceReports;
@@ -175,6 +180,7 @@ declare const fullApi: ApiFromModules<{
   "lib/wholeTeam": typeof lib_wholeTeam;
   parentInvites: typeof parentInvites;
   participation: typeof participation;
+  paymentAdministration: typeof paymentAdministration;
   permissionVersions: typeof permissionVersions;
   permissions: typeof permissions;
   profileSetup: typeof profileSetup;

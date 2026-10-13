@@ -20,7 +20,7 @@ export const financeChangesCopy = {
   coverage: { updating: 'Historical change coverage is updating.', ready: 'Available historical evidence has been prepared.', failed: 'Historical change coverage needs Coach review.' },
   sources: { payment: 'Personal payment', fundraiser: 'Fundraising credit' },
   meanings: { receipt: 'Recorded receipt', obligation: 'Charge obligation', applied: 'Applied to this charge', personalAvailable: 'Available in this personal-payment source', fundraisingAvailable: 'Available in this fundraising source', grossRaised: 'Student fundraiser gross proceeds', priority: 'Fee priority' },
-  kinds: { charge: 'Charge recorded', payment: 'Personal payment', fundraisingCredit: 'Fundraising credit', allocation: 'Funds applied', release: 'Applied funds released', chargeAdjustment: 'Charge adjusted', chargeCancellation: 'Charge cancelled', payout: 'Personal refund recorded', transferOut: 'Funds transferred', awardReversal: 'Fundraising award reversed', fundraiserGross: 'Fundraiser proceeds recorded', feePriority: 'Fee priority changed' },
+  kinds: { charge: 'Charge recorded', payment: 'Personal payment', paymentCorrection: 'Payment receipt corrected', fundraisingCredit: 'Fundraising credit', allocation: 'Funds applied', release: 'Applied funds released', chargeAdjustment: 'Charge adjusted', chargeCancellation: 'Charge cancelled', payout: 'Personal refund recorded', transferOut: 'Funds transferred', awardReversal: 'Fundraising award reversed', fundraiserGross: 'Fundraiser proceeds recorded', feePriority: 'Fee priority changed' },
 } as const
 
 export const financeWorkspaceCopy = {

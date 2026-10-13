@@ -1,0 +1,15 @@
+export const historicalCopy = {
+  title: 'Historical corrections',
+  warning: 'Historical records are locked. Corrections preserve the original evidence and record your identity, time and reason. Access expires after 15 minutes.',
+  acknowledge: 'I understand that this changes historical records and reports.',
+  reason: 'Reason for correction', open: 'Open correction mode', close: 'Return to read-only',
+  chooseStudent: 'Choose a student', chooseSession: 'Choose a session', more: 'Load more',
+  reviewLatest: 'Review latest / start another correction',
+  loading: 'Loading historical records…', empty: 'No historical sessions recorded.',
+  add: 'Add missing interval', replace: 'Replace interval', void: 'Void interval',
+  start: 'Corrected clock-in (your local time)', end: 'Corrected clock-out (your local time)',
+  save: 'Save audited correction', saved: 'Correction saved. Attendance reports will update.',
+  originals: 'Original intervals', corrections: 'Recorded corrections', none: 'No intervals recorded.',
+  review: 'Select an original interval or an added correction to replace or void. The original record remains unchanged.',
+  accessUntil: 'Correction access ends', noTarget: 'Select an interval before replacing or voiding it.',
+} as const
