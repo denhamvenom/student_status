@@ -283,6 +283,6 @@ Backend-dependent gaps remain separately deferred; no production action is autho
 - [x] Astra final source review and complete local check: 101 tests, lint/types/build pass.
 - [ ] Finish restricted/unavailable-state rehearsals and remaining viewport slices; full pixel parity and final Coach acceptance are not claimed.
 - [ ] Resolve flagged backend dependencies in a separately authorized phase.
-- [ ] Publish and verify this follow-up Git checkpoint.
+- [x] Publish and verify follow-up checkpoint `d43fac3` in existing draft PR9.
 
 - [x] Review dark event transport/rooming viewport slices and clarify completed-room Finalized action while preserving required re-finalization.
