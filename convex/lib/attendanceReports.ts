@@ -66,3 +66,14 @@ export async function projectAttendanceMember(ctx:MutationCtx,session:Doc<"timec
   const next=await ctx.db.get(id);if(!next)throw new Error("Attendance projection unavailable.");
   await updateStudentAttendanceAggregate(ctx,previous,next);
 }
+
+/** A new draft season with no sessions has complete empty coverage at activation. */
+export async function initializeEmptyAttendanceSeason(ctx: MutationCtx, seasonId: Id<"seasons">) {
+  const season=await ctx.db.get(seasonId);
+  if(season?.status!=="draft")throw new Error("Attendance initialization requires a draft target season.");
+  const existing=await ctx.db.query("attendanceReportBackfills").withIndex("by_seasonId",q=>q.eq("seasonId",seasonId)).unique();
+  if(existing){if(existing.state!=="complete")throw new Error("Finish target attendance coverage before activation.");return;}
+  const session=await ctx.db.query("timeclockSessions").withIndex("by_seasonId_and_state",q=>q.eq("seasonId",seasonId)).first();
+  if(session)throw new Error("Target attendance sessions require coverage review before activation.");
+  await ctx.db.insert("attendanceReportBackfills",{seasonId,state:"complete",cursor:null,processed:0,updatedAt:Date.now()});
+}

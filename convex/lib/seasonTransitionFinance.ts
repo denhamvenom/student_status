@@ -155,7 +155,10 @@ export async function continueSeasonTargetAllocation(ctx: MutationCtx, planId: I
     return false;
   }
   account = await ensureFinancialAccount(ctx, targetStudentId, planId);
-  if (account.chargedCents === account.paidCents || account.personalAvailableCents + account.fundraisingAvailableCents === 0) return true;
+  if (account.chargedCents === account.paidCents || account.personalAvailableCents + account.fundraisingAvailableCents === 0) {
+    await refreshStudentFinance(ctx, targetStudentId);
+    return true;
+  }
   await allocateUnapplied(ctx, actor, targetStudentId, `season:${planId}:allocate:${targetStudentId}`, undefined, planId);
   return (await financialAccount(ctx, targetStudentId))?.state === "ready";
 }
