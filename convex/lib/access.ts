@@ -85,7 +85,11 @@ export function mentorEvent(event: Doc<"events">) {
 }
 
 export function privateStudent(student: Doc<"students">) {
-  return { ...publicStudent(student), profileRevision: student.profileRevision ?? 0, profileSetupRequired: student.profileCompletedAt === undefined, email: student.email, shirtSize: student.shirtSize ?? null, emergencyName: student.emergencyName ?? null, emergencyRelationship: student.emergencyRelationship ?? null, emergencyPhone: student.emergencyPhone ?? null, allergies: student.allergies, medications: student.medications, otcAuthorization: student.otcAuthorization ?? null };
+  const confirmed = student.consentProfileV2CompletedAt !== undefined && student.consentProfileV2ConfirmedBy !== undefined && student.consentProfileV2 !== undefined;
+  const profile = confirmed ? student.consentProfileV2! : null;
+  const allergies = profile ? profile.allergies.state === "none" ? {state: "none" as const} : {state: "reported" as const, text: profile.allergies.entries.map(item => `${item.allergen}: ${item.severity}; ${item.reaction}; response: ${item.response}`).join("\n")} : student.allergies;
+  const medications = profile ? profile.prescriptions.state === "none" ? {state: "none" as const} : {state: "reported" as const, text: profile.prescriptions.entries.map(item => `${item.name} ${item.dose}; ${item.timing}; ${item.reason}; carried by ${item.carriedBy}`).join("\n")} : student.medications;
+  return { ...publicStudent(student), profileRevision: student.profileRevision ?? 0, profileSetupRequired: student.profileCompletedAt === undefined, structuredConsentProfileComplete: confirmed, email: student.email, shirtSize: student.shirtSize ?? null, emergencyName: profile?.emergency.name ?? student.emergencyName ?? null, emergencyRelationship: profile?.emergency.relationship ?? student.emergencyRelationship ?? null, emergencyPhone: profile?.emergency.phone ?? student.emergencyPhone ?? null, allergies, medications, otcAuthorization: profile ? null : student.otcAuthorization ?? null };
 }
 
 export async function audit(ctx: MutationCtx, actor: AppUser, entity: string, entityId: string, action: string, before: unknown, after: unknown, reason?: string) {

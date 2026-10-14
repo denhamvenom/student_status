@@ -1,6 +1,10 @@
 # Student Status implementation plan
 
-## Current completion checkpoint — October 13
+## Current authorized batch — October 14
+
+Implement [populated field-trip PDF consent](FIELD_TRIP_PDF_PLAN.md): completed student setup and Parent profile before PDF review/signing, structured allergy/prescription entries, no active Medication Choices/OTC policy, minor first aid retained, immutable exact PDF and checkbox/typed signature. Preserve legacy receipts and existing gates. This scoped batch supersedes the consent details below; broader G1–G7 scope is unchanged.
+
+## Historical completion checkpoint — October 13
 
 Follow CURRENT_STATE.md and GOAL_ACCEPTANCE.md for active G1-G7 scope. Published source checkpoint f156744 is synchronized to development. The synthetic season transition, historical roster and attendance corrections, CSV payment import and receipt correction have completed scoped live rehearsals. Existing integrated checks and Astra review remain valid for their recorded checkpoints. The next implementation closes the missing Coach roster archive/reactivate controls using the existing backend contract, followed by combined account-lifecycle and upcoming Whole Team enrollment rehearsal. Historical financial correction, remaining role journeys, selected-scope download evidence and representative prototype comparisons remain open. Production, real signing and automatic deletion remain separately gated.
 
@@ -29,7 +33,7 @@ Stack: React, Vite, strict TypeScript, React Router 7 Data Mode, Tailwind 4, sha
 | Join | Coach creates/revokes codes for 24 h, 1 week or 2 weeks. Five invalid tries impose a 15-minute lock. One request per Google account; submitted requests remain approvable after code expiry. Coach/Travel Lead approve. Archived matches require explicit resolution. |
 | Onboarding | Legal name comes from join approval; shirt size and Boys/Girls rooming category collected, parent contact skippable. Category locks after setup; Coach handles later changes. |
 | Status | Money, participation, event readiness, and attendance are distinct. To-dos group by event and include due dates. Parent sees selected linked child and a Viewing banner. |
-| Profiles | Student edits preferred name, shirt and parent contacts. Parent/Coach edit health and emergency contact. Missing health is Not completed, distinct from None reported. Seasonal OTC authorization is Yes / Contact me first / No. |
+| Profiles | Student edits preferred name, shirt and parent contacts. Parent/Coach edit health and emergency contact. Missing health is Not completed, distinct from None reported. New workflows remove seasonal OTC authorization; structured Parent-confirmed fields follow FIELD_TRIP_PDF_PLAN.md. |
 | Parent linking | Student invites parent by email; recipient signs in with the matching Google email and attests their relationship/authority. Valid acceptance establishes the link without routine Coach approval. Coach handles exceptions. One-time invitations expire after 7 days; landing reveals no student data before validation. Disabling new invitations preserves outstanding valid invitations and existing access. Multiple linked children supported. This is good-faith attestation, not independently verified guardianship. |
 | Parent invitation control (implemented October 12, 2026) | Coach-only **Allow new parent invitations** toggle in **Join Requests**. Persist the setting in Convex and enforce it on every invitation-creation/replacement path. Show a clear explanation where inviting is disabled. Implemented with the parent-invitation milestone; see verification below. |
 | Events | Competition, Outreach and Team event types; six setup steps. Travel Team/Required assignment differs from optional signup. Pending reservations consume capacity but incur no charge until confirmed. Waitlist promotion is manual. |

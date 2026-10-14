@@ -3,11 +3,13 @@ import { paginationOptsValidator } from "convex/server";
 import { env, mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { activeSeason, audit, studentAccess, viewer } from "./lib/access";
+import { activeSeason, audit, privateStudent, studentAccess, viewer } from "./lib/access";
 import { verifiedGoogle, tokenHash } from "./lib/invitationIdentity";
 import { enrollmentPending } from "./lib/eventEnrollmentState";
 import { consentEventValidator, consentSnapshotValidator, correctionFieldValidator, expectedCoverageValidator, medicationChoicesValidator, publicVersion, parseSnapshot, validateSnapshot, selectedEvents, snapshotHash, boundedText, versionValidator, type ConsentSnapshot, type ExpectedCoverage } from "./lib/consentSnapshot";
 import { compareCoverage, controlledCoverage, coverageFor, expectedCoverage, sealedSnapshot, setPendingCoverage } from "./lib/permissionCoverage";
+import { consentSnapshotV2Validator } from "./lib/consentSnapshotV2";
+import { sealedSnapshotV2 } from "./permissionsV2";
 
 type Ctx = QueryCtx | MutationCtx;
 const DEV_URL = "https://third-bandicoot-18.convex.cloud";
@@ -16,12 +18,12 @@ const sourceValidator = v.union(v.literal("electronic"), v.literal("paper"));
 const reviewStatusValidator = v.union(v.literal("accepted"), v.literal("correction"));
 const nullableId = v.union(v.id("permissionSubmissions"), v.null());
 const reportValidator = v.object({state: v.union(v.literal("unknown"), v.literal("none"), v.literal("reported")), text: v.optional(v.string())});
-export const receiptSummaryValidator = v.object({ submissionId: v.id("permissionSubmissions"), source: v.union(sourceValidator, v.null()), synthetic: v.boolean(), wordingVersion: v.string(), signerName: v.string(), signedAt: v.number(), legacy: v.boolean(), controlledCoverage: v.array(expectedCoverageValidator), latestReviewId: v.union(v.id("permissionReviews"), v.null()), latestReviewStatus: v.union(reviewStatusValidator, v.null()), note: v.union(v.string(), v.null()) });
+export const receiptSummaryValidator = v.object({ submissionId: v.id("permissionSubmissions"), source: v.union(sourceValidator, v.null()), synthetic: v.boolean(), wordingVersion: v.string(), signerName: v.string(), signedAt: v.number(), format: v.union(v.literal(0), v.literal(1), v.literal(2)), legacy: v.boolean(), controlledCoverage: v.array(expectedCoverageValidator), latestReviewId: v.union(v.id("permissionReviews"), v.null()), latestReviewStatus: v.union(reviewStatusValidator, v.null()), note: v.union(v.string(), v.null()) });
 export const receiptValidator = v.object({summary: receiptSummaryValidator, snapshot: v.union(consentSnapshotValidator, v.null()), recorderName: v.string()});
 export const workspaceValidator = v.object({
   student: v.object({studentId: v.id("students"), legalName: v.string(), preferredName: v.string(), profileRevision: v.number(), emergencyName: v.union(v.string(), v.null()), emergencyRelationship: v.union(v.string(), v.null()), emergencyPhone: v.union(v.string(), v.null()), allergies: reportValidator, medications: reportValidator}),
   actor: v.object({name: v.string(), email: v.string(), role: v.union(v.literal("coach"), v.literal("mentor"), v.literal("parent"), v.literal("student")), travelLead: v.boolean(), healthExport: v.boolean()}),
-  version: v.union(versionValidator, v.null()), events: v.array(consentEventValidator),
+  version: v.union(v.object({...versionValidator.fields, formFormat: v.union(v.literal(1), v.literal(2))}), v.null()), events: v.array(consentEventValidator),
   coverage: v.array(v.object({eventId: v.id("events"), state: stateValidator, revision: v.number(), submissionId: nullableId, reviewId: v.union(v.id("permissionReviews"), v.null()), reason: v.union(v.string(), v.null()), field: v.union(correctionFieldValidator, v.null()), signatureRequestedAt: v.union(v.number(), v.null())})),
   receipts: v.array(receiptSummaryValidator), canSign: v.boolean(), canRecordPaper: v.boolean(), canReview: v.boolean(), canHealthExport: v.boolean(), gateReason: v.union(v.string(), v.null()),
 });
@@ -45,16 +47,17 @@ async function currentVersion(ctx: Ctx, student: Doc<"students">) {
   const season = await activeSeason(ctx);
   const version = season.activePermissionVersionId ? await ctx.db.get(season.activePermissionVersionId) : null;
   if (!version || version.seasonId !== student.seasonId || student.seasonId !== season._id) throw new Error("No current permission wording is available.");
+  if (version.formFormat === 2) throw new Error("This season uses the new PDF permission form. Prepare it in the updated form workflow.");
   return version;
 }
 async function buildSnapshot(ctx: Ctx, student: Doc<"students">, actor: Doc<"appUsers">, eventIds: Id<"events">[], identity: ConsentSnapshot["signer"]) {
+  const version = await currentVersion(ctx, student);
   for (const [label, value] of [["Emergency contact name", student.emergencyName], ["Emergency contact relationship", student.emergencyRelationship], ["Emergency contact phone", student.emergencyPhone]] as const) boundedText(value ?? "", 254, label);
   function health(report: Doc<"students">["allergies"]) {
     if (report.state === "unknown") throw new Error("Complete allergy and medication reports before preparing permission.");
     if (report.state === "reported") boundedText(report.text ?? "", 4000, "Health details");
     return { state: report.state, text: report.state === "reported" ? report.text!.trim() : null };
   }
-  const version = await currentVersion(ctx, student);
   const events = await selectedEvents(ctx, student, eventIds);
   const expected = await expectedCoverage(ctx, student._id, events.map(event => event.eventId));
   const priorCoverage = await Promise.all(expected.map(async item => ({...item, submissionId: (await coverageFor(ctx, student._id, item.eventId))?.latestSubmissionId ?? null})));
@@ -66,7 +69,7 @@ async function buildSnapshot(ctx: Ctx, student: Doc<"students">, actor: Doc<"app
 async function summary(ctx: Ctx, submission: Doc<"permissionSubmissions">): Promise<Infer<typeof receiptSummaryValidator>> {
   const rows = await controlledCoverage(ctx, submission._id);
   const review = await ctx.db.query("permissionReviews").withIndex("by_submissionId", q => q.eq("submissionId", submission._id)).order("desc").take(1);
-  return {submissionId: submission._id, source: submission.source ?? null, synthetic: submission.synthetic ?? false, wordingVersion: submission.wordingVersion, signerName: submission.signerName ?? submission.typedName, signedAt: submission.signedAt, legacy: submission.snapshotFormat !== 1, controlledCoverage: rows.map(row => ({eventId: row.eventId, revision: row.revision})), latestReviewId: review[0]?._id ?? null, latestReviewStatus: review[0]?.status ?? null, note: review[0]?.note ?? null};
+  return {submissionId: submission._id, source: submission.source ?? null, synthetic: submission.synthetic ?? false, wordingVersion: submission.wordingVersion, signerName: submission.signerName ?? submission.typedName, signedAt: submission.signedAt, format: submission.snapshotFormat ?? 0, legacy: submission.snapshotFormat === undefined, controlledCoverage: rows.map(row => ({eventId: row.eventId, revision: row.revision})), latestReviewId: review[0]?._id ?? null, latestReviewStatus: review[0]?.status ?? null, note: review[0]?.note ?? null};
 }
 
 export const workspace = query({
@@ -93,7 +96,8 @@ export const workspace = query({
     const who = actor.role === "parent" ? await verifiedGoogle(ctx) : null;
     const canSign = !!who && who.authUserId === actor.authUserId && await syntheticAllowed(ctx, student._id, actor._id);
     const canRecordPaper = canReview && await syntheticAllowed(ctx, student._id);
-    return {student: {studentId: student._id, legalName: student.legalName, preferredName: student.preferredName, profileRevision: student.profileRevision ?? 0, emergencyName: student.emergencyName ?? null, emergencyRelationship: student.emergencyRelationship ?? null, emergencyPhone: student.emergencyPhone ?? null, allergies: student.allergies, medications: student.medications}, actor: {name: who?.name ?? actor.name, email: who?.email ?? actor.email, role: actor.role, travelLead: actor.travelLead, healthExport: actor.healthExport ?? false}, version: version ? publicVersion(version) : null, events, coverage, receipts: await Promise.all(submissions.map(submission => summary(ctx, submission))), canSign, canRecordPaper, canReview, canHealthExport: actor.role === "coach" || actor.role === "mentor" && actor.travelLead && (actor.healthExport ?? false), gateReason: canSign || canRecordPaper ? null : "Real signing is closed. This account and fictional subject are not registered for synthetic consent."};
+    const projected = privateStudent(student);
+    return {student: {studentId: student._id, legalName: student.legalName, preferredName: student.preferredName, profileRevision: student.profileRevision ?? 0, emergencyName: projected.emergencyName, emergencyRelationship: projected.emergencyRelationship, emergencyPhone: projected.emergencyPhone, allergies: projected.allergies, medications: projected.medications}, actor: {name: who?.name ?? actor.name, email: who?.email ?? actor.email, role: actor.role, travelLead: actor.travelLead, healthExport: actor.healthExport ?? false}, version: version ? {...publicVersion(version), formFormat: version.formFormat === 2 ? 2 as const : 1 as const} : null, events, coverage, receipts: await Promise.all(submissions.map(submission => summary(ctx, submission))), canSign, canRecordPaper, canReview, canHealthExport: actor.role === "coach" || actor.role === "mentor" && actor.travelLead && (actor.healthExport ?? false), gateReason: canSign || canRecordPaper ? null : "Real signing is closed. This account and fictional subject are not registered for synthetic consent."};
   },
 });
 
@@ -195,7 +199,7 @@ export const review = mutation({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); operations(actor); boundedText(args.idempotencyKey, 128, "Retry key");
     const submission = await ctx.db.get(args.submissionId); if (!submission) throw new Error("Submission not found.");
-    await studentAccess(ctx, actor, submission.studentId); await sealedSnapshot(ctx, submission);
+    await studentAccess(ctx, actor, submission.studentId); if (submission.snapshotFormat === 2) {if (actor.role === "mentor" && !actor.healthExport) throw new Error("Separate health-review permission is required for PDF receipts."); await sealedSnapshotV2(ctx, submission);} else await sealedSnapshot(ctx, submission);
     if (args.status === "correction") boundedText(args.note ?? "", 1000, "Correction note");
     if ((args.note?.length ?? 0) > 1000) throw new Error("Review note is too long.");
     const operationHash = await tokenHash(JSON.stringify({...args, expectedCoverage: [...args.expectedCoverage].sort((a,b) => a.eventId.localeCompare(b.eventId))}));
@@ -231,7 +235,7 @@ export const requestNewSignature = mutation({
   },
 });
 
-const exportRecordValidator = v.object({studentId: v.id("students"), studentName: v.string(), state: stateValidator, revision: v.number(), submissionId: nullableId, signerName: v.union(v.string(), v.null()), signedAt: v.union(v.number(), v.null()), source: v.union(sourceValidator, v.null()), snapshot: v.optional(consentSnapshotValidator), collectedAt: v.number()});
+const exportRecordValidator = v.object({studentId: v.id("students"), studentName: v.string(), state: stateValidator, revision: v.number(), submissionId: nullableId, signerName: v.union(v.string(), v.null()), signedAt: v.union(v.number(), v.null()), source: v.union(sourceValidator, v.null()), snapshot: v.optional(v.union(consentSnapshotValidator, consentSnapshotV2Validator)), collectedAt: v.number()});
 export const exportPacket = mutation({
   args: {eventId: v.id("events"), includeHealth: v.boolean(), paginationOpts: v.optional(paginationOptsValidator)}, returns: v.object({event: v.object({eventId: v.id("events"), name: v.string()}), synthetic: v.literal(true), generatedAt: v.number(), schemaVersion: v.literal(1), isDone: v.boolean(), continueCursor: v.string(), records: v.array(exportRecordValidator)}),
   handler: async (ctx, args) => {
@@ -253,7 +257,7 @@ export const exportPacket = mutation({
       const student = await ctx.db.get(participant.studentId);
       if (!student?.active || student.seasonId !== season._id) continue;
       const row = await coverageFor(ctx, student._id, event._id); const submission = row?.latestSubmissionId ? await ctx.db.get(row.latestSubmissionId) : null;
-      const snapshot = args.includeHealth && submission?.snapshotFormat === 1 ? await sealedSnapshot(ctx, submission) : undefined;
+      const snapshot = args.includeHealth && submission?.snapshotFormat === 1 ? await sealedSnapshot(ctx, submission) : args.includeHealth && submission?.snapshotFormat === 2 ? await sealedSnapshotV2(ctx, submission) : undefined;
       records.push({studentId: student._id, studentName: student.preferredName || student.legalName, state: row?.state ?? "required", revision: row?.revision ?? 0, submissionId: submission?._id ?? null, signerName: submission?.signerName ?? null, signedAt: submission?.signedAt ?? null, source: submission?.source ?? null, ...(snapshot ? {snapshot} : {}), collectedAt: generatedAt});
     }
     await audit(ctx, actor, "permissionExports", event._id, "export", null, {includeHealth: args.includeHealth, count: records.length, generatedAt});

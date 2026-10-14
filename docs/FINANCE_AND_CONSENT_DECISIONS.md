@@ -45,7 +45,11 @@ A family refund request is an exception for Coach review, not an automatic entit
 
 **Superseded October 13 instruction:** an earlier decision required documented family authorization before a personal-payment-to-team transfer. The later direct decision above removed that requirement. Keep the historical decision visible here for traceability; do not enforce it as current policy.
 
-## Permission form and medication choices
+## Current permission decision — October 14, 2026
+
+Remove Medication Choices and seasonal OTC authorization from new workflows. Require completed student setup and Parent-completed profile/structured health information before reviewing or signing the populated field-trip PDF. Keep minor-first-aid wording. Parents review the exact server-generated PDF, check an acknowledgment and type their name; retain immutable PDF/signature evidence and all historical receipts. See [FIELD_TRIP_PDF_PLAN.md](FIELD_TRIP_PDF_PLAN.md) for fields, privacy, compatibility and verification requirements. Implementation is in progress; real signing remains closed.
+
+## Superseded permission form and medication choices — retained history
 
 Use these organization names in the form: **Denham Springs High School** and **FIRST Team 8044, Denham Venom**.
 

@@ -21,18 +21,15 @@ export const familyCopy = {
   },
   permissionDraft: {
     draftStatusLabel: 'Draft status',
-    eyebrow: 'Coach review draft', title: 'Permission and medication form',
+    eyebrow: 'Coach review draft', title: 'Field trip permission and medical release',
     organization: 'Denham Springs High School · FIRST Team 8044, Denham Venom',
-    medicationCategories: ['Pain Medication', 'Allergy Medication', 'Cold Medication'],
-    medicationChoices: 'Allow · Contact me first · Do not allow',
     sections: [
-      { title: 'Draft — not open for signing', body: 'This wording is for Coach review. It does not grant participation, travel, first aid, or medication consent. No choices or signatures can be submitted here.' },
+      { title: 'Draft — not open for signing', body: 'This wording is for Coach review. It does not grant participation, travel, first aid, or medical consent. No signature can be submitted here.' },
       { title: 'Student and covered events', body: 'The final form will name the student and list each covered event with its date, destination, and travel arrangement. Events added later will need separate authorization when required.' },
       { title: 'Participation and travel', body: 'The proposed authorization covers participation in the specifically listed Denham Venom events and supervised team activities. Families will review event schedules and travel details and notify the team of changes. Transportation remains subject to applicable school procedures.' },
-      { title: 'Emergency care and minor first aid', body: 'Families will keep emergency contacts and relevant health information current. If a parent or legal guardian cannot be reached during an illness or injury, supervising adults may seek appropriate emergency care. Signing the final form would permit minor first aid as appropriate. Medication administration requires separate approved procedures and authorization.' },
-      { title: 'Medication categories', body: 'Each category will require one explicit choice in the approved form. No choice is preselected in this preview.', note: 'Products, ingredients, exceptions, prescriber orders, and responsible administration still need approval with school health staff. These categories do not replace school medication procedures.' },
+      { title: 'Emergency care and minor first aid', body: 'Families will keep emergency contacts and relevant health information current. If a parent or legal guardian cannot be reached during an illness or injury, supervising adults may seek appropriate emergency care. Signing the final form would permit minor first aid as appropriate. Medication administration remains subject to separate school procedures.' },
       { title: 'Conduct, fees, and withdrawal', body: 'Students are expected to follow team, school, event, travel, and adult-supervision instructions. Event fees and extras should be shown before a family commits. The Coach or Travel Lead decides withdrawal requests. An approved withdrawal can return all or part of eligible paid amounts to available account funds or retain amounts as non-refundable. Unpaid extras are cancelled; unpaid main event or travel balances remain owed unless explicitly cancelled. An account credit is not a cash or check refund.' },
-      { title: 'Approval still required', body: 'The Coach must approve exact wording, covered products and ingredients, any exceptions, and the school medication process before a versioned form can be signed. The final workflow will separately capture each choice, covered events, health snapshot, and a verified parent or legal guardian acknowledgment.' },
+      { title: 'Approval still required', body: 'The Coach must approve exact wording and the school health process before a versioned form can be used for real consent. The synthetic workflow captures covered events, a parent-confirmed profile, an exact PDF, and a verified parent or legal guardian acknowledgment.' },
     ],
   },
   parent: {

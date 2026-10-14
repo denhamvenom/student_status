@@ -177,12 +177,13 @@ export const updateStudentProfile = mutation({
     }
     const privateEdit = args.emergencyName !== undefined || args.emergencyRelationship !== undefined || args.emergencyPhone !== undefined || args.allergies !== undefined || args.medications !== undefined || args.otcAuthorization !== undefined;
     if (privateEdit && user.role !== "coach" && user.role !== "parent") throw new Error("Health and emergency edits require a linked parent or coach.");
+    if (args.otcAuthorization !== undefined) throw new Error("Medication choices are no longer part of this profile.");
     if (args.emergencyName !== undefined) changes.emergencyName = args.emergencyName.trim();
     if (args.emergencyRelationship !== undefined) changes.emergencyRelationship = args.emergencyRelationship.trim();
     if (args.emergencyPhone !== undefined) changes.emergencyPhone = args.emergencyPhone.trim();
     if (args.allergies !== undefined) changes.allergies = args.allergies;
     if (args.medications !== undefined) changes.medications = args.medications;
-    if (args.otcAuthorization !== undefined) changes.otcAuthorization = args.otcAuthorization;
+    if (privateEdit && student.consentProfileV2CompletedAt !== undefined) changes.consentProfileV2CompletedAt = undefined;
     changes.profileRevision = (student.profileRevision ?? 0) + 1;
     await ctx.db.patch(student._id, changes);
     await audit(ctx, user, "students", student._id, "updateProfile", before, changes);

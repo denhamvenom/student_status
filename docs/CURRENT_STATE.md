@@ -1,5 +1,13 @@
 # Current integration handoff
 
+## Scoped consent checkpoint - October 14
+
+User authorized FIELD_TRIP_PDF_PLAN.md implementation before resuming remaining workflows. Completed profile now gates populated PDF review/signing; Medication Choices/OTC is removed; minor first aid and historical evidence are preserved. Integrated lint/types/tests/build and Astra scoped review passed. Development sync completed at 08:32:54 on third-bandicoot-18. Fictional Parent profile, PDF review, checkbox/typed signature, sealed receipt and Coach acceptance were verified. Desktop PDF and phone light receipt layout were inspected. Manual PDF download/device verification remains because the browser connector cannot capture blob downloads. Final wording and Coach visual approval remain required before real use.
+
+All five Chrome profiles are connected; Mentor is at Join the team and Student at setup. Existing uncommitted Readiness changes are preserved outside this batch. Broad G1-G7 work remains paused. No production, main merge, real signing or deletion was authorized.
+
+## Prior milestone handoff
+
 Updated October 13, 2026. Follow COMPLETION_WORKFLOW.md. G3 is functionally complete; G1, G2 and G4–G7 remain open. DEVELOPMENT_CHECKLIST is the human guide; VISUAL_CHECKS is the only visual queue.
 
 ## Workspace and boundaries

@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import { query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
-import { activeSeason, requireRole, viewer } from "./lib/access";
+import { activeSeason, privateStudent, requireRole, viewer } from "./lib/access";
 import { studentReadiness } from "./lib/readModels";
 import { financeRow } from "./lib/financeRow";
 import { boundedFinancePage } from "./financeAdmin";
@@ -17,12 +17,14 @@ const rowValidator = v.object({ studentId: v.id("students"), name: v.string(), s
 
 function missingInformation(student: Doc<"students">) {
   const missing: string[] = [];
+  const confirmed = student.consentProfileV2CompletedAt !== undefined && student.consentProfileV2ConfirmedBy !== undefined && student.consentProfileV2 !== undefined;
+  const profile = confirmed ? student.consentProfileV2 : null;
   if (student.profileCompletedAt === undefined) missing.push("Profile setup");
   if (!student.shirtSize?.trim()) missing.push("Shirt size");
   if (!student.roomCategory) missing.push("Room category");
-  if (!student.guardianName?.trim() || !student.guardianPhone?.trim()) missing.push("Guardian contact");
-  if (!student.emergencyName?.trim() || !student.emergencyPhone?.trim()) missing.push("Emergency contact");
-  if (student.allergies.state === "unknown" || student.medications.state === "unknown" || !student.otcAuthorization) missing.push("Health information");
+  if (!(profile?.guardian.name ?? student.guardianName)?.trim() || !(profile?.guardian.phone ?? student.guardianPhone)?.trim()) missing.push("Guardian contact");
+  if (!(profile?.emergency.name ?? student.emergencyName)?.trim() || !(profile?.emergency.phone ?? student.emergencyPhone)?.trim()) missing.push("Emergency contact");
+  if (!confirmed) missing.push("Health information");
   return missing;
 }
 
@@ -72,7 +74,7 @@ export const list = query({
   },
 });
 
-const detailValidator = v.object({ ...rowValidator.fields, legalName: v.string(), preferredName: v.string(), email: v.string(), shirtSize: v.union(v.string(), v.null()), roomCategory: v.union(v.string(), v.null()), guardianName: v.union(v.string(), v.null()), guardianRelationship: v.union(v.string(), v.null()), guardianPhone: v.union(v.string(), v.null()), emergencyName: v.union(v.string(), v.null()), emergencyRelationship: v.union(v.string(), v.null()), emergencyPhone: v.union(v.string(), v.null()), allergies: v.object({ state: v.string(), text: v.optional(v.string()) }), medications: v.object({ state: v.string(), text: v.optional(v.string()) }), otcAuthorization: v.union(v.string(), v.null()), profileSetupRequired: v.boolean(), parents: v.array(v.object({name:v.string(),linked:v.boolean(),access:v.union(v.literal("active"),v.literal("inactive"),v.literal("unknown"))})), parentCoverage:v.union(v.literal("complete"),v.literal("unknown")) });
+const detailValidator = v.object({ ...rowValidator.fields, legalName: v.string(), preferredName: v.string(), email: v.string(), shirtSize: v.union(v.string(), v.null()), roomCategory: v.union(v.string(), v.null()), guardianName: v.union(v.string(), v.null()), guardianRelationship: v.union(v.string(), v.null()), guardianPhone: v.union(v.string(), v.null()), emergencyName: v.union(v.string(), v.null()), emergencyRelationship: v.union(v.string(), v.null()), emergencyPhone: v.union(v.string(), v.null()), allergies: v.object({ state: v.string(), text: v.optional(v.string()) }), medications: v.object({ state: v.string(), text: v.optional(v.string()) }), otcAuthorization: v.union(v.string(), v.null()), structuredConsentProfileComplete: v.boolean(), profileSetupRequired: v.boolean(), parents: v.array(v.object({name:v.string(),linked:v.boolean(),access:v.union(v.literal("active"),v.literal("inactive"),v.literal("unknown"))})), parentCoverage:v.union(v.literal("complete"),v.literal("unknown")) });
 export const detail = query({
   args: { studentId: v.id("students"), asOf: v.number() }, returns: detailValidator,
   handler: async (ctx, args) => {
@@ -87,6 +89,8 @@ export const detail = query({
       const parent = await ctx.db.get(link.parentUserId);
       return { name: parent?.name ?? "Parent account unavailable", linked: link.active, access: !parent || parent.role !== "parent" ? "unknown" as const : parent.active ? "active" as const : "inactive" as const };
     }));
-    return { ...row, legalName: student.legalName, preferredName: student.preferredName, email: student.email, shirtSize: student.shirtSize ?? null, roomCategory: student.roomCategory ?? null, guardianName: student.guardianName ?? null, guardianRelationship: student.guardianRelationship ?? null, guardianPhone: student.guardianPhone ?? null, emergencyName: student.emergencyName ?? null, emergencyRelationship: student.emergencyRelationship ?? null, emergencyPhone: student.emergencyPhone ?? null, allergies: student.allergies, medications: student.medications, otcAuthorization: student.otcAuthorization ?? null, profileSetupRequired: student.profileCompletedAt === undefined, parents, parentCoverage:links.length>20?"unknown" as const:"complete" as const };
+    const projected = privateStudent(student);
+    const confirmedProfile = projected.structuredConsentProfileComplete ? student.consentProfileV2 : null;
+    return { ...row, legalName: student.legalName, preferredName: student.preferredName, email: student.email, shirtSize: student.shirtSize ?? null, roomCategory: student.roomCategory ?? null, guardianName: confirmedProfile?.guardian.name ?? student.guardianName ?? null, guardianRelationship: confirmedProfile?.guardian.relationship ?? student.guardianRelationship ?? null, guardianPhone: confirmedProfile?.guardian.phone ?? student.guardianPhone ?? null, emergencyName: projected.emergencyName, emergencyRelationship: projected.emergencyRelationship, emergencyPhone: projected.emergencyPhone, allergies: projected.allergies, medications: projected.medications, otcAuthorization: projected.otcAuthorization, structuredConsentProfileComplete: projected.structuredConsentProfileComplete, profileSetupRequired: student.profileCompletedAt === undefined, parents, parentCoverage:links.length>20?"unknown" as const:"complete" as const };
   },
 });

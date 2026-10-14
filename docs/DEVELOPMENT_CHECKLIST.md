@@ -19,11 +19,15 @@ G3 Whole Team enrollment is functionally complete. G1, G2 and G4–G7 remain ope
 
 ### Required feature status
 
+- [x] October 14 authorized revision: completed profile → populated field-trip PDF → acknowledgment/typed signature; remove active Medication Choices/OTC, retain minor first aid and historical receipts. Implemented, reviewed, integrated checks passed, and fictional Parent-to-Coach journey verified; see FIELD_TRIP_PDF_PLAN.md. Manual PDF download/device verification and approval remain below.
+
 - [x] Complete Coach roster → student record: record navigation, validated balances, bounded genuine next-event readiness, missing-information summaries/filters and truthful account linkage/access status. Membership controls and Coach-only data boundaries preserved. Reviewed and synchronized at 18:21:30; targeted and integrated checks passed, followed by representative live layout/navigation/filter/recovery verification.
 
 - [x] Connect Coach/Travel Lead Reports to bounded role-scoped finance, attendance and selected-event readiness, individual reports and safe loaded-filtered CSV. Reviewed and development-synchronized at 18:39:33; focused and integrated validation passed. Coach live filtering/detail and representative presentation verified.
 
 ### Missing evidence
+
+- [ ] Manual field-trip PDF download/device check (browser connector cannot capture blob downloads), final district-compatible wording and Coach visual approval.
 
 - [ ] Confirm Reports CSV file delivery in the browser and its Travel Lead live presentation. CSV scope, Draft metadata and injection protection pass automated checks; browser download observation timed out, and browser policy blocked the downloads-page inspection. Do not retry through a workaround.
 
@@ -37,7 +41,7 @@ G3 Whole Team enrollment is functionally complete. G1, G2 and G4–G7 remain ope
 
 ### User dependencies and separate gates
 
-- Student and ordinary Mentor browser sessions were unavailable at handoff; invitation acceptance remains pending. Park inaccessible checks without repetitive polling or convenience role grants.
+- All five test browser profiles are connected as of October 14. Student setup and ordinary Mentor invitation acceptance remain pending. Park inaccessible checks without repetitive polling or convenience role grants.
 - Real signing, automatic retention deletion, main merge and production remain unauthorized.
 - Coach visual acceptance remains pending until the ready candidate is presented.
 - Timeclock physical-device/concurrent live evidence remains coordinated separately; preserve its existing checks and shared IDs/contracts.
@@ -53,7 +57,7 @@ These are separate launch gates, not authorization to deploy.
 - [ ] Obtain Coach visual approval of the completed candidate and documented intentional differences.
 - [ ] Confirm organizational ownership and administrators for GitHub, Convex, Google and Cloudflare.
 - [ ] Confirm Student Status production domain, separate production configuration, Google sign-in and allowed origins.
-- [ ] Approve privacy/access rules and final permission/medication wording, products and exceptions before real signatures.
+- [ ] Approve privacy/access rules and final field-trip/first-aid wording consistent with district medication policy before real signatures; Medication Choices is removed.
 - [ ] Resolve retention coverage, holds and backup/export treatment; keep automatic deletion disabled pending explicit authorization.
 - [ ] Review realistic team-volume limits, performance and remaining material usability/accessibility issues.
 - [ ] Establish monitoring, backups, demonstrated restoration and deployment rollback.
