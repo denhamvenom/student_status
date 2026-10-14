@@ -1,8 +1,8 @@
-> October 14 second-round checkpoint: all 13 requested corrections implemented; integrated checks and packaging passed; consequential Astra review clear. Ready for owner review, with screenshot-matrix limitations explicitly recorded in VISUAL_CHECKS.md. Approved PDF and completed work preserved.
+> October 14 planning update: Parent setup usability batch is documented but NOT STARTED. Await explicit user instruction before development. Second-round checkpoint cb0d47f and all completed evidence are preserved. Final visual approval follows the new batch. See [PARENT_SETUP_BATCH.md](PARENT_SETUP_BATCH.md).
 
 # Current G1–G7 acceptance disposition — October 14, 2026
 
-G1–G6 implementation and representative evidence are complete through readiness for Coach visual review. G7 validation/review/delivery is complete; final development publication is handled in this checkpoint. Actual Coach visual approval is pending, and production remains separate.
+G1–G6 implementation and representative evidence are complete through readiness for Coach visual review. G7 validation/review/delivery is complete; final development publication is handled in this checkpoint. Actual Coach visual approval is pending, and production remains separate. These original-scope outcomes remain preserved; the new Parent batch is planned, not implemented, and precedes final approval after explicit start authorization.
 
 DEVELOPMENT_CHECKLIST.md maps all seven outcomes to retained evidence. VISUAL_CHECKS.md records each page/role and the two live-state limits accepted by Astra under the user's focused-check policy. Existing source/tests cover recipient room acceptance and no-linked Parent; no account/relationship changes were made to obtain screenshots.
 

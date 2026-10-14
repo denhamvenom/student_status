@@ -1,8 +1,8 @@
-> October 14 second-round checkpoint: all 13 requested corrections implemented; integrated checks and packaging passed; consequential Astra review clear. Ready for owner review, with screenshot-matrix limitations explicitly recorded in VISUAL_CHECKS.md. Approved PDF and completed work preserved.
+> October 14 planning update: Parent setup usability batch is documented but NOT STARTED. Await explicit user instruction before development. Second-round checkpoint cb0d47f and all completed evidence are preserved. Final visual approval follows the new batch. See [PARENT_SETUP_BATCH.md](PARENT_SETUP_BATCH.md).
 
 # Student Status Development Checklist
 
-Updated October 14, 2026. Current disposition supersedes dated unchecked boxes below. Original G1–G7 scope is preserved. Implementation and representative review are complete; Coach visual approval remains the next gate.
+Updated October 14, 2026. Current disposition supersedes dated unchecked boxes below. Original G1–G7 scope is preserved. Original implementation and evidence remain complete. The planned Parent batch precedes final visual approval; development is on hold.
 
 ## Completion batches
 
@@ -13,6 +13,7 @@ Updated October 14, 2026. Current disposition supersedes dated unchecked boxes b
 - [x] Consolidated Astra review: no blocking findings at the representative scope. No new public API, schema or migration.
 - [x] User confirmed signed PDF opens and Reports CSV downloads.
 - [x] User confirmed CSV opens correctly; friendlier cents headings/units deferred until after launch by explicit request.
+- [ ] Parent setup usability batch — planned only; await explicit start instruction. See PARENT_SETUP_BATCH.md.
 - [ ] Coach visual approval using VISUAL_REVIEW_GUIDE.md.
 
 ## Preserved G1–G7 outcomes

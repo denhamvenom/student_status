@@ -1,3 +1,7 @@
+> October 14 planning update: Parent setup usability batch is documented but NOT STARTED. Await explicit user instruction before development. Second-round checkpoint cb0d47f and completed evidence are preserved. Final visual approval follows the new batch. See [PARENT_SETUP_BATCH.md](PARENT_SETUP_BATCH.md).
+
+Existing correction evidence below applies to cb0d47f. The Parent wizard does not exist yet.
+
 ## Second-round corrections — October 14, 2026
 
 All 13 requested corrections are implemented. Ready for the owner's next visual review; this is not visual approval or launch approval. Original G1–G7, approved PDF, prior receipts and completed evidence remain preserved.

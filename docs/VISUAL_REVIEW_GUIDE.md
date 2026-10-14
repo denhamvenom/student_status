@@ -1,3 +1,7 @@
+> October 14 planning update: Parent setup usability batch is documented but NOT STARTED. Await explicit user instruction before development. Second-round checkpoint cb0d47f and completed evidence are preserved. Final visual approval follows the new batch. See [PARENT_SETUP_BATCH.md](PARENT_SETUP_BATCH.md).
+
+Existing correction evidence below applies to cb0d47f. The Parent wizard does not exist yet.
+
 # Second-round review focus
 
 Start with exact attendance seconds, visible account/report headings, Balance due first, earned-versus-available credit, canceled fees, earlier/current receipts and inline empty-event errors. Travel Lead signature requests intentionally remain available under the saved permission decision. Full item/file/verification table: VISUAL_CHECKS.md.
