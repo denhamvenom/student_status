@@ -1,3 +1,5 @@
+> October 14 correction checkpoint: required corrections implemented; ready for another owner visual review. Fresh Parent presentation remains pending sign-in. Approved PDF and completed work preserved. See VISUAL_CHECKS.md for evidence and deferrals.
+
 # Current G1–G7 acceptance disposition — October 14, 2026
 
 G1–G6 implementation and representative evidence are complete through readiness for Coach visual review. G7 validation/review/delivery is complete; final development publication is handled in this checkpoint. Actual Coach visual approval is pending, and production remains separate.

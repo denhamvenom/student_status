@@ -32,9 +32,9 @@ describe('shared fee presentation', () => {
     queryState.loaded = true; queryState.queryCount = 0
     const html = renderToStaticMarkup(createElement(FeeAdministration, { isCoach: false }))
     expect(queryState.queryCount).toBe(1)
-    expect(html).toContain('Unmapped historical charges still require Coach review')
+    expect(html).toContain('Some earlier charges still need a Coach to match them to shared fees')
     expect(html).not.toContain('<form')
-    expect(html).not.toContain('Prepare historical charge mapping')
+    expect(html).not.toContain('Match earlier charges')
   })
   it('does not label an initially loading fee page as an empty season', () => {
     queryState.loaded = false

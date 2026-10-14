@@ -2,7 +2,7 @@
 
 ## Purpose and status
 
-Visual approval is blocked pending this bounded correction pass. The external review supplies new evidence that supersedes the earlier readiness claim; completed workflows, checks and approved decisions remain valid except where a finding identifies a concrete gap. This document is a plan, not authorization to deploy or a claim that fixes are implemented.
+The required correction pass is implemented; owner visual approval remains open. The external review supplies new evidence that supersedes the earlier readiness claim; completed workflows, checks and approved decisions remain valid except where a finding identifies a concrete gap. See VISUAL_CHECKS.md for implemented corrections, retained evidence and optional deferrals. Production deployment is not authorized.
 
 Source: Logistics Work/claude-v2-review/visual-language-review/8044_visual_language_review_2026-10-14.md and its screenshots. Keep the report and account-specific images outside Git. Reviewed the report and representative Team/Readiness screenshots. Its framed phone/light views are useful observations, not proof of actual responsive or theme behavior.
 

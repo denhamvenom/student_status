@@ -40,5 +40,6 @@ export function percentageLabel(value: number | null | undefined): string {
 
 export function phoneLabel(role: string, index: number, fallback: string): string {
   const labels = reference.navigation.phoneBottomNav as Record<string, string[] | string>
-  return Array.isArray(labels[role]) ? labels[role][index] ?? fallback : fallback
+  const label = Array.isArray(labels[role]) ? labels[role][index] ?? fallback : fallback
+  return label === 'Status' ? 'Home' : label === 'Finances' ? 'Money' : label
 }

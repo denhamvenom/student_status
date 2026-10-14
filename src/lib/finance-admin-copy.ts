@@ -1,6 +1,7 @@
 export const financeAdminCopy = {
-  title: 'Student accounts', student: 'Student', charged: 'Charged', paid: 'Paid', credits: 'Credits', balance: 'Balance', travel: 'Travel acct.',
-  explanation: 'Paid is personal money applied to charges. Credits are fundraising money applied. Travel acct is available fundraising credit; unused personal payments appear in account details.',
+  title: 'Student accounts', student: 'Student', charged: 'Charged', paid: 'Paid', credits: 'Fundraising applied', balance: 'Balance due', travel: 'Fundraising available',
+  columnHelp: 'What do these columns mean?',
+  explanation: 'Paid is personal payments applied to charges. Fundraising applied is fundraising credit used on charges. Fundraising available is unused fundraising credit; account details show unused personal payments separately. Available funds are not cash refunds.',
   loading: 'Loading student accounts...', empty: 'No active student accounts in this season.',
   continuing: 'More student records are available. Continue loading to review them.', more: 'More students', loadingMore: 'Loading more students...', unavailable: 'Unavailable',
   updating: 'Account totals are updating.', failed: 'Account totals need Coach review.', uninitialized: 'Account totals need preparation.',
@@ -14,13 +15,13 @@ export const financeChangesCopy = {
   title: 'Recent changes', when: 'When', student: 'Student', change: 'Change', amounts: 'Previous → updated', actor: 'By · reason',
   team: 'Team', other: 'Financial change', unavailable: 'Not recorded', loading: 'Loading financial changes...',
   empty: 'No financial changes are available in the current coverage.', continuing: 'More financial records are available. Continue loading to review them.',
-  more: 'More changes', progress: 'Partial progress recorded; this entry is not a completion receipt.', historical: 'Historical evidence',
+  more: 'More changes', progress: 'In progress. Only amounts shown as committed are final.', historical: 'Earlier recorded change',
   coverageStarted: 'Historical preparation started', coverageCompleted: 'Historical preparation completed',
-  coverageNote: 'Amounts describe the recorded change and its stated scope, not a current account balance. Historical values are shown only where supported by recorded evidence.',
-  coverage: { updating: 'Historical change coverage is updating.', ready: 'Available historical evidence has been prepared.', failed: 'Historical change coverage needs Coach review.' },
+  coverageNote: 'Each before-and-after amount belongs to that recorded change, not the student’s current balance. Earlier amounts appear only when the original record supports them.',
+  coverage: { updating: 'Earlier changes are still being prepared; this list may be incomplete.', ready: 'Available earlier changes are included.', failed: 'Earlier changes need Coach review; this list may be incomplete.' },
   sources: { payment: 'Personal payment', fundraiser: 'Fundraising credit' },
-  meanings: { receipt: 'Recorded receipt', obligation: 'Charge obligation', applied: 'Applied to this charge', personalAvailable: 'Available in this personal-payment source', fundraisingAvailable: 'Available in this fundraising source', grossRaised: 'Student fundraiser gross proceeds', priority: 'Fee priority' },
-  kinds: { charge: 'Charge recorded', payment: 'Personal payment', paymentCorrection: 'Payment receipt corrected', fundraisingCredit: 'Fundraising credit', allocation: 'Funds applied', release: 'Applied funds released', chargeAdjustment: 'Charge adjusted', chargeCancellation: 'Charge cancelled', payout: 'Personal refund recorded', transferOut: 'Funds transferred', awardReversal: 'Fundraising award reversed', fundraiserGross: 'Fundraiser proceeds recorded', feePriority: 'Fee priority changed' },
+  meanings: { receipt: 'Payment received', obligation: 'Amount owed on this charge', applied: 'Used toward this charge', personalAvailable: 'Unused amount from this personal payment', fundraisingAvailable: 'Unused amount from this fundraising credit', grossRaised: 'Gross fundraiser proceeds', priority: 'Fee order position' },
+  kinds: { charge: 'Charge recorded', payment: 'Personal payment', paymentCorrection: 'Payment receipt corrected', fundraisingCredit: 'Fundraising credit', allocation: 'Funds applied', release: 'Funds returned to available balance', chargeAdjustment: 'Charge adjusted', chargeCancellation: 'Charge canceled', payout: 'Personal refund recorded', transferOut: 'Funds transferred', awardReversal: 'Fundraising award reversed', fundraiserGross: 'Fundraiser proceeds recorded', feePriority: 'Fee order changed' },
 } as const
 
 export const financeWorkspaceCopy = {

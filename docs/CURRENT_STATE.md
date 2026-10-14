@@ -1,27 +1,23 @@
 # Current integration handoff
 
-Updated October 14, 2026. External visual review identified material language and interaction gaps; visual approval is blocked pending VISUAL_REVIEW_CORRECTION_PLAN.md. Completed G1–G7 work and evidence remain preserved. Coach approval and production are separate gates.
+Updated October 14, 2026. Required correction subplan implemented; ready for another owner visual review. Fresh Parent presentation check remains pending sign-in. Original G1-G7 work, approved PDF and valid evidence preserved; no goal recreation.
 
 ## Workspace
 
-- Branch feature/student-status-completion; draft PR10. Visual-review candidate f89b94d is published and remote-verified. A focused Join-page sign-out follow-up is included in this checkpoint.
-- Development backend: daniel-eiland / denham-venom-student-status / dev:third-bandicoot-18, last synchronized October 14 at 09:22:58 local. No later backend changes.
-- User-approved COMPLETION_PLAN.md replaces the cleared goal tracker. Do not recreate a goal or restart completed work.
+- Branch feature/student-status-completion, draft PR10; correction checkpoint follows f2abd3e.
+- Development third-bandicoot-18 synchronized October 14 at 12:01:25 local. No production deployment.
+- No schema, financial calculation, approved PDF generator/template or Timeclock contract changes.
 
-## Completed
+## Corrections and evidence
 
-Approved original one-page PDF workflow, genuine overflow preservation, historical receipts, printable Draft-aware Readiness, roster/student records, bounded Reports, role setup/grant/revocation and source-preserving paid-withdrawal/room recovery are verified. Final copy replaces internal statuses and raw priority ranks; Reports correctly calls combined unspent personal/fundraising money Available funds. No arithmetic/API change.
+Family responses omit staff financial notes/provenance. Home leads with genuine profile/setup/event tasks; Money leads with Balance due. New Event validates each step and final submission. Account/report details scroll and focus. Readiness uses authoritative permission coverage. Role language, attendance explanations, export help, receipt verification disclosure and processing labels corrected.
 
-Page-by-page production-language inventory is recorded in VISUAL_CHECKS.md. Consolidated Astra review has no blockers. Integrated lint/types/tests/build passed; final label-only follow-up passed scoped checks and rebuild. Packaging dry-run succeeded; sandbox blocked only its external log write. Production-build sign-in was inspected and ignored the development review query.
+Astra consequential review clear after three narrow fixes. Integrated lint/types and full behavior suite verified outside Windows sandbox; stale copy assertions updated with affected tests passing. Build/packaging verified without deployment. Final display-only lint/type/build and focused presentation checks passed.
 
-User confirmed PDF and CSV open correctly; friendlier CSV cents headings are explicitly deferred until after launch. No-linked Parent and recipient room acceptance rely on retained source/tests, with no convenience access changes. Detailed evidence stays private.
-
-October 14 follow-up: Join the team and Waiting for approval now offer Sign out with wrong-account guidance and retryable error handling. Scoped lint/types passed; actual Join-page sign-out returned to Google sign-in. No backend, account or role changes. Private screenshot: join-sign-out.jpg.
+Live Student tasks/history, Coach validation/account focus, Readiness Accepted, Travel Reports selection/focus and ordinary Mentor reviewed. Actual phone Home inspected; viewport reset. Parent signed out: fresh changed presentation pending sign-in, with source/tests and earlier receipt evidence retained. No repeated access polling.
 
 ## Next action
 
-Follow VISUAL_REVIEW_CORRECTION_PLAN.md after implementation is authorized. The current request created the correction subplan only; no application changes were made. Do not repeat completed workflows, full checks or account rehearsals. No production/main merge/real signing/destructive retention authorization. Launch checklist remains in DEVELOPMENT_CHECKLIST.md.
+Owner review using VISUAL_REVIEW_GUIDE.md. VISUAL_CHECKS.md records every external finding and deferral. User confirmed prior PDF/CSV opening; cents headings deferred. Existing no-linked Parent and recipient room acceptance evidence reused. Private screenshots stay outside Git.
 
-Timeclock's owner reported a frontend-only wording checkpoint on its separate branch. No shared contract changes or extra Timeclock tests are required here. Keep its visual/device/concurrent approval separate.
-
-Private evidence includes approved-pdf-signed-live.jpg, ordinary original PDF renders, readiness-browser-print.pdf, room-group-deadline-live.jpg, paid-withdrawal-preview.jpg, withdrawn-room-recovery.jpg and final-reports-copy.jpg. Do not commit these artifacts.
+No main merge, production, real signing, destructive retention, account reassignment or broader access authorized. Timeclock frontend work remains with its owner on a separate branch.

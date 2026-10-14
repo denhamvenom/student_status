@@ -104,7 +104,8 @@ describe("fictional multi-role operations rehearsal (mocked Convex identities)",
     const blake = await f.coach.query(api.app.studentFinances, { studentId: f.ids.blake });
     expect(alice.summary).toMatchObject({ personalAvailableCents: 3000, fundraisingAvailableCents: 1000 });
     expect(blake.summary).toMatchObject({ paidCents: 2000, dueCents: 4000, personalAvailableCents: 0, fundraisingAvailableCents: 0 });
-    expect((await f.coach.query(api.financeDetails.history, { studentId: f.ids.blake, paginationOpts: { cursor: null, numItems: 25 } })).page.find((entry: { operationId?: string; kind: string }) => entry.operationId === transferId && entry.kind === "fundraiser")?.originEntryId).toBeTruthy();
+    const transferReceipt = (await f.coach.query(api.financeDetails.history, { studentId: f.ids.blake, paginationOpts: { cursor: null, numItems: 25 } })).page.find(entry => "operationId" in entry && entry.operationId === transferId && entry.kind === "fundraiser");
+    expect(transferReceipt && "originEntryId" in transferReceipt ? transferReceipt.originEntryId : null).toBeTruthy();
     expect((await f.coach.query(api.financeDetails.history, { studentId: f.ids.blake, paginationOpts: { cursor: null, numItems: 25 } })).page.find((entry: { kind: string }) => entry.kind === "allocation")?.sourceKind).toBe("fundraiser");
     await expect(f.parent.query(api.app.studentFinances, { studentId: f.ids.blake })).rejects.toThrow();
   });

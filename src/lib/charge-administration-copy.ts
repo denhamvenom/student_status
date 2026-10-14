@@ -30,6 +30,6 @@ export const chargeAdministrationCopy = {
   updating: 'Financial processing must finish before another correction can be posted.',
   failed: 'Processing needs Coach review. Already committed source releases remain recorded.',
   retry: 'Retry remaining work',
-  retryReason: 'Reason for retry',
+  retryReason: 'Reason for retry (at least 8 characters)',
   close: 'Close charge details',
 } as const

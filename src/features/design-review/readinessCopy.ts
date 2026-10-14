@@ -39,8 +39,8 @@ export const readinessCopy = {
   generatedAt: 'Generated',
   outstanding: 'Outstanding',
   noneOutstanding: 'No outstanding items shown.',
-  printDescription: 'Review the current event summary before printing or saving it as a PDF. Permission packets remain in the restricted permission workflow.',
-  permissionPackets: 'Permission workflow',
+  printDescription: 'Review the current event summary before printing or saving it as a PDF. Print permission forms from Permission forms.',
+  permissionPackets: 'Permission forms',
   updateFailed: 'FIRST registration could not be updated. Try again.',
   themeFailed: 'Theme could not be saved. Try again.',
   signOutFailed: 'Sign out could not be completed. Try again.',
@@ -50,6 +50,6 @@ export const readinessCopy = {
   themeLabel: (dark: boolean) => `Switch to ${dark ? 'light' : 'dark'} theme`,
   openCount: (count: number) => `${count} open`,
   readyCount: (ready: number, total: number) => `${ready} of ${total} ready`,
-  seatCount: (seats: number, passengers: number) => `${seats} seats · ${passengers} passengers`,
+  seatCount: (seats: number, passengers: number) => `${seats} seats for ${passengers} passenger${passengers === 1 ? '' : 's'}`,
   roomOpenCount: (count: number) => `${count} rooming item${count === 1 ? '' : 's'} open.`,
 } as const

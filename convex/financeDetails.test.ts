@@ -7,6 +7,30 @@ import type { FunctionReturnType } from "convex/server";
 
 const modules = import.meta.glob("./**/*.ts");
 describe("paginated financial evidence", () => {
+  it("omits staff finance reasons and provenance from family responses", async () => {
+    const t = createTest(schema, modules);
+    const ids = await t.run(async ctx => {
+      const authCoach = await ctx.db.insert("users", {email: "coach-privacy@example.invalid"});
+      const authParent = await ctx.db.insert("users", {email: "parent-privacy@example.invalid"});
+      const coach = await ctx.db.insert("appUsers", {authUserId: authCoach, name: "Coach", email: "coach-privacy@example.invalid", role: "coach", active: true, travelLead: false, financialEdit: true});
+      const parent = await ctx.db.insert("appUsers", {authUserId: authParent, name: "Parent", email: "parent-privacy@example.invalid", role: "parent", active: true, travelLead: false, financialEdit: false});
+      const seasonId = await ctx.db.insert("seasons", {name: "Synthetic", year: 2026, status: "active", startsAt: 0, permissionVersion: "DRAFT", createdBy: coach});
+      const studentId = await ctx.db.insert("students", {seasonId, legalName: "Student", preferredName: "Student", email: "student-privacy@example.invalid", subteam: "Build", active: true, travelTeam: false, roomCategoryLocked: false, allergies: {state: "unknown"}, medications: {state: "unknown"}});
+      await ctx.db.insert("familyLinks", {parentUserId: parent, studentId, active: true, createdBy: coach});
+      const chargeId = await ctx.db.insert("charges", {studentId, label: "Room fee", amountCents: 100, appliedCents: 0, priority: 1, createdBy: coach, createdAt: 1});
+      await ctx.db.insert("ledgerEntries", {studentId, chargeId, kind: "cancellation", amountCents: 100, previousCents: 100, newCents: 0, reason: "Internal rehearsal note; never show a family", reference: "private-reference", recordedBy: coach, recordedAt: 2, idempotencyKey: "private-idempotency"});
+      return {authCoach, authParent, studentId};
+    });
+    const parent = t.withIdentity({subject: `${ids.authParent}|session`}), coach = t.withIdentity({subject: `${ids.authCoach}|session`});
+    const args = {studentId: ids.studentId, paginationOpts: {cursor: null, numItems: 25}};
+    const family = await parent.query(api.financeDetails.history, args);
+    expect(family.page[0].safeDescription).toBe("Room fee canceled");
+    expect(JSON.stringify(family)).not.toMatch(/Internal rehearsal note|private-reference|private-idempotency|recordedBy/);
+    const charge = await parent.query(api.financeDetails.charges, args);
+    expect(JSON.stringify(charge)).not.toContain("createdBy");
+    const staff = await coach.query(api.financeDetails.history, args);
+    expect(JSON.stringify(staff)).toContain("Internal rehearsal note");
+  });
   it("keeps all history beyond 500 rows accessible and rejects wrong roles and scopes", async () => {
     const t = createTest(schema, modules);
     const ids = await t.run(async ctx => {

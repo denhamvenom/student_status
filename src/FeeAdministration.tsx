@@ -371,7 +371,7 @@ function PrepareFeeMapping({ onJob }: { onJob: (jobId: Id<'feeMappingJobs'>) => 
   return <Card className={styles.card}><CardTitle>{copy.prepareMapping}</CardTitle><p>{copy.proofNote}</p>
     <form className={styles.form} onSubmit={event => { event.preventDefault(); void submit() }}>
       <label className={styles.field}>{copy.reason}<Input value={reason} maxLength={1000} required disabled={pending || !!jobId} onChange={event => setReason(event.target.value)} /></label>
-      <Button type="submit" disabled={pending || !!jobId || reason.trim().length < 8}>{pending ? copy.submitting : copy.prepareMapping}</Button>
+      <Button type="submit" variant="outline" disabled={pending || !!jobId || reason.trim().length < 8}>{pending ? copy.submitting : copy.prepareMapping}</Button>
     </form>{error && <p role="alert">{error}</p>}
   </Card>
 }

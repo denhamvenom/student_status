@@ -7,19 +7,19 @@ const render = (value: FinanceChangeRow) => renderToStaticMarkup(createElement(F
 describe('typed finance change evidence',()=>{
   it('keeps incomplete progress and unavailable historical values explicit',()=>{
     const html=render(row)
-    expect(html).toContain('this entry is not a completion receipt')
+    expect(html).toContain('Only amounts shown as committed are final')
     expect(html).toContain('Not recorded')
     expect(html).toContain('$1.01')
     expect(html).not.toContain('$0.00')
     expect(html).toContain('Personal payment')
     expect(html).not.toContain('not yet complete')
-    expect(html).toContain('Historical change coverage is updating')
+    expect(html).toContain('Earlier changes are still being prepared; this list may be incomplete')
   })
   it('renders priority as ranks rather than currency and never exposes raw unknown kinds',()=>{
     const html=render({...row,kind:'feePriority',meaning:'priority',beforeCents:12,afterCents:3,deltaCents:null,state:'committed',sourceKind:null})
     expect(html).toContain('12 → 3')
     expect(html).not.toContain('$')
-    expect(html).not.toContain('this entry is not a completion receipt')
+    expect(html).not.toContain('Only amounts shown as committed are final')
     expect(render({...row,kind:'internalUnknownKind'})).not.toContain('internalUnknownKind')
   })
 })

@@ -11,7 +11,7 @@ const mentor = reference.navigation.desktop.mentor
 export const navigationCopy = {
   groups: readinessCopy.navigation,
   labels: {
-    status: student[0], events: student[1], finances: student[2], attendance: student[3],
+    status: 'Home', events: student[1], finances: 'Money', attendance: student[3],
     profileHealth: student[4], parents: student[5], settings: student[6],
     permissionForm: parent[5], team: coach[0][1][0], joinRequests: coach[0][1][1],
     usersRoles: coach[0][1][2], readiness: coach[1][1][1], drivers: coach[1][1][2],

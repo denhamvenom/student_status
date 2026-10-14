@@ -1,9 +1,12 @@
 import { enrollmentPending } from "./lib/eventEnrollmentState";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { env } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { activeSeason, identity, linkedStudents, maybeViewer, mentorEvent, mentorStudent, privateStudent, publicStudent, requireRole, studentAccess, viewer as requireViewer, audit } from "./lib/access";
 import { attendanceFor, financeFor, studentReadiness } from "./lib/readModels";
+import { coverageFor } from "./lib/permissionCoverage";
+import { fieldTripApproved } from "../src/lib/field-trip-approved";
 import { transportSummary } from "./travel";
 
 export const viewer = query({
@@ -82,15 +85,38 @@ export const studentDashboard = query({
     const events = await ctx.db.query("events").withIndex("by_seasonId_and_startsAt", q => q.eq("seasonId", season._id)).take(200);
     const participations = await ctx.db.query("participants").withIndex("by_studentId", q => q.eq("studentId", student._id)).take(200);
     const rows = [];
-    const todos: { eventId: Doc<"events">["_id"]; eventName: string; label: string; dueAt: number | null }[] = [];
+    const todos: { eventId: Doc<"events">["_id"] | null; eventName: string; label: string; dueAt: number | null; href: string | null; responsible: "student" | "parent" | "coach"; blocked: boolean }[] = [];
+    const studentSetupComplete = student.profileCompletedAt !== undefined;
+    const parentProfileComplete = !!student.consentProfileV2CompletedAt;
+    const activeVersion = season.activePermissionVersionId ? await ctx.db.get(season.activePermissionVersionId) : null;
+    const syntheticAccess = user.role === "parent" && env.CONVEX_CLOUD_URL === "https://third-bandicoot-18.convex.cloud" ? await ctx.db.query("syntheticConsentSubjects").withIndex("by_studentId_and_parentId", q => q.eq("studentId", student._id).eq("parentId", user._id)).unique() : null;
+    const signingAvailable = activeVersion?.formFormat === 2 && activeVersion.version === fieldTripApproved.templateVersion && syntheticAccess?.enabled === true;
+    if (!studentSetupComplete) todos.push({eventId: null, eventName: "Student setup", label: user.role === "student" ? "Finish your student setup" : "Student setup needs to be finished by the student", dueAt: null, href: user.role === "student" ? "/profile" : null, responsible: "student", blocked: user.role !== "student"});
+    if (!parentProfileComplete) todos.push({eventId: null, eventName: "Profile & health", label: user.role === "parent" ? "Finish the health and contact profile" : "A parent or legal guardian needs to finish the health and contact profile", dueAt: null, href: user.role === "parent" ? "/profile" : null, responsible: "parent", blocked: user.role !== "parent"});
     for (const event of events) {
       const participation = participations.find(x => x.eventId === event._id)?.status ?? null;
       if (event.archived || (!participation && event.signupMode === "assigned")) continue;
       const readiness = await studentReadiness(ctx, event, student);
       rows.push({ event, participation, readiness });
-      if (readiness.state === "open") {
+      if (participation === "confirmed" && readiness.state === "open") {
         const custom = await ctx.db.query("requirements").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(100);
-        for (const label of readiness.open) todos.push({ eventId: event._id, eventName: event.name, label, dueAt: custom.find(x => x.label === label)?.dueAt ?? event.startsAt });
+        for (const item of readiness.open) {
+          if (item === "Permission accepted") {
+            const coverage = await coverageFor(ctx, student._id, event._id);
+            const waiting = coverage?.state === "pending" && coverage.signatureRequestedAt === undefined;
+            const readyToPrepare = studentSetupComplete && parentProfileComplete && !waiting && signingAvailable;
+            const label = waiting ? "Permission form submitted; waiting for Coach review" : !studentSetupComplete ? "Permission form waits for student setup" : !parentProfileComplete ? "Permission form waits for the health and contact profile" : user.role === "parent" && !signingAvailable ? "Permission signing is not available yet; ask a Coach" : user.role === "parent" ? "Review and sign the permission form" : "A parent or legal guardian needs to complete the permission form when available";
+            todos.push({eventId: event._id, eventName: event.name, label, dueAt: event.startsAt, href: user.role === "parent" && readyToPrepare ? "/forms" : null, responsible: waiting || user.role === "parent" && !signingAvailable ? "coach" : "parent", blocked: !readyToPrepare || user.role !== "parent"});
+            continue;
+          }
+          const staff = item === "Season fee maintenance is not complete" || item === "Financial records require review or are updating" || item === "Event financial records require review" || item === "Event requirements require review";
+          const studentOnly = item === "FIRST registration" || item === "Room selection";
+          const responsible = staff ? "coach" as const : studentOnly ? "student" as const : item === "Required payment" ? "parent" as const : "student" as const;
+          const blocked = staff || user.role !== responsible;
+          const label = item === "FIRST registration" && user.role === "parent" ? "Student needs to finish FIRST registration" : item === "Room selection" && user.role === "parent" ? "Student needs to choose room preferences" : item === "Required payment" && user.role === "student" ? "Parent or guardian needs to review the payment due" : item;
+          const href = blocked ? null : item === "Required payment" ? "/finances" : item === "Room selection" ? `/events/${event._id}/rooming` : `/events/${event._id}`;
+          todos.push({eventId: event._id, eventName: event.name, label, dueAt: custom.find(x => x.label === item)?.dueAt ?? event.startsAt, href, responsible, blocked});
+        }
       }
     }
     return { student: publicStudent(student), money: finance.summary, events: rows, attendance: await attendanceFor(ctx, student), todos };

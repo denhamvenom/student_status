@@ -7,7 +7,7 @@ export const historicalFinanceCopy = {
   original: 'Original', effective: 'Effective', paid: 'Paid',
   review: 'Review charge', more: 'Load more charges',
   kind: 'Correction type', adjustment: 'Adjustment', cancellation: 'Cancellation',
-  target: 'Correct effective amount ($)', reason: 'Correction reason',
+  target: 'Correct charge total ($)', reason: 'Correction reason (at least 8 characters)',
   preview: 'Preview historical correction', confirm: 'Confirm audited historical correction',
   current: 'Current obligation', targetLabel: 'Reviewed target', release: 'Applied funds to release',
   held: 'This correction is held. No financial balances have changed.',

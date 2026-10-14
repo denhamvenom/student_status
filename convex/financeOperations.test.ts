@@ -76,7 +76,7 @@ describe("financial operations", () => {
     expect(payouts[0]).toMatchObject({ sourceEntryId: f.ids.payment, sourceKind: "payment", method: "check", reference: "synthetic-check", amountCents: 1000 });
     await f.coach.mutation(api.finance.recordFunds, { studentId: f.ids.student, kind: "payment", amountCents: 100, reason: "New payment", idempotencyKey: "after-payout-payment" });
     const updated = await finances(f, f.ids.student);
-    expect(updated.entries.find((entry: { idempotencyKey: string }) => entry.idempotencyKey === "after-payout-payment")).toMatchObject({ previousCents: 11000, newCents: 11100 });
+    expect(updated.entries.find(entry => "idempotencyKey" in entry && entry.idempotencyKey === "after-payout-payment")).toMatchObject({ previousCents: 11000, newCents: 11100 });
   });
 
   it("moves mixed fundraising sources atomically and conserves credit after recipient allocation", async () => {

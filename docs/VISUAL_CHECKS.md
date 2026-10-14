@@ -1,4 +1,121 @@
-> October 14 external-review update: visual approval is blocked by newly reported language/data-presentation and interaction gaps. VISUAL_REVIEW_CORRECTION_PLAN.md is the bounded follow-up plan; earlier completion evidence is retained, not a claim these findings are fixed.
+> October 14 correction checkpoint: required corrections implemented; ready for another owner visual review. Fresh Parent presentation remains pending sign-in. Approved PDF and completed work preserved. See VISUAL_CHECKS.md for evidence and deferrals.
+
+## Correction checkpoint - October 14
+
+Required findings implemented; owner visual approval remains open. Sol implemented and Astra reviewed consequential privacy/status/interaction changes. Its three narrow follow-up findings are closed. No approved PDF generator/template, schema, financial calculation or Timeclock contract changed.
+
+Validation: integrated lint/types passed. The full suite loaded outside the Windows sandbox after temporary-module ENOENT failures; behavior checks passed. Four files had stale finance-copy assertions; updated affected tests passed. Production build and packaging dry-run passed without deployment. Final display-only lint/type/build and focused presentation checks passed.
+
+Live: Student Home leads with the incomplete parent profile task; Student Money shows safe history and Balance due first. Readiness shows Accepted for the existing signed fictional form. Empty New Event stays on Basics and focuses Name. Coach account and Travel report opening focus their headings. Report close falls back to page heading if a refreshed row replaced its trigger. Mentor report/profile inspected. Actual 390px Student Home inspected, then viewport reset. Prototype typography/navigation/card styling retained; earlier complementary light/desktop evidence reused.
+
+Private images: correction-event-validation.jpg, correction-student-home-phone.jpg, correction-coach-account.jpg. Parent browser is signed out: fresh changed Parent Home/profile/receipt presentation is pending owner sign-in. Source/tests and earlier approved receipt evidence remain valid. No repeated polling, relinking, grants or signing.
+
+### External report disposition
+
+Every report ID is listed. Corrected does not mean every optional redesign suggestion was adopted.
+
+| Finding | Disposition | Detail |
+| --- | --- | --- |
+| A1 | Corrected | Home/Money consistent; short mobile Profile/Forms labels intentional. |
+| A2 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| A3 | Corrected | Addressed in this bounded pass. |
+| A4 | Corrected | Addressed in this bounded pass. |
+| A5 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| A6 | Corrected | Addressed in this bounded pass. |
+| A7 | Corrected | Addressed in this bounded pass. |
+| A8 | Corrected | Open and cancelled sessions explained separately; no calculation change. |
+| A9 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| A10 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| A11 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| A12 | Corrected | Addressed in this bounded pass. |
+| A13 | Corrected | Addressed in this bounded pass. |
+| A14 | Corrected | Addressed in this bounded pass. |
+| S1 | Corrected | Addressed in this bounded pass. |
+| S2 | Corrected | Addressed in this bounded pass. |
+| S3 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| S4 | Corrected | Addressed in this bounded pass. |
+| S5 | Corrected | Addressed in this bounded pass. |
+| S6 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| S7 | Corrected | Addressed in this bounded pass. |
+| S8 | Corrected | Addressed in this bounded pass. |
+| S9 | Retained/reconciled | Seven-day expiry matches later requirements and server. |
+| S10 | Retained/reconciled | Existing clear invitation instructions retained. |
+| P1 | Corrected | Addressed in this bounded pass. |
+| P2 | Corrected | Addressed in this bounded pass. |
+| P3 | Corrected | Selected-child aria-pressed added; layout redesign deferred. |
+| P4 | Corrected | Prepared drafts distinguished from immutable signed receipts. |
+| P5 | Corrected | Addressed in this bounded pass. |
+| P6 | Corrected | Availability meaning preserved; unavailable is not refusal. |
+| P7 | Corrected | Addressed in this bounded pass. |
+| P8 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| P9 | Corrected | Addressed in this bounded pass. |
+| P10 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| P11 | Corrected | Addressed in this bounded pass. |
+| P12 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| P13 | Corrected | Addressed in this bounded pass. |
+| P14 | Corrected | Addressed in this bounded pass. |
+| P15 | Corrected | Addressed in this bounded pass. |
+| P16 | Retained/reconciled | Known verbose fixture overflows; ordinary approved form remains one page. |
+| P17 | Corrected | Balance first; safe history. No unconfirmed payment instructions added. |
+| C1 | Corrected | Addressed in this bounded pass. |
+| C2 | Corrected | Addressed in this bounded pass. |
+| C3 | Corrected | Addressed in this bounded pass. |
+| C4 | Corrected | Addressed in this bounded pass. |
+| C5 | Corrected | Addressed in this bounded pass. |
+| C6 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| C7 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| C8 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| C9 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| C10 | Corrected | Addressed in this bounded pass. |
+| C11 | Corrected | Addressed in this bounded pass. |
+| C12 | Corrected | Addressed in this bounded pass. |
+| C13 | Corrected | Addressed in this bounded pass. |
+| C14 | Corrected | Addressed in this bounded pass. |
+| C15 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| C16 | Corrected | Accessible checkbox names added; optional layout unchanged. |
+| C17 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| C18 | Optional follow-up | Profile completion clarified; optional note simplification deferred. |
+| C19 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| C20 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| C21 | Optional follow-up | Event permission context clarified; further record redesign deferred. |
+| C22 | Corrected | Addressed in this bounded pass. |
+| C23 | Corrected | Addressed in this bounded pass. |
+| C24 | Corrected | Addressed in this bounded pass. |
+| C25 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| C26 | Corrected | Short name plus stable-identifier help; historical keys unchanged. |
+| C27 | Optional follow-up | No-students room empty state fixed; other optional layout changes deferred. |
+| C28 | Corrected | Authoritative Accepted/Missing/Not required status; general unknown-dash caution retained. |
+| C29 | Corrected | Addressed in this bounded pass. |
+| C30 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| C31 | Corrected | Purpose and JSON format explicit; existing PDF preserved. New export format deferred. |
+| C32 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| C33 | Corrected | Addressed in this bounded pass. |
+| C34 | Corrected | Addressed in this bounded pass. |
+| C35 | Corrected | Addressed in this bounded pass. |
+| C36 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| C37 | Corrected | Addressed in this bounded pass. |
+| C38 | Corrected | Addressed in this bounded pass. |
+| C39 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| C40 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| T1 | Corrected | Addressed in this bounded pass. |
+| T2 | Corrected | Addressed in this bounded pass. |
+| T3 | Corrected | Prerequisite hints; later contract permits Coach and Travel Lead re-sign requests. |
+| T4 | Optional follow-up | Existing read-only access retained; no student-record access expansion. |
+| T5 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| T6 | Optional follow-up | Optional polish deferred; preserve current functionality and scope. |
+| T7 | Retained/reconciled | Existing clear own-profile wording retained. |
+
+### Source-only findings
+
+- Charge, finance, fundraiser, withdrawal and season processing codes mapped; partial/held/failed states remain distinct from completion.
+- Attendance correction kinds labeled; internal recorder IDs removed from ordinary presentation.
+- Fee, charge and historical-finance help simplified without changing safeguards.
+- Medication Choices remains in explicitly earlier-version receipt rendering and unused historical helpers/copy, not active V2 signing/correction choices. Obsolete season reset wording removed; approved first aid preserved.
+- Invitation ellipses and Parent access error fixed. Payment method labels capitalized. Touched retry forms explain eight-character minimum.
+- Waitlist/withdrawal actions clarified. Development-only review-shell money format retained outside production UI.
+
+CSV cents headings remain owner-deferred. Production launch and visual approval are separate open gates.
+
 
 # Current visual review disposition — October 14, 2026
 

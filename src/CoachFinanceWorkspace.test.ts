@@ -26,7 +26,7 @@ describe('financial query presentation integration', () => {
     expect(html).toContain('Prepare historical changes')
     expect(html).toContain('Historical preparation started:')
     expect(html).not.toContain('Historical preparation completed:')
-    expect(html).toContain('Historical change coverage needs Coach review')
+    expect(html).toContain('Earlier changes need Coach review; this list may be incomplete')
   })
   it('keeps initial history loading separate from empty history', () => {
     mocks.usePaginatedQuery.mockReturnValue({ results: [], status: 'LoadingFirstPage', loadMore: vi.fn() })

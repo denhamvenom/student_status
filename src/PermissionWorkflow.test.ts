@@ -13,7 +13,7 @@ describe('permission export collection',()=>{
     const fetch=vi.fn(async(args:FunctionArgs<typeof api.permissions.exportPacket>)=>{const current=index++;expect(args).toMatchObject({eventId,includeHealth:false,paginationOpts:{numItems:10,cursor:current?`synthetic-cursor-${current}`:null}});return page(current,current===49)})
     const download=vi.fn()
     const packet=await collectPermissionExport(fetch,{eventId,includeHealth:false}).then(value=>{download(value);return value})
-    expect(fetch).toHaveBeenCalledTimes(50);expect(download).toHaveBeenCalledTimes(1);expect(packet.records).toHaveLength(500);expect(packet.collectionStartedAt).toBe(1000);expect(packet.collectionCompletedAt).toBe(1049);expect(packet.records[499].collectedAt).toBe(1049);expect(packet.collectionSemantics).toContain('not one instantaneous snapshot')
+    expect(fetch).toHaveBeenCalledTimes(50);expect(download).toHaveBeenCalledTimes(1);expect(packet.records).toHaveLength(500);expect(packet.collectionStartedAt).toBe(1000);expect(packet.collectionCompletedAt).toBe(1049);expect(packet.records[499].collectedAt).toBe(1049);expect(packet.collectionSemantics).toContain('A change during collection may appear in some records and not others.')
   })
   it('does not produce a partial download when any page or the final page is denied',async()=>{
     for(const deniedPage of [1,49]){

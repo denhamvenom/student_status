@@ -1,4 +1,4 @@
-> October 14 external-review update: visual approval is blocked by newly reported language/data-presentation and interaction gaps. VISUAL_REVIEW_CORRECTION_PLAN.md is the bounded follow-up plan; earlier completion evidence is retained, not a claim these findings are fixed.
+> October 14 correction checkpoint: required corrections implemented; ready for another owner visual review. Fresh Parent presentation remains pending sign-in. Approved PDF and completed work preserved. See VISUAL_CHECKS.md for evidence and deferrals.
 
 # Completion plan — October 14, 2026
 

@@ -35,6 +35,25 @@ async function fixture() {
 }
 
 describe("server boundaries", () => {
+  it("shows role-appropriate setup and permission next steps only for confirmed events", async () => {
+    const f = await fixture();
+    await f.t.run(ctx => ctx.db.patch(f.ids.event, {permissionRequired: true}));
+    const initialParent = await f.parent.query(api.app.studentDashboard, {studentId: f.ids.student});
+    expect(initialParent.todos.map(item => item.label)).toContain("Finish the health and contact profile");
+    expect(initialParent.todos.some(item => item.eventId === f.ids.event)).toBe(false);
+    const initialStudent = await f.student.query(api.app.studentDashboard, {studentId: f.ids.student});
+    expect(initialStudent.todos).toMatchObject([{eventId: null, responsible: "student", href: "/profile", blocked: false}, {eventId: null, responsible: "parent", href: null, blocked: true}]);
+    await f.t.run(ctx => ctx.db.patch(f.ids.student, {profileCompletedAt: 1, consentProfileV2CompletedAt: 2}));
+    expect((await f.parent.query(api.app.studentDashboard, {studentId: f.ids.student})).todos).toHaveLength(0);
+    await f.coach.mutation(api.participation.setParticipation, {eventId: f.ids.event, studentId: f.ids.student, status: "confirmed"});
+    const parent = await f.parent.query(api.app.studentDashboard, {studentId: f.ids.student});
+    const permission = parent.todos.find(item => item.eventId === f.ids.event && item.label.includes("Permission"));
+    expect(permission).toMatchObject({href: null, responsible: "coach", blocked: true});
+    const student = await f.student.query(api.app.studentDashboard, {studentId: f.ids.student});
+    expect(student.todos.find(item => item.eventId === f.ids.event && item.label.includes("parent or legal guardian"))).toMatchObject({href: null, responsible: "parent", blocked: true});
+    const readiness = await f.coach.query(api.app.eventReadiness, {eventId: f.ids.event});
+    expect(readiness.students[0].permissionStatus).toBe("missing");
+  });
   it("rejects stale profile edits and invalid required shirt sizes", async () => {
     const f = await fixture();
     await f.parent.mutation(api.app.updateStudentProfile, { studentId: f.ids.student, expectedRevision: 0, emergencyName: "Fictional Guardian" });

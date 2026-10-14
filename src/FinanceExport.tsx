@@ -86,7 +86,7 @@ function ExportContent({ selectedStudentId, selectedStudentName, disabled = fals
     {capturing && <p role="status">{copy.preparing} {copy.members}: {job.memberCount}</p>}
     {job?.state === 'ready' && !expired && <p>{copy.ready}. {copy.members}: {job.memberCount}</p>}
     {expired && <p role="alert">{copy.expired}</p>}
-    {job?.state === 'failed' && !expired && <p role="alert">{job.lastError || copy.failed}</p>}
+    {job?.state === 'failed' && !expired && <p role="alert">{copy.failed}</p>}
     {busy === 'download' && <p role="status">{copy.collecting}</p>}
     <p className="text-sm text-muted-foreground">{copy.metadata}</p><p className="text-sm text-muted-foreground">{copy.range}</p>
     {error && <p role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}

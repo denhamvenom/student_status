@@ -4,10 +4,10 @@ import { teamReportCsv, teamReportStatus } from './team-report-csv'
 describe('loaded team report CSV',()=>{
   it('states partial scope, keeps unknown distinct from zero, and escapes spreadsheet formulas',()=>{
     const csv=teamReportCsv([{name:'=HYPERLINK("bad")',subteam:'Mechanical',travelTeam:true,finance:{chargedCents:0,paidCents:null,dueCents:null,raisedCents:null,travelAccountCents:0},attendance:null,eventsCount:null,selectedEvent:{state:'unknown',outstanding:['+private requirement']}}],{seasonId:'synthetic',asOf:0,selectedEvent:'Synthetic event',selectedEventAt:3600000,subteam:'',outstandingOnly:false,loadedCount:1,filteredCount:1,hasMore:true,attendanceState:'updating',eventsCoverage:'unknown'})
-    expect(csv).toContain('"Loaded filtered rows only"')
+    expect(csv).toContain('"Students currently shown after filters"')
     expect(csv).toContain('"Report status","Draft"')
     expect(csv).toContain('"Event starts at","1970-01-01T01:00:00.000Z"')
-    expect(csv).toContain('"More rows available","Yes"')
+    expect(csv).toContain('"More students available","Yes"')
     expect(csv).toContain('"Attendance coverage","Updating; verified totals unavailable"')
     expect(csv).toContain('"Event coverage","Limited to first 50 events; counts may be incomplete"')
     expect(csv).toContain('"\'=HYPERLINK(""bad"")"')
@@ -20,5 +20,6 @@ describe('loaded team report CSV',()=>{
     const scope={seasonId:'synthetic',asOf:0,selectedEvent:'Synthetic event',selectedEventAt:3600000,subteam:'',outstandingOnly:false,loadedCount:1,filteredCount:1,hasMore:false,attendanceState:'ready',eventsCoverage:'complete'}
     expect(teamReportStatus([row],scope)).toBe('Draft')
     expect(teamReportStatus([{...row,selectedEvent:{state:'ready',outstanding:[]}}],scope)).toBe('Complete')
+    expect(teamReportStatus([{...row,selectedEvent:null}],{...scope,selectedEvent:null,selectedEventAt:null})).toBe('Draft')
   })
 })

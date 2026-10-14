@@ -20,8 +20,8 @@ export async function financeFor(ctx: Ctx, studentId: Id<"students">) {
 export async function studentReadiness(ctx: Ctx, event: Doc<"events">, student: Doc<"students">) {
   const open: string[] = [];
   const participant = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
-  if (enrollmentPending(event)) return { state: "open" as const, open: ["Whole Team enrollment is not complete."], participation: participant?.status ?? null };
-  if (participant?.status !== "confirmed") return { state: "notApplicable" as const, open, participation: participant?.status ?? null };
+  if (enrollmentPending(event)) return { state: "open" as const, open: ["Whole Team enrollment is not complete."], participation: participant?.status ?? null, permissionStatus: "unknown" as const };
+  if (participant?.status !== "confirmed") return { state: "notApplicable" as const, open, participation: participant?.status ?? null, permissionStatus: "notApplicable" as const };
   const financialAccount = await ctx.db.query("financialAccounts").withIndex("by_studentId", q => q.eq("studentId", student._id)).unique();
   const maintenance = await feeMaintenanceProjection(ctx, event.seasonId);
   if (maintenance && maintenance.state !== "ready") open.push("Season fee maintenance is not complete");
@@ -29,7 +29,8 @@ export async function studentReadiness(ctx: Ctx, event: Doc<"events">, student: 
   const eventCharges = await ctx.db.query("charges").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(101);
   if (eventCharges.length > 100) open.push("Event financial records require review");
   if (eventCharges.some(x => x.appliedCents < effectiveChargeCents(x))) open.push("Required payment");
-  if (event.permissionRequired && !(await permissionAccepted(ctx, student._id, event._id))) open.push("Permission accepted");
+  const permissionStatus = !event.permissionRequired ? "notRequired" as const : await permissionAccepted(ctx, student._id, event._id) ? "accepted" as const : "missing" as const;
+  if (permissionStatus === "missing") open.push("Permission accepted");
   const completions = await ctx.db.query("requirementCompletions").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(101);
   if (event.firstRequired && !completions.some(x => x.key === "first")) open.push("FIRST registration");
   const custom = await ctx.db.query("requirements").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(101);
@@ -46,7 +47,7 @@ export async function studentReadiness(ctx: Ctx, event: Doc<"events">, student: 
     }
     if (!complete) open.push("Room selection");
   }
-  return { state: open.length ? "open" as const : "ready" as const, open, participation: participant.status };
+  return { state: open.length ? "open" as const : "ready" as const, open, participation: participant.status, permissionStatus };
 }
 
 export async function attendanceFor(ctx: Ctx, student: Doc<"students">) {
