@@ -235,3 +235,13 @@ Sol menu audit found every declared role menu route mapped to a concrete workflo
 Replaced active Medication Choices/OTC controls with Parent-confirmed structured health/contact profile and complete student setup before PDF review/signing. Minor-first-aid wording is required in V2 authoring; historical V1 receipts remain intact. Actual server-generated PDF preserves reviewed pages and appends signature evidence. Authenticated byte retrieval uses temporary browser object URLs.
 
 Integrated lint/types/tests/build and Astra scoped review passed. Dev sync 08:32:54. Fictional Parent incomplete-profile gate, profile save, event selection, PDF display, acknowledgment/typed signature, receipt and Coach acceptance observed in Chrome. Desktop dark PDF rendered; phone light width375/scrollWidth375. Private screenshot: private-data/visual-checks/consent-v2-parent-receipt.jpg (excluded from Git). Native PDF painting occurs when iframe is in viewport; full-page offscreen captures can be blank. Connector blob downloads unsupported: retain manual download/device check. Real wording, Coach visual approval and production remain gated. No broad G1-G7 or paused Readiness closure claimed.
+
+## October 14 final representative completion pass
+
+Page/role editorial inventory and evidence dispositions are in VISUAL_CHECKS.md. Preserved hosted-prototype typography, purple/gold controls, responsive cards/tables and later product features. Retained prior valid phone/light and desktop/dark evidence rather than rebuilding a matrix.
+
+Final live Reports review verifies plain-language coverage/readiness and Available funds, accurately including unspent personal plus fundraising funds. Final fee order uses displayed positions instead of timestamp-like ranks without changing sort or money logic. Production-built sign-in ignores the development review query and shows ordinary user copy.
+
+Current-season fictional room/deadline, paid withdrawal preview/result, released room and scoped recovery were inspected. Original-logo PDF ordinary reviewed/signed renders remain one page; actual long fixture continuation and original footer signature/date inspected. Chrome Readiness print white with 14mm margins. User confirmed PDF/CSV open; friendlier CSV cents labels explicitly deferred until after launch.
+
+Private images include final-reports-copy.jpg, room-group-deadline-live.jpg, paid-withdrawal-preview.jpg, withdrawn-room-recovery.jpg and approved-pdf-signed-live.jpg. These remain outside Git. No-linked Parent and recipient invitation acceptance are source/test-covered live-state limits. Astra found no blockers under the agreed representative scope. User visual approval remains pending.

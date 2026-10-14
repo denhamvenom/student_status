@@ -1,3 +1,15 @@
+# Current approved PDF implementation — October 14, 2026
+
+Implemented and verified in development: the original sanitized PDF raster preserves its logo and one-page layout. Populate existing fields; place typed signature/date in original slots. Minor first aid is appended to Emergency Treatment. Sponsor in Charge is the Coach, currently Daniel Eiland, 225-802-8207. Form and language are officially approved; do not reopen that decision.
+
+Completed Student/Parent profile, including structured allergy and prescription answers, is required before PDF preparation, review and signing. Checkbox acknowledgment plus typed name preserves the reviewed and signed snapshots. Active Medication Choices is removed; historical receipts remain intact.
+
+Normal reviewed/signed renders are one page. Genuine overflow is losslessly continued; the verbose fictional live fixture needed continuation. Parent reviewed/signed synthetically, Coach accepted, prior receipt remained, and user confirmed downloaded PDF opens. No real signature authorization is implied.
+
+## Historical proposals and dated decisions
+
+Earlier redesigns, appendix proposals and paused/in-progress notes below are retained as history, not current instructions.
+
 # Field-trip PDF consent revision
 
 Authorized October 14, 2026. Implemented and development-verified October 14; visual approval and real-use release remain pending. This decision supersedes active Medication Choices and seasonal OTC authorization requirements. Existing evidence and historical signed records remain unchanged. It does not authorize real signing, production deployment, main merge or deletion.

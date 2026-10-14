@@ -1,92 +1,45 @@
 # Student Status Development Checklist
 
-Updated October 13, 2026. Reconciled at the integration handoff against source checkpoint `3ef3d45` and the latest recorded evidence.
+Updated October 14, 2026. Current disposition supersedes dated unchecked boxes below. Original G1–G7 scope is preserved. Implementation and representative review are complete; Coach visual approval remains the next gate.
 
-## Current completion status
+## Completion batches
 
-G3 Whole Team enrollment is functionally complete. G1, G2 and G4–G7 remain open. The goal is the full original G1–G7 scope through **READY FOR COACH VISUAL APPROVAL**; actual Coach approval and production are separate gates. CURRENT_STATE.md is the concise handoff; GOAL_ACCEPTANCE.md defines scope; VISUAL_CHECKS.md is the sole remaining visual queue.
+- [x] Approved original-logo PDF: completed profile required, populated review, checkbox and typed signature, saved immutable receipt and Coach acceptance. Ordinary examples remain one page with signature/date in original slots. Genuine overflow continues losslessly; historical receipts preserved.
+- [x] Operational journeys: current-season room/deadline, paid withdrawal with original-source return and canceled charge, released room membership and scoped withdrawn-room recovery verified with fictional data. Existing room invitation/acceptance and Parent-isolation checks reused.
+- [x] Production-language review: route/role inventory completed using live representative pages, source review and retained evidence. User-friendly status labels, accurate Available funds label and fee order positions replace internal values. See VISUAL_CHECKS.md.
+- [x] Integrated lint, types, tests and build passed at final milestone. Final label-only correction passed scoped lint/CSV checks and rebuilt successfully. Packaging dry-run completed without deployment; sandbox prevented only its external log-file write.
+- [x] Consolidated Astra review: no blocking findings at the representative scope. No new public API, schema or migration.
+- [x] User confirmed signed PDF opens and Reports CSV downloads.
+- [x] User confirmed CSV opens correctly; friendlier cents headings/units deferred until after launch by explicit request.
+- [ ] Coach visual approval using VISUAL_REVIEW_GUIDE.md.
 
-### Completed work and evidence to preserve
+## Preserved G1–G7 outcomes
 
-- [x] Whole Team creation and later reactivation, with existing withdrawals preserved.
-- [x] Finance administration, fundraising, priorities, source transfers, CSV import, immutable receipt correction and verified selected export.
-- [x] Supported historical finance, attendance and roster corrections; transferred/linked financial records remain protected by existing gates.
-- [x] Synthetic season activation, source-preserving carryover and retained Parent links/original records.
-- [x] Roster archive/reactivate and retention preview, hold and release.
-- [x] Synthetic permission signing, correction, re-signing, paper provenance and restricted export journeys.
-- [x] Parent child switching and attendance projections; unavailable future kickoff date remains explicitly unknown.
-- [x] VC-006 representative Coach Finance presentation.
+| Requirement | Current evidence |
+| --- | --- |
+| G1 — Frontend alignment | Hosted prototype visual language retained; later features preserved; representative phone/desktop and light/dark evidence retained. |
+| G2 — Visual coverage | Finite route/role review complete at representative scope; final user acceptance remains open. No claim of every state/device combination. |
+| G3 — Whole Team | Creation/reactivation rehearsal and enrollment/access/financial tests retained. Withdrawals preserved. |
+| G4 — Genuine dashboards | Source-backed finance, attendance, child switching and bounded reports; unknown future kickoff remains unavailable rather than invented. |
+| G5 — Accounts and consent | Setup/correction, Mentor acceptance, independent finance/health grants and restored permissions, approved PDF lifecycle and historical receipts verified. |
+| G6 — Administration | Roster, money/source history, fundraising, season carryover, historical corrections and retention holds retained. Paid withdrawal now verified live. Destructive retention remains gated. |
+| G7 — Delivery | Final integrated milestone, focused follow-up, packaging, Astra review and development publication. PDF/CSV opening confirmed; user visual approval follows. |
 
-### Required feature status
+## Evidence limits, not new implementation scope
 
-- [x] October 14 authorized revision: completed profile → populated field-trip PDF → acknowledgment/typed signature; remove active Medication Choices/OTC, retain minor first aid and historical receipts. Implemented, reviewed, integrated checks passed, and fictional Parent-to-Coach journey verified; see FIELD_TRIP_PDF_PLAN.md. Manual PDF download/device verification and approval remain below.
+Recipient-side room-invitation acceptance and the no-linked-Parent screen were not observed with live signed-in fixtures. Existing source and tests cover acceptance/stale/conflict and Parent link isolation/revocation. Astra accepted these limits under the focused-verification policy. No account was created, permission expanded or Parent link severed for a screenshot.
 
-- [x] Complete Coach roster → student record: record navigation, validated balances, bounded genuine next-event readiness, missing-information summaries/filters and truthful account linkage/access status. Membership controls and Coach-only data boundaries preserved. Reviewed and synchronized at 18:21:30; targeted and integrated checks passed, followed by representative live layout/navigation/filter/recovery verification.
-
-- [x] Connect Coach/Travel Lead Reports to bounded role-scoped finance, attendance and selected-event readiness, individual reports and safe loaded-filtered CSV. Reviewed and development-synchronized at 18:39:33; focused and integrated validation passed. Coach live filtering/detail and representative presentation verified.
-
-### Production-language review - required before final approval
-
-Added by the user October 14. Review every reachable page and role-specific variant once against the actual route/menu inventory. Record each page as reviewed in VISUAL_CHECKS.md; include dialogs, help text, empty/loading/error/success states, notifications, printed pages, PDFs, CSVs and other downloads. This is a finite editorial pass, not a new full functional or theme/device test matrix.
-
-- [ ] Sign-in, join requests and pending/rejected/access-denied screens.
-- [ ] Student setup and Profile & health.
-- [ ] Parent invitations, acceptance and Parents/link-management pages.
-- [ ] Parent child selection and no-linked-student screen.
-- [ ] Student/Parent Status dashboards.
-- [ ] Event lists and individual event pages.
-- [ ] Event creation/editing and signup/waitlist/withdrawal controls.
-- [ ] Readiness overview, detail and printable/exported summary.
-- [ ] Room invitations, assignment requests and adult room management.
-- [ ] Drivers and transportation assignments.
-- [ ] Permission review/signing, paper entry, corrections, receipts and approved PDF.
-- [ ] Family finances and Coach/authorized-adult financial administration.
-- [ ] Fundraisers, imports, transfers, corrections and financial exports.
-- [ ] Family attendance, Coach attendance/corrections and structured-name review.
-- [ ] Reports, individual reports and CSV downloads.
-- [ ] Coach Team roster and student records, including archived records.
-- [ ] Users & Roles, adult invitations and access/grant controls.
-- [ ] Season transition, historical views and retention review.
-- [ ] Settings, shared navigation, banners, tooltips and global messages.
-- [ ] Any remaining route found in the final route/menu inventory; coordinate Timeclock's corresponding pass with its owner.
-
-Acceptance: the production candidate speaks to actual users. Remove development/demo/test/synthetic/fictional/rehearsal/placeholder language from production UI and production-generated documents, along with internal implementation notes or unfinished-feature promises. Replace it with useful user-facing wording where a message is needed. Search source for likely leftovers, then confirm rendered pages and representative downloads; a search alone is not completion. Preserve legitimate business terms such as a genuinely draft record. Keep synthetic evidence truthfully labeled in development and historical test artifacts; do not merely relabel fake records as real or weaken signing/access safeguards to remove a warning. Production must use separate real onboarding/configuration. Finish this pass before Coach visual approval and confirm the production build contains the approved copy before deployment.
-
-### Missing evidence
-
-- [ ] Manual field-trip PDF download/device check (browser connector cannot capture blob downloads), final application visual approval. Form and language already approved.
-
-- [ ] Confirm Reports CSV file delivery in the browser ; Travel Lead live presentation verified October 14. CSV scope, Draft metadata and injection protection pass automated checks; browser download observation timed out, and browser policy blocked the downloads-page inspection. Do not retry through a workaround.
-
-- [x] Student required setup and locked-room correction journey.
-- [ ] Active room invitation/acceptance or deadline, and withdrawn-room recovery.
-- [ ] Live paid-withdrawal decision with fee/return consequences (existing implementation; do not repeat completed financial workflows).
-- [x] Ordinary Mentor invitation acceptance, profile and report journey verified October 14.
-- [x] Independent adult finance/health grants and immediate revocation boundaries; original permissions restored October 14.
-- [ ] No-linked Parent state.
-- [ ] Remaining representative visual comparisons in VISUAL_CHECKS.md, preserving hosted prototype styling and later feature decisions.
-- [ ] Final coherent integrated validation and Astra review against all G1–G7 requirements.
-
-### User dependencies and separate gates
-
-- All five test browser profiles are connected as of October 14. Student setup and ordinary Mentor invitation acceptance are verified. Park inaccessible checks without repetitive polling or convenience role grants.
-- Real signing, automatic retention deletion, main merge and production remain unauthorized.
-- Coach visual acceptance remains pending until the ready candidate is presented.
-- Timeclock physical-device/concurrent live evidence remains coordinated separately; preserve its existing checks and shared IDs/contracts.
-
-### Follow-up and efficiency limits
-
-Optional cosmetic refinements and the existing bundle-size advisory do not replace required acceptance. Finish coherent workflows; use Sol for implementation and Astra for consequential/final reviews. Reuse valid evidence, test changed risks, and perform representative visual checks instead of a full state/theme matrix. Batch documentation and publication at completed milestones.
+Development records and the development-only banner remain truthfully labeled. The production-build sign-in screen has ordinary user language and does not enter review mode through a query parameter. Real onboarding/configuration remains a launch task. Timeclock's frontend-only copy checkpoint and its separate physical/concurrent evidence remain with its owner; Student Status shared contracts did not change.
 
 ## Release checklist — after the visual-review candidate
 
 These are separate launch gates, not authorization to deploy.
 
-- [ ] Complete the page-by-page production-language review above and confirm the production configuration/build uses the approved user-facing copy.
+- [x] Complete the finite page-by-page production-language review; production sign-in build inspected. Confirm real deployment configuration separately at launch.
 - [ ] Obtain Coach visual approval of the completed candidate and documented intentional differences.
 - [ ] Confirm organizational ownership and administrators for GitHub, Convex, Google and Cloudflare.
 - [ ] Confirm Student Status production domain, separate production configuration, Google sign-in and allowed origins.
-- [ ] Approve privacy/access rules and final field-trip/first-aid wording consistent with district medication policy before real signatures; Medication Choices is removed.
+- [ ] Approve production privacy/access configuration and enable real signing separately. Field-trip/first-aid wording is already approved; Medication Choices is removed.
 - [ ] Resolve retention coverage, holds and backup/export treatment; keep automatic deletion disabled pending explicit authorization.
 - [ ] Review realistic team-volume limits, performance and remaining material usability/accessibility issues.
 - [ ] Establish monitoring, backups, demonstrated restoration and deployment rollback.

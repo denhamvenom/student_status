@@ -1,34 +1,25 @@
 # Current integration handoff
 
-Updated October 14, 2026. User resumed implementation of COMPLETION_PLAN.md. The goal tracker was cleared; this saved plan is the execution guide.
+Updated October 14, 2026. Original G1–G7 implementation and representative review complete; ready for Coach visual review. Coach approval and production are separate gates.
 
-## Workspace and boundaries
+## Workspace
 
-- Checkout: student-status-readiness-design; branch feature/student-status-completion; draft PR10. Last published checkpoint be115d6. Current changes are preserved locally, not yet committed/pushed.
-- Development only: daniel-eiland / denham-venom-student-status / dev:third-bandicoot-18. Latest successful sync: October 14, 09:22:58 local. Production, main merge, real signing and destructive retention remain separate gates.
-- Full original G1–G7 scope remains. Preserve prior evidence; DEVELOPMENT_CHECKLIST.md is the human guide, VISUAL_CHECKS.md the visual queue, COMPLETION_WORKFLOW.md the efficiency policy.
+- Branch feature/student-status-completion; draft PR10. Approved PDF checkpoint 978f284 is published. Final copy/evidence checkpoint is being published with this handoff; verify remote branch before claiming publication.
+- Development backend: daniel-eiland / denham-venom-student-status / dev:third-bandicoot-18, last synchronized October 14 at 09:22:58 local. No later backend changes.
+- User-approved COMPLETION_PLAN.md replaces the cleared goal tracker. Do not recreate a goal or restart completed work.
 
-## Completed this batch
+## Completed
 
-- Approved original-logo field-trip PDF integrated in source and development backend. Ordinary reviewed and signed examples remain one page; typed name/date use existing slots. Genuine overflow remains lossless. Original raster sanitized of sample entries. Minor first aid remains at the end of Emergency treatment; approved Coach sponsor sealed. Old receipts unchanged.
-- Coach-approved immutable template selector replaces arbitrary new template authoring. Completed profile remains required before preparation/signing; Medication Choices stays removed. Astra scoped review has no blockers; root inspected sanitized and signed render.
-- Readiness coverage and Draft-aware printable summary integrated. Actual Chrome print verified white with 14mm page margins, no app controls, correct missing-seat/Draft information. Source reviewed by Astra.
-- Student required setup and locked-room correction completed in fictional rehearsal; Student lower Parents page inspected.
-- Ordinary Mentor invitation accepted and profile saved; participation-only report inspected. Travel Reports filters/detail verified.
-- User-approved finance-only then health-only grants verified independently. Both grants restored OFF; Travel Lead remains active in its original role. Revoked health export visibly disabled. No finance transaction performed for this grant check.
-- Unknown-route fallback now offers ordinary unavailable copy and Return home.
-- One integrated lint/type/test/build milestone passed. Focused PDF/backend checks also passed. No rerun needed merely for documentation.
+Approved original one-page PDF workflow, genuine overflow preservation, historical receipts, printable Draft-aware Readiness, roster/student records, bounded Reports, role setup/grant/revocation and source-preserving paid-withdrawal/room recovery are verified. Final copy replaces internal statuses and raw priority ranks; Reports correctly calls combined unspent personal/fundraising money Available funds. No arithmetic/API change.
 
-## Exact next work when resumed
+Page-by-page production-language inventory is recorded in VISUAL_CHECKS.md. Consolidated Astra review has no blockers. Integrated lint/types/tests/build passed; final label-only follow-up passed scoped checks and rebuild. Packaging dry-run succeeded; sandbox blocked only its external log write. Production-build sign-in was inspected and ignored the development review query.
 
-1. Approved template selected; existing fictional Parent signed at 09:34, Coach accepted, Parent coverage updated; old receipt preserved. Live long test labels generated a lossless continuation, while retained ordinary-length reviewed/signed renders are one page. Signature/date visually verified in original first-page slots. Manual download remains pending; do not repeat this signing journey.
-2. Finish finite remaining evidence: active room invitation/deadline and withdrawn-room recovery, paid-withdrawal consequences, no-linked Parent. Manual PDF/CSV download delivery remains parked because browser connector cannot capture blob downloads; no workaround loop.
-3. Page-by-page production-language review is required before final visual approval. Read-only inventory found raw state enums in TeamReports, CoachRosterManagement, CoachStudentRecord and report CSV; missing-backend fallback mentions local build. Plain-language label and configuration-message fixes are now implemented with focused CSV, lint and type checks passed; rendered pass remains. Keep truthful development/synthetic guards until the separate real-use release configuration is authorized.
-4. Batch docs/checklist and reviewed Git publication after live workflow verification. Final G1–G7 Astra review and Coach visual approval remain outstanding. No new scope or exhaustive visual/test matrix.
+User confirmed PDF and CSV open correctly; friendlier CSV cents headings are explicitly deferred until after launch. No-linked Parent and recipient room acceptance rely on retained source/tests, with no convenience access changes. Detailed evidence stays private.
 
-## Evidence and sessions
+## Next action
 
-- Private artifacts: field-trip-original-render-reviewed/signed.pdf and .png; field-trip-sanitized-blank-template.png; readiness-browser-print.pdf/.png. Browser captures include mentor-team-report.jpg and travel-reports-filtered.jpg. Never add private-data to Git.
-- Chrome sessions: Parent, Student, ordinary Mentor, Travel Lead, Coach all connected. Existing user tabs retained. Detailed account identifiers remain private.
-- All current development records are fictional. Do not promote them into production or hide their evidence labels.
-- Timeclock shared contracts unchanged in this batch; its separate physical/concurrent evidence remains coordinated with its owner.
+Present VISUAL_REVIEW_GUIDE.md and await Coach visual approval. Do not repeat completed workflows, full checks or account rehearsals. No production/main merge/real signing/destructive retention authorization. Launch checklist remains in DEVELOPMENT_CHECKLIST.md.
+
+Timeclock's owner reported a frontend-only wording checkpoint on its separate branch. No shared contract changes or extra Timeclock tests are required here. Keep its visual/device/concurrent approval separate.
+
+Private evidence includes approved-pdf-signed-live.jpg, ordinary original PDF renders, readiness-browser-print.pdf, room-group-deadline-live.jpg, paid-withdrawal-preview.jpg, withdrawn-room-recovery.jpg and final-reports-copy.jpg. Do not commit these artifacts.

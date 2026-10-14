@@ -1,3 +1,45 @@
+# Current visual review disposition — October 14, 2026
+
+This section supersedes the dated queue below. VC-001–021 are sufficiently reviewed for the representative visual-review candidate under the user's focused-verification policy and consolidated Astra review. VC-022, actual Coach visual approval, remains open. This is not a claim of pixel parity or every conditional state/device combination.
+
+## Page-by-page production-language review
+
+| Pages / roles | Review outcome and evidence scope |
+| --- | --- |
+| Entry, Google sign-in, join, invitation and access states | Source copy reviewed; previous setup/invitation/error evidence retained. Production-built sign-in inspected; review query cannot open development fixtures. Conditional access states were not artificially forced. |
+| Shared shell, navigation, global recovery | Retained responsive/theme/keyboard observations; unavailable route and service copy reviewed. Development banner is conditional and remains truthful in development. |
+| Student setup, Profile & health, Parents | Live required setup/correction and lower-page controls reviewed; profile and linking copy reviewed. Locked room correction behavior preserved. |
+| Parent child selection, Status, profile | Live child context and incomplete-profile gate reviewed; prior switching/attendance evidence retained. No-linked Parent source and link-isolation tests reused, not live observed. |
+| Student Status and Mentor report/profile | Live current-season views, ordinary Mentor navigation/profile and limited report reviewed. No richer unsupported fields added. |
+| Events list/detail and six-step creation | Current-season fictional creation inspected across all six steps; loaded detail, lower requirements/transport/settings and signup evidence retained. |
+| Readiness overview/detail/print | Accurate coverage and Draft copy reviewed. Actual Chrome print inspected: white pages, 14mm margins and no app controls. |
+| Rooming Student/adult | Live group/deadline, withdrawn scoped recovery and adult empty-group review inspected. Recipient invitation/acceptance relies on existing tests/source. |
+| Drivers and transportation | Live ownership/unavailable driver presentation plus retained assignment evidence reviewed. |
+| Parent Forms and Coach Permissions | Approved PDF review/signature/receipt/acceptance completed; historical receipt retained. Prior correction, re-sign, paper and restricted-export evidence reused. PDF opened by user. |
+| Family/Coach finance and fee administration | Live account/payment/history/withdrawal consequence reviewed plus retained imports/transfers/corrections/exports. Raw priority rank replaced with display position; sorting/money unchanged. |
+| Fundraising | Live empty/create controls reviewed; prior allocation/transfer evidence retained. |
+| Family/Coach attendance | Live unavailable kickoff, legacy/session and Coach controls reviewed; prior loaded totals/child switch/correction evidence retained. |
+| Reports and individual report/CSV | Live Travel and retained Coach phone/desktop views reviewed. Internal state codes replaced; combined balance correctly labeled Available funds. User confirmed CSV downloads and opens. |
+| Coach roster and student record | Live linked status, profile, finance and attendance summary reviewed; retained phone/desktop filter/recovery/lifecycle evidence. |
+| Users & Roles | Ordinary Mentor invitation/profile and separate finance/health grant/revocation reviewed; original permissions restored. |
+| Season/history/retention | Live transition/history list and retention/hold summary reviewed; retained complete transition and supported correction/hold/release evidence. Destructive deletion stays gated. |
+| Settings | Coach family-link preparation and Mentor settings reviewed; appearance/account copy preserved. |
+| Timeclock | Corresponding editorial pass coordinated with its owner; frontend-only follow-up remains on its separate branch. No shared contract change. |
+
+## Final delivery and differences
+
+User confirmed PDF opened and CSV opened with readable rows/columns. User explicitly deferred friendlier CSV money headings/units (Charged cents, Paid cents) until after launch; existing cents contract remains accurate. Record this as a follow-up, not a release blocker.
+
+Normal reviewed/signed PDF examples retain original logo and one-page layout. The verbose live fictional fixture legitimately uses a continuation; signature/date remain in original first-page fields. Approved wording is settled.
+
+Unknown future kickoff and incomplete summaries retain truthful unavailable/Draft states. No convenience account creation, unlinking or extra grants were used to fill screenshots. Existing recipient-invitation and Parent-isolation test coverage is reused; these two live-state limits are explicit.
+
+Integrated lint/types/tests/build passed at the completion milestone. Final label-only follow-up passed scoped lint/CSV tests and type/build; packaging dry-run completed with no upload (external log write restricted by sandbox). Consolidated Astra review found no blockers. Final publication is verified separately by the integration owner.
+
+## Historical queue and dated evidence
+
+The following entries retain what was known at their date. Older pending/paused claims do not reopen completed work; use the disposition above and CURRENT_STATE.md.
+
 # Current visual checks
 
 Updated October 13, 2026. This is the single outstanding visual queue. Keep stable IDs and retain the dated evidence in [FRONTEND_CONFORMANCE_LOG.md](FRONTEND_CONFORMANCE_LOG.md). [CURRENT_STATE.md](CURRENT_STATE.md) and [DEVELOPMENT_CHECKLIST.md](DEVELOPMENT_CHECKLIST.md) describe current implementation and live acceptance; the [design drift report](../design-drift-report.md) is a historical baseline.

@@ -80,9 +80,11 @@ describe('shared fee presentation', () => {
     expect(html).toContain('Synthetic source failure')
     expect(html).not.toContain('Committed row')
   })
-  it('uses recorded season ranks and exact cents without inventing actions for readonly roles', () => {
-    const html = renderToStaticMarkup(createElement(FeePriorityRows, { disabled: false, rows: [{ key: 'synthetic', label: 'Synthetic shared fee', priority: 40, amountCents: Number.MAX_SAFE_INTEGER, cancelled: false }] }))
-    expect(html).toContain('Recorded fee priority 40')
+  it('shows display positions and exact cents without inventing actions for readonly roles', () => {
+    const html = renderToStaticMarkup(createElement(FeePriorityRows, { disabled: false, rows: [{ key: 'synthetic', label: 'Synthetic shared fee', priority: 40, amountCents: Number.MAX_SAFE_INTEGER, cancelled: false }, { key: 'event', label: 'Event fee', priority: 1815660000000, amountCents: 0, cancelled: false }] }))
+    expect(html).toContain('Displayed fee order position 1')
+    expect(html).toContain('Displayed fee order position 2')
+    expect(html).not.toContain('1815660000000')
     expect(html).toContain('$90,071,992,547,409.91')
     expect(html).not.toContain('<button')
   })

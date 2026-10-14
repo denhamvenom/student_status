@@ -1,3 +1,17 @@
+# Current G1–G7 acceptance disposition — October 14, 2026
+
+G1–G6 implementation and representative evidence are complete through readiness for Coach visual review. G7 validation/review/delivery is complete; final development publication is handled in this checkpoint. Actual Coach visual approval is pending, and production remains separate.
+
+DEVELOPMENT_CHECKLIST.md maps all seven outcomes to retained evidence. VISUAL_CHECKS.md records each page/role and the two live-state limits accepted by Astra under the user's focused-check policy. Existing source/tests cover recipient room acceptance and no-linked Parent; no account/relationship changes were made to obtain screenshots.
+
+The user confirmed PDF and CSV open correctly. Friendlier CSV money headings/units are explicitly deferred by the user until after launch. Integrated lint/types/tests/build, focused final copy checks, rebuild and packaging dry-run passed; final Astra review has no blockers. No new API/schema/migration or shared Timeclock contract changes.
+
+The approved original-logo PDF, first-aid wording and Coach sponsor are settled. Medication Choices is removed from active workflow; old receipts remain immutable. Real signing, production/main merge and destructive retention still need separate authorization.
+
+## Historical requirement baseline and evidence
+
+The original requirements below are preserved. Older incomplete/paused claims are dated baseline statements, superseded by the current disposition above and the user-approved completion plan.
+
 # Full goal acceptance map
 
 Updated October 13, 2026. Baseline inspected: `5343092`, branch `feature/student-status-readiness-design`. This is a requirement and evidence map, not a completion claim. Parallel implementation may change source after inspection. The integration owner must reconcile this map at each reviewed checkpoint.

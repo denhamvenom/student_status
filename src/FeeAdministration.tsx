@@ -467,8 +467,8 @@ export function FeeDefinitionDraftForm({ scopeFields, scopeValid, disabled, onPr
 
 /** Presentation receives recorded ranks and permitted actions from its caller. */
 export function FeePriorityRows({ rows, disabled }: { rows: ReadonlyArray<FeeRowPresentation>; disabled: boolean }) {
-  return <div className={styles.order}>{rows.map(row => <div className={styles.fee} key={row.key}>
-    <span className={styles.rank} aria-label={`Recorded fee priority ${row.priority}`}>{row.priority}</span>
+  return <div className={styles.order}>{rows.map((row, index) => <div className={styles.fee} key={row.key}>
+    <span className={styles.rank} aria-label={`Displayed fee order position ${index + 1}`}>{index + 1}</span>
     <div className={styles.feeName}><strong>{row.label}</strong><span className={styles.muted}>{copy.defaultAmount}: {chargeCurrency(row.amountCents)}{row.summary ? ` · ${row.summary}` : ''}</span>{row.cancelled && <span className={styles.status}>{copy.cancelled}</span>}</div>
     {row.actions && <div className={styles.feeActions}>
       {row.actions.view && <Button type="button" variant="outline" aria-label={`${copy.details} ${row.label}`} onClick={row.actions.view}>{copy.details}</Button>}

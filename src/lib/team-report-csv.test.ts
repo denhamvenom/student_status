@@ -8,9 +8,11 @@ describe('loaded team report CSV',()=>{
     expect(csv).toContain('"Report status","Draft"')
     expect(csv).toContain('"Event starts at","1970-01-01T01:00:00.000Z"')
     expect(csv).toContain('"More rows available","Yes"')
+    expect(csv).toContain('"Attendance coverage","Updating; verified totals unavailable"')
+    expect(csv).toContain('"Event coverage","Limited to first 50 events; counts may be incomplete"')
     expect(csv).toContain('"\'=HYPERLINK(""bad"")"')
     expect(csv).toContain('"0","Unavailable","Unavailable","Unknown","0"')
-    expect(csv).toContain('"unknown","\'+private requirement"')
+    expect(csv).toContain('"Readiness unavailable","\'+private requirement"')
     expect(csv).not.toContain('PRIVATE HEALTH')
   })
   it('marks an open selected-event requirement Draft even when the loaded scope is complete',()=>{
