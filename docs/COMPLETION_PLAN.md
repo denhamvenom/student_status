@@ -1,3 +1,5 @@
+> October 14 external-review update: visual approval is blocked by newly reported language/data-presentation and interaction gaps. VISUAL_REVIEW_CORRECTION_PLAN.md is the bounded follow-up plan; earlier completion evidence is retained, not a claim these findings are fixed.
+
 # Completion plan — October 14, 2026
 
 User-approved execution guide. Complete original G1–G7 through ready for Coach visual approval; no replacement goal tracker is required. Preserve completed work and valid evidence.

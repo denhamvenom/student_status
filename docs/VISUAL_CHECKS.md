@@ -1,3 +1,5 @@
+> October 14 external-review update: visual approval is blocked by newly reported language/data-presentation and interaction gaps. VISUAL_REVIEW_CORRECTION_PLAN.md is the bounded follow-up plan; earlier completion evidence is retained, not a claim these findings are fixed.
+
 # Current visual review disposition — October 14, 2026
 
 This section supersedes the dated queue below. VC-001–021 are sufficiently reviewed for the representative visual-review candidate under the user's focused-verification policy and consolidated Astra review. VC-022, actual Coach visual approval, remains open. This is not a claim of pixel parity or every conditional state/device combination.

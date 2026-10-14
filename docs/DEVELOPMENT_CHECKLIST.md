@@ -1,3 +1,5 @@
+> October 14 external-review update: visual approval is blocked by newly reported language/data-presentation and interaction gaps. VISUAL_REVIEW_CORRECTION_PLAN.md is the bounded follow-up plan; earlier completion evidence is retained, not a claim these findings are fixed.
+
 # Student Status Development Checklist
 
 Updated October 14, 2026. Current disposition supersedes dated unchecked boxes below. Original G1–G7 scope is preserved. Implementation and representative review are complete; Coach visual approval remains the next gate.

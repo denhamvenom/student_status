@@ -1,6 +1,6 @@
 # Current integration handoff
 
-Updated October 14, 2026. Original G1–G7 implementation and representative review complete; ready for Coach visual review. Coach approval and production are separate gates.
+Updated October 14, 2026. External visual review identified material language and interaction gaps; visual approval is blocked pending VISUAL_REVIEW_CORRECTION_PLAN.md. Completed G1–G7 work and evidence remain preserved. Coach approval and production are separate gates.
 
 ## Workspace
 
@@ -20,7 +20,7 @@ October 14 follow-up: Join the team and Waiting for approval now offer Sign out 
 
 ## Next action
 
-Present VISUAL_REVIEW_GUIDE.md and await Coach visual approval. Do not repeat completed workflows, full checks or account rehearsals. No production/main merge/real signing/destructive retention authorization. Launch checklist remains in DEVELOPMENT_CHECKLIST.md.
+Follow VISUAL_REVIEW_CORRECTION_PLAN.md after implementation is authorized. The current request created the correction subplan only; no application changes were made. Do not repeat completed workflows, full checks or account rehearsals. No production/main merge/real signing/destructive retention authorization. Launch checklist remains in DEVELOPMENT_CHECKLIST.md.
 
 Timeclock's owner reported a frontend-only wording checkpoint on its separate branch. No shared contract changes or extra Timeclock tests are required here. Keep its visual/device/concurrent approval separate.
 
