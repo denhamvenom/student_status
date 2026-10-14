@@ -13,7 +13,7 @@ Updated October 14, 2026. Current disposition supersedes dated unchecked boxes b
 - [x] Consolidated Astra review: no blocking findings at the representative scope. No new public API, schema or migration.
 - [x] User confirmed signed PDF opens and Reports CSV downloads.
 - [x] User confirmed CSV opens correctly; friendlier cents headings/units deferred until after launch by explicit request.
-- [ ] Parent setup usability batch — planned only; await explicit start instruction. See PARENT_SETUP_BATCH.md.
+- [ ] Parent setup usability batch — planned only; await explicit start instruction. Includes shared season FIRST team acceptance + Consent & Release for Parent/Student/Coach, automatically required for every Competition. See PARENT_SETUP_BATCH.md.
 - [ ] Coach visual approval using VISUAL_REVIEW_GUIDE.md.
 
 ## Preserved G1–G7 outcomes

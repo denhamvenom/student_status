@@ -15,7 +15,7 @@ Use the Create Event visual language in a centered full-page card, responsive to
 | 1. Student details | Prefill existing values. Allow linked Parents to complete missing parent-editable student information, explicitly including T-shirt size and rooming category. Preserve Coach-controlled fields and existing category choices. |
 | 2. Contacts | Existing required parent/guardian and emergency-contact fields. Distinguish each Parent's account information from the shared student's information. |
 | 3. Medical | Existing allergies, prescriptions, physician, insurance and related required fields. Explicit None where applicable; conditional follow-up questions only where existing requirements need them. |
-| 4. FIRST registration | Brief instructions, official link, and current-season student-specific completion checkbox. Distinguish Parent reported complete from Coach verified. Accommodate eligible adult students signing for themselves. |
+| 4. FIRST registration and Consent & Release | Brief instructions, official link, and a checkbox reporting both FIRST team acceptance and current-season Consent & Release completion. Shared student/season status; only Coach verification clears Competition readiness. Accommodate students aged 18 or older reporting their own completion. |
 
 Finish with a short saved-information summary and Go to Home. Explain any pending verification or student/Coach-owned task. Do not equate setup completion with travel clearance. Do not introduce an additional blanket legal acknowledgment or new required questions.
 
@@ -28,9 +28,24 @@ Finish with a short saved-information summary and Go to Home. Explain any pendin
 - A later Parent must not silently overwrite newer changes from another session. Use the smallest compatible conflict/reload handling when necessary.
 - No linked student remains the existing safe recovery state; no auto-linking or broader access.
 
-## FIRST completion
+## Season-wide FIRST requirement — clarified October 14
 
-Store/report completion per student and season; Parent self-report alone does not clear the requirement. Coach verifies against FIRST. Apply the verified requirement to relevant FIRST-event readiness only, not unrelated events. Before implementation, identify how relevant events are reliably designated and how existing completed/unknown records are represented; do not infer verification, bulk-mark records, or retrofit historical clearance silently.
+One combined task per student per season: **FIRST registration and Consent & Release**. Complete only when the Coach verifies BOTH acceptance onto the team in FIRST and the current-season Consent & Release. Parent or eligible adult Student self-report requests verification; it cannot clear readiness.
+
+States: **Needs completion → Awaiting Coach verification → Verified for this season**. A Coach can reopen an incorrect verification; all affected current-season Competition readiness must then reflect the open requirement. Preserve who reported/verified and when. A new season requires fresh verification; do not carry it forward automatically.
+
+Every event whose type is Competition automatically uses this shared requirement, including existing and newly created Competition events. The Coach does not add, enable or complete it separately per event. Missing/unverified status blocks ready/cleared status for participating students, not sign-in, profile access or saving setup. Outreach and Team events do not inherit this automatic blocker; preserve their existing explicit requirements and historical records.
+
+| Surface / role | Planned behavior |
+| --- | --- |
+| Parent setup and Home | Instructions, shared season status and completion report; no repeated task for another linked Parent after verification. Pending verification allows leaving setup. |
+| Student Home | One season task, with what remains or Awaiting Coach verification. Direct minors to Parent guidance; allow students aged 18 or older to report their own FIRST completion. Do not duplicate the action once per Competition. |
+| Coach student record | One season-level verification control confirming both team acceptance and Consent & Release, plus reopen/correction handling. |
+| Coach roster | Clear shared status so students needing verification can be identified. Reuse existing roster layout. |
+| Competition readiness and Reports | Read the same authoritative student/season status for every Competition; no independent event-level FIRST completion toggle. |
+| Create Event | Competition automatically includes the requirement; present it as automatic rather than an optional requirement the Coach must remember. |
+
+Current source baseline: events.firstRequired and requirementCompletions keyed by event/student currently drive FIRST readiness in convex/lib/readModels.ts. That is event-specific, not this planned combined season check. Preserve old completions as historical evidence; never silently promote them into season verification. During implementation, reconcile active-event behavior with the new shared status without rewriting historical receipts or inventing completion. Existing firstRequired data may remain for compatibility/non-Competition behavior; Competition enforcement must not depend on that optional flag.
 
 Show an official instructions link and short guidance: Parent FIRST account, My Roles / Parent/Guardian, select or add youth, Acknowledgement Forms / Consent & Release, apply to FIRST Robotics Competition Team 8044 if needed. Existing official guidance also permits youth aged 18 or older to register/sign themselves. Recheck instructions when implementing because FIRST navigation can change. Reference: https://www.firstinspires.org/programs/youth-registration (consulted October 14, 2026).
 
@@ -44,7 +59,7 @@ Permission-slip review, PDF generation, signing and blanket all-events consent a
 
 1. Inspect existing fields/completeness, Parent update authorization and event classification; resolve only necessary gaps.
 2. Reuse forms in the four-step full-page flow with saving, resume and multiple-student selection.
-3. Implement minimum season-specific FIRST reported/verified status and relevant readiness connection.
+3. Implement the combined season-wide FIRST task across Parent, Student and Coach surfaces, automatic Competition enforcement, Reports and Create Event; preserve legacy evidence.
 4. Perform focused verification, consequential review, update evidence and publish a coherent development checkpoint for owner visual review.
 
 ## Finish conditions and verification
@@ -52,8 +67,10 @@ Permission-slip review, PDF generation, signing and blanket all-events consent a
 - Linked Parents can supply missing T-shirt size, rooming category and all other authorized required information without searching across pages.
 - Completed shared information is prefilled/skipped for a second Parent; each Parent's personal account data remains correctly scoped.
 - Save/resume, multiple students, save failures and conflicting updates preserve information and clearly explain recovery.
-- Self-report cannot masquerade as Coach verification; relevant FIRST readiness reflects verified current-season status. Unrelated event readiness and historical records remain intact.
+- Self-report cannot clear readiness. Both FIRST team acceptance and Consent & Release must be Coach-verified once per student/season; every Competition automatically reflects that status without event setup.
+- Parent/Student Home, Coach roster/student record, Competition readiness and Reports agree. Verify-once covers multiple Competitions; reopening blocks them again; next season begins unverified. Outreach/Team behavior and historical records remain intact.
+- Existing event-level FIRST completions are not silently treated as season-wide verification.
 - The approved PDF and current signing workflow are unchanged.
 - Representative phone/desktop visuals match existing components and language. Review changed steps in light/dark, without restarting the whole application review.
-- Focused tests cover changed completeness/access, second-parent/resume, multi-student isolation, concurrent-save handling and FIRST verification/readiness. Reuse valid checks; integrated validation once at the completed milestone, repeated only after a relevant failure/fix. No fabricated records or expanded access for convenience.
+- Focused tests cover changed completeness/access, second-parent/resume, multi-student isolation, concurrent-save handling and FIRST verification/readiness: both prerequisites, self-report denial, cross-role consistency, multiple Competitions, automatic new/existing Competition applicability, reopening, season rollover and legacy evidence preservation. Reuse valid checks; integrated validation once at the completed milestone, repeated only after a relevant failure/fix. No fabricated records or expanded access for convenience.
 - Final owner visual approval remains open after this batch. Separate launch gates remain unchanged.
