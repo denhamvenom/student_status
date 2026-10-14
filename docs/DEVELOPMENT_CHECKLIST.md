@@ -639,3 +639,5 @@ October 13 payment rehearsal: CSV import recorded one simulated cent with exact 
 - [ ] Manual PDF/CSV delivery, finite page-by-page production-language pass, final G1–G7 review and visual-approval candidate.
 
 User resumed under COMPLETION_PLAN.md; no replacement goal tracker needed. Changes remain local until the reviewed checkpoint is published. All separate production/real-signing/merge/deletion gates remain.
+
+October 14 visual-review follow-up: [x] Join/waiting screens offer Sign out for wrong-account recovery. Live Join-page sign-out returned to Google sign-in; scoped lint/types passed. No role or backend changes.
