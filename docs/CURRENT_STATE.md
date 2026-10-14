@@ -1,49 +1,34 @@
 # Current integration handoff
 
-## Scoped consent checkpoint - October 14
-
-User authorized FIELD_TRIP_PDF_PLAN.md implementation before resuming remaining workflows. Completed profile now gates populated PDF review/signing; Medication Choices/OTC is removed; minor first aid and historical evidence are preserved. Integrated lint/types/tests/build and Astra scoped review passed. Development sync completed at 08:32:54 on third-bandicoot-18. Fictional Parent profile, PDF review, checkbox/typed signature, sealed receipt and Coach acceptance were verified. Desktop PDF and phone light receipt layout were inspected. Manual PDF download/device verification remains because the browser connector cannot capture blob downloads. Final wording and Coach visual approval remain required before real use.
-
-All five Chrome profiles are connected; Mentor is at Join the team and Student at setup. Existing uncommitted Readiness changes are preserved outside this batch. Broad G1-G7 work remains paused. No production, main merge, real signing or deletion was authorized.
-
-## Prior milestone handoff
-
-Updated October 13, 2026. Follow COMPLETION_WORKFLOW.md. G3 is functionally complete; G1, G2 and G4–G7 remain open. DEVELOPMENT_CHECKLIST is the human guide; VISUAL_CHECKS is the only visual queue.
+Updated October 14, 2026. User resumed implementation of COMPLETION_PLAN.md. The goal tracker was cleared; this saved plan is the execution guide.
 
 ## Workspace and boundaries
 
-- Checkout student-status-readiness-design; branch feature/student-status-completion; draft PR10. Prior published checkpoint 06076bd (Coach roster); Reports milestone is recorded in the current commit. Root owns Git, shared backend/generated files and synchronization.
-- Development only: daniel-eiland / denham-venom-student-status / dev:third-bandicoot-18. Latest development sync 18:39:33 (Reports queries; existing writers and shared contracts unchanged). No production, main merge, real signing or deletion authorization.
-- All application records are synthetic. Account-specific evidence, screenshots, exports and secrets stay outside Git.
+- Checkout: student-status-readiness-design; branch feature/student-status-completion; draft PR10. Last published checkpoint be115d6. Current changes are preserved locally, not yet committed/pushed.
+- Development only: daniel-eiland / denham-venom-student-status / dev:third-bandicoot-18. Latest successful sync: October 14, 09:22:58 local. Production, main merge, real signing and destructive retention remain separate gates.
+- Full original G1–G7 scope remains. Preserve prior evidence; DEVELOPMENT_CHECKLIST.md is the human guide, VISUAL_CHECKS.md the visual queue, COMPLETION_WORKFLOW.md the efficiency policy.
 
-## Completed outcomes to retain
+## Completed this batch
 
-- G3 Whole Team creation and later reactivation verified; Astra closed functional acceptance. Upcoming events only, existing withdrawals preserved. All five current profiles restored active.
-- Synthetic season activation completed with clean open-session/lock preflight. Previous season and original records preserved; five returners and existing Parent links carried forward. Source-separated balances reconciled. Timeclock coordinator notified.
-- Finance administration, fundraiser posting, priorities, source transfers, CSV import, immutable receipt correction, selected export download, historical charge correction, historical attendance/roster corrections, retention preview/hold/release and roster archive/reactivate are functionally cleared. See GOAL_ACCEPTANCE G6 closure and checklist evidence. Do not repeat these journeys.
-- Synthetic permission signing, acceptance, corrections/re-signing, paper provenance and restricted exports have retained evidence. Real signing remains gated.
-- Parent child switching and attendance projections verified. Unknown 2028 FIRST kickoff is truthfully unavailable; no invented date. Outreach/Build titles classify attendance; Chicago scheduled date determines weekday/Saturday.
-- Latest isolated historical helper: five-case focused suite, scoped lint/types and Astra review passed. Prior broader checks remain valid at their checkpoints; next full check belongs to the integrated final candidate.
+- Approved original-logo field-trip PDF integrated in source and development backend. Ordinary reviewed and signed examples remain one page; typed name/date use existing slots. Genuine overflow remains lossless. Original raster sanitized of sample entries. Minor first aid remains at the end of Emergency treatment; approved Coach sponsor sealed. Old receipts unchanged.
+- Coach-approved immutable template selector replaces arbitrary new template authoring. Completed profile remains required before preparation/signing; Medication Choices stays removed. Astra scoped review has no blockers; root inspected sanitized and signed render.
+- Readiness coverage and Draft-aware printable summary integrated. Actual Chrome print verified white with 14mm page margins, no app controls, correct missing-seat/Draft information. Source reviewed by Astra.
+- Student required setup and locked-room correction completed in fictional rehearsal; Student lower Parents page inspected.
+- Ordinary Mentor invitation accepted and profile saved; participation-only report inspected. Travel Reports filters/detail verified.
+- User-approved finance-only then health-only grants verified independently. Both grants restored OFF; Travel Lead remains active in its original role. Revoked health export visibly disabled. No finance transaction performed for this grant check.
+- Unknown-route fallback now offers ordinary unavailable copy and Return home.
+- One integrated lint/type/test/build milestone passed. Focused PDF/backend checks also passed. No rerun needed merely for documentation.
 
-## Remaining work and current access
+## Exact next work when resumed
 
-- Student required setup/locked room correction; ordinary Mentor invitation acceptance/profile/report; adult access and independent finance/health grants with revocation; no-linked Parent state. Profile archive is distinct from Google-account access.
-- Coach and Parent Chrome profiles are available. Student and Mentor profiles remain absent from connected-browser inventory despite the user's attempted sign-ins; asked to connect the extension in those profiles. Mentor-only invitation remains pending; token stays private.
-- Representative visual comparisons and final Astra review remain. No exhaustive state-by-theme matrix or additional money/season tests.
-- Hosted prototype discovered in user Chrome at https://denhamvenom.github.io/student_status/index.html and rendered successfully. Local file navigation remains blocked; do not bypass. The user now explicitly authorizes the hosted site as visual reference while preserving later-added functionality and decisions. Version context: documented Pages main/demo differs from immutable sibling student-status-operations/design-reference/prototype. Sol found Adults markup/handlers/assets unchanged between preserved demo and immutable reference; Status and Readiness materially differ. Use the hosted visual language without regressing later Status/Readiness requirements or removing added features.
-- Latest visual pass: Users & Roles phone dark and desktop light, lower phone controls, separate access dialog disabled without reason, Escape returning focus to Edit access. Valid images saved privately; no permissions changed. Document widths375/1425 at requested390/1440, no horizontal overflow. This is scoped evidence, not full VC-018/021 closure.
+1. Approved template selected; existing fictional Parent signed at 09:34, Coach accepted, Parent coverage updated; old receipt preserved. Live long test labels generated a lossless continuation, while retained ordinary-length reviewed/signed renders are one page. Signature/date visually verified in original first-page slots. Manual download remains pending; do not repeat this signing journey.
+2. Finish finite remaining evidence: active room invitation/deadline and withdrawn-room recovery, paid-withdrawal consequences, no-linked Parent. Manual PDF/CSV download delivery remains parked because browser connector cannot capture blob downloads; no workaround loop.
+3. Page-by-page production-language review is required before final visual approval. Read-only inventory found raw state enums in TeamReports, CoachRosterManagement, CoachStudentRecord and report CSV; missing-backend fallback mentions local build. Plain-language label and configuration-message fixes are now implemented with focused CSV, lint and type checks passed; rendered pass remains. Keep truthful development/synthetic guards until the separate real-use release configuration is authorized.
+4. Batch docs/checklist and reviewed Git publication after live workflow verification. Final G1–G7 Astra review and Coach visual approval remain outstanding. No new scope or exhaustive visual/test matrix.
 
-## Resumed workflow — October 13, 2026
+## Evidence and sessions
 
-User resumed the full remaining G1–G7 goal with this chat as integration owner. Sol implements; Astra reviews consequential changes and final milestones. The current checklist is reconciled once; historical phase entries retain their original evidence. Timeclock confirms no conflicting backend work.
-
-1. Coach roster → student record is implemented, reviewed and development-synchronized. Coach-only paginated rows, current-season active/inactive detail, validated balances, account linkage/access, missing fields, bounded next-event readiness and preserved archive controls are integrated. Targeted permission/projection/coverage tests and integrated lint/types/tests/build passed. Representative desktop-dark and phone-light layouts, balance filter, record/back navigation, error recovery and disabled archive/focus were observed. Final scoped layout fixes and error copy passed lint/types as applicable. No repeated financial, season or membership mutation rehearsal.
-2. Reports is implemented and Astra-cleared: bounded Coach/Travel queries, source-validated money, aggregate attendance with unknown kickoff gating, selected-event readiness, filters, individual report and Draft-aware loaded CSV. Integrated lint/types/tests/build passed (types rerun after a fixture update). Coach live filters/detail and desktop-dark/phone-light presentation verified. Remaining: browser CSV delivery observation and live Travel presentation. Download event timed out; browser policy blocked downloads-page inspection, no bypass attempted.
-3. Finish remaining role journeys when connected sessions are available; no repeated sign-in polling. Complete remaining representative visual queue and final G1–G7 review.
-4. User visual approval, production ownership/configuration/policy/backup/monitoring/rollback and explicit deployment approval remain separate gates in the checklist.
-
-Latest evidence-only batch: VC-005 Driver validation/save-result representative scope complete. One labeled synthetic, unapproved, unassigned driver was retained in development; it does not appear as an approved assignment choice. VC-004 lower phone requirements/transport controls and disabled states inspected. VC-016 no-room-selection recovery/return passed; withdrawn Student case remains distinct and parked. No source changes, backend sync or test rerun needed. Next useful independent batch is Parent long-form/receipt and attendance presentation using the existing connected Parent session.
-
-Parent batch: current-season permission gated/empty state, phone-light attendance unknown/empty lower content, profile lower controls and More/Escape focus verified. Parent-only receipt copy clarified current-season scope; lint/types and live text pass. Historical Parent access remains intentionally denied per existing policy. No scope expansion. User reiterated: add no work unless essential for the operational agreed app. All declared menu routes now map to implemented workflows; remaining readiness review should consolidate evidence and finite required gaps, not restart visual matrices.
-
-Astra readiness milestone: remaining work is a finite evidence pass, not new feature development. VC-002/004/007 representative scopes are complete alongside VC-005/006; VC-021 admin/retention presentation subscopes have evidence. Required remaining batches: (1) one new Readiness detail/export view and live paid-withdrawal consequences; (2) Student setup/locked correction, active room invitation/deadline, withdrawn-room recovery and invitation/lower Parents state; (3) Mentor acceptance/profile/report, Travel Reports and independent grants/revocation, no-linked Parent; (4) CSV file delivery, final integrated validation/review/publication. No Parent historical access, forced failure or exhaustive capture matrix. Missing sessions remain parked.
+- Private artifacts: field-trip-original-render-reviewed/signed.pdf and .png; field-trip-sanitized-blank-template.png; readiness-browser-print.pdf/.png. Browser captures include mentor-team-report.jpg and travel-reports-filtered.jpg. Never add private-data to Git.
+- Chrome sessions: Parent, Student, ordinary Mentor, Travel Lead, Coach all connected. Existing user tabs retained. Detailed account identifiers remain private.
+- All current development records are fictional. Do not promote them into production or hide their evidence labels.
+- Timeclock shared contracts unchanged in this batch; its separate physical/concurrent evidence remains coordinated with its owner.

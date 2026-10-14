@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { PDFDocument } from 'pdf-lib'
 import type { ConsentSnapshotV2 } from '../../convex/lib/consentSnapshotV2'
 import { appendFieldTripSignature, renderFieldTripPdf } from './field-trip-pdf'
+import { fieldTripApproved } from './field-trip-approved'
 
 const synthetic = {
   format: 2, synthetic: true, templateVersion: 'field-trip-v2',
@@ -11,8 +12,35 @@ const synthetic = {
   events: [{ eventId: 'event', name: 'Synthetic Event', type: 'Competition', startsAt: 1_900_000_000_000, endsAt: 1_900_086_400_000, destination: 'Test venue', travel: 'Family transport', overnight: false, feeCents: 0, independentTravel: false, transportEnabled: false, busSeats: null, additionalAdults: null, trailerRequired: false, signupMode: 'assigned', capacity: null, signupClosesAt: null, roomingEnabled: false, roomDeadline: null, permissionRequired: true, firstRequired: false, sponsorName: null, sponsorPhone: null, lodging: null }],
   priorCoverage: [{ eventId: 'event', revision: 1, submissionId: null }], signer: { source: 'electronic', accountId: 'parent', name: 'Test Guardian', email: 'guardian@example.test', recordedBy: 'parent' }, typedName: null, acknowledged: false, signedAt: null, recordedAt: null, paper: null,
 } as unknown as ConsentSnapshotV2
+const approved = { ...synthetic, templateVersion: fieldTripApproved.templateVersion, version: { ...synthetic.version, ...fieldTripApproved }, events: [{ ...synthetic.events[0], sponsorName: fieldTripApproved.sponsorName, sponsorPhone: fieldTripApproved.sponsorPhone }] } as ConsentSnapshotV2
 
 describe('field trip PDF renderer', () => {
+  it('keeps the approved original layout to one reviewed and signed page for ordinary values', async () => {
+    const reviewed = await renderFieldTripPdf(approved)
+    expect(await renderFieldTripPdf(approved)).toEqual(reviewed)
+    const signed = await appendFieldTripSignature(reviewed, { typedName: 'Test Guardian', signedAt: 1_900_000_000_000, reviewedSha256: 'a'.repeat(64), source: 'electronic', templateVersion: approved.templateVersion })
+    const reviewedDocument = await PDFDocument.load(reviewed)
+    const signedDocument = await PDFDocument.load(signed)
+    expect(signed).not.toEqual(reviewed)
+    expect(reviewedDocument.getPageCount()).toBe(1)
+    expect(signedDocument.getPageCount()).toBe(1)
+    expect(reviewedDocument.getSubject()).toBe(fieldTripApproved.templateVersion)
+    expect(reviewedDocument.getPage(0).getSize()).toEqual({ width: 612, height: 792 })
+  })
+
+  it('refuses a version whose text disagrees with the fixed approved page', async () => {
+    const changed = { ...approved, version: { ...approved.version, wording: 'Different wording with minor first aid.' } } as ConsentSnapshotV2
+    await expect(renderFieldTripPdf(changed)).rejects.toThrow('does not match')
+  })
+
+  it('preserves excess events on continuation pages without clipping', async () => {
+    const long = { ...approved, events: Array.from({ length: 8 }, (_, index) => ({ ...approved.events[0], eventId: `event-${index}`, name: `Fictional event ${index + 1}` })) } as ConsentSnapshotV2
+    const reviewed = await renderFieldTripPdf(long)
+    const signed = await appendFieldTripSignature(reviewed, { typedName: 'Test Guardian', signedAt: 1_900_000_000_000, reviewedSha256: 'a'.repeat(64), source: 'electronic', templateVersion: long.templateVersion })
+    expect((await PDFDocument.load(reviewed)).getPageCount()).toBeGreaterThan(1)
+    expect((await PDFDocument.load(signed)).getPageCount()).toBe((await PDFDocument.load(reviewed)).getPageCount())
+  })
+
   it('produces deterministic letter-size reviewed pages and appends signature evidence', async () => {
     const reviewed = await renderFieldTripPdf(synthetic)
     expect(await renderFieldTripPdf(synthetic)).toEqual(reviewed)

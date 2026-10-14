@@ -25,23 +25,51 @@ G3 Whole Team enrollment is functionally complete. G1, G2 and G4–G7 remain ope
 
 - [x] Connect Coach/Travel Lead Reports to bounded role-scoped finance, attendance and selected-event readiness, individual reports and safe loaded-filtered CSV. Reviewed and development-synchronized at 18:39:33; focused and integrated validation passed. Coach live filtering/detail and representative presentation verified.
 
+### Production-language review - required before final approval
+
+Added by the user October 14. Review every reachable page and role-specific variant once against the actual route/menu inventory. Record each page as reviewed in VISUAL_CHECKS.md; include dialogs, help text, empty/loading/error/success states, notifications, printed pages, PDFs, CSVs and other downloads. This is a finite editorial pass, not a new full functional or theme/device test matrix.
+
+- [ ] Sign-in, join requests and pending/rejected/access-denied screens.
+- [ ] Student setup and Profile & health.
+- [ ] Parent invitations, acceptance and Parents/link-management pages.
+- [ ] Parent child selection and no-linked-student screen.
+- [ ] Student/Parent Status dashboards.
+- [ ] Event lists and individual event pages.
+- [ ] Event creation/editing and signup/waitlist/withdrawal controls.
+- [ ] Readiness overview, detail and printable/exported summary.
+- [ ] Room invitations, assignment requests and adult room management.
+- [ ] Drivers and transportation assignments.
+- [ ] Permission review/signing, paper entry, corrections, receipts and approved PDF.
+- [ ] Family finances and Coach/authorized-adult financial administration.
+- [ ] Fundraisers, imports, transfers, corrections and financial exports.
+- [ ] Family attendance, Coach attendance/corrections and structured-name review.
+- [ ] Reports, individual reports and CSV downloads.
+- [ ] Coach Team roster and student records, including archived records.
+- [ ] Users & Roles, adult invitations and access/grant controls.
+- [ ] Season transition, historical views and retention review.
+- [ ] Settings, shared navigation, banners, tooltips and global messages.
+- [ ] Any remaining route found in the final route/menu inventory; coordinate Timeclock's corresponding pass with its owner.
+
+Acceptance: the production candidate speaks to actual users. Remove development/demo/test/synthetic/fictional/rehearsal/placeholder language from production UI and production-generated documents, along with internal implementation notes or unfinished-feature promises. Replace it with useful user-facing wording where a message is needed. Search source for likely leftovers, then confirm rendered pages and representative downloads; a search alone is not completion. Preserve legitimate business terms such as a genuinely draft record. Keep synthetic evidence truthfully labeled in development and historical test artifacts; do not merely relabel fake records as real or weaken signing/access safeguards to remove a warning. Production must use separate real onboarding/configuration. Finish this pass before Coach visual approval and confirm the production build contains the approved copy before deployment.
+
 ### Missing evidence
 
-- [ ] Manual field-trip PDF download/device check (browser connector cannot capture blob downloads), final district-compatible wording and Coach visual approval.
+- [ ] Manual field-trip PDF download/device check (browser connector cannot capture blob downloads), final application visual approval. Form and language already approved.
 
-- [ ] Confirm Reports CSV file delivery in the browser and its Travel Lead live presentation. CSV scope, Draft metadata and injection protection pass automated checks; browser download observation timed out, and browser policy blocked the downloads-page inspection. Do not retry through a workaround.
+- [ ] Confirm Reports CSV file delivery in the browser ; Travel Lead live presentation verified October 14. CSV scope, Draft metadata and injection protection pass automated checks; browser download observation timed out, and browser policy blocked the downloads-page inspection. Do not retry through a workaround.
 
-- [ ] Student required setup and locked-room correction journey, active room invitation/acceptance or deadline, and withdrawn-room recovery.
+- [x] Student required setup and locked-room correction journey.
+- [ ] Active room invitation/acceptance or deadline, and withdrawn-room recovery.
 - [ ] Live paid-withdrawal decision with fee/return consequences (existing implementation; do not repeat completed financial workflows).
-- [ ] Ordinary Mentor invitation acceptance, profile and report journey.
-- [ ] Independent adult finance/health grants and immediate revocation boundaries.
+- [x] Ordinary Mentor invitation acceptance, profile and report journey verified October 14.
+- [x] Independent adult finance/health grants and immediate revocation boundaries; original permissions restored October 14.
 - [ ] No-linked Parent state.
 - [ ] Remaining representative visual comparisons in VISUAL_CHECKS.md, preserving hosted prototype styling and later feature decisions.
 - [ ] Final coherent integrated validation and Astra review against all G1–G7 requirements.
 
 ### User dependencies and separate gates
 
-- All five test browser profiles are connected as of October 14. Student setup and ordinary Mentor invitation acceptance remain pending. Park inaccessible checks without repetitive polling or convenience role grants.
+- All five test browser profiles are connected as of October 14. Student setup and ordinary Mentor invitation acceptance are verified. Park inaccessible checks without repetitive polling or convenience role grants.
 - Real signing, automatic retention deletion, main merge and production remain unauthorized.
 - Coach visual acceptance remains pending until the ready candidate is presented.
 - Timeclock physical-device/concurrent live evidence remains coordinated separately; preserve its existing checks and shared IDs/contracts.
@@ -54,6 +82,7 @@ Optional cosmetic refinements and the existing bundle-size advisory do not repla
 
 These are separate launch gates, not authorization to deploy.
 
+- [ ] Complete the page-by-page production-language review above and confirm the production configuration/build uses the approved user-facing copy.
 - [ ] Obtain Coach visual approval of the completed candidate and documented intentional differences.
 - [ ] Confirm organizational ownership and administrators for GitHub, Convex, Google and Cloudflare.
 - [ ] Confirm Student Status production domain, separate production configuration, Google sign-in and allowed origins.
@@ -643,3 +672,17 @@ October 13 payment rehearsal: CSV import recorded one simulated cent with exact 
 
 - [x] VC-006 Coach Finance representative presentation closed after Astra evidence reconciliation; independent Travel grant checks remain open.
 - [ ] Restore the complete Coach roster-to-student-record workflow: record links, truthful account status, financial balance, next-event readiness and missing-information summaries/filtering. This concrete gap was confirmed against the selected prototype; preserve existing membership controls and role boundaries.
+
+## October 14 current pause checkpoint (supersedes older pending notes above)
+
+- [x] Approved original one-page PDF implemented, sanitized, source-reviewed, focused/integrated validated, and development-synchronized. Form and language already approved by the Coach.
+- [x] Student required setup and locked-room correction; lower Parents page inspected.
+- [x] Ordinary Mentor invitation acceptance, profile save and participation-only report.
+- [x] Travel Lead Reports filtering/detail presentation.
+- [x] Independent finance/health grants and revocation; original permissions restored.
+- [x] Readiness detail and actual browser printable summary; white margins and truthful Draft status verified.
+- [x] Select approved template and verify Parent review/signature, Coach acceptance and preserved old receipt on the live integrated version.
+- [ ] Room invitation/deadline and withdrawn-room recovery; paid-withdrawal consequences; no-linked Parent.
+- [ ] Manual PDF/CSV delivery, finite page-by-page production-language pass, final G1–G7 review and visual-approval candidate.
+
+User resumed under COMPLETION_PLAN.md; no replacement goal tracker needed. Changes remain local until the reviewed checkpoint is published. All separate production/real-signing/merge/deletion gates remain.

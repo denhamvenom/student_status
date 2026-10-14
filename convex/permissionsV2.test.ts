@@ -4,6 +4,8 @@ import { convexTest } from "convex-test";
 import { PDFDocument } from "pdf-lib";
 import { api, internal } from "./_generated/api";
 import { privateStudent } from "./lib/access";
+import { fieldTripApproved } from "../src/lib/field-trip-approved";
+import { validateSnapshotV2 } from "./lib/consentSnapshotV2";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -40,7 +42,7 @@ async function fixture() {
   });
   const as = (auth: typeof ids.coach.auth) => t.withIdentity({subject: `${auth}|session`});
   const actors = {coach: as(ids.coach.auth), parent: as(ids.parent.auth), other: as(ids.other.auth), ungranted: as(ids.ungranted.auth)};
-  await actors.coach.mutation(api.permissionVersions.createVersionV2, {version: "SYNTHETIC-PDF-1", title: "Fictional field trip permission", wording: "Fictional travel authorization and minor first aid only. Unapproved draft wording for synthetic review.", acknowledgmentText: "I reviewed this populated fictional form and authorize the listed travel and minor first aid."});
+  await actors.coach.mutation(api.permissionVersions.selectApprovedFieldTripTemplate, {});
   return {t, ids, ...actors};
 }
 
@@ -55,7 +57,7 @@ it("requires student setup and explicit parent confirmation before a populated P
   const draft = await f.parent.mutation(internal.permissionsV2.createDraft, {studentId: f.ids.student, eventIds: [f.ids.event], source: "electronic"});
   expect(draft.snapshot.format).toBe(2);
   expect(draft.snapshot.profile.allergies.entries[0].allergen).toBe("Synthetic pollen");
-  expect(draft.snapshot.events[0]).toMatchObject({sponsorName: null, sponsorPhone: null, lodging: null});
+  expect(draft.snapshot.events[0]).toMatchObject({sponsorName: fieldTripApproved.sponsorName, sponsorPhone: fieldTripApproved.sponsorPhone, lodging: null});
   expect(JSON.stringify(draft.snapshot)).not.toContain("Original free-text allergy");
   const student = await f.t.run(ctx => ctx.db.get(f.ids.student));
   expect(student?.allergies.text).toBe("Original free-text allergy");
@@ -100,9 +102,23 @@ it("seals reviewed and signed PDFs, preserves the reviewed pages, and retries on
   expect(receipt.snapshot.pdf?.signedSha256).toBe(receipt.signedPdfSha256);
   const reviewed = await f.parent.action(api.permissionsV2Pdf.pdf, {submissionId, rendition: "reviewed"});
   const signed = await f.parent.action(api.permissionsV2Pdf.pdf, {submissionId, rendition: "signed"});
-  expect(await PDFDocument.load(signed.bytes).then(document => document.getPageCount())).toBe((await PDFDocument.load(reviewed.bytes)).getPageCount() + 1);
+  expect(await PDFDocument.load(signed.bytes).then(document => document.getPageCount())).toBe((await PDFDocument.load(reviewed.bytes)).getPageCount());
   const summary = await f.coach.query(api.permissions.listSubmissions, {studentId: f.ids.student});
   expect(summary[0]).toMatchObject({submissionId, format: 2, legacy: false});
   await f.coach.mutation(api.permissions.review, {submissionId, status: "accepted", expectedLatestReviewId: null, expectedCoverage: summary[0].controlledCoverage, idempotencyKey: "fictional-review-1"});
   await expect(f.parent.action(api.permissionsV2Pdf.submit, {draftId: prepared.draftId, typedName: "Different Name", acknowledged: true})).rejects.toThrow("already signed differently");
+});
+
+it("selects one immutable approved version and keeps prior V2 snapshot parsing", async () => {
+  const f = await fixture();
+  const first = await f.coach.mutation(api.permissionVersions.selectApprovedFieldTripTemplate, {});
+  expect(await f.coach.mutation(api.permissionVersions.selectApprovedFieldTripTemplate, {})).toBe(first);
+  await expect(f.coach.mutation(api.permissionVersions.createVersionV2, {version: "other", title: "Other", wording: "minor first aid", acknowledgmentText: "Other"})).rejects.toThrow("Custom PDF wording is closed");
+  await f.t.run(ctx => ctx.db.patch(f.ids.student, {profileCompletedAt: 1}));
+  await f.parent.mutation(api.permissionsV2.saveProfile, {studentId: f.ids.student, expectedRevision: 0, value: profile});
+  const draft = await f.parent.mutation(internal.permissionsV2.createDraft, {studentId: f.ids.student, eventIds: [f.ids.event], source: "electronic"});
+  expect(draft.snapshot.templateVersion).toBe(fieldTripApproved.templateVersion);
+  expect(() => validateSnapshotV2({...draft.snapshot, version: {...draft.snapshot.version, wording: "Changed minor first aid"}})).toThrow("Approved field trip template");
+  const older = {...draft.snapshot, templateVersion: "field-trip-v2" as const, version: {...draft.snapshot.version, version: "prior-v2", wording: "Prior synthetic minor first aid wording."}};
+  expect(validateSnapshotV2(older).templateVersion).toBe("field-trip-v2");
 });

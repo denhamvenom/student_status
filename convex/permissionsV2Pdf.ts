@@ -47,7 +47,7 @@ export const submit = action({
     if (!reviewedBlob) throw new Error("Reviewed PDF is unavailable.");
     const reviewedBytes = new Uint8Array(await reviewedBlob.arrayBuffer());
     if (await sha256(reviewedBytes) !== prepared.reviewedPdfSha256) throw new Error("Reviewed PDF failed integrity check.");
-    const bytes = await appendFieldTripSignature(reviewedBytes, {typedName: args.typedName.trim(), signedAt: prepared.signedAt, reviewedSha256: prepared.reviewedPdfSha256, source: "electronic"});
+    const bytes = await appendFieldTripSignature(reviewedBytes, {typedName: args.typedName.trim(), signedAt: prepared.signedAt, reviewedSha256: prepared.reviewedPdfSha256, source: "electronic", templateVersion: prepared.snapshot.templateVersion});
     const pdf = await storePdf(ctx, bytes);
     return ctx.runMutation(internal.permissionsV2.commitSubmit, {...args, signedAt: prepared.signedAt, signedPdfId: pdf.storageId, signedPdfSha256: pdf.sha256, reviewedPdfSha256: prepared.reviewedPdfSha256});
   },
@@ -62,7 +62,7 @@ export const submitPaper = action({
     if (!reviewedBlob) throw new Error("Reviewed PDF is unavailable.");
     const reviewedBytes = new Uint8Array(await reviewedBlob.arrayBuffer());
     if (await sha256(reviewedBytes) !== prepared.reviewedPdfSha256) throw new Error("Reviewed PDF failed integrity check.");
-    const pdf = await storePdf(ctx, await appendFieldTripSignature(reviewedBytes, {typedName: args.typedName.trim(), signedAt: prepared.signedAt, reviewedSha256: prepared.reviewedPdfSha256, source: "paper"}));
+    const pdf = await storePdf(ctx, await appendFieldTripSignature(reviewedBytes, {typedName: args.typedName.trim(), signedAt: prepared.signedAt, reviewedSha256: prepared.reviewedPdfSha256, source: "paper", templateVersion: prepared.snapshot.templateVersion}));
     return ctx.runMutation(internal.permissionsV2.commitSubmit, {...args, signedAt: prepared.signedAt, signedPdfId: pdf.storageId, signedPdfSha256: pdf.sha256, reviewedPdfSha256: prepared.reviewedPdfSha256});
   },
 });

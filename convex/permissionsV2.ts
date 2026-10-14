@@ -8,6 +8,7 @@ import { verifiedGoogle, tokenHash } from "./lib/invitationIdentity";
 import { compareCoverage, coverageFor, expectedCoverage, setPendingCoverage } from "./lib/permissionCoverage";
 import { boundedText, expectedCoverageValidator } from "./lib/consentSnapshot";
 import { consentProfileV2Validator, consentSnapshotV2Validator, selectedEventsV2, snapshotHashV2, validateConsentProfileV2, validateSnapshotV2, type ConsentSnapshotV2 } from "./lib/consentSnapshotV2";
+import { fieldTripApproved } from "../src/lib/field-trip-approved";
 
 type Ctx = QueryCtx | MutationCtx;
 const DEV_URL = "https://third-bandicoot-18.convex.cloud";
@@ -40,18 +41,18 @@ async function build(ctx: Ctx, actor: Doc<"appUsers">, studentId: Id<"students">
   await syntheticGate(ctx, student._id, source === "electronic" ? actor._id : undefined);
   const season = await activeSeason(ctx);
   const version = season.activePermissionVersionId ? await ctx.db.get(season.activePermissionVersionId) : null;
-  if (!version || version.seasonId !== student.seasonId || version.formFormat !== 2) throw new Error("A current PDF form wording version is required.");
-  const events = await selectedEventsV2(ctx, student, eventIds);
+  if (!version || version.seasonId !== student.seasonId || version.formFormat !== 2 || version.version !== fieldTripApproved.templateVersion) throw new Error("Select the approved field trip template before preparing a new PDF.");
+  const events = (await selectedEventsV2(ctx, student, eventIds)).map(event => ({...event, sponsorName: fieldTripApproved.sponsorName, sponsorPhone: fieldTripApproved.sponsorPhone}));
   const expected = await expectedCoverage(ctx, student._id, events.map(event => event.eventId));
   const priorCoverage = await Promise.all(expected.map(async row => ({...row, submissionId: (await coverageFor(ctx, student._id, row.eventId))?.latestSubmissionId ?? null})));
-  const snapshot: ConsentSnapshotV2 = {format: 2, synthetic: true, templateVersion: "field-trip-v2", version: {versionId: version._id, version: version.version, title: version.title, wording: version.wording, schoolName: version.schoolName, teamName: version.teamName, acknowledgmentText: version.acknowledgmentText}, student: {studentId: student._id, seasonId: student.seasonId, legalName: student.legalName, preferredName: student.preferredName, email: student.email, subteam: student.subteam, grade: profile.grade, dateOfBirth: profile.dateOfBirth, profileRevision: student.profileRevision ?? 0, profileConfirmedBy: student.consentProfileV2ConfirmedBy, profileConfirmedAt: student.consentProfileV2CompletedAt}, profile, events, priorCoverage, signer: {source, accountId: source === "electronic" ? actor._id : null, name: source === "electronic" ? who!.name : paper!.name, email: source === "electronic" ? who!.email : paper!.email, recordedBy: actor._id}, typedName: null, acknowledged: false, signedAt: null, recordedAt: null, pdf: null, paper: null};
+  const snapshot: ConsentSnapshotV2 = {format: 2, synthetic: true, templateVersion: fieldTripApproved.templateVersion, version: {versionId: version._id, version: version.version, title: version.title, wording: version.wording, schoolName: version.schoolName, teamName: version.teamName, acknowledgmentText: version.acknowledgmentText}, student: {studentId: student._id, seasonId: student.seasonId, legalName: student.legalName, preferredName: student.preferredName, email: student.email, subteam: student.subteam, grade: profile.grade, dateOfBirth: profile.dateOfBirth, profileRevision: student.profileRevision ?? 0, profileConfirmedBy: student.consentProfileV2ConfirmedBy, profileConfirmedAt: student.consentProfileV2CompletedAt}, profile, events, priorCoverage, signer: {source, accountId: source === "electronic" ? actor._id : null, name: source === "electronic" ? who!.name : paper!.name, email: source === "electronic" ? who!.email : paper!.email, recordedBy: actor._id}, typedName: null, acknowledged: false, signedAt: null, recordedAt: null, pdf: null, paper: null};
   validateSnapshotV2(snapshot);
   return {student, snapshot, expected, eventFingerprint: await tokenHash(JSON.stringify(events))};
 }
 function parseV2(raw: string): ConsentSnapshotV2 {
   let result: ConsentSnapshotV2;
   try { result = JSON.parse(raw) as ConsentSnapshotV2; } catch { throw new Error("Permission snapshot evidence is invalid."); }
-  if (result?.format !== 2 || result.synthetic !== true || result.templateVersion !== "field-trip-v2") throw new Error("Permission snapshot format is invalid.");
+  if (result?.format !== 2 || result.synthetic !== true || result.templateVersion !== "field-trip-v2" && result.templateVersion !== fieldTripApproved.templateVersion) throw new Error("Permission snapshot format is invalid.");
   return validateSnapshotV2(result);
 }
 async function currentDraft(ctx: Ctx, draft: Doc<"permissionDrafts">, actor: Doc<"appUsers">, now: number) {

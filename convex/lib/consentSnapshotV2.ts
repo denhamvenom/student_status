@@ -6,13 +6,14 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { boundedText, MAX_CONSENT_EVENTS, MAX_SNAPSHOT_BYTES, expectedCoverageValidator } from "./consentSnapshot";
 import { requireEnrollmentComplete } from "./eventEnrollmentState";
 import { tokenHash } from "./invitationIdentity";
+import { fieldTripApproved } from "../../src/lib/field-trip-approved";
 
 export const consentVersionV2Validator = v.object({ versionId: v.id("permissionVersions"), version: v.string(), title: v.string(), wording: v.string(), schoolName: v.string(), teamName: v.string(), acknowledgmentText: v.string() });
 export const consentEventV2Validator = v.object({
   eventId: v.id("events"), name: v.string(), type: v.union(v.literal("Competition"), v.literal("Outreach"), v.literal("Team")), startsAt: v.number(), endsAt: v.number(), destination: v.string(), travel: v.string(), overnight: v.boolean(), feeCents: v.number(), independentTravel: v.boolean(), transportEnabled: v.boolean(), busSeats: v.union(v.number(), v.null()), additionalAdults: v.union(v.number(), v.null()), trailerRequired: v.boolean(), signupMode: v.union(v.literal("assigned"), v.literal("open"), v.literal("approval")), capacity: v.union(v.number(), v.null()), signupClosesAt: v.union(v.number(), v.null()), roomingEnabled: v.boolean(), roomDeadline: v.union(v.number(), v.null()), permissionRequired: v.boolean(), firstRequired: v.boolean(), sponsorName: v.union(v.string(), v.null()), sponsorPhone: v.union(v.string(), v.null()), lodging: v.union(v.string(), v.null()),
 });
 export const consentSnapshotV2Validator = v.object({
-  format: v.literal(2), synthetic: v.literal(true), templateVersion: v.literal("field-trip-v2"), version: consentVersionV2Validator,
+  format: v.literal(2), synthetic: v.literal(true), templateVersion: v.union(v.literal("field-trip-v2"), v.literal("field-trip-original-v1")), version: consentVersionV2Validator,
   student: v.object({ studentId: v.id("students"), seasonId: v.id("seasons"), legalName: v.string(), preferredName: v.string(), email: v.string(), subteam: v.string(), grade: v.string(), dateOfBirth: v.string(), profileRevision: v.number(), profileConfirmedBy: v.id("appUsers"), profileConfirmedAt: v.number() }),
   profile: consentProfileV2Validator, events: v.array(consentEventV2Validator),
   priorCoverage: v.array(v.object({ eventId: v.id("events"), revision: v.number(), submissionId: v.union(v.id("permissionSubmissions"), v.null()) })),
@@ -66,7 +67,10 @@ export async function selectedEventsV2(ctx: Ctx, student: Doc<"students">, event
 export function validateSnapshotV2(snapshot: ConsentSnapshotV2) {
   validateConsentProfileV2(snapshot.profile);
   if (snapshot.student.grade !== snapshot.profile.grade || snapshot.student.dateOfBirth !== snapshot.profile.dateOfBirth || !snapshot.events.length || snapshot.events.length > MAX_CONSENT_EVENTS || snapshot.priorCoverage.length !== snapshot.events.length || new Set(snapshot.events.map(event => event.eventId)).size !== snapshot.events.length || snapshot.priorCoverage.some(row => !snapshot.events.some(event => event.eventId === row.eventId))) throw new Error("Permission snapshot evidence is inconsistent.");
-  if (!snapshot.version.wording.toLowerCase().includes("minor first aid") || /medication choices|pain medication|cold medication|allergy medication/i.test(snapshot.version.wording)) throw new Error("New permission wording must include minor first aid and omit OTC choices.");
+  if (snapshot.templateVersion === fieldTripApproved.templateVersion) {
+    const version = snapshot.version;
+    if (version.version !== fieldTripApproved.templateVersion || version.title !== fieldTripApproved.title || version.wording !== fieldTripApproved.wording || version.schoolName !== fieldTripApproved.schoolName || version.teamName !== fieldTripApproved.teamName || version.acknowledgmentText !== fieldTripApproved.acknowledgmentText || snapshot.events.some(event => event.sponsorName !== fieldTripApproved.sponsorName || event.sponsorPhone !== fieldTripApproved.sponsorPhone)) throw new Error("Approved field trip template evidence is inconsistent.");
+  } else if (!snapshot.version.wording.toLowerCase().includes("minor first aid") || /medication choices|pain medication|cold medication|allergy medication/i.test(snapshot.version.wording)) throw new Error("New permission wording must include minor first aid and omit OTC choices.");
   if (snapshot.signedAt !== null && (!snapshot.pdf || !/^[0-9a-f]{64}$/.test(snapshot.pdf.reviewedSha256) || !/^[0-9a-f]{64}$/.test(snapshot.pdf.signedSha256)) || snapshot.signedAt === null && snapshot.pdf !== null) throw new Error("PDF evidence binding is invalid.");
   if (new TextEncoder().encode(JSON.stringify(snapshot)).byteLength > MAX_SNAPSHOT_BYTES) throw new Error("Permission snapshot is too large.");
   return snapshot;

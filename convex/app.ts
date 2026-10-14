@@ -137,22 +137,26 @@ export const eventReadiness = query({
       const student = await studentAccess(ctx, user, args.studentId);
       return { event: { _id: event._id, name: event.name }, students: [{ student: publicStudent(student), ...await studentReadiness(ctx, event, student) }], transportation: null, rooming: null, overall: null };
     }
-    if (enrollmentPending(event)) return { event: { _id: event._id, name: event.name }, students: [], transportation: null, rooming: null, overall: "open", enrollmentState: event.enrollmentState };
-    const participants = await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(500);
+    if (enrollmentPending(event)) return { event: { _id: event._id, name: event.name }, students: [], transportation: null, rooming: null, overall: "open", enrollmentState: event.enrollmentState, coverage: { participantsComplete: false, roomingComplete: false } };
+    const participantPage = await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(501);
+    const participantsComplete = participantPage.length <= 500;
+    const participants = participantPage.slice(0, 500);
     const rows = [];
     for (const p of participants.filter(x => x.status === "confirmed")) {
       const student = await ctx.db.get(p.studentId);
       if (student?.active && student.seasonId === season._id) rows.push({ student: publicStudent(student), ...await studentReadiness(ctx, event, student) });
     }
     const openStudents = rows.filter(x => x.state === "open").length;
-    const transportation = await transportSummary(ctx, event);
-    const groups = await ctx.db.query("roomGroups").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(100);
+    const transportation = participantsComplete ? await transportSummary(ctx, event) : null;
+    const roomGroupPage = await ctx.db.query("roomGroups").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(101);
+    const roomingComplete = roomGroupPage.length <= 100;
+    const groups = roomGroupPage.slice(0, 100);
     const memberships = await Promise.all(rows.map(x => ctx.db.query("roomMemberships").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", x.student._id)).unique()));
     const roomingCovered = memberships.every(m => m && groups.some(g => g._id === m.groupId && g.finalized && !g.needsReview));
-    const rooming = !event.overnight || !event.roomingEnabled ? { state: "notApplicable", open: 0 } : { state: groups.every(x => x.finalized && !x.needsReview) && roomingCovered ? "ready" : "open", open: groups.filter(x => !x.finalized || x.needsReview).length + memberships.filter(x => !x).length };
-    const overall = openStudents || transportation.state === "open" || rooming.state === "open" ? "open" : "ready";
+    const rooming = !event.overnight || !event.roomingEnabled ? { state: "notApplicable", open: 0 } : { state: roomingComplete && participantsComplete && groups.every(x => x.finalized && !x.needsReview) && roomingCovered ? "ready" : "open", open: groups.filter(x => !x.finalized || x.needsReview).length + memberships.filter(x => !x).length };
+    const overall = !participantsComplete || !roomingComplete || openStudents || transportation?.state === "open" || rooming.state === "open" ? "open" : "ready";
     if (user.role === "mentor" && !user.travelLead) return { event: { _id: event._id, name: event.name }, students: [], transportation: null, rooming: null, overall };
-    return { event: { _id: event._id, name: event.name }, students: rows.sort((a, b) => (a.state === "open" ? -1 : 1) - (b.state === "open" ? -1 : 1)), transportation, rooming, overall };
+    return { event: { _id: event._id, name: event.name }, students: rows.sort((a, b) => (a.state === "open" ? -1 : 1) - (b.state === "open" ? -1 : 1)), transportation, rooming, overall, coverage: { participantsComplete, roomingComplete } };
   },
 });
 

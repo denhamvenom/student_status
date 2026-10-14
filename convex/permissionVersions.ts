@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { activeSeason, audit, viewer } from "./lib/access";
 import { medicationDefinitionValidator, publicVersion, validateVersion, versionValidator } from "./lib/consentSnapshot";
+import { fieldTripApproved } from "../src/lib/field-trip-approved";
 
 export const current = query({
   args: {}, returns: v.union(v.object({...versionValidator.fields, formFormat: v.union(v.literal(1), v.literal(2))}), v.null()),
@@ -30,18 +31,28 @@ export const createVersion = mutation({
   },
 });
 
-/** New PDF forms use a separate immutable wording version without OTC choices. */
+/** Retained for old clients; arbitrary PDF wording cannot match the fixed original template. */
 export const createVersionV2 = mutation({
   args: {version: v.string(), title: v.string(), wording: v.string(), acknowledgmentText: v.string()}, returns: v.id("permissionVersions"),
-  handler: async (ctx, args) => {
+  handler: async ctx => {
     const actor = await viewer(ctx); if (actor.role !== "coach") throw new Error("Only a Coach may create permission wording.");
+    throw new Error("Custom PDF wording is closed. Select the approved field trip template instead.");
+  },
+});
+
+/** Select the one immutable, fixed original-template wording for the active season. */
+export const selectApprovedFieldTripTemplate = mutation({
+  args: {}, returns: v.id("permissionVersions"),
+  handler: async ctx => {
+    const actor = await viewer(ctx); if (actor.role !== "coach") throw new Error("Only a Coach may select permission wording.");
     const season = await activeSeason(ctx);
-    const version = args.version.trim(), title = args.title.trim(), wording = args.wording.trim(), acknowledgmentText = args.acknowledgmentText.trim();
-    if (!version || version.length > 80 || !title || title.length > 160 || !wording || wording.length > 20_000 || !acknowledgmentText || acknowledgmentText.length > 2000 || !wording.toLowerCase().includes("minor first aid") || /medication choices|pain medication|cold medication|allergy medication/i.test(wording)) throw new Error("Provide complete PDF wording with minor first aid and without OTC choices.");
-    if (await ctx.db.query("permissionVersions").withIndex("by_seasonId_and_version", q => q.eq("seasonId", season._id).eq("version", version)).unique()) throw new Error("This wording version already exists.");
-    const versionId = await ctx.db.insert("permissionVersions", {seasonId: season._id, version, title, wording, schoolName: "Denham Springs High School", teamName: "FIRST Team 8044, Denham Venom", formFormat: 2, medications: [], administrationText: "", acknowledgmentText, createdBy: actor._id, createdAt: Date.now()});
-    await ctx.db.patch(season._id, {activePermissionVersionId: versionId});
-    await audit(ctx, actor, "permissionVersions", versionId, "createPdfDraftVersion", null, {version, format: 2, active: true, realSigningEnabled: false});
+    const existing = await ctx.db.query("permissionVersions").withIndex("by_seasonId_and_version", q => q.eq("seasonId", season._id).eq("version", fieldTripApproved.templateVersion)).unique();
+    if (existing && (existing.formFormat !== 2 || existing.title !== fieldTripApproved.title || existing.wording !== fieldTripApproved.wording || existing.schoolName !== fieldTripApproved.schoolName || existing.teamName !== fieldTripApproved.teamName || existing.acknowledgmentText !== fieldTripApproved.acknowledgmentText || existing.medications.length !== 0 || existing.administrationText !== "")) throw new Error("An existing permission version conflicts with the approved template; no wording was changed.");
+    const versionId = existing?._id ?? await ctx.db.insert("permissionVersions", {seasonId: season._id, version: fieldTripApproved.templateVersion, title: fieldTripApproved.title, wording: fieldTripApproved.wording, schoolName: fieldTripApproved.schoolName, teamName: fieldTripApproved.teamName, formFormat: 2, medications: [], administrationText: "", acknowledgmentText: fieldTripApproved.acknowledgmentText, createdBy: actor._id, createdAt: Date.now()});
+    if (season.activePermissionVersionId !== versionId) {
+      await ctx.db.patch(season._id, {activePermissionVersionId: versionId});
+      await audit(ctx, actor, "permissionVersions", versionId, "selectApprovedFieldTripTemplate", {previousVersionId: season.activePermissionVersionId ?? null}, {version: fieldTripApproved.templateVersion, format: 2, realSigningEnabled: false});
+    }
     return versionId;
   },
 });

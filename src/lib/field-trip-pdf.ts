@@ -2,11 +2,13 @@ import fontkit from '@pdf-lib/fontkit'
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib'
 import type { ConsentSnapshotV2 } from '../../convex/lib/consentSnapshotV2'
 import { fieldTripFontBase64 } from './field-trip-font'
+import { fieldTripOriginalTemplateBase64 } from './field-trip-original-template'
+import { fieldTripApproved } from './field-trip-approved'
 
 export type FieldTripSignature = { typedName: string; signedAt: number; reviewedSha256: string }
 
 /** Preserve every reviewed page and append signature evidence to those exact PDF bytes. */
-export async function appendFieldTripSignature(reviewedBytes: Uint8Array, signature: FieldTripSignature & { source: 'electronic' | 'paper' }): Promise<Uint8Array> {
+async function appendLegacyFieldTripSignature(reviewedBytes: Uint8Array, signature: FieldTripSignature & { source: 'electronic' | 'paper' }): Promise<Uint8Array> {
   if (!/^[a-f0-9]{64}$/i.test(signature.reviewedSha256)) throw new Error('Reviewed PDF hash is invalid.')
   const document = await PDFDocument.load(reviewedBytes, { updateMetadata: false })
   document.registerFontkit(fontkit)
@@ -43,6 +45,187 @@ export async function appendFieldTripSignature(reviewedBytes: Uint8Array, signat
   }
   page.drawText('The preceding pages are the prepared PDF reviewed before signing.', { x: LEFT, y, font: body, size: 9, color: MUTED })
   return document.save({ useObjectStreams: false })
+}
+
+type SignatureOptions = FieldTripSignature & { source: 'electronic' | 'paper'; templateVersion?: string }
+type Overflow = { label: string; value: string }
+const atX = (value: number) => value / 1.5
+const atY = (value: number) => PAGE_HEIGHT - value / 1.5
+const normalize = (value: string | null | undefined) => value?.trim() || 'Not provided'
+const shortDate = (value: number) => new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'numeric', day: 'numeric', year: 'numeric' }).format(value)
+const birthDate = (value: string) => { const [year, month, day] = value.split('-'); return year && month && day ? `${month}/${day}/${year}` : value }
+
+function assertOriginalVersion(snapshot: ConsentSnapshotV2) {
+  const version = snapshot.version
+  if (String(snapshot.templateVersion) !== fieldTripApproved.templateVersion ||
+      version.title !== fieldTripApproved.title ||
+      version.schoolName !== fieldTripApproved.schoolName ||
+      version.teamName !== fieldTripApproved.teamName ||
+      version.wording !== fieldTripApproved.wording ||
+      version.acknowledgmentText !== fieldTripApproved.acknowledgmentText) {
+    throw new Error('The prepared form wording does not match the approved original layout.')
+  }
+}
+
+function fitted(page: PDFPage, font: PDFFont, overflow: Overflow[], label: string, value: string, x: number, y: number, width: number, size = 8, minimum = 5.8) {
+  const single = normalize(value).replace(/\s+/g, ' ')
+  let chosen = size
+  while (chosen > minimum && font.widthOfTextAtSize(single, chosen) > atX(width)) chosen -= 0.2
+  if (font.widthOfTextAtSize(single, chosen) > atX(width)) {
+    overflow.push({ label, value: single })
+    page.drawText('See continuation', { x: atX(x), y: atY(y), font, size: Math.min(7.5, size), color: INK })
+    return
+  }
+  page.drawText(single, { x: atX(x), y: atY(y), font, size: chosen, color: INK })
+}
+
+function detailLine(entry: ConsentSnapshotV2['events'][number]) {
+  return `${entry.name}; location ${entry.destination}; dates ${date(entry.startsAt)} - ${date(entry.endsAt)}; transport ${entry.travel}; lodging ${entry.lodging ?? 'Not provided'}; sponsor ${entry.sponsorName ?? 'Not provided'}, ${entry.sponsorPhone ?? 'Not provided'}.`
+}
+
+function continuation(document: PDFDocument, body: PDFFont, heading: PDFFont, overflow: Overflow[]) {
+  if (!overflow.length) return
+  let page!: PDFPage
+  let y = TOP
+  function newPage() {
+    page = document.addPage([PAGE_WIDTH, PAGE_HEIGHT])
+    y = TOP
+    page.drawText('FIELD TRIP FORM - CONTINUATION', { x: LEFT, y, font: heading, size: 11, color: INK })
+    y -= 27
+  }
+  newPage()
+  for (const item of overflow) {
+    const lines = wrap(item.value, body, 9, RIGHT - LEFT)
+    if (y - 22 - lines.length * 13 < BOTTOM) newPage()
+    page.drawText(item.label.toUpperCase(), { x: LEFT, y, font: heading, size: 8, color: MUTED })
+    y -= 15
+    for (const line of lines) {
+      page.drawText(line, { x: LEFT, y, font: body, size: 9, color: INK })
+      y -= 13
+    }
+    y -= 12
+  }
+}
+
+async function renderOriginalFieldTripPdf(snapshot: ConsentSnapshotV2): Promise<Uint8Array> {
+  assertOriginalVersion(snapshot)
+  const document = await PDFDocument.create({ updateMetadata: false })
+  document.registerFontkit(fontkit)
+  const fontBytes = bytesFromBase64(fieldTripFontBase64)
+  const characterMap = fontkit.create(fontBytes)
+  for (const character of JSON.stringify({ student: snapshot.student, profile: snapshot.profile, events: snapshot.events, signer: snapshot.signer })) {
+    const point = character.codePointAt(0)!
+    if (point > 31 && characterMap.glyphForCodePoint(point).id === 0) throw new Error(`Field trip PDF font cannot render character U+${point.toString(16).toUpperCase()}.`)
+  }
+  const body = await document.embedFont(fontBytes, { subset: true })
+  const heading = await document.embedFont(StandardFonts.HelveticaBold)
+  const background = await document.embedPng(bytesFromBase64(fieldTripOriginalTemplateBase64))
+  const page = document.addPage([PAGE_WIDTH, PAGE_HEIGHT])
+  page.drawImage(background, { x: 0, y: 0, width: PAGE_WIDTH, height: PAGE_HEIGHT })
+  document.setTitle(fieldTripApproved.title)
+  document.setSubject(fieldTripApproved.templateVersion)
+  document.setCreator('Denham Venom Student Status')
+  const extra: Overflow[] = []
+  const draw = (label: string, value: string, x: number, y: number, width: number, size?: number, minimum?: number) => fitted(page, body, extra, label, value, x, y, width, size, minimum)
+  draw('Student name', snapshot.student.legalName, 55, 153, 255, 8)
+  draw('Grade and date of birth', `${snapshot.profile.grade} / ${birthDate(snapshot.profile.dateOfBirth)}`, 331, 153, 256, 8)
+  draw('Parent or guardian', snapshot.profile.guardian.name, 606, 153, 255, 8)
+  draw('Guardian phone and email', `${snapshot.profile.guardian.phone} / ${snapshot.profile.guardian.email}`, 55, 191, 255, 7.2)
+  draw('Alternate emergency contact', `${snapshot.profile.emergency.name}, ${snapshot.profile.emergency.relationship}, ${snapshot.profile.emergency.phone}`, 331, 191, 256, 7.2)
+  const insurance = snapshot.profile.insurance.state === 'provided' ? `${snapshot.profile.insurance.provider}, ${snapshot.profile.insurance.policy}` : snapshot.profile.insurance.state === 'none' ? 'None reported' : 'Unavailable'
+  const physician = snapshot.profile.physician.state === 'provided' ? `${snapshot.profile.physician.name}, ${snapshot.profile.physician.phone}` : snapshot.profile.physician.state === 'none' ? 'None reported' : 'Unavailable'
+  draw('Insurance and physician', `${insurance} / ${physician}`, 606, 191, 255, 6.2, 4.8)
+  const eventRows = snapshot.events.length > 3 ? snapshot.events.slice(0, 2) : snapshot.events
+  for (const [index, event] of eventRows.entries()) {
+    const rowY = [270, 296, 336][index]
+    draw(`Event ${index + 1} name`, event.name, 62, rowY, 188, 7.3)
+    draw(`Event ${index + 1} location`, event.destination, 255, rowY, 207, 7.3)
+    draw(`Event ${index + 1} dates`, event.startsAt === event.endsAt ? date(event.startsAt) : `${date(event.startsAt)} - ${date(event.endsAt)}`, 471, rowY, 116, 7.3, 5.4)
+    draw(`Event ${index + 1} transport`, event.travel, 594, rowY, 116, 7.3)
+    draw(`Event ${index + 1} lodging`, event.lodging ?? (event.overnight ? 'Not provided' : 'None'), 718, rowY, 140, 7.3)
+  }
+  if (snapshot.events.length > 3) {
+    draw('Additional events', `${snapshot.events.length - 2} more events - see continuation`, 62, 336, 784, 7.3)
+    snapshot.events.slice(2).forEach((event, index) => extra.push({ label: `Additional event ${index + 3}`, value: detailLine(event) }))
+  }
+  const sponsors = [...new Set(snapshot.events.map(event => `${normalize(event.sponsorName)}, ${normalize(event.sponsorPhone)}`))]
+  draw('Sponsor in charge', sponsors.length === 1 ? sponsors[0] : 'See continuation', 170, 362, 177, 7.3)
+  if (sponsors.length > 1) snapshot.events.forEach((event, index) => extra.push({ label: `Sponsor for event ${index + 1}`, value: `${event.name}: ${normalize(event.sponsorName)}, ${normalize(event.sponsorPhone)}` }))
+  const allergies = snapshot.profile.allergies
+  if (allergies.state === 'none') draw('Allergies', 'None reported', 62, 771, 300, 7.5)
+  else {
+    const rows = allergies.entries.length > 2 ? allergies.entries.slice(0, 1) : allergies.entries
+    rows.forEach((entry, index) => {
+      const y = index === 0 ? 771 : 813
+      draw(`Allergy ${index + 1} allergen`, entry.allergen, 62, y, 91, 7.5)
+      draw(`Allergy ${index + 1} severity`, entry.severity, 158, y, 67, 7.5)
+      if (index === 0) {
+        draw(`Allergy ${index + 1} reaction`, entry.reaction, 229, y, 143, 7.1, 5.2)
+        draw(`Allergy ${index + 1} response`, entry.response, 229, y + 15, 143, 7.1, 5.2)
+      } else draw(`Allergy ${index + 1} reaction and response`, `${entry.reaction}; ${entry.response}`, 229, y, 143, 7.1, 5.2)
+    })
+    if (allergies.entries.length > 2) {
+      draw('Additional allergies', 'Additional allergies: see continuation', 62, 813, 307, 7)
+      allergies.entries.slice(1).forEach((entry, index) => extra.push({ label: `Additional allergy ${index + 2}`, value: `${entry.allergen}; severity ${entry.severity}; reaction ${entry.reaction}; response ${entry.response}` }))
+    }
+  }
+  const prescriptions = snapshot.profile.prescriptions
+  if (prescriptions.state === 'none') draw('Prescriptions', 'None reported', 400, 771, 460, 7.3)
+  else {
+    const rows = prescriptions.entries.length > 2 ? prescriptions.entries.slice(0, 1) : prescriptions.entries
+    rows.forEach((entry, index) => {
+      const y = index === 0 ? 771 : 796
+      draw(`Prescription ${index + 1} name`, entry.name, 400, y, 119, 7)
+      draw(`Prescription ${index + 1} dose`, entry.dose, 523, y, 74, 7)
+      draw(`Prescription ${index + 1} timing`, entry.timing, 601, y, 84, 7)
+      draw(`Prescription ${index + 1} reason`, entry.reason, 690, y, 91, 7)
+      draw(`Prescription ${index + 1} carried by`, entry.carriedBy, 786, y, 73, 7)
+    })
+    if (prescriptions.entries.length > 2) {
+      draw('Additional prescriptions', 'Additional prescriptions: see continuation', 400, 796, 460, 7)
+      prescriptions.entries.slice(1).forEach((entry, index) => extra.push({ label: `Additional prescription ${index + 2}`, value: `${entry.name}; dose ${entry.dose}; timing ${entry.timing}; reason ${entry.reason}; carried by ${entry.carriedBy}` }))
+    }
+  }
+  draw('Printed signer name', snapshot.signer.name, 372, 1110, 184, 8)
+  draw('Signer relationship', snapshot.profile.guardian.relationship, 576, 1110, 139, 8)
+  if (snapshot.synthetic) page.drawText('SYNTHETIC DEVELOPMENT FORM - NO REAL CONSENT', { x: atX(55), y: atY(875), font: heading, size: 7, color: INK })
+  continuation(document, body, heading, extra)
+  return document.save({ useObjectStreams: false })
+}
+
+async function signOriginalFieldTripPdf(reviewedBytes: Uint8Array, signature: SignatureOptions): Promise<Uint8Array> {
+  const document = await PDFDocument.load(reviewedBytes, { updateMetadata: false })
+  if (document.getSubject() !== fieldTripApproved.templateVersion || document.getPageCount() < 1) throw new Error('Reviewed PDF does not match the approved original layout.')
+  document.registerFontkit(fontkit)
+  const fontBytes = bytesFromBase64(fieldTripFontBase64)
+  const characterMap = fontkit.create(fontBytes)
+  for (const character of signature.typedName) {
+    const point = character.codePointAt(0)!
+    if (point > 31 && characterMap.glyphForCodePoint(point).id === 0) throw new Error(`Field trip PDF font cannot render character U+${point.toString(16).toUpperCase()}.`)
+  }
+  const body = await document.embedFont(fontBytes, { subset: true })
+  const heading = await document.embedFont(StandardFonts.HelveticaBold)
+  const page = document.getPage(0)
+  const extra: Overflow[] = []
+  fitted(page, body, extra, 'Typed signature', signature.typedName, 67, 1110, 285, 8, 5.8)
+  fitted(page, body, extra, 'Date signed', shortDate(signature.signedAt), 738, 1110, 110, 8, 6)
+  continuation(document, body, heading, extra)
+  return document.save({ useObjectStreams: false })
+}
+
+/** A new approved form uses the original scanned layout; older stored forms retain their renderer. */
+export async function renderFieldTripPdf(snapshot: ConsentSnapshotV2, signature?: FieldTripSignature): Promise<Uint8Array> {
+  if (String(snapshot.templateVersion) !== fieldTripApproved.templateVersion) return renderLegacyFieldTripPdf(snapshot, signature)
+  const reviewed = await renderOriginalFieldTripPdf(snapshot)
+  return signature ? signOriginalFieldTripPdf(reviewed, { ...signature, source: snapshot.signer.source, templateVersion: fieldTripApproved.templateVersion }) : reviewed
+}
+
+/** The server passes the sealed template version explicitly when signing stored reviewed bytes. */
+export async function appendFieldTripSignature(reviewedBytes: Uint8Array, signature: SignatureOptions): Promise<Uint8Array> {
+  if (!/^[a-f0-9]{64}$/i.test(signature.reviewedSha256)) throw new Error('Reviewed PDF hash is invalid.')
+  if (signature.templateVersion === fieldTripApproved.templateVersion) return signOriginalFieldTripPdf(reviewedBytes, signature)
+  if (signature.templateVersion && signature.templateVersion !== 'field-trip-v2') throw new Error('Unknown field trip PDF template.')
+  return appendLegacyFieldTripSignature(reviewedBytes, signature)
 }
 
 const PAGE_WIDTH = 612
@@ -85,7 +268,7 @@ function wrap(text: string, font: PDFFont, size: number, width: number): string[
 }
 
 /** Renders only server-sealed form evidence. The prepared rendition is unsigned. */
-export async function renderFieldTripPdf(snapshot: ConsentSnapshotV2, signature?: FieldTripSignature): Promise<Uint8Array> {
+async function renderLegacyFieldTripPdf(snapshot: ConsentSnapshotV2, signature?: FieldTripSignature): Promise<Uint8Array> {
   if (signature && !/^[a-f0-9]{64}$/i.test(signature.reviewedSha256)) throw new Error('Reviewed PDF hash is invalid.')
   const document = await PDFDocument.create({ updateMetadata: false })
   document.registerFontkit(fontkit)

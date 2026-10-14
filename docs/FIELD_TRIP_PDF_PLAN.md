@@ -55,3 +55,11 @@ Integrated lint, TypeScript, application tests and build passed. Astra reviewed 
 An isolated fictional Parent journey verified incomplete-profile refusal, structured profile confirmation, populated PDF review, initially unchecked acknowledgment, typed synthetic signature, sealed receipt and Coach acceptance. Desktop PDF rendered; phone light receipt layout had no horizontal overflow (375px content width). Renderer checks cover continuation content and signature-page preservation. No real consent was signed.
 
 Browser connector blob-download capture is unsupported, so manual download/device PDF behavior remains an explicit check. Final district-policy/permission wording and Coach visual approval remain required before real use. The broad completion goal stays paused; unrelated Readiness work remains uncommitted and preserved.
+
+## October 14 approved-layout superseding decision
+
+The user officially approved the original-logo one-page form and its language, with minor first aid appended to Emergency treatment and Daniel Eiland (225-802-8207) as Coach/Sponsor. This supersedes the redesigned-renderer and signature-appendix approach above: the sanitized original layout is now the approved template, and ordinary signatures occupy the original name/date slots on the same page. Genuine excess data uses lossless continuation. Historical receipt renderers remain supported. Source implementation, focused checks, integrated checks and Astra review passed; development synchronized at 09:22:58. Live selection/new-template signing verification remains pending at the user's pause. Real-use deployment/signing approval remains separate from the already-settled wording approval.
+
+## Live approved-template completion — October 14
+
+Selected approved original template; existing complete fictional Parent prepared/reviewed and signed at 09:34. Coach accepted and Parent coverage updated. Original signature/date placement visually verified, reviewed/signed hashes retained, earlier receipt preserved. Long explicit test-only labels required lossless continuation; retained ordinary-length examples/tests remain one page. Manual download still pending. Completion-plan implementation resumed; prior pause and pending-wording statements above are historical.
