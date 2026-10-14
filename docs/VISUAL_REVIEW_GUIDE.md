@@ -2,7 +2,7 @@
 
 Open http://localhost:5173 in the existing signed-in Chrome windows. Review appearance, clarity and the connected workflows; there is no need to repeat payments, signatures or permission changes.
 
-Start with corrected family Home/Money, account/report opening, empty New Event validation and accepted-permission Readiness. The Parent window needs sign-in for its updated profile/receipt presentation check. Do not repeat payments or signatures.
+Start with corrected family Home/Money, account/report opening, empty New Event validation and accepted-permission Readiness. The Parent presentation has now been checked live after sign-in. Do not repeat payments or signatures.
 
 1. **Coach: Team → student record.** Check roster filters, profile/link status, financial summary, attendance and upcoming-event readiness.
 2. **Coach: Events → Readiness.** Check event information, room/transport controls and printable summary. Incomplete evidence should be clearly Draft or unavailable.

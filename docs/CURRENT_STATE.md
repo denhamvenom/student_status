@@ -1,6 +1,6 @@
 # Current integration handoff
 
-Updated October 14, 2026. Required correction subplan implemented; ready for another owner visual review. Fresh Parent presentation check remains pending sign-in. Original G1-G7 work, approved PDF and valid evidence preserved; no goal recreation.
+Updated October 14, 2026. Required correction subplan implemented; ready for another owner visual review. Parent presentation checked live after sign-in. Original G1-G7 work, approved PDF and valid evidence preserved; no goal recreation.
 
 ## Workspace
 
@@ -14,7 +14,7 @@ Family responses omit staff financial notes/provenance. Home leads with genuine 
 
 Astra consequential review clear after three narrow fixes. Integrated lint/types and full behavior suite verified outside Windows sandbox; stale copy assertions updated with affected tests passing. Build/packaging verified without deployment. Final display-only lint/type/build and focused presentation checks passed.
 
-Live Student tasks/history, Coach validation/account focus, Readiness Accepted, Travel Reports selection/focus and ordinary Mentor reviewed. Actual phone Home inspected; viewport reset. Parent signed out: fresh changed presentation pending sign-in, with source/tests and earlier receipt evidence retained. No repeated access polling.
+Live Student tasks/history, Coach validation/account focus, Readiness Accepted, Travel Reports selection/focus and ordinary Mentor reviewed. Actual phone Home inspected; viewport reset. Parent Home/profile/Money/accepted receipt checked live after sign-in: accurate setup/profile tasks, required-field and availability wording, Balance due first, safe history and collapsed verification details. Existing PDF loaded; no record edits or signatures.
 
 ## Next action
 

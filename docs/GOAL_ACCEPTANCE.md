@@ -1,4 +1,4 @@
-> October 14 correction checkpoint: required corrections implemented; ready for another owner visual review. Fresh Parent presentation remains pending sign-in. Approved PDF and completed work preserved. See VISUAL_CHECKS.md for evidence and deferrals.
+> October 14 correction checkpoint: required corrections implemented; ready for another owner visual review. Parent presentation checked live after sign-in. Approved PDF and completed work preserved. See VISUAL_CHECKS.md for evidence and deferrals.
 
 # Current G1–G7 acceptance disposition — October 14, 2026
 

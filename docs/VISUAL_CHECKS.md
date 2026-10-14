@@ -1,4 +1,4 @@
-> October 14 correction checkpoint: required corrections implemented; ready for another owner visual review. Fresh Parent presentation remains pending sign-in. Approved PDF and completed work preserved. See VISUAL_CHECKS.md for evidence and deferrals.
+> October 14 correction checkpoint: required corrections implemented; ready for another owner visual review. Parent presentation checked live after sign-in. Approved PDF and completed work preserved. See VISUAL_CHECKS.md for evidence and deferrals.
 
 ## Correction checkpoint - October 14
 
@@ -8,7 +8,7 @@ Validation: integrated lint/types passed. The full suite loaded outside the Wind
 
 Live: Student Home leads with the incomplete parent profile task; Student Money shows safe history and Balance due first. Readiness shows Accepted for the existing signed fictional form. Empty New Event stays on Basics and focuses Name. Coach account and Travel report opening focus their headings. Report close falls back to page heading if a refreshed row replaced its trigger. Mentor report/profile inspected. Actual 390px Student Home inspected, then viewport reset. Prototype typography/navigation/card styling retained; earlier complementary light/desktop evidence reused.
 
-Private images: correction-event-validation.jpg, correction-student-home-phone.jpg, correction-coach-account.jpg. Parent browser is signed out: fresh changed Parent Home/profile/receipt presentation is pending owner sign-in. Source/tests and earlier approved receipt evidence remain valid. No repeated polling, relinking, grants or signing.
+Private images: correction-event-validation.jpg, correction-student-home-phone.jpg, correction-coach-account.jpg. Parent follow-up completed live after owner sign-in: incomplete setup/profile tasks appear first; profile required-field, insurance/physician and draft-versus-receipt wording inspected; Money shows Balance due first and safe history; existing accepted receipt and embedded PDF loaded, with hashes behind collapsed Verification details. Private evidence: correction-parent-receipt.jpg. No edits, relinking, grants or signing.
 
 ### External report disposition
 
