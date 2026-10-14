@@ -39,3 +39,25 @@ describe("permission draft gate", () => {
     expect(await f.parent.query(api.permissions.listSubmissions, { studentId: f.ids.student })).toEqual([]);
   });
 });
+
+it("allows Coach and Travel Lead to request a new signature, but not an ordinary Mentor", async () => {
+  const f = await fixture();
+  const ids = await f.t.run(async ctx => {
+    const season = await ctx.db.query("seasons").take(1).then(rows => rows[0]);
+    const leadAuth = await ctx.db.insert("users", {email: "lead@example.invalid", name: "Travel Lead"});
+    const mentorAuth = await ctx.db.insert("users", {email: "mentor@example.invalid", name: "Mentor"});
+    await ctx.db.insert("appUsers", {authUserId: leadAuth, email: "lead@example.invalid", name: "Travel Lead", role: "mentor", active: true, travelLead: true, financialEdit: false});
+    await ctx.db.insert("appUsers", {authUserId: mentorAuth, email: "mentor@example.invalid", name: "Mentor", role: "mentor", active: true, travelLead: false, financialEdit: false});
+    const eventId = await ctx.db.insert("events", {seasonId: season._id, name: "Fictional trip", type: "Team", startsAt: Date.now() + 86400000, endsAt: Date.now() + 90000000, destination: "School", travel: "Bus", overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "assigned", allowWithdrawal: true, permissionRequired: true, firstRequired: false, archived: false});
+    await ctx.db.insert("participants", {eventId, studentId: f.ids.student, status: "confirmed", createdAt: 1, updatedAt: 1});
+    return {leadAuth, mentorAuth, eventId};
+  });
+  const lead = f.t.withIdentity({subject: `${ids.leadAuth}|session`});
+  const mentor = f.t.withIdentity({subject: `${ids.mentorAuth}|session`});
+  const request = (revision:number) => ({studentId: f.ids.student, eventIds: [ids.eventId], expectedCoverage: [{eventId: ids.eventId, revision}], reason: "Fictional updated details"});
+  await expect(mentor.mutation(api.permissions.requestNewSignature, request(0))).rejects.toThrow("Coach or Travel Lead");
+  await expect(f.coach.mutation(api.permissions.requestNewSignature, request(0))).resolves.toBeNull();
+  await expect(lead.mutation(api.permissions.requestNewSignature, request(1))).resolves.toBeNull();
+  const requests = await f.t.run(ctx => ctx.db.query("permissionSignatureRequests").withIndex("by_studentId", q => q.eq("studentId", f.ids.student)).take(3));
+  expect(requests).toHaveLength(2);
+});

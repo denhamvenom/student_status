@@ -23,7 +23,7 @@ export const readinessCopy = {
   loading: 'Loading event readiness…',
   loadingSelected: 'Loading the selected event…',
   coachOnly: 'This review screen is available to Coaches.',
-  openEvidence: 'Open requirements are marked below. A dash does not verify completion.',
+  openEvidence: 'Open requirements are marked below.',
   first: 'FIRST registration',
   firstDone: 'Mark FIRST done',
   firstReopen: 'Reopen FIRST',

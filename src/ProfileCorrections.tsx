@@ -10,14 +10,14 @@ import { Button } from './components/ui/button'
 import { NativeSelect, NativeSelectOption } from './components/ui/native-select'
 import { correctionCopy as copy } from './lib/correction-copy'
 
-export function RequestProfileCorrection({studentId, revision}:{studentId:Id<'students'>;revision:number}) {
+export function RequestProfileCorrection({studentId, revision, ownProfile=false}:{studentId:Id<'students'>;revision:number;ownProfile?:boolean}) {
   const request = useMutation(api.profileSetup.requestCorrection)
   const [field,setField] = useState<'roomCategory'|'legalName'|'account'>('roomCategory')
   const [note,setNote] = useState('')
   const [busy,setBusy] = useState(false)
   const [message,setMessage] = useState('')
   async function submit(event:FormEvent){event.preventDefault();setBusy(true);setMessage('');try{await request({studentId,expectedRevision:revision,field,note});setNote('');setMessage(copy.sent)}catch(error){setMessage(error instanceof Error?error.message:copy.failed)}finally{setBusy(false)}}
-  return <Card><CardHeader><CardTitle>{copy.requestTitle}</CardTitle></CardHeader><CardContent><p>{copy.explanation}</p><form className="form-grid" onSubmit={event=>void submit(event)}>
+  return <Card><CardHeader><CardTitle>{copy.requestTitle}</CardTitle></CardHeader><CardContent><p>{ownProfile?copy.ownExplanation:copy.explanation}</p><form className="form-grid" onSubmit={event=>void submit(event)}>
     <label>{copy.field}<NativeSelect value={field} onChange={event=>setField(event.target.value as typeof field)}>{Object.entries(copy.fields).map(([value,label])=><NativeSelectOption key={value} value={value}>{label}</NativeSelectOption>)}</NativeSelect></label>
     <label>{copy.note}<Textarea required maxLength={1000} value={note} onChange={event=>setNote(event.target.value)}/></label>
     <Button disabled={busy} type="submit">{busy?copy.saving:copy.request}</Button>{message&&<p role="status">{message}</p>}

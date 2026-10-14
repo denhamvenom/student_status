@@ -247,3 +247,15 @@ Current-season fictional room/deadline, paid withdrawal preview/result, released
 Private images include final-reports-copy.jpg, room-group-deadline-live.jpg, paid-withdrawal-preview.jpg, withdrawn-room-recovery.jpg and approved-pdf-signed-live.jpg. These remain outside Git. No-linked Parent and recipient invitation acceptance are source/test-covered live-state limits. Astra found no blockers under the agreed representative scope. User visual approval remains pending.
 
 October 14 Join-page recovery: existing outline button and plain wrong-account guidance added below the request/waiting card. Actual Join-page sign-out returned to Google sign-in. Waiting-state availability source-reviewed without submitting a request. Private image join-sign-out.jpg; focused lint/types passed.
+
+## October 14, 2026 — second-round correction verification
+
+Final integrated lint/types/tests/build and packaging dry-run passed. Consequential Astra review clear after encoding cleanup. Full item disposition and the sole current review matrix are in VISUAL_CHECKS.md.
+
+Requested role/page matrix exercised at actual 1440 and 390 CSS pixels, light and dark. Scrollbars reduce document content width to 1425/375; phone height 843/844 and desktop 1000. Account heading measured 178.5px below a 163px header on desktop and 82.08px below a 65.59px phone header. Report headings remained below header in all four observed combinations. No document-wide horizontal overflow or Vite error overlay observed.
+
+Exact attendance showed 59min48s scheduled/longest visit and explained the one-hour rule. Parent earlier receipt preserved acceptance while explicitly having no current event coverage; current receipt retained coverage. Withdrawn event fee read canceled from existing financial source data. Empty Basics stayed on step 1, focused Name and displayed a linked error directly below it. Travel Lead signature-request authority unchanged; disabled export and paper-form hints linked in DOM.
+
+Evidence distinctions: live interactions and DOM dimensions cover the requested matrix; representative settled visual captures were inspected. Some automatic screenshots captured preceding frames, wrong themes or distorted scaling; reject those as visual proof. The complete matrix is not a claim of screenshot comparison for every combination. Reliable examples: student-attendance-exact-time.jpg, coach-empty-basics-settled.jpg, coach-390-dark-account.jpg, parent-home-settled.jpg in private-data/visual-checks/round2. Existing prototype comparison remains valid for unchanged typography/colors/navigation; no restyle. Owner live visual review remains open, including lower receipt/export sections. No screenshot or account-specific evidence enters Git.
+
+Synthetic render tests verify failure/processing/held/retry wording and Join/Waiting Sign out controls; not live backend transitions or signout clicks. All temporary viewport overrides reset and dark themes restored. No records, links, grants or signatures changed. PDF, source-money calculations and Timeclock contracts unchanged.

@@ -15,7 +15,7 @@ export const feeAdministrationCopy = {
   moveConfirm: 'Confirm priority change',
   mappingUnknown: 'Some earlier charges are not yet matched to a shared fee. Match them before confirming the full season payment order.',
   prepareMapping: 'Match earlier charges',
-  proofNote: 'The review uses recorded event and fee identities. Similar names or amounts alone do not prove that charges belong together; unmatched charges still need a Coach decision.',
+  proofNote: "Match older charges to the fee they belong to. Names or amounts alone aren't enough; anything unmatched waits for a Coach.",
   mappingReceipt: 'Earlier charge review',
   mappingTarget: 'Shared fee for these charges',
   createMappingDefinition: 'Create shared fee for reviewed charges',

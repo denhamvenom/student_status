@@ -1,4 +1,4 @@
-> October 14 correction checkpoint: required corrections implemented; ready for another owner visual review. Parent presentation checked live after sign-in. Approved PDF and completed work preserved. See VISUAL_CHECKS.md for evidence and deferrals.
+> October 14 second-round checkpoint: all 13 requested corrections implemented; integrated checks and packaging passed; consequential Astra review clear. Ready for owner review, with screenshot-matrix limitations explicitly recorded in VISUAL_CHECKS.md. Approved PDF and completed work preserved.
 
 # Current G1–G7 acceptance disposition — October 14, 2026
 

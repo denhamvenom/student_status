@@ -1,3 +1,40 @@
+## Second-round corrections — October 14, 2026
+
+All 13 requested corrections are implemented. Ready for the owner's next visual review; this is not visual approval or launch approval. Original G1–G7, approved PDF, prior receipts and completed evidence remain preserved.
+
+| Item | Change | Main files (under src unless noted) | Verification |
+| --- | --- | --- | --- |
+| 1 | Exact scheduled/longest-visit time; one uninterrupted hour remains the rule. | DashboardReports.tsx; lib/attendance-display.ts | Live Student/Parent; boundary tests |
+| 2 | Header measured on resize; account/report heading scroll margin follows its height. | AppShell.tsx; LiveApp.tsx; TeamReports.tsx; lib/sticky-header.ts; styles.css | Live desktop/phone focus; observer test; Astra |
+| 3 | Preserved Coach OR Mentor with Travel Lead permission for signature requests, per later saved decision. | convex/permissions.test.ts | Server source; allow/deny regression; live Travel Lead; Astra |
+| 4 | Home Money shows Balance due first. | DashboardReports.tsx | Live family pages; render test |
+| 5 | Earned from fundraisers and Available fundraising credit name distinct values. | DashboardReports.tsx; lib/report-copy.ts; lib/family-copy.ts | Live; distinct-value render test |
+| 6 | Event name appears once; canceled amount stays distinct from an actual return. | LiveApp.tsx | Live canceled fixture; Astra |
+| 7 | Empty event heading omitted; charge details button has spacing. | LiveApp.tsx; FamilyDashboard.module.css | Live/source |
+| 8 | Earlier signed form labeled by current coverage; Events this form covers heading. | PermissionWorkflow.tsx; lib/permission-workflow-copy.ts | Live earlier/current receipts; render tests; Astra |
+| 9 | Field error directly below field, linked by aria-describedby; focus retained. | LiveApp.tsx; NewEvent.module.css | Live empty Basics; settled phone screenshot |
+| 10 | No-event cells use dash; accurate complete/filtered/partial counts; Search students. | TeamReports.tsx; CoachRosterManagement.tsx | Live no-event report; pagination/filter tests |
+| 11 | Disabled actions reference visible explanatory hints. | PermissionWorkflow.tsx | Live DOM association; source |
+| 12 | Requested readiness, export, fundraising, bulk-payment and charge-matching copy. | features/design-review/readinessCopy.ts; lib/*copy.ts | Live/source; relevant render tests |
+| 13 | Consistent Profile/Forms labels, single-day dates, Coach-only explanation, own-profile/travel wording, actual withdrawn fee outcome. | LiveApp.tsx; ProfileCorrections.tsx; Travel.tsx; WithdrawnEventFee.tsx; lib/*copy.ts; lib/withdrawn-fee-label.ts | Live canceled fee/nav/date; source pronouns; fee helper tests; Astra |
+
+Validation: final `bun run check` passed lint, types, full tests and build. `bun run cloudflare:check` passed packaging dry-run; no deployment. Existing large-bundle advisory remains nonblocking. Astra reviewed consequential changes; its replacement-character finding was corrected and the changed source scanned clean. No backend production source, schema, PDF generator/template, financial calculation or Timeclock contract changed. No backend sync needed.
+
+Synthetic render tests cover finance failure/partial commitment/retry, withdrawal processing/failure/reason-gated retry, attendance recalculation failure, held/failed fundraising, and Join/Waiting wrong-account Sign out. These prove rendered wording/control states, not live job transitions or click execution. Existing workflow and sign-out evidence remains valid.
+
+### Current remaining review
+
+| ID | Surface/state | Evidence retained | Remaining comparison / dependency |
+| --- | --- | --- | --- |
+| R2-owner | Corrected pages, all roles | Live desktop 1440 CSS px and phone 390 CSS px in light/dark: Student/Parent Home, Money, Attendance; Parent receipts; Coach account, report, empty Basics, Readiness; Travel permissions. DOM observations saved privately. Representative settled screenshots inspected. | Owner visual review. Capture timing/scaling made some matrix images stale or distorted; those are rejected, not full screenshot proof for every combination. Use the live app for the remaining visual comparison, especially lower receipt/export sections. No application failure observed in these checks. |
+| R2-deferred | CSV column units | Owner confirmed opened CSV; source unchanged this round. | Friendlier cents headings deferred by user until post-launch. |
+| R2-launch | Production | Existing gate list retained. | Separate ownership/domain/sign-in, retention/privacy, backup/restore, monitoring/rollback, onboarding/demo transition and explicit deployment approval. |
+
+Private evidence remains in private-data/visual-checks/round2 (not Git). Reliable representative captures include student-attendance-exact-time.jpg, coach-empty-basics-settled.jpg, coach-390-dark-account.jpg and parent-home-settled.jpg. Earlier full-page/incorrect-theme captures are not acceptance evidence. Temporary browser sizes reset; all four test windows restored to dark theme. No records, permissions, links or signatures changed.
+
+
+## Earlier first-round checkpoint (historical)
+
 > October 14 correction checkpoint: required corrections implemented; ready for another owner visual review. Parent presentation checked live after sign-in. Approved PDF and completed work preserved. See VISUAL_CHECKS.md for evidence and deferrals.
 
 ## Correction checkpoint - October 14

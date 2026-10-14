@@ -1,23 +1,11 @@
 # Current integration handoff
 
-Updated October 14, 2026. Required correction subplan implemented; ready for another owner visual review. Parent presentation checked live after sign-in. Original G1-G7 work, approved PDF and valid evidence preserved; no goal recreation.
+October 14, 2026: second-round corrections complete; owner visual review next. Branch feature/student-status-completion, draft PR10. This checkpoint follows 9523543. No goal recreation.
 
-## Workspace
+All 13 requested fixes and dispositions are in VISUAL_CHECKS.md. The approved PDF, original G1–G7, prior receipts and completed finance/attendance/season/roster/Reports/access work remain preserved. Coach and Travel Lead signature-request authority follows the existing saved decision; no role expansion.
 
-- Branch feature/student-status-completion, draft PR10; correction checkpoint follows f2abd3e.
-- Development third-bandicoot-18 synchronized October 14 at 12:01:25 local. No production deployment.
-- No schema, financial calculation, approved PDF generator/template or Timeclock contract changes.
+Final bun run check passed lint/types/full tests/build. Packaging dry-run passed. Astra consequential review clear after encoding cleanup. No backend production source/schema, PDF generator/template, financial calculation or Timeclock contract changed; development third-bandicoot-18 needs no new sync. Production untouched.
 
-## Corrections and evidence
+Live desktop/390px light/dark requested surfaces exercised; representative screenshots inspected. Some captures were stale/distorted and rejected, so do not claim complete screenshot proof for every combination. See VISUAL_CHECKS.md and FRONTEND_CONFORMANCE_LOG.md for exact evidence scope. Synthetic render tests cover unavailable processing/failure/retry and Join/Waiting signout states. Viewport overrides reset and dark themes restored. No record edits or signatures.
 
-Family responses omit staff financial notes/provenance. Home leads with genuine profile/setup/event tasks; Money leads with Balance due. New Event validates each step and final submission. Account/report details scroll and focus. Readiness uses authoritative permission coverage. Role language, attendance explanations, export help, receipt verification disclosure and processing labels corrected.
-
-Astra consequential review clear after three narrow fixes. Integrated lint/types and full behavior suite verified outside Windows sandbox; stale copy assertions updated with affected tests passing. Build/packaging verified without deployment. Final display-only lint/type/build and focused presentation checks passed.
-
-Live Student tasks/history, Coach validation/account focus, Readiness Accepted, Travel Reports selection/focus and ordinary Mentor reviewed. Actual phone Home inspected; viewport reset. Parent Home/profile/Money/accepted receipt checked live after sign-in: accurate setup/profile tasks, required-field and availability wording, Balance due first, safe history and collapsed verification details. Existing PDF loaded; no record edits or signatures.
-
-## Next action
-
-Owner review using VISUAL_REVIEW_GUIDE.md. VISUAL_CHECKS.md records every external finding and deferral. User confirmed prior PDF/CSV opening; cents headings deferred. Existing no-linked Parent and recipient room acceptance evidence reused. Private screenshots stay outside Git.
-
-No main merge, production, real signing, destructive retention, account reassignment or broader access authorized. Timeclock frontend work remains with its owner on a separate branch.
+Next: owner reviews the corrected app with VISUAL_REVIEW_GUIDE.md. PDF/CSV opening confirmation remains valid; cents headings deferred. Screenshots and account-specific evidence stay private outside Git. No main merge, production, real signing, destructive retention, account reassignment or broader access authorized.

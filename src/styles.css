@@ -35,3 +35,5 @@ select,[data-slot="native-select-wrapper"]{max-width:100%}
 /* Keep section headings below the sticky shell and event navigation. */
 [id^="event-"]{scroll-margin-top:232px}
 @media(max-width:1023px){.event-workspace-nav{top:72px}[id^="event-"]{scroll-margin-top:156px}}
+
+.detail-focus-heading{scroll-margin-top:calc(var(--app-header-height, 0px) + 16px)}

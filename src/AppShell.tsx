@@ -1,6 +1,7 @@
+import { observeStickyHeader } from './lib/sticky-header'
 import { phoneLabel, uiCopy } from './lib/ui-copy'
 import { menu, navigationCopy } from './lib/navigation-copy'
-import { useState, type ReactNode } from 'react'
+import { useState, useRef, useLayoutEffect, type ReactNode } from 'react'
 import { useAuthActions } from '@convex-dev/auth/react'
 import { useMutation } from 'convex/react'
 import { Link, useLocation } from 'react-router'
@@ -16,6 +17,8 @@ export { menu }
 export const primaryPaths:Record<string,string[]>={student:['/','/events','/finances','/profile'],parent:['/','/events','/forms','/finances'],coach:['/','/events','/readiness','/finances'],travelLead:['/readiness','/events','/','/drivers'],mentor:['/','/myprofile','/settings']}
 
 export function AppShell({ children, viewer, familyContext, role = "coach" }: { children: ReactNode; viewer: ShellViewer; familyContext?: ReactNode; role?: string }) {
+  const shellRef=useRef<HTMLDivElement>(null), headerRef=useRef<HTMLElement>(null)
+  useLayoutEffect(()=>{if(shellRef.current&&headerRef.current)return observeStickyHeader(headerRef.current,shellRef.current)},[])
   const { theme, resolvedTheme, setTheme } = useTheme()
   const saveTheme = useMutation(api.app.setTheme)
   const { signOut } = useAuthActions()
@@ -54,8 +57,8 @@ export function AppShell({ children, viewer, familyContext, role = "coach" }: { 
   const additionalLinks = allowed.filter(([, path]) => !primary.includes(path))
   const roleLabel = role === 'travelLead' ? navigationCopy.travelLeadRole : role[0].toUpperCase() + role.slice(1)
   const icon = (path: string) => path === '/events' ? <Calendar size={21}/> : path === '/finances' ? <DollarSign size={21}/> : path === '/readiness' ? <SquareCheck size={21}/> : path === '/' ? (staff ? <Users size={21}/> : <Home size={21}/>) : path === '/profile' || path === '/myprofile' ? <UserRound size={21}/> : path === '/settings' ? <Settings size={21}/> : path === '/drivers' ? <Car size={21}/> : <FileText size={21}/>
-  return <div className={styles.review}>
-    <header className={styles.header}>
+  return <div ref={shellRef} className={styles.review}>
+    <header ref={headerRef} className={styles.header}>
       <div className={styles.headerInner}><Link to="/" aria-label={copy.brand} className={styles.brand}><img src="/assets/logos/logo-mark-white-text.png" alt="" /><span className={styles.brandCopy}><span className={styles.wordmark}>{copy.brand}</span><span className={styles.product}>{copy.product} · {viewer.season?.name ?? copy.seasonFallback}</span></span></Link><div className={styles.headerActions}><span className={styles.viewerName}><strong>{viewer.user?.name}</strong><small>{roleLabel} · {viewer.user?.email}</small></span><Button type="button" variant="outline" role="switch" aria-checked={resolvedTheme === 'dark'} className={styles.headerButton} onClick={() => void changeTheme()} aria-label={copy.themeLabel(resolvedTheme === 'dark')}><Moon size={18} aria-hidden="true"/><span className={styles.themeTrack}><span className={styles.themeKnob}/></span></Button><Button type="button" variant="outline" className={`${styles.headerButton} ${styles.signOut}`} onClick={() => void exit()}>{nav.signOut}</Button></div></div>
       {themeError && <p role="alert" className={styles.themeError}>{themeError}</p>}
       {signOutError && <p role="alert" className={styles.themeError}>{signOutError}</p>}

@@ -11,7 +11,7 @@ export const familyCopy = {
   finance: {
     title: 'Money', selectStudent: 'Select a linked student.', loading: 'Loading money information…',
     charged: 'Charged', applied: 'Applied to charges', available: 'Available funds', due: 'Balance due',
-    bySource: 'Available funds by source', personal: 'Personal payments', fundraising: 'Fundraising credits',
+    bySource: 'Available funds by source', personal: 'Personal payments', fundraising: 'Available fundraising credit',
     returnNote: 'Available funds can pay other charges or be used toward a future charge. Money returned from a canceled event stays available here; it has not been paid back to the family in cash or by check.',
     charges: 'Charges', chargesByEvent: 'Charges by event', otherCharges: 'Other charges', eventCharges: 'Event charges',
     charge: 'Charge', appliedShort: 'Applied', dueShort: 'Due', covered: 'Covered', canceled: 'Canceled', canceledLower: 'canceled', balanceDue: 'Balance due',
