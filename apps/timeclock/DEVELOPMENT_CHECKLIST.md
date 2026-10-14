@@ -63,6 +63,7 @@ The browser harness intercepts transport only inside Playwright and does not shi
 - [ ] Integration owner incorporates the October 13 usability follow-up and checks the combined branch. Never merge main or independently sync shared Convex from this frontend checkout.
 
 ## 6. Remaining scope
+- [x] October 14 tablet review: active clocking hides identity/sign-out, uses a moon/theme switch, smaller event controls and header, and two roster columns from 700px with 44px touch controls. Success notices clear after four seconds. Event selection retained; user approved that screen. Expanded synthetic suite passes 52 checks including 820px tablet/light/dark; active sign-out absence verified. Full clocking visual approval still pending.
 - [x] October 14 wording review removed the DEVELOPMENT header and environment-file setup instructions, and simplified console, connection, event-switch and transfer copy. Timeclock lint/types/build pass. User visual review is in progress; browser-tool access was blocked, so no new live visual verification is claimed. Local preview remains development-only.
 - [x] Added plain-language SEASON_TRANSITION response explaining paused actions and continued clock-out access. Backend transition guards and live cutover verification remain with Student Status integration.
 - Other synthetic names still require explicit Coach review; do not infer surnames or reseed.

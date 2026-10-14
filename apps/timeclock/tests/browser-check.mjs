@@ -63,7 +63,7 @@ try {
     return box.width < 44 || box.height < 44;
   }).map(node => node.textContent));
   expect(smallTargets).toEqual([]);
-  expect(await u.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+  expect(await u.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
   results.push('320px touch targets, keyboard group selection and collision blocking');
   await u.getByRole('button', { name: 'Extend event', exact: true }).click();
   await expect(modal).toBeVisible();
@@ -73,10 +73,10 @@ try {
   results.push('Short mobile dialog scroll and Cancel focus return');
   // Presentation stress case: the backend permits long event titles.
   await u.getByRole('heading', { name: 'Synthetic build meeting', exact: true }).evaluate(node => { node.textContent = 'X'.repeat(160); });
-  expect(await u.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+  expect(await u.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
   results.push('Long unbroken event title stays within narrow viewport');
   await usability.context.close();
-  for (const width of [390, 1440]) {
+  for (const width of [390, 820, 1440]) {
     for (const theme of ['light', 'dark']) {
       const { context, page } = await setup(width, theme);
       await expect(page.getByRole('article').filter({ hasText: 'Finished synthetic meeting' }).getByRole('button')).toBeDisabled();
@@ -169,6 +169,9 @@ try {
   await dialog.getByRole('button', { name: 'Open event', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Clock students' })).toBeVisible();
   results.push('All-day setup and PIN-protected event switching');
+  await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toHaveCount(0);
+  await page.evaluate(() => window.__clockTest.close());
+  await expect(page.getByRole('heading', { name: "Today's events" })).toBeVisible();
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await dialog.getByLabel('Operator PIN').fill('wrong');
   await dialog.getByRole('button', { name: 'Sign out', exact: true }).click();
