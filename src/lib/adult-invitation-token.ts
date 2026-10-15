@@ -14,4 +14,7 @@ export function prepareAdultInvitationOAuth(origin: string, token: string, stora
   storage.setItem(adultInvitationOAuthKey, token)
   return `${origin}/invite-adult`
 }
+export function adultInvitationLandingUrl(pathname: string, search: string, token: string | null) {
+  return `${pathname}${search}${token ? `#token=${encodeURIComponent(token)}` : ''}`
+}
 export function clearAdultInvitationOAuth(storage: TokenStorage) {storage.removeItem(adultInvitationOAuthKey)}

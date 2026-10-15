@@ -5,6 +5,7 @@ Updated October 15, 2026. Parent and Student wizard batch implemented in develop
 ## Completion batches
 
 - [x] October15 adult-invitation OAuth return route fixed after live failure; exact-origin/path regression and security review passed.
+- [x] Adult invitation landing preserves the OAuth code query while restoring the token fragment; focused transport regression and scoped lint passed. Owner completed invited-account sign-in in the in-app browser; Mentor Team report observed. Separate Chrome retry not observed.
 - [ ] Invited Mentor retries sign-in after development repair; successful account acceptance remains unverified.
 
 ### October 15 wizard-review correction batch

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { adultInvitationLink, adultInvitationOAuthKey, clearAdultInvitationOAuth, prepareAdultInvitationOAuth, readAdultInvitationToken } from '../src/lib/adult-invitation-token'
+import { adultInvitationLink, adultInvitationLandingUrl, adultInvitationOAuthKey, clearAdultInvitationOAuth, prepareAdultInvitationOAuth, readAdultInvitationToken } from '../src/lib/adult-invitation-token'
 function tabStorage() {
   const values = new Map<string, string>()
   return { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => {values.set(key, value)}, removeItem: (key: string) => {values.delete(key)} }
@@ -28,6 +28,13 @@ describe('adult invitation OAuth transport', () => {
     expect(originalTab.getItem(adultInvitationOAuthKey)).toBeNull()
     expect(readAdultInvitationToken('', originalTab)).toBeNull()
     expect(readAdultInvitationToken(new URL(adultInvitationLink('https://status.example.invalid', restored!)).hash, originalTab)).toBe(token)
+  })
+  it('restores the token fragment without removing the OAuth code query', () => {
+    const restored = adultInvitationLandingUrl('/invite-adult', '?code=oauth-code&next=home', token)
+    expect(restored).toBe(`/invite-adult?code=oauth-code&next=home#token=${token}`)
+    expect(new URL(restored, 'https://status.example.invalid').searchParams.get('code')).toBe('oauth-code')
+    expect(adultInvitationLandingUrl('/invite-adult', '?code=oauth-code', null)).toBe('/invite-adult?code=oauth-code')
+    expect(new URL(restored, 'https://status.example.invalid').search).not.toContain(token)
   })
   it('rejects malformed tokens and permits cancellation cleanup without restoring a token', () => {
     const storage = tabStorage()

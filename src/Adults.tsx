@@ -12,7 +12,7 @@ import { NativeSelect, NativeSelectOption } from './components/ui/native-select'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './components/ui/dialog'
 import { accountCopy } from './lib/account-copy'
 import styles from './Adults.module.css'
-import { adultInvitationLink, readAdultInvitationToken, prepareAdultInvitationOAuth, clearAdultInvitationOAuth } from './lib/adult-invitation-token'
+import { adultInvitationLink, adultInvitationLandingUrl, readAdultInvitationToken, prepareAdultInvitationOAuth, clearAdultInvitationOAuth } from './lib/adult-invitation-token'
 
 const copy = accountCopy.adults
 const message = (error: unknown) => error instanceof Error ? error.message : copy.failed
@@ -103,8 +103,7 @@ export function AdultInvitationLanding({viewer}: {viewer: {status: 'signedOut' |
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   useEffect(() => {
-    if (token) window.history.replaceState(window.history.state, '', `/invite-adult#token=${encodeURIComponent(token)}`)
-    else window.history.replaceState(window.history.state, '', window.location.pathname)
+    window.history.replaceState(window.history.state, '', adultInvitationLandingUrl(window.location.pathname, window.location.search, token))
     clearAdultInvitationOAuth(window.sessionStorage)
   }, [token])
   useEffect(() => {
