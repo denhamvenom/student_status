@@ -1,5 +1,7 @@
 # Current integration handoff
 
+October15 bounded no-new-account rehearsal: existing in-memory second-Parent reuse, multi-Competition FIRST verify/reopen, invitation identity and partial-finance retry checks passed. Added adult FIRST report and unrelated-Parent denial assertions; passed. Join/Waiting/processing states rendered with synthetic props. No live records/accounts changed and no app source/backend deployment. VISUAL_CHECKS.md distinguishes automated evidence from visual and OAuth limits.
+
 October15 final wording/spacing polish after 7fcd965: items1-6 implemented; item7 recorded as launch-only cleanup, development signing explanation retained. VISUAL_CHECKS.md has numbered1-7 mapping. Live report heading gaps32px confirmed desktop1440 and390; empty Competition has one message with header/Manage event retained. No permissions/data/PDF/backend changes. Typecheck/build and scoped lint passed; earlier evidence and deferrals preserved.
 
 October 15 recheck/Mentor correction candidate: implemented R1, M1–M4, section3 confirmations and optional a–j on top of 3739315 (preserves 73e471b/6e66ca8). VISUAL_CHECKS.md has the full item mapping and live limitations. Ordinary Mentor Events routes blocked; Report/Profile names and three-tab phone navigation aligned; compact report with one kickoff line; family waiting separated from actions; fundraising wording, reports help/spacing, empty-readiness and end-date correction polished. Available funds uses a native tap/keyboard disclosure instead of a hover tooltip.

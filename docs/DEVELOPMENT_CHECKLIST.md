@@ -660,3 +660,8 @@ October 13 payment rehearsal: CSV import recorded one simulated cent with exact 
 User resumed under COMPLETION_PLAN.md; no replacement goal tracker needed. Changes remain local until the reviewed checkpoint is published. All separate production/real-signing/merge/deletion gates remain.
 
 October 14 visual-review follow-up: [x] Join/waiting screens offer Sign out for wrong-account recovery. Live Join-page sign-out returned to Google sign-in; scoped lint/types passed. No role or backend changes.
+
+## October15 bounded account-free rehearsal
+- [x] Isolated second-Parent reuse, adult FIRST reporting, unrelated-Parent denial, Competition verify/reopen, invitation identity and source-preserving retry checks passed.
+- [x] Join/Waiting/processing render checks passed; no live state was manufactured.
+- [ ] Remaining visual fixture check and owner visual approval; fresh Google login per simulated identity is not claimed.

@@ -56,6 +56,30 @@ describe("shared setup and season FIRST registration", () => {
     expect(adultTodo).toMatchObject({href:"/setup",responsible:"student",blocked:false});
   });
 
+  it("lets an adult student read the invitation and report completion for Coach review", async () => {
+    const f=await fixture();
+    await f.coach.mutation(api.firstRegistration.setInvitation,{expectedRevision:0,url:"https://my.firstinspires.org/synthetic-invitation",qrStorageId:null,qrMatchesInvitation:false});
+    await f.student.mutation(api.setupWizard.saveStudentAbout,{studentId:f.ids.student,expectedRevision:0,preferredName:"Synthetic",grade:"12",dateOfBirth:"2000-01-01"});
+    expect(await f.student.mutation(api.firstRegistration.get,{studentId:f.ids.student})).toMatchObject({status:"needsCompletion",revision:0,adultEligible:true,canAccessInvitation:true,canReport:true,invitationUrl:"https://my.firstinspires.org/synthetic-invitation"});
+    expect(await f.student.mutation(api.firstRegistration.report,{studentId:f.ids.student,expectedRevision:0})).toBe(1);
+    expect(await f.student.mutation(api.firstRegistration.get,{studentId:f.ids.student})).toMatchObject({status:"awaitingVerification",revision:1,canReport:false,teamAccepted:false,consentRelease:false});
+  });
+
+  it("denies an unrelated parent the setup, medical, and FIRST paths", async () => {
+    const f=await fixture();
+    const user=await f.t.run(async ctx=>{
+      const authUserId=await ctx.db.insert("users",{email:"unlinked-parent@example.invalid"});
+      await ctx.db.insert("appUsers",{authUserId,email:"unlinked-parent@example.invalid",name:"Unlinked parent",role:"parent",active:true,travelLead:false,financialEdit:false});
+      return authUserId;
+    });
+    const unrelated=f.t.withIdentity({subject:`${user}|session`});
+    expect((await unrelated.mutation(api.setupWizard.summary,{})).students).toEqual([]);
+    await expect(unrelated.query(api.setupWizard.get,{studentId:f.ids.student})).rejects.toThrow("permission for this student");
+    await expect(unrelated.mutation(api.setupWizard.saveMedical,{studentId:f.ids.student,expectedRevision:0,allergies:{state:"none",entries:[]},prescriptions:{state:"none",entries:[]},insurance:{state:"unavailable",provider:null,policy:null},physician:{state:"unavailable",name:null,phone:null}})).rejects.toThrow("permission for this student");
+    await expect(unrelated.mutation(api.firstRegistration.get,{studentId:f.ids.student})).rejects.toThrow("permission for this student");
+    await expect(unrelated.mutation(api.firstRegistration.report,{studentId:f.ids.student,expectedRevision:0})).rejects.toThrow("permission for this student");
+  });
+
   it("allows initial subteam choice, preserves legacy assignment, and shares parent revisions", async () => {
     const f=await fixture();
     await f.student.mutation(api.setupWizard.saveStudentTeam,{studentId:f.ids.student,expectedRevision:0,shirtSize:"M",roomCategory:"Boys",subteam:"Programming"});

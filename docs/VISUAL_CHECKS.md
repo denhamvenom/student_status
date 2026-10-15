@@ -1,5 +1,25 @@
 # Current visual review — Parent and Student wizard, October 15
 
+## Bounded rehearsal without additional Google accounts — October 15
+
+Application baseline a3a2b03 preserved. No live mutations, account creation, role changes, Parent-link changes, financial records, FIRST verification or signatures. All behavioral rehearsal below uses isolated convex-test identities or server-rendered synthetic props.
+
+| State | Fresh evidence | Limit |
+|---|---|---|
+| Second linked Parent | setupWizardFirst confirms shared completed contacts/medical answers, shared revisions, no repeated completed setup, stale edits rejected | Simulated identity; no new Google login |
+| Adult Student | Added direct invitation-access and completion-report assertions; adult can report but remains awaiting Coach verification | Actual FIRST site not contacted; no live age edit |
+| Unrelated Parent | Added empty-family summary and denial of setup read, medical write, FIRST read/report | Simulated unauthorized identity |
+| Competition FIRST | Existing setupWizardFirst rehearsal checks confirmed participants across two Competitions; legacy event completion does not bypass season FIRST; verify clears both, reopen blocks again | In-memory records only |
+| Wrong-account invitation | accounts and parentInvites suites passed identity, expiry/revocation and access checks | No new OAuth round trip; earlier live evidence retained |
+| Processing/retry | ReviewStates renders partial/failed/held views; targeted financeOperations retry preserves locks and committed source money without duplication | Rendered controls and backend retry tested separately, not a live failed job |
+| Join/Waiting sign-out | ReviewStates verifies sign-out controls in both states without form submission; existing handler calls auth signOut with recoverable error display | Fresh real-session sign-out not performed |
+| Kickoff boundary | Existing seasonCalendar boundary tests passed | Post-kickoff Mentor appearance remains a visual gap unless a real-component fixture is supplied |
+
+Only two missing authorization scenarios were added to the existing setupWizardFirst suite. Selected suites passed; no full-suite/build repetition because application source is unchanged. Account-specific screenshots remain private. Fresh Google identity flow per scenario is intentionally not required for this development rehearsal; owner launch gates remain separate.
+
+Read-only reviewer preview: http://localhost:5173/private-data/rehearsal-preview/index.html (local, ignored private-data/rehearsal-preview/index.html). Actual components rendered with fictional props and current built CSS: Join, Waiting, partial financial failure/retry, withdrawal failure/retry, held fundraiser and unknown gross raised. Opened in browser; representative Join view visually inspected. Controls intentionally do nothing; no live data or authentication bypass. Wrapper spacing is not evidence for the complete app shell.
+
+Reviewer checklist: inspect Join/Waiting wording and Sign out placement; distinguish completed versus remaining work and next steps in failed/held/retry views; confirm unknown gross reads Not recorded; check readability at desktop and 390px. Do not rerun all previously approved pages. Second Parent, adult Student and FIRST lifecycle have automated behavioral evidence, not newly observed authenticated screens. Post-kickoff Mentor appearance remains unobserved. Fresh real Google round trips and live sign-out were not repeated.
 ## Final polish after external recheck 7fcd965 — October 15
 
 The external recheck passed the required corrections and identified these final presentation changes. Prior evidence remains retained below.
