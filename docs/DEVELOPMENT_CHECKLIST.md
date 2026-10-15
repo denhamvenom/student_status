@@ -4,6 +4,9 @@ Updated October 15, 2026. Parent and Student wizard batch implemented in develop
 
 ## Completion batches
 
+- [x] October15 adult-invitation OAuth return route fixed after live failure; exact-origin/path regression and security review passed.
+- [ ] Invited Mentor retries sign-in after development repair; successful account acceptance remains unverified.
+
 ### October 15 wizard-review correction batch
 
 - [x] B1–B3 and W1–W4 implemented; full updated cutting pass mapped row-by-row in VISUAL_CHECKS.md.

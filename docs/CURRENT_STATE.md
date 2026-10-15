@@ -1,5 +1,7 @@
 # Current integration handoff
 
+October 15 adult-invitation sign-in repair: a fresh Mentor OAuth attempt exposed a missing `/invite-adult` return path in the exact redirect allowlist. Added only that path on the configured Student Status origin. Timeclock and unsafe-redirect restrictions unchanged. Focused redirect/calendar regression and scoped lint pass; Astra review clear. Existing invitations remain valid; the invited user must retry Google sign-in to verify the full live round trip. No role, schema or invitation-token change.
+
 October 15 wizard-review correction checkpoint (supersedes next-step statements below): updated 30 KB report reconciled; B1–B3, W1–W4 and every cutting-pass row implemented and mapped in VISUAL_CHECKS.md. Prior published baseline d70fa5a preserved. Parent selector names the actual next item, including Finish setup for saved-but-unconfirmed information; minor Student Home does not offer Parent-only FIRST actions. Approved PDF/signing unchanged; receipt presentation jargon shortened only. No schema/access/financial/Timeclock contract changes.
 
 Validation: focused setupWizardFirst/app/travel regressions, full lint/typecheck/build and packaging dry-run passed (Wrangler external log-write warning only). Astra found one summary/resume mismatch; corrected and re-reviewed clear. Development third-bandicoot-18 synchronized at 10:20 America/Chicago. Do not repeat checks without a relevant change.
