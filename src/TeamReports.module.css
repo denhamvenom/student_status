@@ -20,7 +20,7 @@
 .fundsHelp{font-size:var(--text-sm);color:var(--text-muted)}
 .fundsHelp summary{width:max-content;max-width:100%;min-height:44px;display:flex;align-items:center;color:var(--text-link);font-weight:700;text-decoration:underline;cursor:pointer}
 .fundsHelp p{margin:0 0 var(--space-2)}
-.individual h3{font:400 var(--text-lg)/var(--leading-tight) var(--font-heading);margin:var(--space-6) 0 var(--space-3)}
+.individual [data-slot="card-content"] h3{font:400 var(--text-lg)/var(--leading-tight) var(--font-heading);margin:var(--space-6) 0 var(--space-3)}
 .individual ul{padding-left:1.25rem}
 .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:var(--space-3)}
 .metrics>div{display:grid;gap:var(--space-1);min-width:0;border-top:1px solid var(--border-default);padding-top:var(--space-2)}

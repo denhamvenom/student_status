@@ -1,5 +1,23 @@
 # Current visual review — Parent and Student wizard, October 15
 
+## Final polish after external recheck 7fcd965 — October 15
+
+The external recheck passed the required corrections and identified these final presentation changes. Prior evidence remains retained below.
+
+| Item | File changed | Result / evidence |
+|---|---|---|
+| 1 | src/TeamReports.module.css | Raised heading selector specificity above the shared heading reset. Actual margin and preceding gap are 32px for Attendance and Selected event at desktop1440 and phone390; both screenshots inspected. Shared Coach/Travel Lead component; live Coach verified. |
+| 2 | src/LiveApp.tsx | Each waiting item names who and what; preferred student name used for Parent context and you/your for Student context. Hide To do heading when count is zero; keep caught-up text. Student Home observed live with separate health-profile and FIRST waiting sentences. |
+| 3 | src/features/design-review/ReadinessReview.tsx | Empty participant state uses one message instead of three cards/repeated badges/counts; event header and Manage event retained. Enrollment processing/failure and printable output preserved. Empty Competition observed live with one message. |
+| 4 | src/LiveApp.tsx | /enroll now names Coaches; known restricted route mappings checked. Generic wording remains only for unknown paths. No access change. |
+| 5 | src/lib/adult-profile-copy.ts | Page heading is Profile. |
+| 6 | src/lib/report-copy.ts | Gross raised is the total before the team and student split. |
+| 7 | docs/DEVELOPMENT_CHECKLIST.md | Launch-only cleanup: remove the synthetic-signing explanation together with the development banner from the production user experience. Retain both in development; do not remove signing safeguards or enable real signing without separate authorization. |
+
+Validation: typecheck and build passed; scoped lint and diff checks passed. No new tests added for this presentation-only pass. Standard build bundle-size advisory remains unchanged.
+
+Private spacing captures: private-data/visual-checks/wizard-corrections/final-polish/report-desktop.png and report-phone390.png. Temporary viewport reset. No role/link/financial/FIRST/signature/access changes; approved permission PDF and workflow unchanged. CSV cents remain deferred. Production/main merge not authorized.
+
 ## October 15 recheck and first Mentor review corrections
 
 Current batch builds on 3739315, preserving both sign-in repairs after the review's 6e66ca8 baseline. Source review is clear. This table supersedes the older claim that the Fundraising footer was already removed.

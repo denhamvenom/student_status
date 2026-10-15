@@ -54,6 +54,7 @@ Development records and the development-only banner remain truthfully labeled. T
 These are separate launch gates, not authorization to deploy.
 
 - [x] Complete the finite page-by-page production-language review; production sign-in build inspected. Confirm real deployment configuration separately at launch.
+- [ ] Before launch, remove the permission-page development explanation "Real signing is closed. This account and fictional subject are not registered for synthetic consent." together with the development banner from production-facing copy. Keep it in development and retain signing safeguards; real signing approval remains separate.
 - [ ] Obtain Coach visual approval of the completed candidate and documented intentional differences.
 - [ ] Confirm organizational ownership and administrators for GitHub, Convex, Google and Cloudflare.
 - [ ] Confirm Student Status production domain, separate production configuration, Google sign-in and allowed origins.

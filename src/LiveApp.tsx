@@ -108,6 +108,26 @@ function PendingJoin(){
   return <PendingJoinView submitted={submitted} busy={busy} signOutError={signOutError} onSignOut={()=>void exit()}><Box title={liveCopy.join.heading}><p>{liveCopy.join.instruction}</p><form className="form-grid" onSubmit={e=>void submit(e)}><label>{liveCopy.join.code} <Input value={code} onChange={e=>setCode(e.target.value)} autoComplete="off" required/></label><label>{liveCopy.join.first} <Input value={first} onChange={e=>setFirst(e.target.value)} required/></label><label>{liveCopy.join.last} <Input value={last} onChange={e=>setLast(e.target.value)} required/></label><p className="muted">{liveCopy.join.studentNote}</p><Button className="button button-primary" type="submit" disabled={busy}>{liveCopy.join.submit}</Button></form>{error&&<p role="alert" className="open-text">{error}</p>}</Box></PendingJoinView>
 }
 function Home({viewer,studentId}:{viewer:Viewer;studentId:string|null}){const r=role(viewer);if(r==='mentor')return <Mentor year={viewer.season?.year??null}/>;if(r==='coach'||r==='travelLead')return <Roster viewer={viewer}/>;if(!studentId)return <State>{liveCopy.states.noLinkedStudent}</State>;return <><p><Link className="button button-outline" to="/setup">Edit setup</Link></p><DashboardPage studentId={studentId} viewerRole={r}/></>}
+type WaitingTodo={eventName:string;label:string;responsible:'student'|'parent'|'coach'}
+function waitingSentence(todo:WaitingTodo,studentName:string,viewerRole:string){
+  const student=viewerRole==='student'?'your':`${studentName}'s`
+  const label=todo.label.toLowerCase()
+  if(todo.eventName==='Student setup')return `Waiting on ${studentName} to finish student setup.`
+  if(todo.eventName==='Profile & health')return `Waiting on ${viewerRole==='student'?'your parent':'a parent or guardian'} to finish ${student} health profile.`
+  if(todo.eventName==='FIRST registration and Consent & Release')return todo.responsible==='coach'?`Waiting on the Coach to confirm ${student} FIRST registration.`:`Waiting on ${viewerRole==='student'?'your parent':studentName} to complete ${student} FIRST registration.`
+  if(label.includes('permission')){
+    if(label.includes('student setup'))return `Waiting on ${studentName} to finish setup before the permission form for ${todo.eventName}.`
+    if(label.includes('health and contact'))return `Waiting for ${student} health profile before the permission form for ${todo.eventName}.`
+    if(todo.responsible==='coach')return label.includes('signing')?`Waiting on the Coach to open permission signing for ${todo.eventName}.`:`Waiting on the Coach to review ${student} permission form for ${todo.eventName}.`
+    return `Waiting on ${viewerRole==='student'?'your parent':'a parent or guardian'} to sign ${student} permission form for ${todo.eventName}.`
+  }
+  if(todo.responsible==='parent'&&label.includes('payment'))return `Waiting on your parent to review payment for ${todo.eventName}.`
+  if(todo.responsible==='student'&&label.includes('room'))return `Waiting on ${studentName} to choose room preferences for ${todo.eventName}.`
+  if(todo.responsible==='student'&&label.includes('first registration'))return `Waiting on ${studentName} to complete FIRST registration for ${todo.eventName}.`
+  if(todo.responsible==='coach'&&(label.includes('financial')||label.includes('fee maintenance')))return `Waiting on the Coach to review financial records for ${todo.eventName}.`
+  if(todo.responsible==='coach')return `Waiting on the Coach to review ${student} requirements for ${todo.eventName}.`
+  return `Waiting on ${todo.responsible==='student'?studentName:'a parent or guardian'} to complete ${student} requirements for ${todo.eventName}.`
+}
 function DashboardPage({studentId,viewerRole}:{studentId:string;viewerRole:string}) {
   const [asOf]=useState(Date.now)
   const data=useQuery(qDashboard,{studentId:sid(studentId),asOf})
@@ -115,12 +135,11 @@ function DashboardPage({studentId,viewerRole}:{studentId:string;viewerRole:strin
   const actionable=data.todos.filter(t=>!t.blocked&&!!t.href)
   const waiting=data.todos.filter(t=>t.blocked||!t.href)
   const todoGroups=Array.from(new Set(actionable.map(t=>t.eventId??t.eventName))).map(key=>({eventId:key,todos:actionable.filter(t=>(t.eventId??t.eventName)===key)}))
-  const waitingOn=Array.from(new Set(waiting.map(t=>t.responsible).filter(responsible=>responsible!==viewerRole))).map(responsible=>responsible==='parent'?'parent or guardian':responsible==='student'?'student':'Coach')
   return <>
     <Heading title={name(data.student)}/>
-    <div className="section-head"><h2>{familyCopy.dashboard.toDo} · {actionable.length}</h2></div>
+    {actionable.length>0&&<div className="section-head"><h2>{familyCopy.dashboard.toDo} · {actionable.length}</h2></div>}
     {actionable.length?<div className={familyStyles.todoGroups}>{todoGroups.map(group=><section key={group.eventId??'profile'} className={familyStyles.todoGroup}><h3>{group.todos[0].eventName}</h3><div className={familyStyles.todoCards}>{group.todos.map((t,i)=><article key={i} className={`card ${familyStyles.todoCard}`}><strong>{t.label}</strong>{t.dueAt&&<span className="muted">{familyCopy.dashboard.duePrefix} {date(t.dueAt)}</span>}{t.href&&<Link className="button button-primary" to={t.href}>{t.href==='/setup'?'Finish setup':t.href==='/profile'?'Open profile':t.href==='/forms'?'Open permission form':t.href==='/finances'?'Open Money':'View event'}</Link>}</article>)}</div></section>)}</div>:<State>{familyCopy.dashboard.caughtUp}</State>}
-    {waiting.length>0&&<p className="muted">{waitingOn.length?`Waiting on: ${waitingOn.join(', ')}.`:'Some steps are waiting for earlier requirements.'}</p>}
+    {waiting.map((todo,index)=><p className="muted" key={`${todo.eventId??'profile'}:${index}`}>{waitingSentence(todo,name(data.student),viewerRole)}</p>)}
     <div className="summary-grid">
       <FamilyFunding studentId={sid(studentId)} compact/>
       <section className="card"><div className="card-head"><h2>{familyCopy.dashboard.events}</h2><Link to="/events">{familyCopy.dashboard.allEvents}</Link></div><div className="event-mini-list">{data.events.length?data.events.map(x=><Link key={x.event._id} className="event-mini" to={`/events/${x.event._id}`}><div><strong>{x.event.name}</strong><span>{date(x.event.startsAt)} · {status(x.participation)}</span></div>{x.readiness.state!=='notApplicable'&&<span className={`badge badge-${x.readiness.state==='ready'?'ready':x.readiness.state==='open'?'open':'pending'}`}>{x.readiness.state==='open'?`${x.readiness.open.length} ${uiCopy.status.open.toLowerCase()}`:status(x.readiness.state)}</span>}</Link>):<p className="muted">{familyCopy.dashboard.noEvents}</p>}</div></section>
@@ -322,7 +341,7 @@ function SetupEntryGate({children}:{children:React.ReactNode}) {
 type FamilyPaging = { status: 'LoadingFirstPage'|'LoadingMore'|'CanLoadMore'|'Exhausted'; onMore:()=>void }
 function unavailableMessage(path:string) {
   if(path==='/setup')return 'Setup is for students and parents.'
-  if(path==='/team'||path.startsWith('/team/')||path==='/adults'||path==='/season'||path==='/retention'||path==='/events/new')return 'This page is for Coaches.'
+  if(path==='/team'||path.startsWith('/team/')||path==='/adults'||path==='/season'||path==='/retention'||path==='/events/new'||path==='/enroll')return 'This page is for Coaches.'
   if(path==='/events'||path.startsWith('/events/'))return 'Events are for students, parents, Coaches, and Travel Leads.'
   if(path==='/readiness'||path==='/reports'||path==='/fundraising'||path==='/withdrawals'||path==='/drivers'||path==='/permissions')return 'This page is for Coaches and Travel Leads.'
   if(path==='/attendance')return 'Attendance is for students, parents, and Coaches.'

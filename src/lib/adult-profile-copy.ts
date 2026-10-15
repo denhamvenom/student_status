@@ -1,5 +1,5 @@
 export const adultProfileCopy = {
-  title: 'My profile',
+  title: 'Profile',
   mentor: 'Mentor', travelLead: 'Travel Lead',
   setup: 'Add your shirt size to finish setting up.',
   about: 'About you', name: 'Name', phone: 'Phone', googleAccount: 'Google account', shirt: 'Shirt size (adult)',

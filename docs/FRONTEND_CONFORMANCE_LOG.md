@@ -274,3 +274,6 @@ Live fictional Student save/resume/Finish later/completion and Parent reuse/save
 
 ## October 15 — recheck and Mentor corrections
 See VISUAL_CHECKS.md current R1/M1-M4/S3/P mapping. Compared hosted Mentor report/profile styling with corrected phone light390 (document/client390) and desktop dark1440. Compact rows preserve hierarchy and reduce four-line cards; nav is Report/Profile/Settings. Both Mentor event routes denied live. Coach fundraising, empty Competition and Reports keyboard help observed. Private evidence is under wizard-corrections/recheck-mentor. Parent-specific states and post-kickoff Mentor display remain source evidence; no live fixtures changed. Shared disabled styling and source corrections reviewed; owner visual approval remains open. Full lint/types/build and focused regressions passed; Astra source review clear.
+
+## October15 final polish after 7fcd965
+Existing report heading rule lost to the shared .review h3 reset at equal specificity. Scoped card-content descendant selector now wins: both h3 headings measured32px margin and preceding gap at1440 and390; screenshots inspected. Empty Competition now has one message, event header and Manage event. Numbered1-7 mapping and launch-only signing-notice cleanup in VISUAL_CHECKS.md. Private screenshots in wizard-corrections/final-polish; viewport reset.

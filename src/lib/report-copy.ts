@@ -26,7 +26,7 @@ export const reportCopy = {
   financialMaintenanceFailed: 'Season fee maintenance needs Coach review. New financial changes remain unavailable.',
   committedTotals: 'Displayed amounts remain the recorded totals; processing may change them.',
   grossRaised: 'Gross Raised', teamGrossUnavailable: "Older fundraising credits don't include the full amount raised. Transfers and carried-over credit are not counted as money raised.",
-  teamGrossDefinition: 'Gross Raised is fundraising proceeds before the team/student split. Incoming transfers are not new amounts raised.',
+  teamGrossDefinition: 'Gross raised is the total before the team and student split.',
   activeStudents: 'Active students', inactiveStudents: 'Inactive students', travelTeam: 'Travel Team', rosterSummary: 'Current season roster totals',
   charged: 'Charged', applied: 'Applied to charges', available: 'Available funds', due: 'Balance due',
   personal: 'Available personal payments', fundraising: 'Available fundraising credit', earned: 'Earned from fundraisers',
