@@ -6,6 +6,7 @@ import { privateStudent, publicStudent } from "./access";
 import { calculateStudentFinance } from "./financeSummaries";
 import { permissionAccepted } from "./permissionCoverage";
 import { feeMaintenanceProjection } from "./seasonFinance";
+import { firstStatus } from "../firstRegistration";
 export { permissionAccepted } from "./permissionCoverage";
 
 type Ctx = QueryCtx | MutationCtx;
@@ -19,9 +20,10 @@ export async function financeFor(ctx: Ctx, studentId: Id<"students">) {
 }
 export async function studentReadiness(ctx: Ctx, event: Doc<"events">, student: Doc<"students">) {
   const open: string[] = [];
+  const firstRegistrationState = event.type === "Competition" ? await firstStatus(ctx, student._id) : null;
   const participant = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
-  if (enrollmentPending(event)) return { state: "open" as const, open: ["Whole Team enrollment is not complete."], participation: participant?.status ?? null, permissionStatus: "unknown" as const };
-  if (participant?.status !== "confirmed") return { state: "notApplicable" as const, open, participation: participant?.status ?? null, permissionStatus: "notApplicable" as const };
+  if (enrollmentPending(event)) return { state: "open" as const, open: ["Whole Team enrollment is not complete."], participation: participant?.status ?? null, permissionStatus: "unknown" as const, firstRegistrationState };
+  if (participant?.status !== "confirmed") return { state: "notApplicable" as const, open, participation: participant?.status ?? null, permissionStatus: "notApplicable" as const, firstRegistrationState };
   const financialAccount = await ctx.db.query("financialAccounts").withIndex("by_studentId", q => q.eq("studentId", student._id)).unique();
   const maintenance = await feeMaintenanceProjection(ctx, event.seasonId);
   if (maintenance && maintenance.state !== "ready") open.push("Season fee maintenance is not complete");
@@ -32,7 +34,8 @@ export async function studentReadiness(ctx: Ctx, event: Doc<"events">, student: 
   const permissionStatus = !event.permissionRequired ? "notRequired" as const : await permissionAccepted(ctx, student._id, event._id) ? "accepted" as const : "missing" as const;
   if (permissionStatus === "missing") open.push("Permission accepted");
   const completions = await ctx.db.query("requirementCompletions").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(101);
-  if (event.firstRequired && !completions.some(x => x.key === "first")) open.push("FIRST registration");
+  if (event.type === "Competition") { if (firstRegistrationState !== "verified") open.push("FIRST registration and Consent & Release"); }
+  else if (event.firstRequired && !completions.some(x => x.key === "first")) open.push("FIRST registration");
   const custom = await ctx.db.query("requirements").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(101);
   if (completions.length > 100 || custom.length > 100) open.push("Event requirements require review");
   for (const requirement of custom) if (!completions.some(x => x.key === requirement.key)) open.push(requirement.label);
@@ -47,7 +50,7 @@ export async function studentReadiness(ctx: Ctx, event: Doc<"events">, student: 
     }
     if (!complete) open.push("Room selection");
   }
-  return { state: open.length ? "open" as const : "ready" as const, open, participation: participant.status, permissionStatus };
+  return { state: open.length ? "open" as const : "ready" as const, open, participation: participant.status, permissionStatus, firstRegistrationState };
 }
 
 export async function attendanceFor(ctx: Ctx, student: Doc<"students">) {

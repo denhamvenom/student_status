@@ -259,3 +259,10 @@ Exact attendance showed 59min48s scheduled/longest visit and explained the one-h
 Evidence distinctions: live interactions and DOM dimensions cover the requested matrix; representative settled visual captures were inspected. Some automatic screenshots captured preceding frames, wrong themes or distorted scaling; reject those as visual proof. The complete matrix is not a claim of screenshot comparison for every combination. Reliable examples: student-attendance-exact-time.jpg, coach-empty-basics-settled.jpg, coach-390-dark-account.jpg, parent-home-settled.jpg in private-data/visual-checks/round2. Existing prototype comparison remains valid for unchanged typography/colors/navigation; no restyle. Owner live visual review remains open, including lower receipt/export sections. No screenshot or account-specific evidence enters Git.
 
 Synthetic render tests verify failure/processing/held/retry wording and Join/Waiting Sign out controls; not live backend transitions or signout clicks. All temporary viewport overrides reset and dark themes restored. No records, links, grants or signatures changed. PDF, source-money calculations and Timeclock contracts unchanged.
+
+
+## October 15 — Parent and Student wizard batch
+
+Centered full-page cards use existing Anton headings, purple/gold tokens, Base UI controls and responsive form spacing. Parent has four steps; Student three. Live review removed duplicate child selection and corrected the Home setup link label/grouping. Parent phone light medical controls and Student desktop dark completion were inspected; phone width390/scrollWidth375. Private screenshots are in private-data/visual-checks/wizard. Parent theme restored dark; phone override reset.
+
+Live fictional Student save/resume/Finish later/completion and Parent reuse/save/completion observed. Coach FIRST settings, roster and verification controls observed without asserting real registration. Actual FIRST link/QR remains owner input. Astra review found no remaining blockers after scoped corrections. No PDF/template, finance calculations or Timeclock contract changed. See VISUAL_CHECKS.md for current matrix and check results.

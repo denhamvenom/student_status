@@ -24,7 +24,7 @@ async function fixture() {
     const other = await ctx.db.insert("students", { seasonId: season, userId: otherUser, legalName: "Other Example", preferredName: "Other", email: "other@example.org", subteam: "Programming", active: true, travelTeam: true, roomCategory: "Boys", roomCategoryLocked: true, allergies: { state: "none" }, medications: { state: "none" } });
     await ctx.db.insert("familyLinks", { parentUserId: parent, studentId: student, active: true, createdBy: coach });
     const event = await ctx.db.insert("events", { seasonId: season, name: "Regional", type: "Competition", startsAt: 1000000, endsAt: 2000000, destination: "City", travel: "Vehicles", overnight: false, roomingEnabled: false, feeCents: 45000, signupMode: "approval", capacity: 1, allowWithdrawal: true, permissionRequired: false, firstRequired: false, archived: false });
-    return { student, other, event, authCoach, authParent, authMentor, authStudent, authOther };
+    return { student, other, event, parent, authCoach, authParent, authMentor, authStudent, authOther };
   });
   const parent = t.withIdentity({ subject: `${ids.authParent}|session1` });
   const mentor = t.withIdentity({ subject: `${ids.authMentor}|session1` });
@@ -42,8 +42,9 @@ describe("server boundaries", () => {
     expect(initialParent.todos.map(item => item.label)).toContain("Finish the health and contact profile");
     expect(initialParent.todos.some(item => item.eventId === f.ids.event)).toBe(false);
     const initialStudent = await f.student.query(api.app.studentDashboard, {studentId: f.ids.student});
-    expect(initialStudent.todos).toMatchObject([{eventId: null, responsible: "student", href: "/profile", blocked: false}, {eventId: null, responsible: "parent", href: null, blocked: true}]);
-    await f.t.run(ctx => ctx.db.patch(f.ids.student, {profileCompletedAt: 1, consentProfileV2CompletedAt: 2}));
+    expect(initialStudent.todos).toEqual(expect.arrayContaining([expect.objectContaining({eventId: null, responsible: "student", href: "/setup", blocked: false}), expect.objectContaining({eventId: null, responsible: "parent", href: null, blocked: true}), expect.objectContaining({eventId: null, eventName: "FIRST registration and Consent & Release"})]));
+    await f.t.run(ctx => ctx.db.patch(f.ids.student, {profileCompletedAt: 1, shirtSize: "M", consentProfileV2CompletedAt: 2, consentProfileV2ConfirmedBy: f.ids.parent, consentProfileV2: {grade:"11",dateOfBirth:"2010-01-01",guardian:{name:"Fictional Parent",relationship:"Parent",phone:"555-0100",email:"parent@example.org"},emergency:{name:"Fictional Emergency",relationship:"Family",phone:"555-0101"},allergies:{state:"none",entries:[]},prescriptions:{state:"none",entries:[]},insurance:{state:"unavailable",provider:null,policy:null},physician:{state:"unavailable",name:null,phone:null}} }));
+    await f.coach.mutation(api.firstRegistration.verify, {studentId:f.ids.student,expectedRevision:0,teamAccepted:true,consentRelease:true});
     expect((await f.parent.query(api.app.studentDashboard, {studentId: f.ids.student})).todos).toHaveLength(0);
     await f.coach.mutation(api.participation.setParticipation, {eventId: f.ids.event, studentId: f.ids.student, status: "confirmed"});
     const parent = await f.parent.query(api.app.studentDashboard, {studentId: f.ids.student});

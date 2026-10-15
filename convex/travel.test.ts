@@ -33,6 +33,7 @@ async function fixture() {
     const oldEvent = await ctx.db.insert("events", { seasonId: oldSeason, name: "Old", type: "Team", startsAt: 1, endsAt: 2, destination: "Example", travel: "Vehicles", overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "assigned", allowWithdrawal: false, permissionRequired: false, firstRequired: false, archived: false });
     const participant = await ctx.db.insert("participants", { eventId: event, studentId, status: "confirmed", createdAt: 0, updatedAt: 0 });
     await ctx.db.insert("participants", { eventId: event, studentId: otherId, status: "confirmed", createdAt: 0, updatedAt: 0 });
+    for (const targetStudentId of [studentId,otherId]) await ctx.db.insert("firstRegistrationStates",{studentId:targetStudentId,seasonId:season,status:"verified",revision:1,teamAccepted:true,consentRelease:true,verifiedBy:coach.user,verifiedAt:0});
     return { coach, lead, mentor, parent, studentUser, otherUser, season, studentId, otherId, event, oldEvent, participant };
   });
   const as = (auth: typeof ids.coach.auth) => t.withIdentity({ subject: `${auth}|session` });

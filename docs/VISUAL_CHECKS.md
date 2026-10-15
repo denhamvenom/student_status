@@ -1,6 +1,19 @@
-> October 14 planning update: Parent setup usability batch is documented but NOT STARTED. Await explicit user instruction before development. Second-round checkpoint cb0d47f and completed evidence are preserved. Final visual approval follows the new batch. See [PARENT_SETUP_BATCH.md](PARENT_SETUP_BATCH.md).
+# Current visual review — Parent and Student wizard, October 15
 
-Existing correction evidence below applies to cb0d47f. The Parent wizard does not exist yet.
+Implementation is complete in development; owner visual approval is pending. Earlier correction evidence below remains valid for unchanged surfaces.
+
+| Surface | Completed evidence | Owner review / limit |
+| --- | --- | --- |
+| Student setup | Live fictional first-step save, exact five subteam choices, locked category, initial assignment, Finish later, resume to step3 and completion. Minor sees Parent guidance without invitation/report controls. | Review wording and ease of use at /setup. |
+| Parent setup | Live linked-child selection; completed sections skipped; existing contacts, allergy/prescription and insurance/physician values prefilled; contacts/medical save and finish succeed without FIRST completion. | Review four steps and switching children. |
+| FIRST and Coach | Settings link/optional QR controls, missing-link guidance, roster season status and both-condition verification controls inspected live. | Actual invitation link/QR not supplied. Coach must provide the real season invitation. |
+| Shared correctness | Focused tests cover revisions, second-Parent shared completion, Student medical minimization, Chicago birthday, initial subteam protection, Parent report versus Coach verification, multiple Competitions, reopen, next season and legacy Team evidence. Astra review closed all blockers. | Adult UI, QR upload and a full live FIRST report/verify cycle were not rehearsed; no real FIRST integration or verification claimed. |
+| Visual style | Existing hosted-prototype tokens/components retained. Representative desktop dark and phone390 light inspected; no phone document overflow (scrollWidth375). Private parent-phone-medical.png and student-complete.png. | Representative scope, not every step/theme/device screenshot. |
+| Preserved work | Approved PDF/generator and signed history unchanged. Existing PDF/CSV download/open evidence reused. | CSV cents headings remain deferred by user. Final owner approval and production launch remain separate. |
+
+Validation: integrated lint/types passed. Full tests ran outside sandbox after the documented Windows temporary-file error; three old expectations were updated for the intended /setup and automatic Competition FIRST behavior, and both affected files passed focused reruns. The new Parent lifecycle test passed separately. Final typecheck/build passed after the Home label/selector changes. Packaging dry-run completed successfully; only the external Wrangler log-file write was blocked by sandbox permissions. No deployment. No repeated whole-app review. Dev sync: third-bandicoot-18, October15 08:44:23. Temporary Parent phone viewport reset and original dark theme restored.
+
+## Preserved second-round evidence
 
 ## Second-round corrections — October 14, 2026
 

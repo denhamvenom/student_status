@@ -98,6 +98,7 @@ export const recordRequirement = mutation({
     const event = await ctx.db.get(args.eventId); const student = await ctx.db.get(args.studentId);
     const season = await activeSeason(ctx);
     if (!event || !student || !student.active || event.seasonId !== season._id || student.seasonId !== season._id || ["pay", "perm", "room"].includes(args.key)) throw new Error("Invalid requirement.");
+    if (event.type === "Competition" && args.key === "first") throw new Error("Competition FIRST verification is managed on the Coach student record.");
     requireEnrollmentComplete(event);
     if (args.key !== "first") {
       const requirement = await ctx.db.query("requirements").withIndex("by_eventId_and_key", q => q.eq("eventId", event._id).eq("key", args.key)).unique();

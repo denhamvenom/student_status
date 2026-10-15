@@ -8,12 +8,13 @@ import { studentReadiness } from "./lib/readModels";
 import { financeRow } from "./lib/financeRow";
 import { boundedFinancePage } from "./financeAdmin";
 import { enrollmentPending } from "./lib/eventEnrollmentState";
+import { firstStatus } from "./firstRegistration";
 
 const nullableMoney = v.union(v.number(), v.null());
 const balanceValidator = v.object({ state: v.union(v.literal("ready"), v.literal("updating"), v.literal("failed"), v.literal("uninitialized")), dueCents: nullableMoney, personalAvailableCents: nullableMoney, fundraisingAvailableCents: nullableMoney, updatedAt: nullableMoney });
 const accountValidator = v.object({ linkage: v.union(v.literal("linked"), v.literal("unlinked"), v.literal("unavailable")), access: v.union(v.literal("active"), v.literal("inactive"), v.literal("unknown")) });
 const eventValidator = v.union(v.null(), v.object({ eventId: v.id("events"), name: v.string(), startsAt: v.number(), participation: v.union(v.literal("confirmed"), v.literal("pending"), v.literal("waitlist"), v.literal("withdrawn"), v.null()), state: v.union(v.literal("ready"), v.literal("open"), v.literal("unknown")), open: v.array(v.string()) }));
-const rowValidator = v.object({ studentId: v.id("students"), name: v.string(), subteam: v.string(), travelTeam: v.boolean(), active: v.boolean(), profileRevision: v.number(), account: accountValidator, balance: balanceValidator, nextEvent: eventValidator, readinessCoverage: v.union(v.literal("complete"), v.literal("unknown"), v.literal("notApplicable")), missingSummary: v.array(v.string()) });
+const rowValidator = v.object({ studentId: v.id("students"), name: v.string(), subteam: v.string(), travelTeam: v.boolean(), active: v.boolean(), profileRevision: v.number(), firstRegistrationState: v.union(v.literal("needsCompletion"),v.literal("awaitingVerification"),v.literal("verified")), account: accountValidator, balance: balanceValidator, nextEvent: eventValidator, readinessCoverage: v.union(v.literal("complete"), v.literal("unknown"), v.literal("notApplicable")), missingSummary: v.array(v.string()) });
 
 function missingInformation(student: Doc<"students">) {
   const missing: string[] = [];
@@ -56,9 +57,9 @@ async function nextEvent(ctx: QueryCtx, student: Doc<"students">, upcoming: Upco
 }
 
 async function rosterRow(ctx: QueryCtx, student: Doc<"students">, upcoming: Upcoming) {
-  const [finance, account] = await Promise.all([financeRow(ctx, student._id), accountStatus(ctx, student)]);
+  const [finance, account, firstRegistrationState] = await Promise.all([financeRow(ctx, student._id), accountStatus(ctx, student), firstStatus(ctx, student._id)]);
   const event = await nextEvent(ctx, student, upcoming, finance.state);
-  return { studentId: student._id, name: student.preferredName || student.legalName, subteam: student.subteam, travelTeam: student.travelTeam, active: student.active, profileRevision: student.profileRevision ?? 0, account, balance: { state: finance.state, dueCents: finance.dueCents, personalAvailableCents: finance.personalAvailableCents, fundraisingAvailableCents: finance.fundraisingAvailableCents, updatedAt: finance.updatedAt }, ...event, missingSummary: missingInformation(student) };
+  return { studentId: student._id, name: student.preferredName || student.legalName, subteam: student.subteam, travelTeam: student.travelTeam, active: student.active, profileRevision: student.profileRevision ?? 0, firstRegistrationState, account, balance: { state: finance.state, dueCents: finance.dueCents, personalAvailableCents: finance.personalAvailableCents, fundraisingAvailableCents: finance.fundraisingAvailableCents, updatedAt: finance.updatedAt }, ...event, missingSummary: missingInformation(student) };
 }
 
 export const list = query({

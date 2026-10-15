@@ -1,6 +1,10 @@
 # Student Status implementation plan
 
-## Current authorized batch — October 14
+## Current checkpoint — October 15
+
+Parent and Student setup batch implemented under PARENT_SETUP_BATCH.md; owner visual review next. Season FIRST verification automatically applies to every Competition. Preserve completed G1–G7 and approved PDF. CURRENT_STATE.md and VISUAL_CHECKS.md hold current evidence.
+
+## Preserved authorized PDF batch — October 14
 
 Implement [populated field-trip PDF consent](FIELD_TRIP_PDF_PLAN.md): completed student setup and Parent profile before PDF review/signing, structured allergy/prescription entries, no active Medication Choices/OTC policy, minor first aid retained, immutable exact PDF and checkbox/typed signature. Preserve legacy receipts and existing gates. This scoped batch supersedes the consent details below; broader G1–G7 scope is unchanged.
 

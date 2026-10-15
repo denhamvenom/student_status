@@ -1,6 +1,6 @@
 # Parent and Student setup usability batch
 
-Approved for planning October 14, 2026; Student wizard and initial subteam selection added October 15, 2026. **PLANNED — development is on hold until the user explicitly instructs us to begin.** Document approval does not authorize implementation, backend changes, account changes or deployment.
+Implementation authorized October 15, 2026. **IMPLEMENTED — owner visual review pending.** Parent and Student wizards, shared profile saving and season-wide FIRST verification are synchronized to development. Production remains separately gated. See VISUAL_CHECKS.md for observed evidence and limits.
 
 ## Purpose and placement
 
@@ -69,13 +69,13 @@ Current source baseline: events.firstRequired and requirementCompletions keyed b
 
 Show an official instructions link and short guidance: Parent FIRST account, My Roles / Parent/Guardian, select or add youth, Acknowledgement Forms / Consent & Release, apply to FIRST Robotics Competition Team 8044 if needed. Existing official guidance also permits youth aged 18 or older to register/sign themselves. Recheck instructions when implementing because FIRST navigation can change. Reference: https://www.firstinspires.org/programs/youth-registration (consulted October 14, 2026).
 
-The minimum durable status and readiness changes may need a small backward-compatible schema/API extension. This is a scoped exception to the earlier no-planned-schema-change statement, not authorization to implement now. Inspect existing capabilities first; do not add a FIRST integration, proof-upload requirement or extra verification roles. Allow only the narrowly scoped Student profile/subteam and age-eligible reporting permissions specified in this batch. Consequential authorization/readiness changes receive Astra review.
+The batch uses backward-compatible setup-draft, season invitation and student FIRST-status records. This is the scoped exception to the earlier no-planned-schema-change statement. No FIRST integration, proof-upload requirement or extra verification roles were added. Student profile/subteam and age-eligible reporting permissions stay within this batch. Consequential authorization/readiness changes received Astra review.
 
 ## Explicit exclusions
 
 Permission-slip review, PDF generation, signing and blanket all-events consent are excluded from this wizard. Existing approved PDF wording/layout, coverage rules, signature requirements and historical receipts remain unchanged and separate. No Medication Choices, extra policies, general redesign, payment changes, Timeclock changes, account reassignment, production deployment, main merge or destructive retention. CSV cents headings remain deferred.
 
-## Implementation sequence — only after start instruction
+## Implementation sequence — completed October 15
 
 1. Inspect existing fields/completeness, Parent update authorization and event classification; resolve only necessary gaps.
 2. Reuse forms in the four-step Parent and three-step Student flows with saving/resume, shared completeness and Parent multiple-student selection; implement initial subteam selection and existing Coach correction access.

@@ -1,8 +1,6 @@
-> October 14 planning update: Parent setup usability batch is documented but NOT STARTED. Await explicit user instruction before development. Second-round checkpoint cb0d47f and all completed evidence are preserved. Final visual approval follows the new batch. See [PARENT_SETUP_BATCH.md](PARENT_SETUP_BATCH.md).
-
 # Student Status Development Checklist
 
-Updated October 14, 2026. Current disposition supersedes dated unchecked boxes below. Original G1–G7 scope is preserved. Original implementation and evidence remain complete. The planned Parent batch precedes final visual approval; development is on hold.
+Updated October 15, 2026. Parent and Student wizard batch implemented in development; owner visual approval remains open. Current disposition supersedes historical unchecked boxes. Original G1–G7 scope and valid evidence are preserved.
 
 ## Completion batches
 
@@ -13,7 +11,7 @@ Updated October 14, 2026. Current disposition supersedes dated unchecked boxes b
 - [x] Consolidated Astra review: no blocking findings at the representative scope. No new public API, schema or migration.
 - [x] User confirmed signed PDF opens and Reports CSV downloads.
 - [x] User confirmed CSV opens correctly; friendlier cents headings/units deferred until after launch by explicit request.
-- [ ] Parent and Student setup usability batch — planned only; await explicit start instruction. Includes three-step Student setup and initial subteam selection (Build, Electrical, Programming, Machining, Business), Coach corrections, and shared season FIRST team acceptance + Consent & Release for Parent/Student/Coach, automatically required for every Competition. See PARENT_SETUP_BATCH.md.
+- [x] Parent and Student setup usability batch — implemented and reviewed; live representative workflows and focused checks complete. Includes three-step Student setup and initial subteam selection (Build, Electrical, Programming, Machining, Business), Coach corrections, and shared season FIRST team acceptance + Consent & Release for Parent/Student/Coach, automatically required for every Competition. See PARENT_SETUP_BATCH.md.
 - [ ] Coach visual approval using VISUAL_REVIEW_GUIDE.md.
 
 ## Preserved G1–G7 outcomes

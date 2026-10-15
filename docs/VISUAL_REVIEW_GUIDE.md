@@ -1,3 +1,14 @@
+## Start with the new setup workflows — October 15
+
+At http://localhost:5173, sign in with the existing role windows. Use Home → Review setup information to reopen /setup even after completion.
+
+1. Student: About you, Team details, Parent connection / FIRST. Review the five subteams, protected assignments, Save and continue, Back and Finish later. A minor sees Parent guidance; eligible adults can use the FIRST invitation themselves.
+2. Parent: select a student, review details, contacts, medical and FIRST. Already completed sections are skipped; Back lets you inspect them. Setup can finish before FIRST is verified. PDF signing remains separate.
+3. Coach: Settings → FIRST team invitation; Team roster → student → FIRST registration and Consent & Release. Both team acceptance and release must be checked before verification. This one season status applies to every Competition.
+4. Review the same pages on a phone. The real FIRST link is currently missing, so Contact your Coach is expected. Do not claim actual FIRST completion for test records.
+
+These additions follow the hosted prototype styling while retaining later approved features. Final visual approval is still yours; launch requires separate approval. The existing review guide below remains applicable to preserved work.
+
 > October 14 planning update: Parent setup usability batch is documented but NOT STARTED. Await explicit user instruction before development. Second-round checkpoint cb0d47f and completed evidence are preserved. Final visual approval follows the new batch. See [PARENT_SETUP_BATCH.md](PARENT_SETUP_BATCH.md).
 
 Existing correction evidence below applies to cb0d47f. The Parent wizard does not exist yet.

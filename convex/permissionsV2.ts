@@ -79,6 +79,8 @@ export const saveProfile = mutation({
     if ((student.profileRevision ?? 0) !== args.expectedRevision) throw new Error("Profile changed. Reload before saving.");
     const value = validateConsentProfileV2(args.value);
     if (Date.parse(`${value.dateOfBirth}T00:00:00Z`) >= Date.now()) throw new Error("Date of birth must be in the past.");
+    const setupDraft = await ctx.db.query("setupDrafts").withIndex("by_studentId", q => q.eq("studentId", student._id)).unique();
+    if (setupDraft) await ctx.db.delete(setupDraft._id);
     await ctx.db.patch(student._id, {consentProfileV2: value, consentProfileV2CompletedAt: Date.now(), consentProfileV2ConfirmedBy: actor._id, profileRevision: args.expectedRevision + 1});
     await audit(ctx, actor, "students", student._id, "confirmStructuredConsentProfile", {revision: args.expectedRevision}, {revision: args.expectedRevision + 1, completed: true});
     return null;
