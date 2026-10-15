@@ -27,6 +27,7 @@ function MaintenanceContent() {
   const mounted = useRef(true)
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const retryValid = reason.trim().length >= 8 && reason.trim().length <= 500
+  if (status?.state === 'complete' && status.unresolved === 0) return null
   async function request(event?: FormEvent) {
     event?.preventDefault()
     if (pending.current || status === undefined || status?.state === 'running' || status?.state === 'complete' || status?.state === 'failed' && !retryValid) return
@@ -41,8 +42,8 @@ function MaintenanceContent() {
   return <Card><CardHeader><CardTitle>{copy.title}</CardTitle></CardHeader><CardContent className="flex flex-col gap-3">
     <p>{copy.description}</p>
     {status === undefined ? <p role="status">{copy.loading}</p> : <>
-      {!status || status.state === 'pending' ? <p>{copy.pending}</p> : status.state === 'complete' ? <p role="status">{copy.complete}</p> : status.state === 'failed' ? <p role="alert">{copy.failed}</p> : <p role="status">{copy.running} {status.phase === 'backfill' ? copy.backfill : copy.verify}.</p>}
-      {status && <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1"><dt>{copy.scanned}</dt><dd>{status.scanned}</dd><dt>{copy.unresolved}</dt><dd>{status.unresolved}</dd></dl>}
+      {!status || status.state === 'pending' ? <p>{copy.pending}</p> : status.state === 'complete' ? <p role="status">{status.unresolved} family link{status.unresolved===1?'':'s'} need attention.</p> : status.state === 'failed' ? <p role="alert">{copy.failed}</p> : <p role="status">{copy.running} {status.phase === 'backfill' ? copy.backfill : copy.verify}.</p>}
+      {status && status.state !== 'complete' && <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1"><dt>{copy.scanned}</dt><dd>{status.scanned}</dd><dt>{copy.unresolved}</dt><dd>{status.unresolved}</dd></dl>}
       {(!status || status.state === 'pending') && <Button className="self-start" type="button" disabled={busy} onClick={() => void request()}>{busy ? copy.starting : copy.start}</Button>}
       {status?.state === 'failed' && <>
         {status.lastError && <p role="alert">{status.lastError}</p>}

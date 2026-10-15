@@ -4,6 +4,15 @@ Updated October 15, 2026. Parent and Student wizard batch implemented in develop
 
 ## Completion batches
 
+### October 15 wizard-review correction batch
+
+- [x] B1–B3 and W1–W4 implemented; full updated cutting pass mapped row-by-row in VISUAL_CHECKS.md.
+- [x] Focused setup/Home/travel regressions, lint, typecheck/build and packaging dry-run passed; Astra consequential finding corrected and closed.
+- [x] Development backend synchronized October 15 at 10:20 America/Chicago; no schema, permissions, financial or Timeclock contract changes.
+- [x] Parent phone FIRST at360/390, single report, Waiting on Coach, completion summary; Student minor Home/setup/completion; Coach Verify/Reopen and settings checked live. Conditional fixture limitations recorded in VISUAL_CHECKS.md.
+- [ ] Owner visual recheck of the correction candidate.
+
+
 - [x] Approved original-logo PDF: completed profile required, populated review, checkbox and typed signature, saved immutable receipt and Coach acceptance. Ordinary examples remain one page with signature/date in original slots. Genuine overflow continues losslessly; historical receipts preserved.
 - [x] Operational journeys: current-season room/deadline, paid withdrawal with original-source return and canceled charge, released room membership and scoped withdrawn-room recovery verified with fictional data. Existing room invitation/acceptance and Parent-isolation checks reused.
 - [x] Production-language review: route/role inventory completed using live representative pages, source review and retained evidence. User-friendly status labels, accurate Available funds label and fee order positions replace internal values. See VISUAL_CHECKS.md.

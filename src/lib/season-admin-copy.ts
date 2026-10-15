@@ -18,7 +18,7 @@ export const seasonAdminCopy = {
   discardReason: 'Reason for discarding this draft',
   activeSeason: 'Current season',
   verifiedKickoff: (date: string) => `FIRST kickoff: ${date} (America/Chicago)`,
-  unverifiedKickoff: 'The FIRST kickoff date for this competition year has not been verified. Build-season reporting remains unavailable.',
+  unverifiedKickoff: 'Attendance totals start at kickoff.',
   rosterDescription: 'Choose Returning or Departing for each student. An undecided student stays undecided; saving a draft never archives anyone.',
   staleDecision: 'Student changed since this choice. Review and save the choice again.',
   undecided: 'Undecided',

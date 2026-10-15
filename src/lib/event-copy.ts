@@ -20,7 +20,7 @@ export const eventCopy = {
   fields: {
     name: 'Name', type: 'Type', starts: 'Starts', ends: 'Ends', destination: 'Destination',
     capacity: 'Participant limit (optional)', fee: 'Event fee (USD)',
-    permission: 'Permission accepted', first: 'FIRST registration',
+    permission: 'Permission form', first: 'Require FIRST registration for this event',
     travelArrangement: 'Travel arrangement', overnight: 'Overnight event',
     rooming: 'Enable room selection', roomDeadline: 'Room selection deadline',
   },

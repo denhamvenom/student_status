@@ -49,6 +49,11 @@ describe("shared setup and season FIRST registration", () => {
     expect(first).toMatchObject({adultEligible:false,canAccessInvitation:false,canReport:false});
     await expect(f.student.mutation(api.firstRegistration.report,{studentId:f.ids.student,expectedRevision:0})).rejects.toThrow("linked parent");
     expect((await f.student.query(api.setupWizard.get,{studentId:f.ids.student})).medical).toBeNull();
+    const minorTodo=(await f.student.query(api.app.studentDashboard,{studentId:f.ids.student,asOf:Date.parse("2026-10-15T05:00:00Z")})).todos.find(item=>item.eventName==="FIRST registration and Consent & Release");
+    expect(minorTodo).toMatchObject({label:"Your parent completes FIRST registration.",href:null,responsible:"parent",blocked:true});
+    await f.student.mutation(api.setupWizard.saveStudentAbout,{studentId:f.ids.student,expectedRevision:1,preferredName:"Synthetic",grade:"11",dateOfBirth:"2008-10-15"});
+    const adultTodo=(await f.student.query(api.app.studentDashboard,{studentId:f.ids.student,asOf:Date.parse("2026-10-15T05:00:00Z")})).todos.find(item=>item.eventName==="FIRST registration and Consent & Release");
+    expect(adultTodo).toMatchObject({href:"/setup",responsible:"student",blocked:false});
   });
 
   it("allows initial subteam choice, preserves legacy assignment, and shares parent revisions", async () => {
@@ -66,22 +71,28 @@ describe("shared setup and season FIRST registration", () => {
   it("confirms a saved Parent profile, waits for Coach after self-report, and starts a new season unverified", async () => {
     const f=await fixture();
     const studentId=f.ids.student;
+    expect((await f.parent.mutation(api.setupWizard.summary,{})).students[0]).toMatchObject({nextItem:"studentDetails",needsSetup:true});
     let revision=await f.parent.mutation(api.setupWizard.saveParentStudent,{studentId,expectedRevision:0,shirtSize:"M",roomCategory:"Boys",grade:"11",dateOfBirth:"2010-10-15"});
+    expect((await f.parent.mutation(api.setupWizard.summary,{})).students[0]).toMatchObject({nextItem:"contacts",needsSetup:true});
     revision=await f.parent.mutation(api.setupWizard.saveContacts,{studentId,expectedRevision:revision,guardian:{name:"Fictional Guardian",relationship:"Parent",phone:"555-0100",email:"guardian@example.invalid"},emergency:{name:"Fictional Contact",relationship:"Aunt",phone:"555-0101"}});
+    expect((await f.parent.mutation(api.setupWizard.summary,{})).students[0]).toMatchObject({nextItem:"medical",needsSetup:true});
     revision=await f.parent.mutation(api.setupWizard.saveMedical,{studentId,expectedRevision:revision,allergies:{state:"none",entries:[]},prescriptions:{state:"none",entries:[]},insurance:{state:"unavailable",provider:null,policy:null},physician:{state:"unavailable",name:null,phone:null}});
     expect((await f.parent2.query(api.setupWizard.get,{studentId})).student.parentComplete).toBe(false);
+    expect((await f.parent2.mutation(api.setupWizard.summary,{})).students[0]).toMatchObject({nextItem:"finishSetup",needsSetup:true});
     revision=await f.parent.mutation(api.setupWizard.finishParent,{studentId,expectedRevision:revision});
+    expect((await f.parent.mutation(api.setupWizard.summary,{})).students[0]).toMatchObject({nextItem:"first",needsSetup:true});
     const secondParent=await f.parent2.query(api.setupWizard.get,{studentId});
     expect(secondParent).toMatchObject({revision,student:{parentComplete:true,contactsComplete:true,medicalComplete:true},contacts:{guardian:{name:"Fictional Guardian"}},medical:{allergies:{state:"none"}}});
     expect((await f.student.query(api.setupWizard.get,{studentId}))).toMatchObject({contacts:null,medical:null});
     const reportedRevision=await f.parent2.mutation(api.firstRegistration.report,{studentId,expectedRevision:0});
     expect(reportedRevision).toBe(1);
     expect(await f.parent.mutation(api.firstRegistration.get,{studentId})).toMatchObject({status:"awaitingVerification",canReport:false,teamAccepted:false,consentRelease:false});
+    expect((await f.parent.mutation(api.setupWizard.summary,{})).students[0]).toMatchObject({nextItem:"waitingCoach",needsSetup:false});
     const pending=await f.coach.query(api.app.eventDetail,{eventId:f.ids.events[0],studentId});
     if(!pending.readiness)throw new Error("Expected a student readiness result.");
     expect(pending.readiness.open).toContain("FIRST registration and Consent & Release");
     await f.coach.mutation(api.firstRegistration.verify,{studentId,expectedRevision:reportedRevision,teamAccepted:true,consentRelease:true});
-    expect((await f.parent2.mutation(api.setupWizard.summary,{})).students[0]).toMatchObject({parentComplete:true,firstState:"verified",needsSetup:false});
+    expect((await f.parent2.mutation(api.setupWizard.summary,{})).students[0]).toMatchObject({parentComplete:true,firstState:"verified",nextItem:"done",needsSetup:false});
     const nextStudent=await f.t.run(async ctx=>{
       await ctx.db.patch(f.ids.season,{status:"archived"});
       const season=await ctx.db.insert("seasons",{name:"Next synthetic",year:2027,status:"active",startsAt:1,permissionVersion:"DRAFT",createdBy:f.ids.auth[0].app});

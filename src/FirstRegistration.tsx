@@ -63,11 +63,10 @@ function InvitationEditor({settings}:{settings:Invitation}) {
     } catch (cause) {setError(failure(cause))} finally {setBusy(false)}
   }
 
-  return <Card><CardHeader><CardTitle>FIRST team invitation</CardTitle><CardDescription>Set the FIRST-provided invitation link for this season. This is separate from Student Status parent invitations.</CardDescription></CardHeader><CardContent className="grid gap-4">
-    <p className="text-sm text-muted-foreground">Parents or eligible adult students use this link to register with FIRST and complete the current-season Consent &amp; Release. A Coach still verifies both FIRST team acceptance and the release.</p>
+  return <Card><CardHeader><CardTitle>FIRST team invitation</CardTitle><CardDescription>Paste the team invitation link from FIRST. Families see it during setup.</CardDescription></CardHeader><CardContent className="grid gap-4">
     <form className="grid gap-4" onSubmit={event=>void submit(event)}>
       <label className="grid gap-2">FIRST team invitation link<Input type="url" inputMode="url" required value={url} disabled={busy || stale} onChange={event=>{setUrl(event.target.value);setSaved(false);setQrChecked(false)}} placeholder="https://" /></label>
-      <label className="grid gap-2">FIRST-provided QR image (optional)<Input type="file" accept="image/*" disabled={busy || stale} onChange={event=>{setQrFile(event.target.files?.[0] ?? null);setSaved(false);setQrChecked(false)}} /></label>
+      <label className="grid gap-2">FIRST-provided QR image (optional)<Input className="file:mr-3 file:rounded-sm file:border-0 file:bg-secondary file:px-3 file:py-2 file:font-semibold file:text-secondary-foreground" type="file" accept="image/*" disabled={busy || stale} onChange={event=>{setQrFile(event.target.files?.[0] ?? null);setSaved(false);setQrChecked(false)}} /></label>
       {qrFile && <p className="text-sm text-muted-foreground">Selected image: {qrFile.name}. It will upload when you save.</p>}
       {!qrFile && qrStorageId && settings.qrUrl && <img className="max-h-40 max-w-40 object-contain" src={settings.qrUrl} alt="Current FIRST team invitation QR code" />}
       {qrStorageId && !qrFile && <Button type="button" variant="outline" disabled={busy || stale} onClick={()=>{setQrStorageId(null);setQrChecked(false);setSaved(false)}}>Remove QR image</Button>}
@@ -75,9 +74,9 @@ function InvitationEditor({settings}:{settings:Invitation}) {
       {hasQr && <label className="flex items-start gap-2"><Checkbox checked={qrChecked} disabled={busy || stale} onCheckedChange={setQrChecked}/><span>I checked that this QR code opens the invitation link above.</span></label>}
       {stale && <p role="status">Another Coach changed the invitation settings. Reload the saved values before editing. <Button type="button" variant="outline" onClick={reload}>Reload settings</Button></p>}
       {error && <p role="alert" className="open-text">{error}</p>}{saved && <p role="status" className="ready-text">FIRST team invitation saved for this season.</p>}
-      <div className="flex flex-wrap gap-2"><Button type="submit" disabled={busy || stale || !changed || !validUrl || oldQrCannotFollowNewLink || hasQr && !qrChecked}>{busy?'Saving…':'Save invitation'}</Button>{settings.url && <Button type="button" variant="outline" onClick={()=>void navigator.clipboard.writeText(settings.url!).catch(()=>setError('Could not copy the link. Select and copy it from the field instead.'))}>Copy saved link</Button>}</div>
+      <div className="flex flex-wrap gap-2"><Button type="submit" className="disabled:opacity-35" disabled={busy || stale || !changed || !validUrl || oldQrCannotFollowNewLink || hasQr && !qrChecked}>{busy?'Saving…':'Save invitation'}</Button>{settings.url && <Button type="button" variant="outline" onClick={()=>void navigator.clipboard.writeText(settings.url!).catch(()=>setError('Could not copy the link. Select and copy it from the field instead.'))}>Copy saved link</Button>}</div>
     </form>
-    {settings.url ? <a href={settings.url} target="_blank" rel="noopener noreferrer">Open saved FIRST team invitation</a> : <p role="status">No FIRST team invitation is saved yet. Families should contact a Coach until this is set.</p>}
+    {settings.url ? <a href={settings.url} target="_blank" rel="noopener noreferrer">Open saved FIRST team invitation</a> : <p role="status">Not set. Families are told to contact you.</p>}
     <a href={officialInstructions} target="_blank" rel="noopener noreferrer">Official FIRST youth registration instructions</a>
   </CardContent></Card>
 }
@@ -120,13 +119,13 @@ export function FirstStudentVerification({studentId}:{studentId:Id<'students'>})
       setRegistration(await get({studentId}))
     } catch(cause) {setError(failure(cause))} finally {setBusy(false)}
   }
-  return <Card><CardHeader><CardTitle>FIRST registration and Consent &amp; Release</CardTitle><CardDescription>One shared requirement for this student in the current season. Coach verification controls Competition readiness.</CardDescription></CardHeader><CardContent className="grid gap-4">
+  return <Card><CardHeader><CardTitle>FIRST registration and Consent &amp; Release</CardTitle><CardDescription>Covers every Competition this season.</CardDescription></CardHeader><CardContent className="grid gap-4">
     {loading ? <p role="status">Loading FIRST registration status…</p> : registration ? <>
       <p><FirstStudentStatus state={registration.status}/></p>
       {registration.reportedAt && <p className="text-sm text-muted-foreground">Completion reported {when(registration.reportedAt)}.</p>}
       {registration.verifiedAt && <p className="text-sm text-muted-foreground">Coach verified {when(registration.verifiedAt)}.</p>}
       <form className="grid gap-3" onSubmit={event=>void decide(event)}>
-        {registration.status === 'verified' ? <><label className="grid gap-2">Reason to reopen<Input required maxLength={1000} disabled={busy} value={reason} onChange={event=>setReason(event.target.value)}/></label><Button type="submit" variant="outline" disabled={busy || !reason.trim()}>Reopen verification</Button></> : <><p className="text-sm text-muted-foreground">Check the student's FIRST roster and the current-season release in FIRST before verifying. A family report is helpful, but the Coach can verify directly when both items are visible in FIRST.</p><label className="flex items-start gap-2"><Checkbox checked={teamAccepted} disabled={busy} onCheckedChange={setTeamAccepted}/><span>Accepted onto FIRST Robotics Competition Team 8044</span></label><label className="flex items-start gap-2"><Checkbox checked={consentRelease} disabled={busy} onCheckedChange={setConsentRelease}/><span>Current-season FIRST Consent &amp; Release completed</span></label><Button type="submit" disabled={busy || !teamAccepted || !consentRelease}>{busy?'Saving…':'Verify both for this season'}</Button></>}
+        {registration.status === 'verified' ? <><label className="grid gap-2">Reason to reopen<Input required maxLength={1000} disabled={busy} value={reason} onChange={event=>setReason(event.target.value)}/></label><Button type="submit" variant="outline" disabled={busy || !reason.trim()}>Reopen verification</Button></> : <><p className="text-sm text-muted-foreground">Check both in FIRST, then verify.</p><label className="flex min-h-11 items-center gap-3"><Checkbox className="size-6" checked={teamAccepted} disabled={busy} onCheckedChange={setTeamAccepted}/><span>Accepted onto FIRST Robotics Competition Team 8044</span></label><label className="flex min-h-11 items-center gap-3"><Checkbox className="size-6" checked={consentRelease} disabled={busy} onCheckedChange={setConsentRelease}/><span>Current-season FIRST Consent &amp; Release completed</span></label><Button type="submit" className="disabled:opacity-35" disabled={busy || !teamAccepted || !consentRelease}>{busy?'Saving…':'Verify both for this season'}</Button></>}
       </form>
     </> : <Button type="button" variant="outline" disabled={loading} onClick={()=>void refresh()}>Retry loading status</Button>}
     {error && <div><p role="alert" className="open-text">{error}</p><Button type="button" variant="outline" disabled={loading || busy} onClick={()=>void refresh()}>Reload current status</Button></div>}{saved && <p role="status" className="ready-text">{saved}</p>}

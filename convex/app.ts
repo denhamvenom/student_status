@@ -8,7 +8,7 @@ import { attendanceFor, financeFor, studentReadiness } from "./lib/readModels";
 import { coverageFor } from "./lib/permissionCoverage";
 import { fieldTripApproved } from "../src/lib/field-trip-approved";
 import { transportSummary } from "./travel";
-import { firstStatus } from "./firstRegistration";
+import { age18, firstStatus } from "./firstRegistration";
 import { studentSetupCompleteFor } from "./setupWizard";
 
 export const viewer = query({
@@ -77,7 +77,7 @@ export const studentFinances = query({
 });
 
 export const studentDashboard = query({
-  args: { studentId: v.id("students") }, returns: v.any(),
+  args: { studentId: v.id("students"), asOf: v.optional(v.number()) }, returns: v.any(),
   handler: async (ctx, args) => {
     const user = await requireViewer(ctx);
     const student = await studentAccess(ctx, user, args.studentId);
@@ -96,7 +96,11 @@ export const studentDashboard = query({
     if (!studentSetupComplete) todos.push({eventId: null, eventName: "Student setup", label: user.role === "student" ? "Finish your student setup" : "Student setup needs to be finished by the student", dueAt: null, href: user.role === "student" ? "/setup" : null, responsible: "student", blocked: user.role !== "student"});
     if (!parentProfileComplete) todos.push({eventId: null, eventName: "Profile & health", label: user.role === "parent" ? "Finish the health and contact profile" : "A parent or legal guardian needs to finish the health and contact profile", dueAt: null, href: user.role === "parent" ? "/setup" : null, responsible: "parent", blocked: user.role !== "parent"});
     const firstRegistrationState = await firstStatus(ctx, student._id);
-    if (firstRegistrationState !== "verified") todos.push({eventId:null,eventName:"FIRST registration and Consent & Release",label:firstRegistrationState==="awaitingVerification"?"FIRST registration awaits Coach verification":user.role==="parent"?"Complete FIRST registration and Consent & Release":"A parent or guardian completes FIRST registration; eligible adults can complete their own",dueAt:null,href:firstRegistrationState==="needsCompletion"?"/setup":null,responsible:firstRegistrationState==="awaitingVerification"?"coach":"parent",blocked:firstRegistrationState==="awaitingVerification"});
+    const adultStudent = user.role === "student" && args.asOf !== undefined && Number.isFinite(args.asOf) && age18((await ctx.db.query("setupDrafts").withIndex("by_studentId",q=>q.eq("studentId",student._id)).unique())?.dateOfBirth ?? student.consentProfileV2?.dateOfBirth, args.asOf);
+    if (firstRegistrationState !== "verified") {
+      const waiting=firstRegistrationState==="awaitingVerification";
+      todos.push({eventId:null,eventName:"FIRST registration and Consent & Release",label:waiting?"FIRST registration awaits Coach verification":user.role==="parent"||adultStudent?"Complete FIRST registration and Consent & Release":"Your parent completes FIRST registration.",dueAt:null,href:waiting||user.role==="student"&&!adultStudent?null:"/setup",responsible:waiting?"coach":adultStudent?"student":"parent",blocked:waiting||user.role==="student"&&!adultStudent});
+    }
     for (const event of events) {
       const participation = participations.find(x => x.eventId === event._id)?.status ?? null;
       if (event.archived || (!participation && event.signupMode === "assigned")) continue;

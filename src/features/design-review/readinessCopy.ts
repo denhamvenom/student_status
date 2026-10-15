@@ -39,7 +39,7 @@ export const readinessCopy = {
   generatedAt: 'Generated',
   outstanding: 'Outstanding',
   noneOutstanding: 'No outstanding items shown.',
-  printDescription: 'Review the current event summary before printing or saving it as a PDF. Print permission forms from Permission forms.',
+  printDescription: 'Print permission forms from',
   permissionPackets: 'Permission forms',
   updateFailed: 'FIRST registration could not be updated. Try again.',
   themeFailed: 'Theme could not be saved. Try again.',

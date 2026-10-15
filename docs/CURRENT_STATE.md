@@ -1,5 +1,12 @@
 # Current integration handoff
 
+October 15 wizard-review correction checkpoint (supersedes next-step statements below): updated 30 KB report reconciled; B1–B3, W1–W4 and every cutting-pass row implemented and mapped in VISUAL_CHECKS.md. Prior published baseline d70fa5a preserved. Parent selector names the actual next item, including Finish setup for saved-but-unconfirmed information; minor Student Home does not offer Parent-only FIRST actions. Approved PDF/signing unchanged; receipt presentation jargon shortened only. No schema/access/financial/Timeclock contract changes.
+
+Validation: focused setupWizardFirst/app/travel regressions, full lint/typecheck/build and packaging dry-run passed (Wrangler external log-write warning only). Astra found one summary/resume mismatch; corrected and re-reviewed clear. Development third-bandicoot-18 synchronized at 10:20 America/Chicago. Do not repeat checks without a relevant change.
+
+Live: Student Home/under-18 FIRST/secondary linked-Parent invitation/completion summary inspected. Coach verification and reopening succeeded on the fictional PDF student. Parent FIRST has no horizontal overflow at360 (client/scroll345) or390 (client/scroll375); single reporting action changed child list to Waiting on Coach. The fictional FIRST record now awaits Coach verification after that Parent rehearsal. Coach Settings hides completed family-link maintenance and shows shortened invitation text. Private screenshots: private-data/visual-checks/wizard-corrections. Adult Student, second linked Parent and populated Competition FIRST retain source/test evidence, not live verification; no links/roles/financial participation altered to manufacture fixtures. Owner visual approval remains open.
+
+
 October 15, 2026: Parent and Student wizard batch implemented after explicit start authorization. Branch feature/student-status-completion, draft PR10. Prior published checkpoint 509a2ad and application baseline cb0d47f remain preserved. No goal recreation.
 
 New /setup flow: Parent details/contacts/medical/FIRST; Student about/team/Parent connection. Step saves, resume, Finish later, existing-answer reuse, initial subteam selection and conflict recovery. One child selector during setup. Coach settings hold the season FIRST invitation link and optional matching QR. Coach student record verifies both FIRST team acceptance and Consent & Release; every Competition reads that season status. Legacy event evidence remains intact and Outreach/Team behavior is preserved.

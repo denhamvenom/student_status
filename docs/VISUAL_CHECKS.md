@@ -1,5 +1,84 @@
 # Current visual review — Parent and Student wizard, October 15
 
+## October 15 wizard review corrections
+
+Verification: focused setup/Home/travel regressions passed, as did full lint/typecheck/build and packaging dry-run. Astra's saved-but-unconfirmed summary finding is closed. Development synchronized at 10:20 America/Chicago. Student Home, under-18 FIRST, secondary Invite another parent and completion summary observed live. Coach Verified and Reopen rehearsed on an existing fictional record; Settings short copy and completed-zero-unresolved maintenance hiding observed. Parent access restored: FIRST width390/client375/scroll375 and width360/client345/scroll345; button white-space normal; single report action moved list to Waiting on Coach. Fictional FIRST now awaits verification for owner review. One duplicate post-report status sentence removed after this observation. Screenshots inspected and retained privately in private-data/visual-checks/wizard-corrections.
+
+Live evidence limitations: second linked Parent, adult Student and Competition-with-participants FIRST retain focused in-memory/source evidence; no suitable live fixture altered to create those states. These are not claimed live passes. Owner visual approval is still pending.
+
+Final Parent confirmation: completion summary observed after the final copy cleanup; Home uses Finish setup on unfinished family tasks. Phone viewport overrides reset. Final typecheck/build passed after removing the duplicate confirmation. Parent/Student completion did not sign a permission form.
+
+
+Reconciled the updated 30 KB wizard report once. Row numbers below follow each cutting-pass table in order. Source implementation is complete; live verification and publication are recorded separately. Prior PDF, finance, attendance and download evidence remains valid.
+
+| Review item | Change / disposition | Location (src unless convex named) |
+| --- | --- | --- |
+| B1 | FIRST controls wrap within constrained grids | SetupWizard.module.css |
+| B2 | Child list names next missing section, Finish setup, Waiting on Coach or Done | setupWizard.ts; SetupWizard.tsx |
+| B3 | One reporting button: I've done both in FIRST | SetupWizard.tsx |
+| W1 | Correct locked-assignment note | setup-wizard-copy.ts |
+| W2 | Removed unconditional unsaved-step footer | SetupWizard.tsx |
+| W3 | Parent Finish setup; no minor Student action for Parent-only FIRST | app.ts; LiveApp.tsx |
+| W4 | Secondary Invite another parent when already linked | SetupWizard.tsx |
+| Parent 1 | Your answers save after each step | SetupWizard.tsx |
+| Parent 2 | Removed footer | SetupWizard.tsx |
+| Parent 3 | Actual next item (B2), including saved-but-unconfirmed Finish setup | setupWizard.ts; SetupWizard.tsx |
+| Parent 4 | Removed selected-child/Coach assignments explanation | SetupWizard.tsx |
+| Parent 5 | Who should we call about [preferred name]? | SetupWizard.tsx |
+| Parent 6 | Choose None reported if there are none | setup-wizard-copy.ts |
+| Parent 7 | Short personalized FIRST instruction | SetupWizard.tsx |
+| Parent 8 | Single FIRST completion button | SetupWizard.tsx |
+| Parent 9 | Removed reporting explanation | SetupWizard.tsx |
+| Parent 10 | You can finish now. Field trip forms are signed separately | SetupWizard.tsx |
+| Parent 11 | Kept Contact your Coach missing-link recovery | setup-wizard-copy.ts |
+| Student 1 | Removed footer | SetupWizard.tsx |
+| Student 2 | Legal name wrong? Request a correction links to Profile | SetupWizard.tsx |
+| Student 3 | Ask a Coach to change your subteam, rooming or Travel Team | setup-wizard-copy.ts |
+| Student 4 | Your parents heading; removed connection explainer | SetupWizard.tsx |
+| Student 5 | Secondary Invite another parent | SetupWizard.tsx |
+| Student 6 | Minor Students do not see FIRST adult instructions/link | SetupWizard.tsx |
+| Student 7 | Your parent completes FIRST registration | setup-wizard-copy.ts |
+| Student 8 | Removed duplicate finish sentence | SetupWizard.tsx |
+| Home 1 | Minor/adult FIRST wording follows age; server authorization unchanged | app.ts |
+| Home 2 | No action for Parent-only Student items | app.ts; LiveApp.tsx |
+| Home 3 | Finish setup action | LiveApp.tsx |
+| Home 4 | Edit setup link | LiveApp.tsx |
+| Home 5 | Attendance totals start at kickoff | report-copy.ts |
+| Coach 1 | Paste the team invitation link from FIRST. Families see it during setup | FirstRegistration.tsx |
+| Coach 2 | Removed repeated invitation explanation | FirstRegistration.tsx |
+| Coach 3 | Not set. Families are told to contact you | FirstRegistration.tsx |
+| Coach 4 | Hide completed Family link maintenance with zero unresolved links | FamilyLinkMaintenance.tsx; family-link-maintenance-copy.ts |
+| Coach 5 | Removed student-record explanation | CoachStudentRecord.tsx |
+| Coach 6 | Removed health explanation; retained correction-request link | CoachStudentRecord.tsx |
+| Coach 7 | Open permission forms link only | CoachStudentRecord.tsx |
+| Coach 8 | Covers every Competition this season | FirstRegistration.tsx |
+| Coach 9 | Check both in FIRST, then verify | FirstRegistration.tsx |
+| Coach 10 | One Attendance heading | CoachStudentRecord.tsx; DashboardReports.tsx |
+| Coach 11 | Attendance totals start at kickoff | report-copy.ts |
+| Coach 12 | Removed roster explanation | CoachRosterManagement.tsx |
+| Coach 13 | Omit redundant Profile setup from displayed missing-information list | CoachRosterManagement.tsx |
+| Coach 14 | Student sign-in heading | CoachRosterManagement.tsx |
+| Coach 15 | Removed Refresh event status button; timed refresh retained | CoachRosterManagement.tsx |
+| Coach 16 | Permission form label | event-copy.ts |
+| Coach 17 | FIRST registration is required automatically | LiveApp.tsx |
+| Coach 18 | Require FIRST registration for this event; existing Outreach default preserved | event-copy.ts |
+| Coach 19 | Print permission forms from [Permission forms] | readinessCopy.ts |
+| Reports 1 | As of [date] header | TeamReports.tsx |
+| Reports 2 | Draft badge beside export when applicable | TeamReports.tsx |
+| Reports 3 | Available funds definition in column-heading tooltip | TeamReports.tsx |
+| Reports 4 | Attendance totals start at kickoff | TeamReports.tsx |
+| Reports 5 | Attendance totals start at kickoff | TeamReports.tsx |
+| Reports 6 | One Choose an event to see readiness message | TeamReports.tsx |
+| All 1 | Removed Appearance paragraph | LiveApp.tsx |
+| All 2 | Setup is for students and parents | LiveApp.tsx |
+| 14 Oct 1 | A dash does not verify completion absent | src source search |
+| 14 Oct 2 | Records are collected in pages explanation absent | src source search |
+| 14 Oct 3 | Events this form covers retained; removed sealed-to-record phrase from receipt UI | PermissionWorkflow.tsx |
+| 14 Oct 4 | Standalone Fundraising footer and duplicate bulk retry footer absent; actionable posting/retry safeguards retained | Fundraising.tsx; PaymentAdministration.tsx; payment-admin-copy.ts |
+
+Optional polish: phone student list starts collapsed; Travel Team is plain text; Coach verification checkboxes are 24px with clickable rows; disabled FIRST buttons are visibly subdued; QR file input styled; empty Readiness reports No students yet. Uniform locked-field icon/style and smaller remove controls are deferred as cosmetic. Grade remains free text to preserve supported grades; existing Mechanical assignments and Parent Google-email sign-in remain compatible. No account/link/access/financial records changed by implementation.
+
+
 Implementation is complete in development; owner visual approval is pending. Earlier correction evidence below remains valid for unchanged surfaces.
 
 | Surface | Completed evidence | Owner review / limit |

@@ -1,6 +1,8 @@
 ## Start with the new setup workflows — October 15
 
-At http://localhost:5173, sign in with the existing role windows. Use Home → Review setup information to reopen /setup even after completion.
+At http://localhost:5173, sign in with the existing role windows. Use Home → Edit setup to reopen /setup even after completion.
+
+October15 correction recheck: compare Parent FIRST at360/390, its single report button, accurate child-list next items and Waiting on Coach state. Check Student's secondary Invite another parent, short minor FIRST instruction and no Parent-only Home action. Coach settings/record, Reports and New event copy follow the updated cutting-pass table in VISUAL_CHECKS.md. Uniform locked-field icons and smaller remove controls remain optional; grade stays free text and CSV cents headings stay deferred. Permission PDF and signing remain unchanged.
 
 1. Student: About you, Team details, Parent connection / FIRST. Review the five subteams, protected assignments, Save and continue, Back and Finish later. A minor sees Parent guidance; eligible adults can use the FIRST invitation themselves.
 2. Parent: select a student, review details, contacts, medical and FIRST. Already completed sections are skipped; Back lets you inspect them. Setup can finish before FIRST is verified. PDF signing remains separate.
