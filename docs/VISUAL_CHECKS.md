@@ -1,5 +1,40 @@
 # Current visual review — Parent and Student wizard, October 15
 
+## October 15 recheck and first Mentor review corrections
+
+Current batch builds on 3739315, preserving both sign-in repairs after the review's 6e66ca8 baseline. Source review is clear. This table supersedes the older claim that the Fundraising footer was already removed.
+
+| ID | Change / confirmation | Evidence and remaining visual scope |
+|---|---|---|
+| R1 | Removed technical gross-proceeds footer; unknown gross cells say Not recorded; Leftover cents go to the team | Fundraising.tsx, fundraising-copy.ts, TeamReports.tsx. Coach footer observed live; unknown-value branch source checked. |
+| M1 | Ordinary Mentor event list/detail routes show Page unavailable before rendering event content; Travel Lead preserved | LiveApp.tsx. Both routes rejected live. |
+| M2 | Attendance heading includes Tuesday and Thursday after verified kickoff; before/unknown kickoff hides column and uses one kickoff line | LiveApp.tsx and existing seasonCalendar helper. Current season observed; post-kickoff source reviewed. |
+| M3 | Mentor bottom nav is Report, Profile, Settings; no More | AppShell.tsx. Phone390 observed. |
+| M4 | Known restricted routes name permitted roles; unknown routes retain generic fallback | LiveApp.tsx. Mentor event message observed; remaining mappings source reviewed. |
+| S3-nav | Profile and Forms labels aligned between phone and desktop; Mentor Report/Profile also aligned | navigation-copy.ts. Mentor both sizes live; family source checked. |
+| S3-date | One-day permission events already render one date | Existing PermissionWorkflow date formatter and focused tests pass; no new permission change. Travel Lead live recheck not performed. |
+| S3-receipt | sealed to this record already absent | Permission presentation source checked; no new receipt/PDF change. Parent live receipt not reopened. |
+| S3-transport | Student ownProfile uses you; Parent heading now Student transportation | LiveApp.tsx, operations-copy.ts, existing Travel implementation. Source reviewed. |
+| S3-withdrawal | Original event fee label distinguishes historical fee; existing canceled/no-fee-owed/retained calculation preserved | LiveApp.tsx, WithdrawnEventFee.tsx and withdrawn-fee-label.ts source checked; Student withdrawn event observed Original event fee $1.00 canceled. No money edits. |
+| P-a | Awaiting FIRST shows only status and Your Coach will confirm it | SetupWizard.tsx, setup-wizard-copy.ts. Source reviewed; current Parent session unavailable. |
+| P-b | Home counts reader-actionable items only; waiting appears separately | LiveApp.tsx. Student Home observed To do 0 with separate Waiting on parent or guardian; Parent live recheck remains. |
+| P-c | Collapsed child list names selected student followed by Change | SetupWizard.tsx. Source reviewed; Parent phone recheck remains. |
+| P-d | Disabled shared gold buttons use muted colors, not opacity | components/ui/button.tsx. Source/typecheck; visual disabled states remain owner recheck. |
+| P-e | Available funds definition uses keyboard/touch disclosure above table, visible on phone too | TeamReports.tsx/CSS. Native disclosure replaces hover-only tooltip; live Enter opens explanation. |
+| P-f | Removed bulk row-mechanics sentence; useful retry sentence retained | payment-admin-copy.ts. Source checked. |
+| P-g | Added individual report section spacing | TeamReports.module.css. Source checked; owner visual recheck. |
+| P-h | Empty-event transport/rooming show No students yet, not Ready/open | ReadinessReview.tsx. Empty Competition observed live. Printable/PDF path unchanged. |
+| P-i | Correcting end date clears its stale validation immediately | LiveApp.tsx. Source/typecheck; no event created. |
+| P-j | Mentor phone uses compact student rows; event detail uses same date range as list | MentorReport.module.css, LiveApp.tsx. Phone390 observed without horizontal overflow; Student event date range observed live. |
+
+Fresh checks: scoped regressions for Fundraising and permission dates; Reports/DashboardReports/ReviewStates render regressions; full lint, TypeScript and production build passed. Reports test initially hit the known sandbox temporary-file failure; the bounded outside-sandbox run passed. Astra consolidated source review clear. No backend/schema/Timeclock/PDF changes or deployment. Existing packaging evidence reused.
+
+Live captures are private under private-data/visual-checks/wizard-corrections/recheck-mentor: Mentor phone light390 (client/scroll390) and desktop dark1440, event denial, Coach Fundraising, empty Competition, and accessible Reports help. Hosted prototype Mentor report/profile inspected for typography, colors, tables and navigation. Temporary Mentor theme and viewport restored.
+
+Requested special states: processing/retry and Join/Waiting sign-out retain synthetic-render evidence, not fresh live rehearsal; wrong-account invitation/sign-out was observed in the earlier sign-in repair. Second linked Parent, adult Student, populated Competition FIRST remain unavailable live. Verified/Reopen were observed in the earlier October15 fictional rehearsal and were not repeated. No roles, links or financial participation altered to create fixtures. Current former Parent Chrome session is Mentor; Parent-only live comparisons are parked once.
+
+Intentional deferrals unchanged: CSV cents headings, free-text grade, existing Mechanical assignments, Google-email Parent invitations and missing real FIRST invitation link. No requested correction is intentionally deferred; native disclosure is the only implementation variation from the requested tooltip. Owner visual approval remains open.
+
 ## October 15 wizard review corrections
 
 Verification: focused setup/Home/travel regressions passed, as did full lint/typecheck/build and packaging dry-run. Astra's saved-but-unconfirmed summary finding is closed. Development synchronized at 10:20 America/Chicago. Student Home, under-18 FIRST, secondary Invite another parent and completion summary observed live. Coach Verified and Reopen rehearsed on an existing fictional record; Settings short copy and completed-zero-unresolved maintenance hiding observed. Parent access restored: FIRST width390/client375/scroll375 and width360/client345/scroll345; button white-space normal; single report action moved list to Waiting on Coach. Fictional FIRST now awaits verification for owner review. One duplicate post-report status sentence removed after this observation. Screenshots inspected and retained privately in private-data/visual-checks/wizard-corrections.

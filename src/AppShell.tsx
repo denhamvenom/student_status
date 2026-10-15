@@ -69,9 +69,9 @@ export function AppShell({ children, viewer, familyContext, role = "coach" }: { 
     </header>
     {import.meta.env.DEV && <div className={styles.development} role="status">{copy.development}</div>}
     <main className={`${styles.main} app-content`}>{children}</main>
-    <Sheet open={more} onOpenChange={setMore}>
-      <nav className={styles.mobileNav} style={{gridTemplateColumns:`repeat(${primary.length+1},minmax(0,1fr))`}} aria-label={navigationCopy.mobile}>{primary.map((path, index) => { const item = allowed.find(([, to]) => to === path); return item && <Link key={path} to={path} aria-current={path === activePath ? 'page' : undefined}><span aria-hidden="true">{icon(path)}</span>{phoneLabel(role,index,item[0])}</Link> })}<SheetTrigger><Ellipsis size={21} aria-hidden="true"/>{nav.more}</SheetTrigger></nav>
-      <SheetContent side="bottom" className={styles.moreSheet}><SheetHeader><SheetTitle>{nav.more}</SheetTitle></SheetHeader><nav aria-label={navigationCopy.more}>{additionalLinks.map(([label, path]) => <Link key={path} to={path} onClick={() => setMore(false)}>{label}</Link>)}<button type="button" onClick={() => void exit()}>{nav.signOut}</button></nav></SheetContent>
+    <Sheet open={role === 'mentor' ? false : more} onOpenChange={setMore}>
+      <nav className={styles.mobileNav} style={{gridTemplateColumns:`repeat(${primary.length+(role === 'mentor' ? 0 : 1)},minmax(0,1fr))`}} aria-label={navigationCopy.mobile}>{primary.map((path, index) => { const item = allowed.find(([, to]) => to === path); return item && <Link key={path} to={path} aria-current={path === activePath ? 'page' : undefined}><span aria-hidden="true">{icon(path)}</span>{phoneLabel(role,index,item[0])}</Link> })}{role !== 'mentor' && <SheetTrigger><Ellipsis size={21} aria-hidden="true"/>{nav.more}</SheetTrigger>}</nav>
+      {role !== 'mentor' && <SheetContent side="bottom" className={styles.moreSheet}><SheetHeader><SheetTitle>{nav.more}</SheetTitle></SheetHeader><nav aria-label={navigationCopy.more}>{additionalLinks.map(([label, path]) => <Link key={path} to={path} onClick={() => setMore(false)}>{label}</Link>)}<button type="button" onClick={() => void exit()}>{nav.signOut}</button></nav></SheetContent>}
     </Sheet>
   </div>
 }

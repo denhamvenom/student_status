@@ -4,9 +4,13 @@ Updated October 15, 2026. Parent and Student wizard batch implemented in develop
 
 ## Completion batches
 
+- [x] October15 recheck R1, M1-M4, section3 confirmations and optional a-j implemented/reconciled; see VISUAL_CHECKS.md for exact source and live evidence limits.
+- [x] Focused regressions, full lint/types/build and consolidated Astra review passed; no backend sync required.
+- [ ] Owner rechecks current correction candidate, including parked Parent-specific visuals.
+
 - [x] October15 adult-invitation OAuth return route fixed after live failure; exact-origin/path regression and security review passed.
 - [x] Adult invitation landing preserves the OAuth code query while restoring the token fragment; focused transport regression and scoped lint passed. Owner completed invited-account sign-in in the in-app browser; Mentor Team report observed. Separate Chrome retry not observed.
-- [ ] Invited Mentor retries sign-in after development repair; successful account acceptance remains unverified.
+- [x] Owner confirmed invited Mentor access after both sign-in repairs; Mentor report observed. Separate Chrome retry was not observed in that repair session.
 
 ### October 15 wizard-review correction batch
 

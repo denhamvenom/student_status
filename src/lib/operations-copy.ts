@@ -33,7 +33,7 @@ export const operationsCopy = {
     "assignVehicle": "Assign vehicle",
     "confirmedStudents": "Confirmed students",
     "noConfirmedStudents": "No confirmed students.",
-    "yourTransportation": "Your transportation",
+    "yourTransportation": "Student transportation",
     "chooseWhetherThisStudentWillRideWithTheTeamOrTravelIndependentlyTeamSeatDemandUp": "Choose whether this student will ride with the team or travel independently. Team seat demand updates immediately.",
     "approved": "Approved",
     "unavailable": "Unavailable",

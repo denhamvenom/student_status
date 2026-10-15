@@ -13,7 +13,7 @@ export const setupWizardCopy = {
   firstMinorStudent: 'Your parent completes FIRST registration.',
   firstUnavailable: 'The FIRST team invitation is not available yet. Contact your Coach.',
   firstOfficial: 'Read FIRST youth-registration instructions', firstOpen: 'Open FIRST team invitation', firstCopy: 'Copy invitation link', firstCopied: 'Link copied',
-  firstReport: "I've done both in FIRST", firstAwaiting: 'Awaiting Coach verification', firstVerified: 'Verified for this season', firstNeeds: 'Needs completion',
+  firstReport: "I've done both in FIRST", firstAwaiting: 'Awaiting Coach verification', firstCoachConfirm: 'Your Coach will confirm it.', firstVerified: 'Verified for this season', firstNeeds: 'Needs completion',
   reloadFirst: 'Reload FIRST status',
   studentDone: 'Your setup is saved. Parent information and Coach verification may still be needed before Competition readiness is clear.',
   parentDone: 'Student information is saved. FIRST registration may still await Coach verification. Event-specific requirements are handled separately.',

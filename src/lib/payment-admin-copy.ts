@@ -7,7 +7,7 @@ export const paymentAdministrationCopy = {
   reload: "Reload payments",
   importTitle: "Import payments",
   bulkTitle: "Bulk payment entry",
-  purpose: "Record personal payments received offline. Each row records separately and applies to charges in priority order. If an import stops partway, retry with the same batch name so rows aren't recorded twice.",
+  purpose: "Record personal payments received offline. If an import stops partway, retry with the same batch name so rows aren't recorded twice.",
   enterRows: "Enter rows",
   importCsv: "Import CSV",
   batchReference: "Batch name",

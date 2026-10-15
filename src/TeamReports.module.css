@@ -17,7 +17,10 @@
 .table td:last-child button{white-space:nowrap}
 .rowName{border:0;background:transparent;color:var(--text-link);font:inherit;font-weight:700;text-align:left;text-decoration:underline;padding:0;min-height:36px;cursor:pointer}
 .individual{max-width:100%}
-.individual h3{font:400 var(--text-lg)/var(--leading-tight) var(--font-heading);margin:var(--space-4) 0 var(--space-2)}
+.fundsHelp{font-size:var(--text-sm);color:var(--text-muted)}
+.fundsHelp summary{width:max-content;max-width:100%;min-height:44px;display:flex;align-items:center;color:var(--text-link);font-weight:700;text-decoration:underline;cursor:pointer}
+.fundsHelp p{margin:0 0 var(--space-2)}
+.individual h3{font:400 var(--text-lg)/var(--leading-tight) var(--font-heading);margin:var(--space-6) 0 var(--space-3)}
 .individual ul{padding-left:1.25rem}
 .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:var(--space-3)}
 .metrics>div{display:grid;gap:var(--space-1);min-width:0;border-top:1px solid var(--border-default);padding-top:var(--space-2)}

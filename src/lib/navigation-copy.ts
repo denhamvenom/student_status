@@ -4,8 +4,6 @@ import { readinessCopy } from '../features/design-review/readinessCopy'
 
 const student = reference.navigation.desktop.student
 const coach = reference.navigation.desktop.coachGroups as [string, string[]][]
-const travel = reference.navigation.desktop.travelLeadGroups as [string, string[]][]
-const mentor = reference.navigation.desktop.mentor
 
 export const navigationCopy = {
   groups: readinessCopy.navigation,
@@ -15,7 +13,7 @@ export const navigationCopy = {
     permissionForm: 'Forms', team: coach[0][1][0], joinRequests: coach[0][1][1],
     usersRoles: coach[0][1][2], readiness: coach[1][1][1], drivers: coach[1][1][2],
     permissionForms: coach[1][1][3], fundraising: coach[2][1][1], reports: coach[3][1][0],
-    season: coach[4][1][1], myProfile: travel[4][1][0], teamReport: mentor[0],
+    season: coach[4][1][1], myProfile: 'Profile', teamReport: 'Report',
     withdrawals: readinessCopy.navigation.withdrawals,
   },
   main: 'Main navigation', mobile: 'Mobile navigation', more: 'More navigation',

@@ -134,7 +134,6 @@ function FundraisingContent() {
       {activeId && <FundraiserWorkspace key={activeId} fundraiserId={activeId} />}
       {(capabilities ?? firstPage?.capabilities)?.canCreate && <FundraiserCreationForm pending={creating} onCreate={createFundraiser} />}
     </div>
-    <p className={styles.muted}>{copy.unknownRaised} {copy.grossExplanation}</p>
   </section>
 }
 
