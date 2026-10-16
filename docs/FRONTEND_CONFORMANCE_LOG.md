@@ -277,3 +277,6 @@ See VISUAL_CHECKS.md current R1/M1-M4/S3/P mapping. Compared hosted Mentor repor
 
 ## October15 final polish after 7fcd965
 Existing report heading rule lost to the shared .review h3 reset at equal specificity. Scoped card-content descendant selector now wins: both h3 headings measured32px margin and preceding gap at1440 and390; screenshots inspected. Empty Competition now has one message, event header and Manage event. Numbered1-7 mapping and launch-only signing-notice cleanup in VISUAL_CHECKS.md. Private screenshots in wizard-corrections/final-polish; viewport reset.
+
+## October16 bounded isolated-state pass
+No application source change. Actual-component preview corrected and inspected: adult FIRST and post-kickoff Mentor phone390, shared completed Parent desktop, populated verified Competition desktop1440. FIRST awaiting/reopened and completion text checked in DOM; reviewer visual acceptance remains open. Client/scroll width375/375 and1425/1425. Private evidence under private-data/visual-checks/final-targeted. Current matrix: VISUAL_CHECKS F1-F6. Full-shell/prototype comparison retained from prior checkpoints, not repeated.

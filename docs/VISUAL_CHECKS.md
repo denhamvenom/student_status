@@ -1,5 +1,23 @@
 # Current visual review — Parent and Student wizard, October 15
 
+## Final targeted pass — October 16
+
+Supersedes only the remaining-state limitations below; earlier evidence is retained. Existing Mentor session signed out to the application login page, selected the same existing account in Google, and returned to the authenticated Report. No credentials, accounts, roles, Parent links, domain records, FIRST evidence, money or signatures were changed. This exercises normal app sign-out and Google return, not live Join/Waiting sign-out or the production origin.
+
+The ignored read-only preview now targets a second Parent viewing a previously completed shared student profile, Parent completion summary, adult Student FIRST, awaiting/verified/reopened FIRST, populated Competition FIRST and post-kickoff Mentor attendance. These are synthetic component snapshots with mocked query results, not authenticated role sessions or live transitions. Existing isolated behavioral checks remain valid. Private fixture render validation only; no app-source change and no repeated integrated build.
+
+Remaining boundaries: no live Join/Waiting account was manufactured; no real processing failure was forced; production-domain OAuth is a launch check. Reviewer should inspect only the new preview sections and any still-unaccepted final-polish items. Static controls intentionally do nothing. Actual FIRST invitation is still not supplied; a configured-link example is hypothetical, not a configured live invitation. CSV cents headings and production-only development-copy removal remain deferred. Approved PDF/signing remain untouched.
+| ID | Targeted evidence | Reviewer action / remaining limit |
+|---|---|---|
+| F1 | Existing Mentor signed out and returned through Google to Report | Live Join/Waiting sign-out still not exercised; do not manufacture an account state |
+| F2 | Second Parent same completed student and completion summary rendered; desktop screenshot inspected | Check wording; link authorization established by prior isolated tests, not snapshot |
+| F3 | Adult FIRST, awaiting, verified and reopened rendered; adult phone390 inspected | Check role wording and waiting/next-step clarity; configured invitation is fictional |
+| F4 | Competition awaiting/verified/reopened rendered as 0/1, 1/1, 0/1 ready; verified desktop inspected | Status and Review season verification link sit tightly together on desktop; assess as optional spacing polish |
+| F5 | Post-kickoff Mentor phone390 screenshot inspected with compact Tuesday/Thursday row | Reviewer checks desktop table as well; no actual date change |
+| F6 | Preview document client/scroll widths agree:375/375 at390 and1425/1425 at1440 | Isolated preview wrapper, not full application shell |
+
+Private screenshots: private-data/visual-checks/final-targeted. Preview corrections fixed a mislabeled second-student fixture and built CSS suffix mapping before capture. Scoped fixture render assertions passed after correction. No new full-suite/typecheck/build run because application source is unchanged. Reader should review these states once, retaining earlier accepted results. Development signing explanation/banners and CSV headings stay deferred as stated above.
+
 ## Bounded rehearsal without additional Google accounts — October 15
 
 Application baseline a3a2b03 preserved. No live mutations, account creation, role changes, Parent-link changes, financial records, FIRST verification or signatures. All behavioral rehearsal below uses isolated convex-test identities or server-rendered synthetic props.

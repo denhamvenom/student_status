@@ -665,3 +665,6 @@ October 14 visual-review follow-up: [x] Join/waiting screens offer Sign out for 
 - [x] Isolated second-Parent reuse, adult FIRST reporting, unrelated-Parent denial, Competition verify/reopen, invitation identity and source-preserving retry checks passed.
 - [x] Join/Waiting/processing render checks passed; no live state was manufactured.
 - [ ] Remaining visual fixture check and owner visual approval; fresh Google login per simulated identity is not claimed.
+
+- [x] October16 targeted pass: existing-account Google sign-out/return and isolated missing-state previews completed; see VISUAL_CHECKS F1-F6.
+- [ ] Reviewer acceptance of new isolated states; live Join/Waiting sign-out remains unobserved, production-origin sign-in remains a launch check. No additional accounts required for this visual pass.
