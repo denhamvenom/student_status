@@ -20,3 +20,19 @@ Second Parent/adult FIRST/populated Competition states use isolated tests and co
 - [ ] Obtain explicit production authorization; publish approved release and perform controlled production smoke checks.
 
 No production deployment, main merge, real signing, data migration or deletion is authorized by this closure. Existing development build/package evidence does not prove production configuration, restoration, monitoring, volume behavior or real onboarding.
+
+## Owner launch decisions — October 16
+
+- Launch both Student Status (students.team8044.org) and Timeclock (timeclock.team8044.org). Owner manages Cloudflare domain and wants GitHub-connected hosting management.
+- Full rollout with Coach-controlled enrollment; production season 2026–2027. No roster import required: students choose their Google account, use the team invite code, and await Coach approval before setup and Parent invitation. Check for existing records during approval to avoid duplicates; do not auto-link on name alone.
+- Owner can supply actual FIRST invitation. Real signing enablement is authorized as launch scope, with no immediate events needing permission forms; production deployment remains separately gated.
+- Five-year retention from Coach account archival was already agreed (DEVELOPMENT_CHECKLIST retained decision). Coverage, exports/backups/holds and deletion procedure remain to be finalized; do not reopen the duration or enable deletion automatically.
+- Launch ASAP on Cloudflare. Cloudflare frontend hosting does not replace the existing Convex backend. Owner confirms control of GitHub, Cloudflare, Convex and Google accounts. Backup administrator deferred. Combined monthly budget target is $10; obtain approval before adding paid services.
+- Required prelaunch work: scoped security audit of both apps/shared backend and data-usage audit (query/subscription frequency, payload/database reads, file downloads, always-open Timeclock devices, repeated loading). Measure representative load; no user-count-only cost assurance.
+- Preserve closed visual cycle. These are launch gates, not a new cosmetic review.
+
+### Enrollment and recovery confirmation
+
+Owner approved invite-code enrollment with Coach approval and no preloaded roster. School email is not required. Typical Timeclock use is one tablet plus one or two phones across events.
+
+Owner approved nightly backups. Scheduling, storage, retention of backups, cost and a demonstrated restore remain implementation gates; nightly backups are not yet configured. The proposed one-day restoration target has not been separately confirmed or proven. No existing retention policy exists; draft operational rules around the agreed five-year archival period for approval. Automatic deletion remains disabled.
