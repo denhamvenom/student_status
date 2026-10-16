@@ -1,12 +1,12 @@
 # Student Status Development Checklist
 
-Updated October 15, 2026. Parent and Student wizard batch implemented in development; owner visual approval remains open. Current disposition supersedes historical unchecked boxes. Original G1–G7 scope and valid evidence are preserved.
+Updated October 16, 2026. Owner closed the development visual review cycle at 1f20ca8; Parent/Student setup and review corrections are complete. Current disposition supersedes historical unchecked boxes. Original G1–G7 scope and valid evidence are preserved.
 
 ## Completion batches
 
 - [x] October15 recheck R1, M1-M4, section3 confirmations and optional a-j implemented/reconciled; see VISUAL_CHECKS.md for exact source and live evidence limits.
 - [x] Focused regressions, full lint/types/build and consolidated Astra review passed; no backend sync required.
-- [ ] Owner rechecks current correction candidate, including parked Parent-specific visuals.
+- [x] Owner closed the current visual correction cycle October 16; evidence limitations retained.
 
 - [x] October15 adult-invitation OAuth return route fixed after live failure; exact-origin/path regression and security review passed.
 - [x] Adult invitation landing preserves the OAuth code query while restoring the token fragment; focused transport regression and scoped lint passed. Owner completed invited-account sign-in in the in-app browser; Mentor Team report observed. Separate Chrome retry not observed.
@@ -18,7 +18,7 @@ Updated October 15, 2026. Parent and Student wizard batch implemented in develop
 - [x] Focused setup/Home/travel regressions, lint, typecheck/build and packaging dry-run passed; Astra consequential finding corrected and closed.
 - [x] Development backend synchronized October 15 at 10:20 America/Chicago; no schema, permissions, financial or Timeclock contract changes.
 - [x] Parent phone FIRST at360/390, single report, Waiting on Coach, completion summary; Student minor Home/setup/completion; Coach Verify/Reopen and settings checked live. Conditional fixture limitations recorded in VISUAL_CHECKS.md.
-- [ ] Owner visual recheck of the correction candidate.
+- [x] Owner visual review cycle closed October 16.
 
 
 - [x] Approved original-logo PDF: completed profile required, populated review, checkbox and typed signature, saved immutable receipt and Coach acceptance. Ordinary examples remain one page with signature/date in original slots. Genuine overflow continues losslessly; historical receipts preserved.
@@ -29,19 +29,19 @@ Updated October 15, 2026. Parent and Student wizard batch implemented in develop
 - [x] User confirmed signed PDF opens and Reports CSV downloads.
 - [x] User confirmed CSV opens correctly; friendlier cents headings/units deferred until after launch by explicit request.
 - [x] Parent and Student setup usability batch — implemented and reviewed; live representative workflows and focused checks complete. Includes three-step Student setup and initial subteam selection (Build, Electrical, Programming, Machining, Business), Coach corrections, and shared season FIRST team acceptance + Consent & Release for Parent/Student/Coach, automatically required for every Competition. See PARENT_SETUP_BATCH.md.
-- [ ] Coach visual approval using VISUAL_REVIEW_GUIDE.md.
+- [x] Coach closed visual review October 16 at 1f20ca8.
 
 ## Preserved G1–G7 outcomes
 
 | Requirement | Current evidence |
 | --- | --- |
 | G1 — Frontend alignment | Hosted prototype visual language retained; later features preserved; representative phone/desktop and light/dark evidence retained. |
-| G2 — Visual coverage | Finite route/role review complete at representative scope; final user acceptance remains open. No claim of every state/device combination. |
+| G2 — Visual coverage | Finite route/role review complete at representative scope; owner visual acceptance recorded October 16. No claim of every state/device combination. |
 | G3 — Whole Team | Creation/reactivation rehearsal and enrollment/access/financial tests retained. Withdrawals preserved. |
 | G4 — Genuine dashboards | Source-backed finance, attendance, child switching and bounded reports; unknown future kickoff remains unavailable rather than invented. |
 | G5 — Accounts and consent | Setup/correction, Mentor acceptance, independent finance/health grants and restored permissions, approved PDF lifecycle and historical receipts verified. |
 | G6 — Administration | Roster, money/source history, fundraising, season carryover, historical corrections and retention holds retained. Paid withdrawal now verified live. Destructive retention remains gated. |
-| G7 — Delivery | Final integrated milestone, focused follow-up, packaging, Astra review and development publication. PDF/CSV opening confirmed; user visual approval follows. |
+| G7 — Delivery | Final integrated milestone, focused follow-up, packaging, Astra review and development publication. PDF/CSV opening confirmed; owner visual cycle closed October 16. |
 
 ## Evidence limits, not new implementation scope
 
@@ -55,7 +55,7 @@ These are separate launch gates, not authorization to deploy.
 
 - [x] Complete the finite page-by-page production-language review; production sign-in build inspected. Confirm real deployment configuration separately at launch.
 - [ ] Before launch, remove the permission-page development explanation "Real signing is closed. This account and fictional subject are not registered for synthetic consent." together with the development banner from production-facing copy. Keep it in development and retain signing safeguards; real signing approval remains separate.
-- [ ] Obtain Coach visual approval of the completed candidate and documented intentional differences.
+- [x] Coach closed development visual review October 16 with documented evidence limits retained.
 - [ ] Confirm organizational ownership and administrators for GitHub, Convex, Google and Cloudflare.
 - [ ] Confirm Student Status production domain, separate production configuration, Google sign-in and allowed origins.
 - [ ] Approve production privacy/access configuration and enable real signing separately. Field-trip/first-aid wording is already approved; Medication Choices is removed.
@@ -672,3 +672,5 @@ October 14 visual-review follow-up: [x] Join/waiting screens offer Sign out for 
 - [x] October16 bounded-review wording/spacing items1-4,6-10; typecheck/build/scoped lint passed. Item5 reopened-specific explanation deferred pending explicit client state; no scope expansion. See VISUAL_CHECKS.
 
 - [x] October16 explicitly authorized item5 followup: FIRST reopened explanation for Parent/adult Student, minimal derived flag; focused checks and review passed, development synced. Supersedes prior deferral; existing records/rules preserved.
+
+- [x] October16 owner visual-cycle closure and fresh independent Astra handoff review; no blocking findings. Current launch queue: ONLINE_READINESS_HANDOFF.md. Historical owner-approval/fixture-recheck boxes above are superseded; evidence limits retained.
