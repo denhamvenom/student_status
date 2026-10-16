@@ -670,3 +670,5 @@ October 14 visual-review follow-up: [x] Join/waiting screens offer Sign out for 
 - [ ] Reviewer acceptance of new isolated states; live Join/Waiting sign-out remains unobserved, production-origin sign-in remains a launch check. No additional accounts required for this visual pass.
 
 - [x] October16 bounded-review wording/spacing items1-4,6-10; typecheck/build/scoped lint passed. Item5 reopened-specific explanation deferred pending explicit client state; no scope expansion. See VISUAL_CHECKS.
+
+- [x] October16 explicitly authorized item5 followup: FIRST reopened explanation for Parent/adult Student, minimal derived flag; focused checks and review passed, development synced. Supersedes prior deferral; existing records/rules preserved.

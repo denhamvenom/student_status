@@ -60,9 +60,20 @@ describe("shared setup and season FIRST registration", () => {
     const f=await fixture();
     await f.coach.mutation(api.firstRegistration.setInvitation,{expectedRevision:0,url:"https://my.firstinspires.org/synthetic-invitation",qrStorageId:null,qrMatchesInvitation:false});
     await f.student.mutation(api.setupWizard.saveStudentAbout,{studentId:f.ids.student,expectedRevision:0,preferredName:"Synthetic",grade:"12",dateOfBirth:"2000-01-01"});
-    expect(await f.student.mutation(api.firstRegistration.get,{studentId:f.ids.student})).toMatchObject({status:"needsCompletion",revision:0,adultEligible:true,canAccessInvitation:true,canReport:true,invitationUrl:"https://my.firstinspires.org/synthetic-invitation"});
+    expect(await f.student.mutation(api.firstRegistration.get,{studentId:f.ids.student})).toMatchObject({status:"needsCompletion",revision:0,reopened:false,adultEligible:true,canAccessInvitation:true,canReport:true,invitationUrl:"https://my.firstinspires.org/synthetic-invitation"});
     expect(await f.student.mutation(api.firstRegistration.report,{studentId:f.ids.student,expectedRevision:0})).toBe(1);
-    expect(await f.student.mutation(api.firstRegistration.get,{studentId:f.ids.student})).toMatchObject({status:"awaitingVerification",revision:1,canReport:false,teamAccepted:false,consentRelease:false});
+    expect(await f.student.mutation(api.firstRegistration.get,{studentId:f.ids.student})).toMatchObject({status:"awaitingVerification",revision:1,reopened:false,canReport:false,teamAccepted:false,consentRelease:false});
+    await f.coach.mutation(api.firstRegistration.verify,{studentId:f.ids.student,expectedRevision:1,teamAccepted:true,consentRelease:true});
+    expect(await f.student.mutation(api.firstRegistration.get,{studentId:f.ids.student})).toMatchObject({status:"verified",reopened:false});
+    await f.coach.mutation(api.firstRegistration.reopen,{studentId:f.ids.student,expectedRevision:2,reason:"Fictional correction"});
+    const reopened=await f.student.mutation(api.firstRegistration.get,{studentId:f.ids.student});
+    expect(reopened).toMatchObject({status:"needsCompletion",revision:3,reopened:true,adultEligible:true,canReport:true});
+    expect(reopened).not.toHaveProperty("reopenReason");
+    expect(reopened).not.toHaveProperty("reopenedBy");
+    expect(await f.student.mutation(api.firstRegistration.report,{studentId:f.ids.student,expectedRevision:3})).toBe(4);
+    expect(await f.student.mutation(api.firstRegistration.get,{studentId:f.ids.student})).toMatchObject({status:"awaitingVerification",reopened:false});
+    await f.coach.mutation(api.firstRegistration.verify,{studentId:f.ids.student,expectedRevision:4,teamAccepted:true,consentRelease:true});
+    expect(await f.student.mutation(api.firstRegistration.get,{studentId:f.ids.student})).toMatchObject({status:"verified",reopened:false});
   });
 
   it("denies an unrelated parent the setup, medical, and FIRST paths", async () => {
@@ -134,6 +145,7 @@ describe("shared setup and season FIRST registration", () => {
     if (!before.readiness) throw new Error("Expected a student readiness result.");
     expect(before.readiness).toMatchObject({firstRegistrationState:"needsCompletion"});
     expect(before.readiness.open).toContain("FIRST registration and Consent & Release");
+    expect(await f.parent.mutation(api.firstRegistration.get,{studentId:f.ids.student})).toMatchObject({status:"needsCompletion",reopened:false});
     await expect(f.coach.mutation(api.participation.recordRequirement,{eventId:f.ids.events[0],studentId:f.ids.student,key:"first",complete:true})).rejects.toThrow("student record");
     await expect(f.parent.mutation(api.firstRegistration.verify,{studentId:f.ids.student,expectedRevision:0,teamAccepted:true,consentRelease:true})).rejects.toThrow("Only a Coach");
     expect(await f.coach.mutation(api.firstRegistration.verify,{studentId:f.ids.student,expectedRevision:0,teamAccepted:true,consentRelease:true})).toBe(1);
@@ -147,6 +159,7 @@ describe("shared setup and season FIRST registration", () => {
     if (!team.readiness) throw new Error("Expected a student readiness result.");
     expect(team.readiness.open).toContain("FIRST registration");
     await f.coach.mutation(api.firstRegistration.reopen,{studentId:f.ids.student,expectedRevision:1,reason:"FIRST evidence corrected"});
+    expect(await f.parent.mutation(api.firstRegistration.get,{studentId:f.ids.student})).toMatchObject({status:"needsCompletion",reopened:true,canReport:true});
     const reopened=await f.coach.query(api.app.eventDetail,{eventId:f.ids.events[1],studentId:f.ids.student});
     if (!reopened.readiness) throw new Error("Expected a student readiness result.");
     expect(reopened.readiness.open).toContain("FIRST registration and Consent & Release");

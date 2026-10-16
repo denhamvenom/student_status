@@ -283,3 +283,6 @@ No application source change. Actual-component preview corrected and inspected: 
 
 ## October16 bounded-review polish verification
 Refreshed ignored rehearsal preview from current source and built CSS. Inspected Mentor phone390 screenshot (Tuesday75% ·4 Thursday sessions; client/scroll375/375) and verified Competition desktop1440 screenshot. DOM confirms FIRST link display:block/margin-top6px in Awaiting, Verified and Needs completion; no-open helper hidden in verified case. Parent current-status summary, complete-steps orientation and checked verified text confirmed in DOM. Private screenshots: private-data/visual-checks/final-targeted/polish-first-spacing.png and polish-mentor-phone.png. Preview render assertions, typecheck/build and scoped lint passed. Item5 deferred; no broad retest or backend change.
+
+## October16 FIRST reopened message
+Private preview refreshed from current source: Parent and adult reopened show exact message above Needs completion; initial adult example omits it. Fixture render checks pass. Parent phone390 screenshot inspected, private-data/visual-checks/final-targeted/first-reopened-phone.png. No live FIRST transition performed; isolated lifecycle tests provide behavior evidence.

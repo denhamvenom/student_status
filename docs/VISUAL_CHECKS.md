@@ -1,5 +1,10 @@
 # Current visual review — Parent and Student wizard, October 15
 
+## FIRST reopened explanation — October 16 follow-up
+
+Item5 is now implemented after explicit authorization for the minimal response addition. The existing authorized FIRST getter returns a boolean derived from needsCompletion plus saved reopenedAt; no reason, actor identity, schema, state-write or verification-rule change. Parent/adult Student see: Your Coach reopened this. Check both in FIRST, then report again. It appears above Needs completion; initial, awaiting and verified states omit it. Minors are not directed to report.
+
+Focused existing setupWizardFirst suite passed: initial versus reopened, direct Coach verify-before-report then reopen, adult re-report/re-verify clears the indicator, unrelated Parent access remains denied, correction reason/actor stay private. Typecheck/build/scoped lint passed. Astra narrow review: no blocking findings. Synced successfully to development third-bandicoot-18 only; no live domain records altered. Owner visual approval remains separate.
 ## Bounded review corrections after 5210585 — October 16
 
 External bounded review: ready for owner visual approval, no blockers. This requested polish pass preserves that evidence; application wording/style changes only.
@@ -465,3 +470,5 @@ Original-layout PDF source/backend integration and focused/integrated validation
 Approved template selected. Existing complete fictional profile prepared the original-layout PDF; initially unchecked acknowledgment and typed synthetic signature submitted, Coach accepted, and Parent event coverage updated. Earlier receipt remained present. Signature/date visually occupy original first-page fields. Long explicit rehearsal labels overflowed three small health cells into a lossless continuation; this is distinct from retained passing one-page ordinary-length renders. Private screenshot: approved-pdf-signed-live.jpg. No real consent, profile alteration or data truncation. Manual download remains pending. Reuse prior focused/integrated/Astra evidence; no repeat full consent suite.
 
 October16 polish evidence supplement: refreshed preview render checks pass; Mentor phone390 and verified Competition desktop1440 inspected. FIRST links are block with6px top margin for all three states. Parent summary/orientation and verified check confirmed in DOM. See FRONTEND_CONFORMANCE_LOG and private-data/visual-checks/final-targeted/polish-*.png.
+
+FIRST followup visual evidence: refreshed preview includes Parent and adult reopened examples, initial state absence assertions pass. Parent phone390 capture inspected; see FRONTEND_CONFORMANCE_LOG. Item5 no longer deferred.

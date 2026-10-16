@@ -26,7 +26,7 @@ async function eligible(ctx: Ctx, actor: Doc<"appUsers">, student: Doc<"students
   const adultEligible = age18(draft?.dateOfBirth ?? student.consentProfileV2?.dateOfBirth, now);
   return {adultEligible, allowed: adultEligible};
 }
-const getResult = v.object({status: stateValue, revision:v.number(), reportedAt:v.union(v.number(),v.null()), verifiedAt:v.union(v.number(),v.null()), teamAccepted:v.boolean(), consentRelease:v.boolean(), adultEligible:v.boolean(), canAccessInvitation:v.boolean(), canReport:v.boolean(), invitationUrl:v.union(v.string(),v.null()), qrUrl:v.union(v.string(),v.null())});
+const getResult = v.object({status: stateValue, revision:v.number(), reopened:v.boolean(), reportedAt:v.union(v.number(),v.null()), verifiedAt:v.union(v.number(),v.null()), teamAccepted:v.boolean(), consentRelease:v.boolean(), adultEligible:v.boolean(), canAccessInvitation:v.boolean(), canReport:v.boolean(), invitationUrl:v.union(v.string(),v.null()), qrUrl:v.union(v.string(),v.null())});
 /** Mutation so age at the eighteenth birthday uses trusted server time. */
 export const get = mutation({args:{studentId:v.id("students")},returns:getResult,handler:async(ctx,args)=>{
   const actor=await viewer(ctx),student=await studentAccess(ctx,actor,args.studentId);
@@ -34,7 +34,7 @@ export const get = mutation({args:{studentId:v.id("students")},returns:getResult
   const state=await firstState(ctx,student._id), invitation=await ctx.db.query("firstInvitationSettings").withIndex("by_seasonId",q=>q.eq("seasonId",student.seasonId)).unique();
   const access=await eligible(ctx,actor,student,Date.now());
   const canAccessInvitation=actor.role==="coach"||access.allowed;
-  return {status:state?.status??"needsCompletion",revision:state?.revision??0,reportedAt:state?.reportedAt??null,verifiedAt:state?.verifiedAt??null,teamAccepted:state?.teamAccepted??false,consentRelease:state?.consentRelease??false,adultEligible:access.adultEligible,canAccessInvitation,canReport:access.allowed&&state?.status!=="verified"&&state?.status!=="awaitingVerification",invitationUrl:canAccessInvitation?invitation?.url??null:null,qrUrl:canAccessInvitation&&invitation?.qrStorageId?await ctx.storage.getUrl(invitation.qrStorageId):null};
+  return {status:state?.status??"needsCompletion",revision:state?.revision??0,reopened:state?.status==="needsCompletion"&&state.reopenedAt!==undefined,reportedAt:state?.reportedAt??null,verifiedAt:state?.verifiedAt??null,teamAccepted:state?.teamAccepted??false,consentRelease:state?.consentRelease??false,adultEligible:access.adultEligible,canAccessInvitation,canReport:access.allowed&&state?.status!=="verified"&&state?.status!=="awaitingVerification",invitationUrl:canAccessInvitation?invitation?.url??null:null,qrUrl:canAccessInvitation&&invitation?.qrStorageId?await ctx.storage.getUrl(invitation.qrStorageId):null};
 }});
 export const report=mutation({args:{studentId:v.id("students"),expectedRevision:v.number()},returns:v.number(),handler:async(ctx,args)=>{
   const actor=await viewer(ctx),student=await studentAccess(ctx,actor,args.studentId),access=await eligible(ctx,actor,student,Date.now());
