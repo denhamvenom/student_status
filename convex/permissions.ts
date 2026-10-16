@@ -10,6 +10,7 @@ import { consentEventValidator, consentSnapshotValidator, correctionFieldValidat
 import { compareCoverage, controlledCoverage, coverageFor, expectedCoverage, sealedSnapshot, setPendingCoverage } from "./lib/permissionCoverage";
 import { consentSnapshotV2Validator } from "./lib/consentSnapshotV2";
 import { sealedSnapshotV2 } from "./permissionsV2";
+import { permissionSigningMode, v2SigningAllowed } from "./lib/permissionSigningMode";
 
 type Ctx = QueryCtx | MutationCtx;
 const DEV_URL = "https://third-bandicoot-18.convex.cloud";
@@ -25,7 +26,7 @@ export const workspaceValidator = v.object({
   actor: v.object({name: v.string(), email: v.string(), role: v.union(v.literal("coach"), v.literal("mentor"), v.literal("parent"), v.literal("student")), travelLead: v.boolean(), healthExport: v.boolean()}),
   version: v.union(v.object({...versionValidator.fields, formFormat: v.union(v.literal(1), v.literal(2))}), v.null()), events: v.array(consentEventValidator),
   coverage: v.array(v.object({eventId: v.id("events"), state: stateValidator, revision: v.number(), submissionId: nullableId, reviewId: v.union(v.id("permissionReviews"), v.null()), reason: v.union(v.string(), v.null()), field: v.union(correctionFieldValidator, v.null()), signatureRequestedAt: v.union(v.number(), v.null())})),
-  receipts: v.array(receiptSummaryValidator), canSign: v.boolean(), canRecordPaper: v.boolean(), canReview: v.boolean(), canHealthExport: v.boolean(), gateReason: v.union(v.string(), v.null()),
+  receipts: v.array(receiptSummaryValidator), signingMode: v.union(v.literal("synthetic"), v.literal("real"), v.literal("closed")), canSign: v.boolean(), canRecordPaper: v.boolean(), canReview: v.boolean(), canHealthExport: v.boolean(), gateReason: v.union(v.string(), v.null()),
 });
 const paperFields = { studentId: v.id("students"), eventIds: v.array(v.id("events")), signerName: v.string(), signerEmail: v.optional(v.string()), paperSignedAt: v.number(), paperReference: v.string() };
 const paperPreviewValidator = v.object({snapshot: consentSnapshotValidator, versionId: v.id("permissionVersions"), expectedProfileRevision: v.number(), eventFingerprint: v.string(), expectedCoverage: v.array(expectedCoverageValidator)});
@@ -94,10 +95,12 @@ export const workspace = query({
     submissions.sort((a,b) => b.signedAt - a.signedAt || b._creationTime - a._creationTime);
     const canReview = actor.role === "coach" || actor.role === "mentor" && actor.travelLead;
     const who = actor.role === "parent" ? await verifiedGoogle(ctx) : null;
-    const canSign = !!who && who.authUserId === actor.authUserId && await syntheticAllowed(ctx, student._id, actor._id);
-    const canRecordPaper = canReview && await syntheticAllowed(ctx, student._id);
+    const v2 = version?.formFormat === 2;
+    const signingMode = v2 ? permissionSigningMode() : "synthetic";
+    const canSign = !!who && who.authUserId === actor.authUserId && (v2 ? await v2SigningAllowed(ctx, student._id, actor._id) : await syntheticAllowed(ctx, student._id, actor._id));
+    const canRecordPaper = (v2 ? actor.role === "coach" || actor.role === "mentor" && actor.travelLead && actor.healthExport === true : canReview) && (v2 ? await v2SigningAllowed(ctx, student._id) : await syntheticAllowed(ctx, student._id));
     const projected = privateStudent(student);
-    return {student: {studentId: student._id, legalName: student.legalName, preferredName: student.preferredName, profileRevision: student.profileRevision ?? 0, emergencyName: projected.emergencyName, emergencyRelationship: projected.emergencyRelationship, emergencyPhone: projected.emergencyPhone, allergies: projected.allergies, medications: projected.medications}, actor: {name: who?.name ?? actor.name, email: who?.email ?? actor.email, role: actor.role, travelLead: actor.travelLead, healthExport: actor.healthExport ?? false}, version: version ? {...publicVersion(version), formFormat: version.formFormat === 2 ? 2 as const : 1 as const} : null, events, coverage, receipts: await Promise.all(submissions.map(submission => summary(ctx, submission))), canSign, canRecordPaper, canReview, canHealthExport: actor.role === "coach" || actor.role === "mentor" && actor.travelLead && (actor.healthExport ?? false), gateReason: canSign || canRecordPaper ? null : "Real signing is closed. This account and fictional subject are not registered for synthetic consent."};
+    return {student: {studentId: student._id, legalName: student.legalName, preferredName: student.preferredName, profileRevision: student.profileRevision ?? 0, emergencyName: projected.emergencyName, emergencyRelationship: projected.emergencyRelationship, emergencyPhone: projected.emergencyPhone, allergies: projected.allergies, medications: projected.medications}, actor: {name: who?.name ?? actor.name, email: who?.email ?? actor.email, role: actor.role, travelLead: actor.travelLead, healthExport: actor.healthExport ?? false}, version: version ? {...publicVersion(version), formFormat: version.formFormat === 2 ? 2 as const : 1 as const} : null, events, coverage, receipts: await Promise.all(submissions.map(submission => summary(ctx, submission))), signingMode, canSign, canRecordPaper, canReview, canHealthExport: actor.role === "coach" || actor.role === "mentor" && actor.travelLead && (actor.healthExport ?? false), gateReason: canSign || canRecordPaper ? null : signingMode === "synthetic" ? "Only registered fictional development subjects may use consent." : "Permission signing is closed for this deployment or account."};
   },
 });
 
@@ -213,7 +216,7 @@ export const review = mutation({
     await compareCoverage(ctx, submission.studentId, args.expectedCoverage, rows.map(row => row.eventId));
     const reviewId = await ctx.db.insert("permissionReviews", {submissionId: submission._id, status: args.status, note: args.note?.trim() || undefined, field: args.field, controlledCoverage: rows.map(row => ({eventId: row.eventId, priorRevision: row.revision})), snapshotHash: submission.snapshotHash, reviewedBy: actor._id, reviewedAt: Date.now(), idempotencyKey: args.idempotencyKey, operationHash});
     for (const row of rows) await ctx.db.patch(row._id, {state: args.status, latestReviewId: reviewId, revision: row.revision + 1, updatedAt: Date.now(), updatedBy: actor._id, reason: args.status === "correction" ? args.note?.trim() : undefined, correctionField: args.status === "correction" ? args.field ?? "general" : undefined});
-    await audit(ctx, actor, "permissionSubmissions", submission._id, "reviewSyntheticPermission", null, {status: args.status, eventIds: rows.map(row => row.eventId)});
+    await audit(ctx, actor, "permissionSubmissions", submission._id, submission.synthetic ? "reviewSyntheticPermission" : "reviewPermission", null, {status: args.status, synthetic: submission.synthetic ?? false, eventIds: rows.map(row => row.eventId)});
     return null;
   },
 });
@@ -235,9 +238,9 @@ export const requestNewSignature = mutation({
   },
 });
 
-const exportRecordValidator = v.object({studentId: v.id("students"), studentName: v.string(), state: stateValidator, revision: v.number(), submissionId: nullableId, signerName: v.union(v.string(), v.null()), signedAt: v.union(v.number(), v.null()), source: v.union(sourceValidator, v.null()), snapshot: v.optional(v.union(consentSnapshotValidator, consentSnapshotV2Validator)), collectedAt: v.number()});
+const exportRecordValidator = v.object({studentId: v.id("students"), studentName: v.string(), state: stateValidator, revision: v.number(), submissionId: nullableId, signerName: v.union(v.string(), v.null()), signedAt: v.union(v.number(), v.null()), source: v.union(sourceValidator, v.null()), synthetic: v.union(v.boolean(), v.null()), snapshot: v.optional(v.union(consentSnapshotValidator, consentSnapshotV2Validator)), collectedAt: v.number()});
 export const exportPacket = mutation({
-  args: {eventId: v.id("events"), includeHealth: v.boolean(), paginationOpts: v.optional(paginationOptsValidator)}, returns: v.object({event: v.object({eventId: v.id("events"), name: v.string()}), synthetic: v.literal(true), generatedAt: v.number(), schemaVersion: v.literal(1), isDone: v.boolean(), continueCursor: v.string(), records: v.array(exportRecordValidator)}),
+  args: {eventId: v.id("events"), includeHealth: v.boolean(), paginationOpts: v.optional(paginationOptsValidator)}, returns: v.object({event: v.object({eventId: v.id("events"), name: v.string()}), synthetic: v.boolean(), generatedAt: v.number(), schemaVersion: v.literal(1), isDone: v.boolean(), continueCursor: v.string(), records: v.array(exportRecordValidator)}),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); operations(actor);
     if (args.includeHealth && actor.role !== "coach" && !actor.healthExport) throw new Error("Separate health-export permission is required.");
@@ -258,9 +261,9 @@ export const exportPacket = mutation({
       if (!student?.active || student.seasonId !== season._id) continue;
       const row = await coverageFor(ctx, student._id, event._id); const submission = row?.latestSubmissionId ? await ctx.db.get(row.latestSubmissionId) : null;
       const snapshot = args.includeHealth && submission?.snapshotFormat === 1 ? await sealedSnapshot(ctx, submission) : args.includeHealth && submission?.snapshotFormat === 2 ? await sealedSnapshotV2(ctx, submission) : undefined;
-      records.push({studentId: student._id, studentName: student.preferredName || student.legalName, state: row?.state ?? "required", revision: row?.revision ?? 0, submissionId: submission?._id ?? null, signerName: submission?.signerName ?? null, signedAt: submission?.signedAt ?? null, source: submission?.source ?? null, ...(snapshot ? {snapshot} : {}), collectedAt: generatedAt});
+      records.push({studentId: student._id, studentName: student.preferredName || student.legalName, state: row?.state ?? "required", revision: row?.revision ?? 0, submissionId: submission?._id ?? null, signerName: submission?.signerName ?? null, signedAt: submission?.signedAt ?? null, source: submission?.source ?? null, synthetic: submission?.synthetic ?? null, ...(snapshot ? {snapshot} : {}), collectedAt: generatedAt});
     }
     await audit(ctx, actor, "permissionExports", event._id, "export", null, {includeHealth: args.includeHealth, count: records.length, generatedAt});
-    return {event: {eventId: event._id, name: event.name}, synthetic: true as const, generatedAt, schemaVersion: 1 as const, isDone: page.isDone, continueCursor: page.continueCursor, records};
+    return {event: {eventId: event._id, name: event.name}, synthetic: records.length > 0 && records.every(record => record.synthetic === true), generatedAt, schemaVersion: 1 as const, isDone: page.isDone, continueCursor: page.continueCursor, records};
   },
 });

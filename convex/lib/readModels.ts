@@ -53,8 +53,8 @@ export async function studentReadiness(ctx: Ctx, event: Doc<"events">, student: 
   return { state: open.length ? "open" as const : "ready" as const, open, participation: participant.status, permissionStatus, firstRegistrationState };
 }
 
-export async function attendanceFor(ctx: Ctx, student: Doc<"students">) {
-  const meetings = await ctx.db.query("attendanceMeetings").withIndex("by_seasonId_and_startsAt", q => q.eq("seasonId", student.seasonId)).take(500);
+export async function attendanceFor(ctx: Ctx, student: Doc<"students">, seasonMeetings?: Doc<"attendanceMeetings">[]) {
+  const meetings = seasonMeetings ?? await ctx.db.query("attendanceMeetings").withIndex("by_seasonId_and_startsAt", q => q.eq("seasonId", student.seasonId)).take(500);
   const records = await ctx.db.query("attendanceRecords").withIndex("by_studentId", q => q.eq("studentId", student._id)).take(500);
   const present = new Set(records.filter(x => x.present).map(x => x.meetingId));
   const held = meetings.filter(x => !x.cancelled);

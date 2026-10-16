@@ -136,7 +136,7 @@ describe("synthetic versioned permission workflow", () => {
     await expect(f.mentor.mutation(api.permissions.exportPacket, {eventId: f.ids.events[0], includeHealth: false})).rejects.toThrow("Coach or Travel Lead");
   });
 
-  it("uses compact accepted evidence without loading full receipt JSON and invalidates stale hash markers", async () => {
+  it("binds accepted coverage to the receipt and invalidates stale provenance markers", async () => {
     const f = await fixture(); const signed = await sign(f, [f.ids.events[0]]); await review(f, signed.submissionId);
     const inspected = await f.t.run(async ctx => {
       const reads: string[] = [];
@@ -146,11 +146,14 @@ describe("synthetic versioned permission workflow", () => {
       }});
       return {accepted: await permissionAccepted({...ctx, db}, f.ids.student, f.ids.events[0]), reads};
     });
-    expect(inspected.accepted).toBe(true); expect(inspected.reads).not.toContain(signed.submissionId); expect(inspected.reads).toHaveLength(1);
+    expect(inspected.accepted).toBe(true); expect(inspected.reads).toContain(signed.submissionId); expect(inspected.reads).toHaveLength(2);
     const row = await f.t.run(ctx => ctx.db.query("permissionCoverage").withIndex("by_studentId_and_eventId", q => q.eq("studentId", f.ids.student).eq("eventId", f.ids.events[0])).unique());
     await f.t.run(ctx => ctx.db.patch(row!._id, {sealedSnapshotHash: "b".repeat(64)}));
     expect(await accepted(f)).toBe(false);
     await f.t.run(ctx => ctx.db.patch(row!._id, {sealedSnapshotFormat: undefined}));
+    expect(await accepted(f)).toBe(false);
+    const original = await f.t.run(ctx => ctx.db.get(signed.submissionId));
+    await f.t.run(ctx => ctx.db.patch(row!._id, {sealedSnapshotFormat: 1, sealedSnapshotHash: original!.snapshotHash, synthetic: false}));
     expect(await accepted(f)).toBe(false);
   });
 

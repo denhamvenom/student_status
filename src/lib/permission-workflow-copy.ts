@@ -4,7 +4,7 @@ export const permissionWorkflowCopy = {
   parentDescription: 'Review the covered events, contact and health information, then prepare a permission form.',
   reviewDescription: 'Review submitted evidence and current event coverage. Signed receipts retain their original information.',
   synthetic: 'Synthetic test evidence', syntheticNotice: 'This development workflow accepts only server-registered fictional records. Real permission signing remains closed.',
-  signingClosed: 'Signing is unavailable for this student. Real field trip consent remains closed.',
+  signingClosed: 'Signing is unavailable for this student or deployment.',
   noStudent: 'Select a linked student.', noVersion: 'No permission wording version is configured.', noEvents: 'No eligible confirmed events.',
   currentWording: 'Current wording', version: 'Version', wording: 'Permission wording', administration: 'Medication administration', exceptions: 'Exceptions', products: 'Products and ingredients',
   unapprovedWording: 'This wording and medication administration policy are unapproved development drafts. The synthetic form grants no real consent.',

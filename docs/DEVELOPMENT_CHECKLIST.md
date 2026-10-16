@@ -674,3 +674,6 @@ October 14 visual-review follow-up: [x] Join/waiting screens offer Sign out for 
 - [x] October16 explicitly authorized item5 followup: FIRST reopened explanation for Parent/adult Student, minimal derived flag; focused checks and review passed, development synced. Supersedes prior deferral; existing records/rules preserved.
 
 - [x] October16 owner visual-cycle closure and fresh independent Astra handoff review; no blocking findings. Current launch queue: ONLINE_READINESS_HANDOFF.md. Historical owner-approval/fixture-recheck boxes above are superseded; evidence limits retained.
+
+- [x] October16 local launch-preparation batch: integrated Timeclock frontend, focused read reductions, guarded production signing and first-Coach procedure; focused validation and final Astra review passed. See LAUNCH_PREPARATION.md. No deployment/push or live changes.
+- [ ] Launch configuration, billing/backup decision, recovery drill, ownership/origins and physical-device checks remain open; production authorization still required.

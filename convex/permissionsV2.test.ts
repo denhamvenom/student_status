@@ -6,6 +6,8 @@ import { api, internal } from "./_generated/api";
 import { privateStudent } from "./lib/access";
 import { fieldTripApproved } from "../src/lib/field-trip-approved";
 import { validateSnapshotV2 } from "./lib/consentSnapshotV2";
+import { resolvePermissionSigningMode } from "./lib/permissionSigningMode";
+import { permissionAccepted } from "./lib/permissionCoverage";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -107,6 +109,9 @@ it("seals reviewed and signed PDFs, preserves the reviewed pages, and retries on
   expect(summary[0]).toMatchObject({submissionId, format: 2, legacy: false});
   await f.coach.mutation(api.permissions.review, {submissionId, status: "accepted", expectedLatestReviewId: null, expectedCoverage: summary[0].controlledCoverage, idempotencyKey: "fictional-review-1"});
   await expect(f.parent.action(api.permissionsV2Pdf.submit, {draftId: prepared.draftId, typedName: "Different Name", acknowledged: true})).rejects.toThrow("already signed differently");
+  vi.stubEnv("CONVEX_CLOUD_URL", "https://team-prod.convex.cloud");
+  expect((await f.parent.query(api.permissionsV2.receipt, {submissionId})).snapshot.synthetic).toBe(true);
+  expect((await f.parent.action(api.permissionsV2Pdf.pdf, {submissionId, rendition: "signed"})).sha256).toBe(receipt.signedPdfSha256);
 });
 
 it("selects one immutable approved version and keeps prior V2 snapshot parsing", async () => {
@@ -121,4 +126,51 @@ it("selects one immutable approved version and keeps prior V2 snapshot parsing",
   expect(() => validateSnapshotV2({...draft.snapshot, version: {...draft.snapshot.version, wording: "Changed minor first aid"}})).toThrow("Approved field trip template");
   const older = {...draft.snapshot, templateVersion: "field-trip-v2" as const, version: {...draft.snapshot.version, version: "prior-v2", wording: "Prior synthetic minor first aid wording."}};
   expect(validateSnapshotV2(older).templateVersion).toBe("field-trip-v2");
+});
+
+it("fails closed until real signing is explicitly bound to this non-development deployment", async () => {
+  const prod = "https://team-prod.convex.cloud";
+  expect(resolvePermissionSigningMode({cloudUrl: prod})).toBe("closed");
+  expect(resolvePermissionSigningMode({cloudUrl: prod, realEnabled: "true", realCloudUrl: "https://other.convex.cloud"})).toBe("closed");
+  expect(resolvePermissionSigningMode({cloudUrl: prod, realEnabled: "true", realCloudUrl: "http://team-prod.convex.cloud"})).toBe("closed");
+  expect(resolvePermissionSigningMode({cloudUrl: "https://third-bandicoot-18.convex.cloud", realEnabled: "true", realCloudUrl: "https://third-bandicoot-18.convex.cloud"})).toBe("synthetic");
+  expect(resolvePermissionSigningMode({cloudUrl: prod, realEnabled: "true", realCloudUrl: prod})).toBe("real");
+
+  const f = await fixture();
+  await f.t.run(ctx => ctx.db.patch(f.ids.student, {profileCompletedAt: 1}));
+  await f.parent.mutation(api.permissionsV2.saveProfile, {studentId: f.ids.student, expectedRevision: 0, value: profile});
+  vi.stubEnv("CONVEX_CLOUD_URL", prod);
+  await expect(f.parent.action(api.permissionsV2Pdf.prepare, {studentId: f.ids.student, eventIds: [f.ids.event]})).rejects.toThrow("signing is closed");
+  vi.stubEnv("PERMISSION_REAL_SIGNING_ENABLED", "true");
+  vi.stubEnv("PERMISSION_REAL_SIGNING_CLOUD_URL", "https://other.convex.cloud");
+  await expect(f.parent.action(api.permissionsV2Pdf.prepare, {studentId: f.ids.student, eventIds: [f.ids.event]})).rejects.toThrow("signing is closed");
+  vi.stubEnv("PERMISSION_REAL_SIGNING_CLOUD_URL", prod);
+  const workspace = await f.parent.query(api.permissions.workspace, {studentId: f.ids.student});
+  expect(workspace).toMatchObject({signingMode: "real", canSign: true});
+  const dashboard = await f.parent.query(api.app.studentDashboard, {studentId: f.ids.student});
+  expect(dashboard.todos).toEqual(expect.arrayContaining([expect.objectContaining({label: "Review and sign the permission form", href: "/forms"})]));
+  const prepared = await f.parent.action(api.permissionsV2Pdf.prepare, {studentId: f.ids.student, eventIds: [f.ids.event]});
+  expect(prepared.snapshot.synthetic).toBe(false);
+  vi.stubEnv("PERMISSION_REAL_SIGNING_ENABLED", "false");
+  await expect(f.parent.action(api.permissionsV2Pdf.submit, {draftId: prepared.draftId, typedName: "Fictional Parent", acknowledged: true})).rejects.toThrow("signing is closed");
+  vi.stubEnv("PERMISSION_REAL_SIGNING_ENABLED", "true");
+  const submissionId = await f.parent.action(api.permissionsV2Pdf.submit, {draftId: prepared.draftId, typedName: "Fictional Parent", acknowledged: true});
+  const receipt = await f.parent.query(api.permissionsV2.receipt, {submissionId});
+  expect(receipt.snapshot.synthetic).toBe(false);
+  const summary = await f.coach.query(api.permissions.listSubmissions, {studentId: f.ids.student});
+  expect(summary[0].synthetic).toBe(false);
+  expect(await f.t.run(ctx => permissionAccepted(ctx, f.ids.student, f.ids.event))).toBe(false);
+  await f.coach.mutation(api.permissions.review, {submissionId, status: "accepted", expectedLatestReviewId: null, expectedCoverage: summary[0].controlledCoverage, idempotencyKey: "real-review-1"});
+  expect(await f.t.run(ctx => permissionAccepted(ctx, f.ids.student, f.ids.event))).toBe(true);
+  expect((await f.parent.query(api.app.eventDetail, {eventId: f.ids.event, studentId: f.ids.student})).readiness?.open).not.toContain("Permission accepted");
+  const paper = await f.coach.action(api.permissionsV2Pdf.preparePaper, {studentId: f.ids.student, eventIds: [f.ids.event], signerName: "Fictional Paper Guardian"});
+  expect(paper.snapshot.synthetic).toBe(false);
+  const paperId = await f.coach.action(api.permissionsV2Pdf.submitPaper, {draftId: paper.draftId, typedName: "Fictional Paper Guardian", acknowledged: true, paperReference: "paper-real-1", paperSignedAt: Date.now() - 1000});
+  expect((await f.coach.query(api.permissionsV2.receipt, {submissionId: paperId})).snapshot.synthetic).toBe(false);
+  const exported = await f.coach.mutation(api.permissions.exportPacket, {eventId: f.ids.event, includeHealth: false});
+  expect(exported.synthetic).toBe(false);
+  expect(exported.records[0].synthetic).toBe(false);
+  vi.stubEnv("PERMISSION_REAL_SIGNING_ENABLED", "false");
+  expect((await f.parent.query(api.permissionsV2.receipt, {submissionId})).snapshot.synthetic).toBe(false);
+  expect((await f.parent.action(api.permissionsV2Pdf.pdf, {submissionId, rendition: "signed"})).sha256).toBe(receipt.signedPdfSha256);
 });

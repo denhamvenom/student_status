@@ -5,7 +5,7 @@ import type { Id } from '../convex/_generated/dataModel'
 import { collectPermissionExport, emptyChoices, receiptHistoryLabels, eventDateRange } from './PermissionWorkflow'
 type Page=FunctionReturnType<typeof api.permissions.exportPacket>
 const eventId='synthetic-event' as Id<'events'>
-function page(index:number,isDone=false):Page{return{event:{eventId,name:'Synthetic event'},schemaVersion:1,synthetic:true,generatedAt:1000+index,records:Array.from({length:10},(_,offset)=>({studentId:`synthetic-student-${index*10+offset}` as Id<'students'>,studentName:`Synthetic student ${index*10+offset}`,state:'required',revision:0,submissionId:null,signerName:null,signedAt:null,source:null,collectedAt:1000+index})),isDone,continueCursor:`synthetic-cursor-${index+1}`}}
+function page(index:number,isDone=false):Page{return{event:{eventId,name:'Synthetic event'},schemaVersion:1,synthetic:false,generatedAt:1000+index,records:Array.from({length:10},(_,offset)=>({studentId:`synthetic-student-${index*10+offset}` as Id<'students'>,studentName:`Synthetic student ${index*10+offset}`,state:'required',revision:0,submissionId:null,signerName:null,signedAt:null,source:null,synthetic:null,collectedAt:1000+index})),isDone,continueCursor:`synthetic-cursor-${index+1}`}}
 describe('permission export collection',()=>{
   it('shows one Chicago date for a same-day event and a range across days',()=>{
     const start=Date.parse('2027-05-10T10:00:00-05:00')
@@ -24,7 +24,7 @@ describe('permission export collection',()=>{
     const fetch=vi.fn(async(args:FunctionArgs<typeof api.permissions.exportPacket>)=>{const current=index++;expect(args).toMatchObject({eventId,includeHealth:false,paginationOpts:{numItems:10,cursor:current?`synthetic-cursor-${current}`:null}});return page(current,current===49)})
     const download=vi.fn()
     const packet=await collectPermissionExport(fetch,{eventId,includeHealth:false}).then(value=>{download(value);return value})
-    expect(fetch).toHaveBeenCalledTimes(50);expect(download).toHaveBeenCalledTimes(1);expect(packet.records).toHaveLength(500);expect(packet.collectionStartedAt).toBe(1000);expect(packet.collectionCompletedAt).toBe(1049);expect(packet.records[499].collectedAt).toBe(1049);expect(packet.collectionSemantics).toBe('If records change while you download, run the export again for the latest version.')
+    expect(fetch).toHaveBeenCalledTimes(50);expect(download).toHaveBeenCalledTimes(1);expect(packet.records).toHaveLength(500);expect(packet.synthetic).toBe(false);expect(packet.collectionStartedAt).toBe(1000);expect(packet.collectionCompletedAt).toBe(1049);expect(packet.records[499].collectedAt).toBe(1049);expect(packet.collectionSemantics).toBe('If records change while you download, run the export again for the latest version.')
   })
   it('does not produce a partial download when any page or the final page is denied',async()=>{
     for(const deniedPage of [1,49]){

@@ -20,10 +20,10 @@ export async function sealedSnapshot(ctx: Ctx, submission: Doc<"permissionSubmis
   if (submission.source === "electronic" && (!submission.signedBy || snapshot.signer.accountId !== submission.signedBy || snapshot.signer.email !== submission.signerEmail) || submission.source === "paper" && (submission.signedBy !== undefined || !snapshot.paper || !submission.paperAttestation || snapshot.paper.reference !== submission.paperReference || snapshot.paper.signedAt !== submission.paperSignedAt || snapshot.paper.signedAt !== snapshot.signedAt || snapshot.signer.email !== (submission.signerEmail ?? null))) throw new Error("Permission signature provenance is inconsistent.");
   return snapshot;
 }
-export async function setPendingCoverage(ctx: MutationCtx, actor: Doc<"appUsers">, student: Doc<"students">, submissionId: Id<"permissionSubmissions">, versionId: Id<"permissionVersions">, expected: ExpectedCoverage[], seal: {snapshotHash: string; source: "electronic" | "paper"; format?: 1 | 2}) {
+export async function setPendingCoverage(ctx: MutationCtx, actor: Doc<"appUsers">, student: Doc<"students">, submissionId: Id<"permissionSubmissions">, versionId: Id<"permissionVersions">, expected: ExpectedCoverage[], seal: {snapshotHash: string; source: "electronic" | "paper"; format?: 1 | 2; synthetic?: boolean}) {
   for (const item of expected) {
     const row = await coverageFor(ctx, student._id, item.eventId);
-    const fields = { seasonId: student.seasonId, studentId: student._id, eventId: item.eventId, state: "pending" as const, revision: item.revision + 1, updatedAt: Date.now(), updatedBy: actor._id, latestSubmissionId: submissionId, versionId, latestReviewId: undefined, signatureRequestedAt: undefined, reason: undefined, correctionField: undefined, sealedSnapshotFormat: seal.format ?? 1, sealedSnapshotHash: seal.snapshotHash, synthetic: true, source: seal.source };
+    const fields = { seasonId: student.seasonId, studentId: student._id, eventId: item.eventId, state: "pending" as const, revision: item.revision + 1, updatedAt: Date.now(), updatedBy: actor._id, latestSubmissionId: submissionId, versionId, latestReviewId: undefined, signatureRequestedAt: undefined, reason: undefined, correctionField: undefined, sealedSnapshotFormat: seal.format ?? 1, sealedSnapshotHash: seal.snapshotHash, synthetic: seal.synthetic ?? true, source: seal.source };
     if (row) await ctx.db.patch(row._id, fields); else await ctx.db.insert("permissionCoverage", fields);
   }
 }
@@ -36,7 +36,9 @@ export async function controlledCoverage(ctx: Ctx, submissionId: Id<"permissionS
 export async function permissionAccepted(ctx: Ctx, studentId: Id<"students">, eventId: Id<"events">) {
   const coverage = await coverageFor(ctx, studentId, eventId);
   if (!coverage || coverage.state !== "accepted" || coverage.signatureRequestedAt !== undefined || !coverage.latestSubmissionId || !coverage.latestReviewId) return false;
-  if (coverage.sealedSnapshotFormat !== 1 && coverage.sealedSnapshotFormat !== 2 || coverage.synthetic !== true || !coverage.sealedSnapshotHash || !/^[0-9a-f]{64}$/.test(coverage.sealedSnapshotHash) || !coverage.versionId || !coverage.source) return false;
+  if (coverage.sealedSnapshotFormat !== 1 && coverage.sealedSnapshotFormat !== 2 || typeof coverage.synthetic !== "boolean" || coverage.sealedSnapshotFormat === 1 && coverage.synthetic !== true || !coverage.sealedSnapshotHash || !/^[0-9a-f]{64}$/.test(coverage.sealedSnapshotHash) || !coverage.versionId || !coverage.source) return false;
+  const submission = await ctx.db.get(coverage.latestSubmissionId);
+  if (!submission || submission.studentId !== studentId || submission.seasonId !== coverage.seasonId || submission.snapshotFormat !== coverage.sealedSnapshotFormat || submission.synthetic !== coverage.synthetic || submission.snapshotHash !== coverage.sealedSnapshotHash || submission.versionId !== coverage.versionId || submission.source !== coverage.source) return false;
   const review = await ctx.db.get(coverage.latestReviewId);
   return !!review && review.status === "accepted" && review.submissionId === coverage.latestSubmissionId && review.snapshotHash === coverage.sealedSnapshotHash && !!review.controlledCoverage?.some(item => item.eventId === eventId && item.priorRevision + 1 === coverage.revision);
 }

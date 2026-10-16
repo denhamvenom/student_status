@@ -76,7 +76,7 @@ try {
   expect(await u.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
   results.push('Long unbroken event title stays within narrow viewport');
   await usability.context.close();
-  for (const width of [390, 1440]) {
+  for (const width of [390, 820, 1440]) {
     for (const theme of ['light', 'dark']) {
       const { context, page } = await setup(width, theme);
       await expect(page.getByRole('article').filter({ hasText: 'Finished synthetic meeting' }).getByRole('button')).toBeDisabled();
@@ -169,6 +169,9 @@ try {
   await dialog.getByRole('button', { name: 'Open event', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Clock students' })).toBeVisible();
   results.push('All-day setup and PIN-protected event switching');
+  await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toHaveCount(0);
+  await page.evaluate(() => window.__clockTest.close());
+  await expect(page.getByRole('heading', { name: "Today's events" })).toBeVisible();
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await dialog.getByLabel('Operator PIN').fill('wrong');
   await dialog.getByRole('button', { name: 'Sign out', exact: true }).click();

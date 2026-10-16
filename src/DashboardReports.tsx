@@ -28,7 +28,16 @@ export function FinancialMaintenanceNotice({maintenance}:{maintenance?:{state:'r
   if(!maintenance||maintenance.state==='ready')return null
   return <p className={styles.note} role={maintenance.state==='failed'?'alert':'status'}>{maintenance.state==='failed'?copy.financialMaintenanceFailed:copy.financialMaintenancePending} {copy.committedTotals}</p>
 }
-function useReportTime(){const [asOf,setAsOf]=useState(()=>Date.now());useEffect(()=>{const timer=setInterval(()=>setAsOf(Date.now()),30000);return()=>clearInterval(timer)},[]);return asOf}
+function useReportTime(){
+  const [asOf,setAsOf]=useState(()=>Date.now())
+  useEffect(()=>{
+    const refresh=()=>{if(!document.hidden)setAsOf(Date.now())}
+    const timer=window.setInterval(refresh,30000)
+    document.addEventListener('visibilitychange',refresh)
+    return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',refresh)}
+  },[])
+  return asOf
+}
 
 export function FamilyFunding({studentId,compact=false}:{studentId:Id<'students'>;compact?:boolean}){
   const data=useQuery(api.dashboardReports.familyFinance,{studentId})

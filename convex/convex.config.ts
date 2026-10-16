@@ -5,6 +5,10 @@ import rateLimiter from "@convex-dev/rate-limiter/convex.config.js";
 
 const app = defineApp({ env: {
   SITE_URL: v.optional(v.string()),
+  PERMISSION_REAL_SIGNING_ENABLED: v.optional(v.string()),
+  PERMISSION_REAL_SIGNING_CLOUD_URL: v.optional(v.string()),
+  PRODUCTION_BOOTSTRAP_ENABLED: v.optional(v.string()),
+  PRODUCTION_BOOTSTRAP_CLOUD_URL: v.optional(v.string()),
   TIMECLOCK_CALENDAR_ID: v.optional(v.string()),
   TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_EMAIL: v.optional(v.string()),
   TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_PRIVATE_KEY: v.optional(v.string()),

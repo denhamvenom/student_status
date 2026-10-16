@@ -3,6 +3,7 @@ import { mutation, query } from "./_generated/server";
 import { activeSeason, audit, viewer } from "./lib/access";
 import { medicationDefinitionValidator, publicVersion, validateVersion, versionValidator } from "./lib/consentSnapshot";
 import { fieldTripApproved } from "../src/lib/field-trip-approved";
+import { permissionSigningMode } from "./lib/permissionSigningMode";
 
 export const current = query({
   args: {}, returns: v.union(v.object({...versionValidator.fields, formFormat: v.union(v.literal(1), v.literal(2))}), v.null()),
@@ -51,7 +52,7 @@ export const selectApprovedFieldTripTemplate = mutation({
     const versionId = existing?._id ?? await ctx.db.insert("permissionVersions", {seasonId: season._id, version: fieldTripApproved.templateVersion, title: fieldTripApproved.title, wording: fieldTripApproved.wording, schoolName: fieldTripApproved.schoolName, teamName: fieldTripApproved.teamName, formFormat: 2, medications: [], administrationText: "", acknowledgmentText: fieldTripApproved.acknowledgmentText, createdBy: actor._id, createdAt: Date.now()});
     if (season.activePermissionVersionId !== versionId) {
       await ctx.db.patch(season._id, {activePermissionVersionId: versionId});
-      await audit(ctx, actor, "permissionVersions", versionId, "selectApprovedFieldTripTemplate", {previousVersionId: season.activePermissionVersionId ?? null}, {version: fieldTripApproved.templateVersion, format: 2, realSigningEnabled: false});
+      await audit(ctx, actor, "permissionVersions", versionId, "selectApprovedFieldTripTemplate", {previousVersionId: season.activePermissionVersionId ?? null}, {version: fieldTripApproved.templateVersion, format: 2, realSigningEnabled: permissionSigningMode() === "real"});
     }
     return versionId;
   },

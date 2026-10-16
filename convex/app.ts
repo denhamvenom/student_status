@@ -1,12 +1,12 @@
 import { enrollmentPending } from "./lib/eventEnrollmentState";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { env } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { activeSeason, identity, linkedStudents, maybeViewer, mentorEvent, mentorStudent, privateStudent, publicStudent, requireRole, studentAccess, viewer as requireViewer, audit } from "./lib/access";
 import { attendanceFor, financeFor, studentReadiness } from "./lib/readModels";
 import { coverageFor } from "./lib/permissionCoverage";
 import { fieldTripApproved } from "../src/lib/field-trip-approved";
+import { v2SigningAllowed } from "./lib/permissionSigningMode";
 import { transportSummary } from "./travel";
 import { age18, firstStatus } from "./firstRegistration";
 import { studentSetupCompleteFor } from "./setupWizard";
@@ -91,8 +91,7 @@ export const studentDashboard = query({
     const studentSetupComplete = await studentSetupCompleteFor(ctx, student);
     const parentProfileComplete = !!student.consentProfileV2CompletedAt;
     const activeVersion = season.activePermissionVersionId ? await ctx.db.get(season.activePermissionVersionId) : null;
-    const syntheticAccess = user.role === "parent" && env.CONVEX_CLOUD_URL === "https://third-bandicoot-18.convex.cloud" ? await ctx.db.query("syntheticConsentSubjects").withIndex("by_studentId_and_parentId", q => q.eq("studentId", student._id).eq("parentId", user._id)).unique() : null;
-    const signingAvailable = activeVersion?.formFormat === 2 && activeVersion.version === fieldTripApproved.templateVersion && syntheticAccess?.enabled === true;
+    const signingAvailable = user.role === "parent" && activeVersion?.formFormat === 2 && activeVersion.version === fieldTripApproved.templateVersion && await v2SigningAllowed(ctx, student._id, user._id);
     if (!studentSetupComplete) todos.push({eventId: null, eventName: "Student setup", label: user.role === "student" ? "Finish your student setup" : "Student setup needs to be finished by the student", dueAt: null, href: user.role === "student" ? "/setup" : null, responsible: "student", blocked: user.role !== "student"});
     if (!parentProfileComplete) todos.push({eventId: null, eventName: "Profile & health", label: user.role === "parent" ? "Finish the health and contact profile" : "A parent or legal guardian needs to finish the health and contact profile", dueAt: null, href: user.role === "parent" ? "/setup" : null, responsible: "parent", blocked: user.role !== "parent"});
     const firstRegistrationState = await firstStatus(ctx, student._id);
@@ -151,10 +150,11 @@ export const mentorReport = query({
     const season = await activeSeason(ctx);
     const students = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(500);
     const events = await ctx.db.query("events").withIndex("by_seasonId_and_startsAt", q => q.eq("seasonId", season._id)).take(200);
+    const meetings = await ctx.db.query("attendanceMeetings").withIndex("by_seasonId_and_startsAt", q => q.eq("seasonId", season._id)).take(500);
     const report = [];
     for (const student of students.filter(x => x.active)) {
       const participation = await ctx.db.query("participants").withIndex("by_studentId", q => q.eq("studentId", student._id)).take(200);
-      report.push({ student: mentorStudent(student), attendance: await attendanceFor(ctx, student), events: events.filter(e => participation.some(p => p.eventId === e._id && p.status === "confirmed")).map(e => ({ id: e._id, name: e.name })) });
+      report.push({ student: mentorStudent(student), attendance: await attendanceFor(ctx, student, meetings), events: events.filter(e => participation.some(p => p.eventId === e._id && p.status === "confirmed")).map(e => ({ id: e._id, name: e.name })) });
     }
     return report;
   },

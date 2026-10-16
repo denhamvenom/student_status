@@ -2,26 +2,20 @@ import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { env } from "./_generated/server";
 import { activeSeason, audit, studentAccess, viewer } from "./lib/access";
 import { verifiedGoogle, tokenHash } from "./lib/invitationIdentity";
 import { compareCoverage, coverageFor, expectedCoverage, setPendingCoverage } from "./lib/permissionCoverage";
 import { boundedText, expectedCoverageValidator } from "./lib/consentSnapshot";
 import { consentProfileV2Validator, consentSnapshotV2Validator, selectedEventsV2, snapshotHashV2, validateConsentProfileV2, validateSnapshotV2, type ConsentSnapshotV2 } from "./lib/consentSnapshotV2";
 import { fieldTripApproved } from "../src/lib/field-trip-approved";
+import { requireV2Signing } from "./lib/permissionSigningMode";
 
 type Ctx = QueryCtx | MutationCtx;
-const DEV_URL = "https://third-bandicoot-18.convex.cloud";
 const hashPattern = /^[0-9a-f]{64}$/;
 const pdfAccessValidator = v.object({storageId: v.id("_storage"), sha256: v.string()});
 const profileResultValidator = v.object({studentId: v.id("students"), revision: v.number(), setupComplete: v.boolean(), completed: v.boolean(), value: v.union(consentProfileV2Validator, v.null())});
 const draftResultValidator = v.object({draftId: v.id("permissionDrafts"), expiresAt: v.number(), snapshot: consentSnapshotV2Validator, expectedCoverage: v.array(expectedCoverageValidator)});
 
-async function syntheticGate(ctx: Ctx, studentId: Id<"students">, parentId?: Id<"appUsers">) {
-  if (env.CONVEX_CLOUD_URL !== DEV_URL) throw new Error("Real signing remains closed.");
-  const row = await ctx.db.query("syntheticConsentSubjects").withIndex("by_studentId_and_parentId", q => q.eq("studentId", studentId).eq("parentId", parentId)).unique();
-  if (row?.enabled !== true) throw new Error("Only registered fictional development subjects may use consent.");
-}
 async function parentSigner(ctx: Ctx, actor: Doc<"appUsers">) {
   if (actor.role !== "parent") throw new Error("Only a linked parent may complete or sign this form.");
   const who = await verifiedGoogle(ctx);
@@ -38,21 +32,21 @@ async function build(ctx: Ctx, actor: Doc<"appUsers">, studentId: Id<"students">
   const profile = validateConsentProfileV2(student.consentProfileV2);
   const who = source === "electronic" ? await parentSigner(ctx, actor) : null;
   if (source === "paper") operations(actor);
-  await syntheticGate(ctx, student._id, source === "electronic" ? actor._id : undefined);
+  const signingMode = await requireV2Signing(ctx, student._id, source === "electronic" ? actor._id : undefined);
   const season = await activeSeason(ctx);
   const version = season.activePermissionVersionId ? await ctx.db.get(season.activePermissionVersionId) : null;
   if (!version || version.seasonId !== student.seasonId || version.formFormat !== 2 || version.version !== fieldTripApproved.templateVersion) throw new Error("Select the approved field trip template before preparing a new PDF.");
   const events = (await selectedEventsV2(ctx, student, eventIds)).map(event => ({...event, sponsorName: fieldTripApproved.sponsorName, sponsorPhone: fieldTripApproved.sponsorPhone}));
   const expected = await expectedCoverage(ctx, student._id, events.map(event => event.eventId));
   const priorCoverage = await Promise.all(expected.map(async row => ({...row, submissionId: (await coverageFor(ctx, student._id, row.eventId))?.latestSubmissionId ?? null})));
-  const snapshot: ConsentSnapshotV2 = {format: 2, synthetic: true, templateVersion: fieldTripApproved.templateVersion, version: {versionId: version._id, version: version.version, title: version.title, wording: version.wording, schoolName: version.schoolName, teamName: version.teamName, acknowledgmentText: version.acknowledgmentText}, student: {studentId: student._id, seasonId: student.seasonId, legalName: student.legalName, preferredName: student.preferredName, email: student.email, subteam: student.subteam, grade: profile.grade, dateOfBirth: profile.dateOfBirth, profileRevision: student.profileRevision ?? 0, profileConfirmedBy: student.consentProfileV2ConfirmedBy, profileConfirmedAt: student.consentProfileV2CompletedAt}, profile, events, priorCoverage, signer: {source, accountId: source === "electronic" ? actor._id : null, name: source === "electronic" ? who!.name : paper!.name, email: source === "electronic" ? who!.email : paper!.email, recordedBy: actor._id}, typedName: null, acknowledged: false, signedAt: null, recordedAt: null, pdf: null, paper: null};
+  const snapshot: ConsentSnapshotV2 = {format: 2, synthetic: signingMode === "synthetic", templateVersion: fieldTripApproved.templateVersion, version: {versionId: version._id, version: version.version, title: version.title, wording: version.wording, schoolName: version.schoolName, teamName: version.teamName, acknowledgmentText: version.acknowledgmentText}, student: {studentId: student._id, seasonId: student.seasonId, legalName: student.legalName, preferredName: student.preferredName, email: student.email, subteam: student.subteam, grade: profile.grade, dateOfBirth: profile.dateOfBirth, profileRevision: student.profileRevision ?? 0, profileConfirmedBy: student.consentProfileV2ConfirmedBy, profileConfirmedAt: student.consentProfileV2CompletedAt}, profile, events, priorCoverage, signer: {source, accountId: source === "electronic" ? actor._id : null, name: source === "electronic" ? who!.name : paper!.name, email: source === "electronic" ? who!.email : paper!.email, recordedBy: actor._id}, typedName: null, acknowledged: false, signedAt: null, recordedAt: null, pdf: null, paper: null};
   validateSnapshotV2(snapshot);
   return {student, snapshot, expected, eventFingerprint: await tokenHash(JSON.stringify(events))};
 }
 function parseV2(raw: string): ConsentSnapshotV2 {
   let result: ConsentSnapshotV2;
   try { result = JSON.parse(raw) as ConsentSnapshotV2; } catch { throw new Error("Permission snapshot evidence is invalid."); }
-  if (result?.format !== 2 || result.synthetic !== true || result.templateVersion !== "field-trip-v2" && result.templateVersion !== fieldTripApproved.templateVersion) throw new Error("Permission snapshot format is invalid.");
+  if (result?.format !== 2 || typeof result.synthetic !== "boolean" || result.templateVersion !== "field-trip-v2" && result.templateVersion !== fieldTripApproved.templateVersion) throw new Error("Permission snapshot format is invalid.");
   return validateSnapshotV2(result);
 }
 async function currentDraft(ctx: Ctx, draft: Doc<"permissionDrafts">, actor: Doc<"appUsers">, now: number) {
@@ -147,17 +141,17 @@ export const commitSubmit = internalMutation({
     validateSnapshotV2(final);
     const sealedHash = await snapshotHashV2(final);
     const priorIds = [...new Set(snapshot.priorCoverage.flatMap(row => row.submissionId ? [row.submissionId] : []))];
-    const submissionId = await ctx.db.insert("permissionSubmissions", {studentId: student._id, seasonId: student.seasonId, signedBy: snapshot.signer.accountId ?? undefined, typedName: final.typedName!, wordingVersion: snapshot.version.version, eventIds: snapshot.events.map(event => event.eventId), answersJson: JSON.stringify({acknowledged: true, format: 2}), signedAt, versionId: snapshot.version.versionId, draftId: draft._id, source: snapshot.signer.source, synthetic: true, snapshotFormat: 2, snapshotJson: JSON.stringify(final), snapshotHash: sealedHash, reviewedPdfId: draft.reviewedPdfId, reviewedPdfSha256: draft.reviewedPdfSha256, signedPdfId: args.signedPdfId, signedPdfSha256: args.signedPdfSha256, recordedBy: actor._id, signerName: snapshot.signer.name, signerEmail: snapshot.signer.email ?? undefined, supersedesSubmissionId: priorIds.length === 1 ? priorIds[0] : undefined, paperReference: final.paper?.reference, paperSignedAt: final.paper?.signedAt, paperAttestation: final.paper?.attested});
-    await setPendingCoverage(ctx, actor, student, submissionId, snapshot.version.versionId, draft.expectedCoverage, {snapshotHash: sealedHash, source: snapshot.signer.source, format: 2});
+    const submissionId = await ctx.db.insert("permissionSubmissions", {studentId: student._id, seasonId: student.seasonId, signedBy: snapshot.signer.accountId ?? undefined, typedName: final.typedName!, wordingVersion: snapshot.version.version, eventIds: snapshot.events.map(event => event.eventId), answersJson: JSON.stringify({acknowledged: true, format: 2}), signedAt, versionId: snapshot.version.versionId, draftId: draft._id, source: snapshot.signer.source, synthetic: snapshot.synthetic, snapshotFormat: 2, snapshotJson: JSON.stringify(final), snapshotHash: sealedHash, reviewedPdfId: draft.reviewedPdfId, reviewedPdfSha256: draft.reviewedPdfSha256, signedPdfId: args.signedPdfId, signedPdfSha256: args.signedPdfSha256, recordedBy: actor._id, signerName: snapshot.signer.name, signerEmail: snapshot.signer.email ?? undefined, supersedesSubmissionId: priorIds.length === 1 ? priorIds[0] : undefined, paperReference: final.paper?.reference, paperSignedAt: final.paper?.signedAt, paperAttestation: final.paper?.attested});
+    await setPendingCoverage(ctx, actor, student, submissionId, snapshot.version.versionId, draft.expectedCoverage, {snapshotHash: sealedHash, source: snapshot.signer.source, format: 2, synthetic: snapshot.synthetic});
     await ctx.db.patch(draft._id, {usedSubmissionId: submissionId});
-    await audit(ctx, actor, "permissionSubmissions", submissionId, "submitSyntheticPdfConsent", null, {format: 2, eventIds: snapshot.events.map(event => event.eventId), reviewedPdfSha256: draft.reviewedPdfSha256, signedPdfSha256: args.signedPdfSha256});
+    await audit(ctx, actor, "permissionSubmissions", submissionId, snapshot.synthetic ? "submitSyntheticPdfConsent" : "submitPdfConsent", null, {format: 2, synthetic: snapshot.synthetic, eventIds: snapshot.events.map(event => event.eventId), reviewedPdfSha256: draft.reviewedPdfSha256, signedPdfSha256: args.signedPdfSha256});
     return submissionId;
   },
 });
 export async function sealedSnapshotV2(ctx: Ctx, submission: Doc<"permissionSubmissions">) {
-  if (submission.snapshotFormat !== 2 || !submission.synthetic || !submission.snapshotJson || !submission.snapshotHash || !submission.reviewedPdfId || !submission.reviewedPdfSha256 || !submission.signedPdfId || !submission.signedPdfSha256 || !hashPattern.test(submission.reviewedPdfSha256) || !hashPattern.test(submission.signedPdfSha256)) throw new Error("PDF permission evidence is incomplete.");
+  if (submission.snapshotFormat !== 2 || typeof submission.synthetic !== "boolean" || !submission.snapshotJson || !submission.snapshotHash || !submission.reviewedPdfId || !submission.reviewedPdfSha256 || !submission.signedPdfId || !submission.signedPdfSha256 || !hashPattern.test(submission.reviewedPdfSha256) || !hashPattern.test(submission.signedPdfSha256)) throw new Error("PDF permission evidence is incomplete.");
   const snapshot = parseV2(submission.snapshotJson);
-  if (!snapshot.pdf || snapshot.pdf.reviewedStorageId !== submission.reviewedPdfId || snapshot.pdf.reviewedSha256 !== submission.reviewedPdfSha256 || snapshot.pdf.signedStorageId !== submission.signedPdfId || snapshot.pdf.signedSha256 !== submission.signedPdfSha256) throw new Error("PDF evidence binding is inconsistent.");
+  if (!snapshot.pdf || snapshot.synthetic !== submission.synthetic || snapshot.pdf.reviewedStorageId !== submission.reviewedPdfId || snapshot.pdf.reviewedSha256 !== submission.reviewedPdfSha256 || snapshot.pdf.signedStorageId !== submission.signedPdfId || snapshot.pdf.signedSha256 !== submission.signedPdfSha256) throw new Error("PDF evidence binding is inconsistent.");
   if (await snapshotHashV2(snapshot) !== submission.snapshotHash || snapshot.student.studentId !== submission.studentId || snapshot.student.seasonId !== submission.seasonId || snapshot.version.versionId !== submission.versionId || snapshot.version.version !== submission.wordingVersion || snapshot.signer.source !== submission.source || snapshot.signer.recordedBy !== submission.recordedBy || snapshot.signer.name !== submission.signerName || snapshot.typedName !== submission.typedName || snapshot.signedAt !== submission.signedAt || !snapshot.acknowledged || snapshot.recordedAt === null || snapshot.events.length !== submission.eventIds.length || snapshot.events.some(event => !submission.eventIds.includes(event.eventId))) throw new Error("PDF permission sealed evidence is inconsistent.");
   if (submission.source === "electronic" && (!submission.signedBy || snapshot.signer.accountId !== submission.signedBy || snapshot.signer.email !== submission.signerEmail || snapshot.paper !== null) || submission.source === "paper" && (submission.signedBy !== undefined || !snapshot.paper || !submission.paperAttestation || snapshot.paper.reference !== submission.paperReference || snapshot.paper.signedAt !== submission.paperSignedAt)) throw new Error("PDF signature provenance is inconsistent.");
   return snapshot;
