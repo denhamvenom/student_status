@@ -1,5 +1,23 @@
 # Current visual review — Parent and Student wizard, October 15
 
+## Bounded review corrections after 5210585 — October 16
+
+External bounded review: ready for owner visual approval, no blockers. This requested polish pass preserves that evidence; application wording/style changes only.
+
+| Item | Outcome | Files |
+|---|---|---|
+| 1 | Mentor desktop Thursday sessions; phone count precedes Thursday sessions. Coach/Travel Lead table headings and phone labels use Tuesday attendance / Thursday sessions. | src/LiveApp.tsx, src/lib/live-copy.ts, src/TeamReports.tsx |
+| 2 | FIRST review link is on a separate line with 6px top spacing, shared across Awaiting, Verified and Needs completion. | src/features/design-review/ReadinessReview.tsx, ReadinessReview.module.css |
+| 3 | Parent final step shows the exact earlier-complete orientation only when details, contacts and medical are complete. | src/SetupWizard.tsx, src/lib/setup-wizard-copy.ts |
+| 4 | Parent summary reads Saved. FIRST registration: [current status]. Existing read endpoint supplies status; checking/unavailable remain honest. | src/SetupWizard.tsx, src/lib/setup-wizard-copy.ts |
+| 5 | Deferred. Current FIRST client result has no explicit reopened marker; revision/timestamps cannot reliably identify all reopened records. No inferred message or backend contract change introduced. | No change |
+| 6 | Verified FIRST uses existing success colors and a check mark. | src/SetupWizard.tsx, src/SetupWizard.module.css |
+| 7 | FIRST invitation link is secondary; reporting completion remains primary. | src/SetupWizard.tsx |
+| 8 | Held-row explanation replaced as requested; Fundraising user-facing committed terminology changed to recorded. Internal fields/states and financial semantics unchanged. | src/Fundraising.tsx, src/lib/fundraising-copy.ts |
+| 9 | Hide open-requirements helper when none are open; Permission form display heading preserves the original domain key and missing-item highlighting. | src/features/design-review/ReadinessReview.tsx |
+| 10 | Reports counts use student/students correctly, including filtered and partially loaded counts. | src/TeamReports.tsx |
+
+Validation: typecheck and build passed, scoped ESLint passed. Existing bundle-size advisory remains. No backend/schema/Timeclock/PDF/signature/account/financial changes or production deployment. CSV cents, development labels and synthetic-signing explanation retained. Only item5 deferred from this request. Rehearsal preview refreshed separately under ignored private-data; static controls remain nonfunctional.
 ## Final targeted pass — October 16
 
 Supersedes only the remaining-state limitations below; earlier evidence is retained. Existing Mentor session signed out to the application login page, selected the same existing account in Google, and returned to the authenticated Report. No credentials, accounts, roles, Parent links, domain records, FIRST evidence, money or signatures were changed. This exercises normal app sign-out and Google return, not live Join/Waiting sign-out or the production origin.
@@ -445,3 +463,5 @@ Original-layout PDF source/backend integration and focused/integrated validation
 ## October 14 live approved-template workflow
 
 Approved template selected. Existing complete fictional profile prepared the original-layout PDF; initially unchecked acknowledgment and typed synthetic signature submitted, Coach accepted, and Parent event coverage updated. Earlier receipt remained present. Signature/date visually occupy original first-page fields. Long explicit rehearsal labels overflowed three small health cells into a lossless continuation; this is distinct from retained passing one-page ordinary-length renders. Private screenshot: approved-pdf-signed-live.jpg. No real consent, profile alteration or data truncation. Manual download remains pending. Reuse prior focused/integrated/Astra evidence; no repeat full consent suite.
+
+October16 polish evidence supplement: refreshed preview render checks pass; Mentor phone390 and verified Competition desktop1440 inspected. FIRST links are block with6px top margin for all three states. Parent summary/orientation and verified check confirmed in DOM. See FRONTEND_CONFORMANCE_LOG and private-data/visual-checks/final-targeted/polish-*.png.

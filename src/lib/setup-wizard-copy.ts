@@ -16,7 +16,9 @@ export const setupWizardCopy = {
   firstReport: "I've done both in FIRST", firstAwaiting: 'Awaiting Coach verification', firstCoachConfirm: 'Your Coach will confirm it.', firstVerified: 'Verified for this season', firstNeeds: 'Needs completion',
   reloadFirst: 'Reload FIRST status',
   studentDone: 'Your setup is saved. Parent information and Coach verification may still be needed before Competition readiness is clear.',
-  parentDone: 'Student information is saved. FIRST registration may still await Coach verification. Event-specific requirements are handled separately.',
+  parentEarlierComplete: 'Student details, contacts and medical are already complete. Use Back to review them.',
+  parentDone: (status: string) => `Saved. FIRST registration: ${status}.`,
+  firstChecking: 'Checking status', firstUnknown: 'Status unavailable',
   shirtSizes: ['XS','S','M','L','XL','2XL','3XL'] as const,
   subteams: ['Build','Electrical','Programming','Machining','Business'] as const,
 } as const

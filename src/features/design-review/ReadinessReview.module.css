@@ -54,6 +54,7 @@
 .statusChip{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:6px 14px;border:1px solid currentColor;border-radius:18px;font-size:14px;line-height:1.2;white-space:nowrap}
 .statusChip strong{font-weight:700}
 .statusChip>span:last-child{font-weight:400}
+.firstReviewLink{display:block;margin-top:6px}
 .statusIcon{display:inline-grid;place-items:center;width:16px;height:16px;font-size:15px;font-weight:900}
 .ready{background:var(--rr-ready-bg);color:var(--rr-ready)}
 .open{background:var(--rr-open-bg);color:var(--rr-open)}

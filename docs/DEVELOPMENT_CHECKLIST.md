@@ -668,3 +668,5 @@ October 14 visual-review follow-up: [x] Join/waiting screens offer Sign out for 
 
 - [x] October16 targeted pass: existing-account Google sign-out/return and isolated missing-state previews completed; see VISUAL_CHECKS F1-F6.
 - [ ] Reviewer acceptance of new isolated states; live Join/Waiting sign-out remains unobserved, production-origin sign-in remains a launch check. No additional accounts required for this visual pass.
+
+- [x] October16 bounded-review wording/spacing items1-4,6-10; typecheck/build/scoped lint passed. Item5 reopened-specific explanation deferred pending explicit client state; no scope expansion. See VISUAL_CHECKS.
