@@ -2,6 +2,9 @@
 
 ## Current prelaunch checkpoint — October17
 
+- [x] Prepare RELEASE_APPROVAL_PACKET.md with verified remote/Pages identity, known four-file demo merge conflicts, hosting matrix and rollback gates.
+- [ ] Owner authorizes controlled hosting release; no merge, Pages change or deployment yet.
+
 - [x] Public About/Privacy/Terms and signed-out links in both apps; Terms exclude permission forms. Owner-approved concise public privacy; detailed operations internal.
 - [x] Approved Google project-only OAuth Config Editor and saved organizational support email.
 - [x] Post-migration calendar read verified; three production calendar settings privately installed/verified; owner PIN presence verified.
