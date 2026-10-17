@@ -1,10 +1,12 @@
 # Launch configuration plan — October 17, 2026
 
+October 17 OAuth review: owner confirmed up to 165 users (50 students, 15 mentors, up to 100 parents) and personal/school accounts. Separate production Google project is required for the planned audience. See [GOOGLE_PRODUCTION_SETUP.md](GOOGLE_PRODUCTION_SETUP.md) for the concrete approval packet: retain existing development/calendar project; propose new Denham Venom Production project and one Web client for both apps. Execution, new-project IAM and private production credential replacement await owner approval. Nothing changed in Google or production. This supersedes earlier statements that policy applicability remains unknown.
+
 ## Current October17 follow-up
 
 Public /about, /privacy and /terms are prepared and linked from both apps. Owner-approved organization/retention policy and season values are in PRELAUNCH_DECISIONS.md. Google OAuth Config Editor project role approved/applied; admin support email saved. Calendar integration reverified HTTP200 after migration and three production settings privately installed/compared. Owner-entered production PIN presence verified. Ten expected settings present; bootstrap/signing gates remain unset. No deployment/merge/Pages switch.
 
-Public URLs to register only after hosting: https://students.team8044.org/about, https://students.team8044.org/privacy, https://students.team8044.org/terms. Before OAuth publication resolve Google separate-project policy applicability; separate clients currently share the existing project. Read CURRENT_STATE.md for current evidence; older pending statements below are historical.
+Public URLs to register only after hosting: https://students.team8044.org/about, https://students.team8044.org/privacy, https://students.team8044.org/terms. Before OAuth publication execute the separately approved production-project setup; policy applicability is resolved in GOOGLE_PRODUCTION_SETUP.md. Read CURRENT_STATE.md for current evidence; older pending statements below are historical.
 
 ## Historical configuration sequence
 

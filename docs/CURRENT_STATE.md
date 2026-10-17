@@ -1,6 +1,8 @@
 # Current integration handoff
 
-## October 17 — prelaunch preparation complete to deployment boundary
+October 17 OAuth review: owner confirmed up to 165 users (50 students, 15 mentors, up to 100 parents) and personal/school accounts. Separate production Google project is required for the planned audience. See [GOOGLE_PRODUCTION_SETUP.md](GOOGLE_PRODUCTION_SETUP.md) for the concrete approval packet: retain existing development/calendar project; propose new Denham Venom Production project and one Web client for both apps. Execution, new-project IAM and private production credential replacement await owner approval. Nothing changed in Google or production. This supersedes earlier statements that policy applicability remains unknown.
+
+## October 17 — Google production setup ready for approval
 
 Workspace: this repository, branch `feature/student-status-completion`, draft PR10. Application/prelaunch checkpoint `87134fb441aadc70598739fc05d61fa2258ab360` is published and remote-verified. Draft [PR10](https://github.com/denhamvenom/student_status/pull/10) targets `feature/student-status-readiness-design`, not main. A documentation-only boundary reconciliation follows that application checkpoint; verify Git before continuing. Main/Pages source remains 18ef1c27b35f7a30a3c6edeb572d8eb452301538; no merge, deployment or Pages source change.
 
@@ -19,7 +21,7 @@ Before development push, GitHub Pages verified main/root with only its Pages wor
 ## Remaining
 
 1. Owner release approval: preserve current demo on a dedicated reference branch and switch Pages before merging main; create/configure both Cloudflare Workers (reviewed dashboard flow submits Deploy), scoped build token, Bun1.4.3, previews off, same approved revision. See LAUNCH_CONFIGURATION_PLAN.md and PRELAUNCH_DECISIONS.md.
-2. Publish pages/HTTPS; then set Google home/privacy/terms URLs and complete applicable branding/domain verification and OAuth publication. Current guidance also calls for separate testing/production Google projects; existing setup uses separate clients in one project. Resolve applicability before OAuth Production; do not silently recreate credentials or undo the approved migration.
+2. Publish pages/HTTPS; then set Google home/privacy/terms URLs and complete applicable branding/domain verification and OAuth publication. Project separation applicability is resolved; execute GOOGLE_PRODUCTION_SETUP.md only after approval. Do not silently recreate credentials or undo the approved migration.
 3. Deploy backend and frontends only after approval. Verify Coach Google identity, empty-target bootstrap, immediate flag removal, FIRST configuration, role/invitation/sign-out flows, calendar freshness and tablet/two-phone concurrency/reconnection.
 4. Real signing remains separately gated. Recovery and measured production volume remain outstanding, not reasons to reopen deferred paid upgrades during ordinary configuration.
 

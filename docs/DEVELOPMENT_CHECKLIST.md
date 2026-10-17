@@ -8,7 +8,8 @@
 - [x] Exact season name/year/date boundary approved; FIRST inputs remain private.
 - [x] Scoped frontend checks/builds and final Astra source review passed; representative local desktop/phone/light/dark page checks.
 - [ ] Release approval, Pages preservation/source switch, main merge, hosting, Google live URLs/publication prerequisites and real-domain/device proof. Nothing deployed.
-- [ ] Resolve Google separate testing/production-project policy applicability before OAuth publication. No credential recreation authorized.
+- [x] Resolve Google separate-project applicability from official policy and owner-confirmed audience; prepare GOOGLE_PRODUCTION_SETUP.md approval packet.
+- [ ] Owner approves and executes new production Google project/client configuration and private credential replacement. No configuration change authorized yet.
 
 - [x] Published application checkpoint `87134fb` and verified remote development revision, unchanged main, and draft PR10 integration target. Boundary documentation audit reconciled current handoff, plan and historical status notices.
 
