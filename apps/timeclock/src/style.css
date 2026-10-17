@@ -70,6 +70,8 @@ h3 { font-size: 1.25rem; }
 .tc-meta { color: var(--text-muted); font-size: .875rem; line-height: 1.45; }
 .eyebrow { color: var(--text-link); font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .tc-footer { padding: 20px 24px; border-top: 1px solid var(--border-default); color: var(--text-muted); font-size: .8125rem; text-align: center; }
+.tc-public-links { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 16px; }
+.tc-public-links a { display: inline-flex; align-items: center; min-height: 44px; }
 
 .tc-panel, .tc-card { min-width: 0; padding: 22px; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: 8px; box-shadow: var(--shadow-sm); }
 .tc-app > .tc-panel { width: min(calc(100% - 32px), 600px); margin: 44px auto; align-self: center; }

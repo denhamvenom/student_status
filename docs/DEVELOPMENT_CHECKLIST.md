@@ -1,5 +1,17 @@
 # Student Status Development Checklist
 
+## Current prelaunch checkpoint — October17
+
+- [x] Public About/Privacy/Terms and signed-out links in both apps; Terms exclude permission forms. Owner-approved concise public privacy; detailed operations internal.
+- [x] Approved Google project-only OAuth Config Editor and saved organizational support email.
+- [x] Post-migration calendar read verified; three production calendar settings privately installed/verified; owner PIN presence verified.
+- [x] Exact season name/year/date boundary approved; FIRST inputs remain private.
+- [x] Scoped frontend checks/builds and final Astra source review passed; representative local desktop/phone/light/dark page checks.
+- [ ] Release approval, Pages preservation/source switch, main merge, hosting, Google live URLs/publication prerequisites and real-domain/device proof. Nothing deployed.
+- [ ] Resolve Google separate testing/production-project policy applicability before OAuth publication. No credential recreation authorized.
+
+Earlier checklist entries are historical where superseded by CURRENT_STATE.md.
+
 - [x] Two-agent prelaunch pass: DEV-only Timeclock label, both builds/typechecks and Timeclock lint passed; independent auth/release review clear. See NEXT_CHAT_HANDOFF.md.
 - [x] Owner supplied January 9, 2027 kickoff/start, FIRST enrollment link/QR (private local storage), and admin support identity. Production season not yet created.
 

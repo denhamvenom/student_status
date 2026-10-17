@@ -1,5 +1,11 @@
 # Launch configuration plan — October 17, 2026
 
+## Current October17 follow-up
+
+Public /about, /privacy and /terms are prepared and linked from both apps. Owner-approved organization/retention policy and season values are in PRELAUNCH_DECISIONS.md. Google OAuth Config Editor project role approved/applied; admin support email saved. Calendar integration reverified HTTP200 after migration and three production settings privately installed/compared. Owner-entered production PIN presence verified. Ten expected settings present; bootstrap/signing gates remain unset. No deployment/merge/Pages switch.
+
+Public URLs to register only after hosting: https://students.team8044.org/about, https://students.team8044.org/privacy, https://students.team8044.org/terms. Before OAuth publication resolve Google separate-project policy applicability; separate clients currently share the existing project. Read CURRENT_STATE.md for current evidence; older pending statements below are historical.
+
 ## Approved configuration progress
 
 Owner approved the proposed target/client/address/build preparation batch. Saved and verified SITE_URL and TIMECLOCK_SITE_URL on production amicable-eel-413. Google Web client form prepared as Denham Venom Production with both approved origins and the exact production callback; owner reported clicking Create and privately entered the credentials. AUTH_GOOGLE_ID and AUTH_GOOGLE_SECRET were verified present on production amicable-eel-413 with no pending Save control; values were not read or exposed. Development client remains unchanged. Production JWT_PRIVATE_KEY/JWKS now generated and installed privately via the installed Convex CLI. Existing-key preflight prevented overwrite; stored values were verified in memory to parse and sign/verify as a matching RS256 pair. No values displayed or written to repository files. Google credential correctness and live OAuth round trip remain unverified.

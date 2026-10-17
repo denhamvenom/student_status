@@ -90,7 +90,7 @@ function Access() {
   const status = useQuery(api.timeclockRoster.operatorStatus, isAuthenticated ? {} : "skip");
   const [error, setError] = useState("");
   if (isLoading) return <section className="tc-panel">Checking sign-in…</section>;
-  if (!isAuthenticated) return <section className="tc-panel"><h2>Operator sign-in</h2><p>Sign in with an approved Coach or Mentor Google account.</p><Button primary onClick={() => { setError(""); void signIn("google", { redirectTo: `${location.origin}/` }).catch(() => setError("Sign-in could not start. Please try again.")); }}>Sign in with Google</Button>{error && <p role="alert" className="tc-banner">{error}</p>}</section>;
+  if (!isAuthenticated) return <section className="tc-panel"><h2>Operator sign-in</h2><p>Sign in with an approved Coach or Mentor Google account.</p><Button primary onClick={() => { setError(""); void signIn("google", { redirectTo: `${location.origin}/` }).catch(() => setError("Sign-in could not start. Please try again.")); }}>Sign in with Google</Button>{error && <p role="alert" className="tc-banner">{error}</p>}<nav className="tc-public-links" aria-label="Public information"><a href="https://students.team8044.org/about">About</a><a href="https://students.team8044.org/privacy">Privacy</a><a href="https://students.team8044.org/terms">Terms</a></nav></section>;
   if (status === undefined) return <section className="tc-panel">Checking access…</section>;
   if (!status.allowed) return <section className="tc-panel"><h2>Access unavailable</h2><p role="alert">Timeclock is available only to approved Coaches and Mentors. Contact the Coach if you need access.</p></section>;
   return <Timeclock role={status.role!} />;

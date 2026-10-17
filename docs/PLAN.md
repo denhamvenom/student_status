@@ -1,6 +1,10 @@
 # Student Status implementation plan
 
-## Current checkpoint — October 15
+## Current checkpoint — October 17
+
+Public About/Privacy/Terms and prelaunch configuration are prepared. See CURRENT_STATE.md for verified configuration, targeted checks and release-only gates. No deployment or merge.
+
+## Historical checkpoint — October 15
 
 Parent and Student setup batch implemented under PARENT_SETUP_BATCH.md; owner visual review next. Season FIRST verification automatically applies to every Competition. Preserve completed G1–G7 and approved PDF. CURRENT_STATE.md and VISUAL_CHECKS.md hold current evidence.
 
