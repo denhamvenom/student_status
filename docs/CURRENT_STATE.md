@@ -2,7 +2,7 @@
 
 ## October 17 — prelaunch preparation complete to deployment boundary
 
-Workspace: this repository, branch `feature/student-status-completion`, draft PR10. Prior local checkpoint fa96cac; current public-page/configuration checkpoint is being committed. Check Git before continuing. Main/Pages source remains 18ef1c27b35f7a30a3c6edeb572d8eb452301538; no merge, deployment or Pages source change.
+Workspace: this repository, branch `feature/student-status-completion`, draft PR10. Application/prelaunch checkpoint `87134fb441aadc70598739fc05d61fa2258ab360` is published and remote-verified. Draft [PR10](https://github.com/denhamvenom/student_status/pull/10) targets `feature/student-status-readiness-design`, not main. A documentation-only boundary reconciliation follows that application checkpoint; verify Git before continuing. Main/Pages source remains 18ef1c27b35f7a30a3c6edeb572d8eb452301538; no merge, deployment or Pages source change.
 
 - Public `/about`, `/privacy`, `/terms` prepared; all require no sign-in. Both Student Status signed-out screens and Timeclock link to them. Simple Terms exclude permission forms. Owner approved Foundation identity and internal retention/hold/export policy; public notice retains only concise family-facing information. Policy revision date October 17, not a launch-date claim.
 - Google project remains in Foundation, External/Testing. Owner-approved project-only OAuth Config Editor applied to admin@team8044.org; support email saved with Google success confirmation. Existing developer contacts, clients and domains preserved. Public URL fields await actual hosting.
@@ -23,4 +23,4 @@ Before development push, GitHub Pages verified main/root with only its Pages wor
 3. Deploy backend and frontends only after approval. Verify Coach Google identity, empty-target bootstrap, immediate flag removal, FIRST configuration, role/invitation/sign-out flows, calendar freshness and tablet/two-phone concurrency/reconnection.
 4. Real signing remains separately gated. Recovery and measured production volume remain outstanding, not reasons to reopen deferred paid upgrades during ordinary configuration.
 
-Context is suitable to finish this bounded checkpoint. Reassess before the release phase. Historical notes: CURRENT_STATE_HISTORY_2026-10-17.md; detailed accepted development evidence remains in VISUAL_CHECKS.md and prior reviews.
+Boundary documentation audit completed October 17. A fresh chat can begin the release phase from NEXT_CHAT_HANDOFF.md; no application work needs repeating. Release authorization has not been granted. Historical notes: CURRENT_STATE_HISTORY_2026-10-17.md; detailed accepted development evidence remains in VISUAL_CHECKS.md and prior reviews.

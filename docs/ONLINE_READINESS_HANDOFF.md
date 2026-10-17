@@ -1,6 +1,10 @@
 # Development review closure and online-readiness handoff — October 16, 2026
 
-## October 17 infrastructure checkpoint
+## Current status pointer — October 17 boundary
+
+This document preserves development closure and earlier infrastructure evidence. Its empty-environment, pending-membership and unconfigured-branding statements below are historical and superseded. Current approved settings, public pages, publication and remaining release gates are in CURRENT_STATE.md and NEXT_CHAT_HANDOFF.md. Application/prelaunch checkpoint `87134fb` is published; no production application deployment or merge occurred.
+
+## Historical October 17 infrastructure checkpoint
 
 Latest preparation: see LAUNCH_CONFIGURATION_PLAN.md for the concrete proposed configuration batch, two-app build matrix, Pages transition and rollback. Production environment list is empty; Google client/branding remain development-only; app Workers and exact DNS names are absent. Cloudflare GitHub connection verified after owner login: student_status is available under denhamvenom; no additional repository access grant needed. Preparation completed without external changes. Proposed settings are not applied or approved for launch.
 

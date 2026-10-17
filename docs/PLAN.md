@@ -2,7 +2,7 @@
 
 ## Current checkpoint — October 17
 
-Public About/Privacy/Terms and prelaunch configuration are prepared. See CURRENT_STATE.md for verified configuration, targeted checks and release-only gates. No deployment or merge.
+Public About/Privacy/Terms and approved prelaunch configuration are complete at published application checkpoint `87134fb`. Boundary documentation reconciled October 17; implementation checks are retained from that checkpoint, not rerun for this documentation audit. See CURRENT_STATE.md for verified configuration, targeted checks and release-only gates. No deployment or merge.
 
 ## Historical checkpoint — October 15
 

@@ -10,7 +10,11 @@
 - [ ] Release approval, Pages preservation/source switch, main merge, hosting, Google live URLs/publication prerequisites and real-domain/device proof. Nothing deployed.
 - [ ] Resolve Google separate testing/production-project policy applicability before OAuth publication. No credential recreation authorized.
 
-Earlier checklist entries are historical where superseded by CURRENT_STATE.md.
+- [x] Published application checkpoint `87134fb` and verified remote development revision, unchanged main, and draft PR10 integration target. Boundary documentation audit reconciled current handoff, plan and historical status notices.
+
+## Historical checklist — superseded where noted
+
+Earlier checklist entries are historical where superseded by CURRENT_STATE.md; unchecked configuration items below do not reopen completed approvals or settings.
 
 - [x] Two-agent prelaunch pass: DEV-only Timeclock label, both builds/typechecks and Timeclock lint passed; independent auth/release review clear. See NEXT_CHAT_HANDOFF.md.
 - [x] Owner supplied January 9, 2027 kickoff/start, FIRST enrollment link/QR (private local storage), and admin support identity. Production season not yet created.
