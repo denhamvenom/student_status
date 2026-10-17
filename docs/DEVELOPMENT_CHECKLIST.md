@@ -10,7 +10,8 @@
 - [ ] Release approval, Pages preservation/source switch, main merge, hosting, Google live URLs/publication prerequisites and real-domain/device proof. Nothing deployed.
 - [x] Resolve Google separate-project applicability from official policy and owner-confirmed audience; prepare GOOGLE_PRODUCTION_SETUP.md approval packet.
 - [x] Owner approved production Google setup; created denham-venom-production under Foundation. Creator already has project access; no manual IAM grant.
-- [ ] Finish OAuth policy acceptance, client configuration and private credential replacement. Wizard prepared; action-time policy confirmation pending.
+- [x] Owner authorized User Data Policy acceptance; branding, identity scopes and shared production Web client saved. External/Testing verified.
+- [ ] Owner privately transfers new client credentials into production AUTH_GOOGLE_ID/AUTH_GOOGLE_SECRET; verify saved state without exposing values. One-time Google dialog remains open.
 
 - [x] Published application checkpoint `87134fb` and verified remote development revision, unchanged main, and draft PR10 integration target. Boundary documentation audit reconciled current handoff, plan and historical status notices.
 

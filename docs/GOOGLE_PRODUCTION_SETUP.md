@@ -1,8 +1,8 @@
 # Google production setup — approval packet, October 17, 2026
 
-Execution update October 17: owner approved the new Google project, shared client, scoped access and private production credential replacement. Created denham-venom-production under dsroboticsfoundation.org (organization 90524038636). IAM shows creator admin@team8044.org automatically has Owner; no manual role grant was made. OAuth wizard prepared with Denham Venom, admin support/contact and External audience; final User Data Policy acceptance awaits action-time confirmation. Client creation and credential replacement remain incomplete. No deployment, merge or OAuth publication. Prior approval-pending text below is historical for this batch.
+Execution update October 17: owner approved setup and separately authorized Google User Data Policy acceptance. Project denham-venom-production exists under Foundation. OAuth configuration and Denham Venom Production Web client created successfully; both approved origins and exact amicable-eel-413 callback configured. Branding saved with admin@team8044.org support/contact and team8044.org plus amicable-eel-413.convex.site authorized domains; public URL fields remain blank. Only openid/userinfo.email/userinfo.profile declared; save confirmed. Audience verified External/Testing. Creator admin already has automatic Owner access; no manual IAM grant. Google one-time secret dialog is kept open for owner to privately transfer client ID/secret into production AUTH_GOOGLE_ID/AUTH_GOOGLE_SECRET. Browser credential-entry rules require owner handoff; transfer is NOT completed or verified. No credential values saved in documentation. No deployment, merge, OAuth publication or changes to calendar, signing keys or PIN.
 
-Status: source/policy review and configuration proposal complete; execution awaits owner approval. No Google configuration, IAM, credentials or production settings changed during this review.
+Historical approval packet below: setup approval has since been granted and executed as recorded above. Private credential transfer remains pending.
 
 ## Audience and policy conclusion
 
