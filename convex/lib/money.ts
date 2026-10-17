@@ -2,6 +2,11 @@ import type { MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { AppUser } from "./access";
 import { audit } from "./access";
+import { refreshStudentFinance } from "./financeSummaries";
+import { ensureFinancialAccount, recordChargeChange, recordProjectedEntry, saveFinancialAccount } from "./financialSources";
+import { makeFunctionReference } from "convex/server";
+import { chargeFeeDefinition } from "./feeDefinitions";
+import { requireSeasonFinanceReady, requireSeasonFinancialContinuation, type FinancialContinuationId } from "./seasonFinance";
 
 type Entry = Doc<"ledgerEntries">;
 type Source = Extract<Entry["kind"], "payment" | "fundraiser">;
@@ -13,78 +18,93 @@ export function allocationSourceId(entry: Entry, sources: (Entry & { kind: Sourc
   throw new Error("Historical allocations have ambiguous funding sources; a financial review is required.");
 }
 
-export function effectiveChargeCents(charge: Doc<"charges">) {
-  const cancelled = charge.cancelledCents ?? 0;
-  if (!Number.isSafeInteger(cancelled) || cancelled < 0 || cancelled > charge.amountCents || charge.appliedCents > charge.amountCents - cancelled) throw new Error("Charge balance is inconsistent.");
-  return charge.amountCents - cancelled;
-}
-
-export async function financialEntries(ctx: MutationCtx, studentId: Id<"students">) {
-  const entries = await ctx.db.query("ledgerEntries").withIndex("by_studentId_and_recordedAt", q => q.eq("studentId", studentId)).take(501);
-  if (entries.length > 500) throw new Error("Financial record limit reached; transaction stopped safely.");
-  return entries;
-}
+export { effectiveChargeCents } from "./chargeObligation";
 
 /** Resolve each allocation to its actual payment or fundraising entry. Older ambiguous records fail closed. */
 export function sourceBalances(entries: Entry[]) {
   const sources = entries.filter((e): e is Entry & { kind: Source } => e.kind === "payment" || e.kind === "fundraiser");
   const byId = new Map(sources.map(s => [s._id, { entry: s, available: s.amountCents }]));
+  const receivedById = new Map(sources.map(source => [source._id, source.amountCents]));
   for (const entry of entries) {
-    if (entry.kind !== "allocation" && entry.kind !== "deallocation" && entry.kind !== "payout" && entry.kind !== "transferOut") continue;
+    if (entry.kind === "paymentCorrection") {
+      const source = entry.sourceEntryId ? byId.get(entry.sourceEntryId) : undefined;
+      if (!source || source.entry.kind !== "payment" || source.entry.originEntryId || receivedById.get(source.entry._id) !== entry.previousCents || !Number.isSafeInteger(entry.newCents) || entry.newCents < 0 || Math.abs(entry.newCents - entry.previousCents) !== entry.amountCents) throw new Error("Payment correction source is inconsistent.");
+      source.available += entry.newCents - entry.previousCents;
+      receivedById.set(source.entry._id, entry.newCents);
+      continue;
+    }
+    if (entry.kind !== "allocation" && entry.kind !== "deallocation" && entry.kind !== "payout" && entry.kind !== "transferOut" && entry.kind !== "awardReversal") continue;
     const sourceId = allocationSourceId(entry, sources);
     const source = byId.get(sourceId);
     if (!source || entry.sourceKind && entry.sourceKind !== source.entry.kind || entry.amountCents <= 0) throw new Error("Financial source history is inconsistent.");
-    if (entry.studentId !== source.entry.studentId || entry.kind === "payout" && source.entry.kind !== "payment" || entry.kind === "transferOut" && source.entry.kind !== "fundraiser") throw new Error("Financial source history is inconsistent.");
+    if (entry.studentId !== source.entry.studentId || entry.kind === "payout" && source.entry.kind !== "payment" || entry.kind === "transferOut" && source.entry.kind !== "fundraiser" && !entry.seasonTransitionPlanId) throw new Error("Financial source history is inconsistent.");
     source.available += entry.kind === "deallocation" ? entry.amountCents : -entry.amountCents;
   }
-  for (const source of byId.values()) if (source.available < 0 || source.available > source.entry.amountCents) throw new Error("Financial source balance is inconsistent.");
+  for (const source of byId.values()) {
+    if (!Number.isSafeInteger(source.available) || source.available < 0 || source.available > receivedById.get(source.entry._id)!) throw new Error("Financial source balance is inconsistent.");
+  }
   return [...byId.values()];
 }
 
-export async function addCharge(ctx: MutationCtx, actor: AppUser, studentId: Id<"students">, label: string, amountCents: number, priority: number, idempotencyKey: string, eventId?: Id<"events">, category?: "main" | "extra") {
-  if (!Number.isSafeInteger(amountCents) || amountCents < 0) throw new Error("Charge must be a nonnegative number of cents.");
-  const duplicate = await ctx.db.query("ledgerEntries").withIndex("by_idempotencyKey", q => q.eq("idempotencyKey", idempotencyKey)).unique();
-  if (duplicate) {
-    const charge = duplicate.chargeId ? await ctx.db.get(duplicate.chargeId) : null;
-    if (!charge || charge.studentId !== studentId || charge.eventId !== eventId || charge.amountCents !== amountCents || charge.label !== label || (charge.category ?? "main") !== (category ?? "main")) throw new Error("Transaction key is already used for a different charge.");
-    return charge._id;
-  }
-  const entries = await financialEntries(ctx, studentId);
-  if (entries.length >= 500) throw new Error("Financial record limit reached; charge was not recorded.");
-  const now = Date.now();
-  const chargeId = await ctx.db.insert("charges", { studentId, eventId, label, amountCents, appliedCents: 0, cancelledCents: 0, category: category ?? "main", priority, createdBy: actor._id, createdAt: now });
-  await ctx.db.insert("ledgerEntries", { studentId, chargeId, eventId, kind: "charge", amountCents, previousCents: 0, newCents: amountCents, recordedBy: actor._id, recordedAt: now, idempotencyKey });
-  await audit(ctx, actor, "charges", chargeId, "create", null, { label, amountCents, eventId, category: category ?? "main" });
-  await allocateUnapplied(ctx, actor, studentId, `auto:${idempotencyKey}`);
-  return chargeId;
+export type ChargeDraft = { label: string; amountCents: number; priority: number; idempotencyKey: string; eventId?: Id<"events">; category?: "main" | "extra"; feeDefinitionId?: Id<"feeDefinitions"> };
+
+export async function addCharge(ctx: MutationCtx, actor: AppUser, studentId: Id<"students">, label: string, amountCents: number, priority: number, idempotencyKey: string, eventId?: Id<"events">, category?: "main" | "extra", originId?: FinancialContinuationId) {
+  return (await addCharges(ctx, actor, studentId, [{ label, amountCents, priority, idempotencyKey, eventId, category }], `auto:${idempotencyKey}`, originId))[0];
 }
 
-export async function allocateUnapplied(ctx: MutationCtx, actor: AppUser, studentId: Id<"students">, idempotencyPrefix: string, excludedEventId?: Id<"events">) {
-  const entries = await financialEntries(ctx, studentId);
-  const sources = sourceBalances(entries);
-  const charges = await ctx.db.query("charges").withIndex("by_studentId_and_priority", q => q.eq("studentId", studentId)).take(501);
-  if (charges.length > 500) throw new Error("Charge limit reached; allocation stopped safely.");
-  const plan: { charge: Doc<"charges">; source: (typeof sources)[number]; amount: number }[] = [];
-  for (const charge of charges) {
-    if (excludedEventId && charge.eventId === excludedEventId) continue;
-    let due = effectiveChargeCents(charge) - charge.appliedCents;
-    for (const source of sources) {
-      if (due <= 0) break;
-      const amount = Math.min(due, source.available);
-      if (amount <= 0) continue;
-      plan.push({ charge, source, amount });
-      source.available -= amount;
-      due -= amount;
-    }
+export async function addCharges(ctx: MutationCtx, actor: AppUser, studentId: Id<"students">, drafts: ChargeDraft[], idempotencyPrefix: string, originId?: FinancialContinuationId) {
+  if (drafts.length > 100 || new Set(drafts.map(d => d.idempotencyKey)).size !== drafts.length) throw new Error("Invalid charge batch.");
+  if (!drafts.length) return [];
+  const ids = new Map<string, Id<"charges">>();
+  const missing: ChargeDraft[] = [];
+  for (const draft of drafts) {
+    if (!Number.isSafeInteger(draft.amountCents) || draft.amountCents < 0) throw new Error("Charge must be a nonnegative number of cents.");
+    const duplicate = await ctx.db.query("ledgerEntries").withIndex("by_idempotencyKey", q => q.eq("idempotencyKey", draft.idempotencyKey)).unique();
+    if (!duplicate) { missing.push(draft); continue; }
+    const charge = duplicate.chargeId ? await ctx.db.get(duplicate.chargeId) : null;
+    if (!charge || charge.studentId !== studentId || charge.eventId !== draft.eventId || charge.amountCents !== draft.amountCents || charge.label !== draft.label || (charge.category ?? "main") !== (draft.category ?? "main")) throw new Error("Transaction key is already used for a different charge.");
+    ids.set(draft.idempotencyKey, charge._id);
   }
-  if (entries.length + plan.length > 500) throw new Error("Financial record limit reached; allocation stopped safely.");
-  const applied = new Map<Id<"charges">, number>();
-  for (const { charge, source, amount } of plan) {
-    const previous = applied.get(charge._id) ?? charge.appliedCents;
-    const next = previous + amount;
-    await ctx.db.patch(charge._id, { appliedCents: next });
-    await ctx.db.insert("ledgerEntries", { studentId, chargeId: charge._id, eventId: charge.eventId, kind: "allocation", amountCents: amount, previousCents: previous, newCents: next, sourceEntryId: source.entry._id, sourceKind: source.entry.kind, recordedBy: actor._id, recordedAt: Date.now(), idempotencyKey: `${idempotencyPrefix}:${charge._id}:${source.entry._id}` });
-    await audit(ctx, actor, "charges", charge._id, "allocate", { appliedCents: previous }, { appliedCents: next, sourceKind: source.entry.kind });
-    applied.set(charge._id, next);
+  if (!missing.length) return drafts.map(d => ids.get(d.idempotencyKey)!);
+  const account = await ensureFinancialAccount(ctx, studentId, originId);
+  const student = await ctx.db.get(studentId);
+  if (!student) throw new Error("Student is unavailable for fee assignment.");
+  if (originId) await requireSeasonFinancialContinuation(ctx, student.seasonId, originId);
+  else await requireSeasonFinanceReady(ctx, student.seasonId);
+  for (const draft of missing) {
+    const now = Date.now();
+    const definition = await chargeFeeDefinition(ctx, actor._id, student, draft);
+    const chargeId = await ctx.db.insert("charges", { studentId, eventId: draft.eventId, label: draft.label, amountCents: draft.amountCents, appliedCents: 0, cancelledCents: 0, category: draft.category ?? "main", priority: definition.priority, feeDefinitionId: definition._id, createdBy: actor._id, createdAt: now, outstanding: draft.amountCents > 0 });
+    const entryId = await ctx.db.insert("ledgerEntries", { studentId, chargeId, eventId: draft.eventId, kind: "charge", amountCents: draft.amountCents, previousCents: 0, newCents: draft.amountCents, recordedBy: actor._id, recordedAt: now, idempotencyKey: draft.idempotencyKey });
+    const charge = await ctx.db.get(chargeId);
+    if (!charge) throw new Error("New charge is unavailable.");
+    await recordProjectedEntry(ctx, entryId, account);
+    await recordChargeChange(ctx, account, charge, 0, 0, true);
+    ids.set(draft.idempotencyKey, chargeId);
+    await audit(ctx, actor, "charges", chargeId, "create", null, { label: draft.label, amountCents: draft.amountCents, eventId: draft.eventId, category: draft.category ?? "main" });
   }
+  await allocateUnapplied(ctx, actor, studentId, idempotencyPrefix, undefined, originId);
+  return drafts.map(d => ids.get(d.idempotencyKey)!);
+}
+
+/** Bounded synchronous work; remaining allocation is durable and locks competing writers. */
+export async function allocateUnapplied(ctx: MutationCtx, actor: AppUser, studentId: Id<"students">, idempotencyPrefix: string, excludedEventId?: Id<"events">, originId?: FinancialContinuationId) {
+  const account = await ensureFinancialAccount(ctx, studentId, originId);
+  if (originId) await requireSeasonFinancialContinuation(ctx, account.seasonId, originId);
+  else await requireSeasonFinanceReady(ctx, account.seasonId);
+  if (account.personalAvailableCents + account.fundraisingAvailableCents === 0) { await refreshStudentFinance(ctx, studentId); return; }
+  const origin = originId ? await ctx.db.get(originId) : null;
+  const requiredFinancialProjectionVersion = originId && origin && !("targetSeasonId" in origin) ? ("requiredFinancialProjectionVersion" in origin ? origin.requiredFinancialProjectionVersion : undefined) : 4 as const;
+  const jobId = await ctx.db.insert("financialAllocationJobs", { requiredFinancialProjectionVersion, studentId, actorId: actor._id, generation: account.generation, state: "running", chargeCursor: null, step: 0, processed: 0, idempotencyPrefix, excludedEventId, maintenanceOriginId: originId, updatedAt: Date.now() });
+  const job = await ctx.db.get(jobId);
+  if (!job) throw new Error("Allocation job could not be created.");
+  account.state = "allocating"; account.allocationJobId = jobId;
+  await saveFinancialAccount(ctx, account);
+  // Nested mutations isolate each native pagination call and still roll back with this transaction.
+  for (let count = 0; count < 5; count++) {
+    const current = await ctx.db.get(jobId);
+    if (!current || current.state !== "running") break;
+    await ctx.runMutation(makeFunctionReference<"mutation">("financialAllocation:processPage"), { jobId, step: current.step });
+  }
+  await refreshStudentFinance(ctx, studentId);
 }

@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { describe, expect, it } from "vitest";
-import { convexTest } from "convex-test";
+import { createTest as convexTest } from "../testUtils";
 import { api } from "./_generated/api";
 import schema from "./schema";
 
@@ -24,7 +24,7 @@ async function fixture() {
     const other = await ctx.db.insert("students", { seasonId: season, userId: otherUser, legalName: "Other Example", preferredName: "Other", email: "other@example.org", subteam: "Programming", active: true, travelTeam: true, roomCategory: "Boys", roomCategoryLocked: true, allergies: { state: "none" }, medications: { state: "none" } });
     await ctx.db.insert("familyLinks", { parentUserId: parent, studentId: student, active: true, createdBy: coach });
     const event = await ctx.db.insert("events", { seasonId: season, name: "Regional", type: "Competition", startsAt: 1000000, endsAt: 2000000, destination: "City", travel: "Vehicles", overnight: false, roomingEnabled: false, feeCents: 45000, signupMode: "approval", capacity: 1, allowWithdrawal: true, permissionRequired: false, firstRequired: false, archived: false });
-    return { student, other, event, authCoach, authParent, authMentor, authStudent, authOther };
+    return { student, other, event, parent, authCoach, authParent, authMentor, authStudent, authOther };
   });
   const parent = t.withIdentity({ subject: `${ids.authParent}|session1` });
   const mentor = t.withIdentity({ subject: `${ids.authMentor}|session1` });
@@ -35,6 +35,36 @@ async function fixture() {
 }
 
 describe("server boundaries", () => {
+  it("shows role-appropriate setup and permission next steps only for confirmed events", async () => {
+    const f = await fixture();
+    await f.t.run(ctx => ctx.db.patch(f.ids.event, {permissionRequired: true}));
+    const initialParent = await f.parent.query(api.app.studentDashboard, {studentId: f.ids.student});
+    expect(initialParent.todos.map(item => item.label)).toContain("Finish the health and contact profile");
+    expect(initialParent.todos.some(item => item.eventId === f.ids.event)).toBe(false);
+    const initialStudent = await f.student.query(api.app.studentDashboard, {studentId: f.ids.student});
+    expect(initialStudent.todos).toEqual(expect.arrayContaining([expect.objectContaining({eventId: null, responsible: "student", href: "/setup", blocked: false}), expect.objectContaining({eventId: null, responsible: "parent", href: null, blocked: true}), expect.objectContaining({eventId: null, eventName: "FIRST registration and Consent & Release"})]));
+    await f.t.run(ctx => ctx.db.patch(f.ids.student, {profileCompletedAt: 1, shirtSize: "M", consentProfileV2CompletedAt: 2, consentProfileV2ConfirmedBy: f.ids.parent, consentProfileV2: {grade:"11",dateOfBirth:"2010-01-01",guardian:{name:"Fictional Parent",relationship:"Parent",phone:"555-0100",email:"parent@example.org"},emergency:{name:"Fictional Emergency",relationship:"Family",phone:"555-0101"},allergies:{state:"none",entries:[]},prescriptions:{state:"none",entries:[]},insurance:{state:"unavailable",provider:null,policy:null},physician:{state:"unavailable",name:null,phone:null}} }));
+    await f.coach.mutation(api.firstRegistration.verify, {studentId:f.ids.student,expectedRevision:0,teamAccepted:true,consentRelease:true});
+    expect((await f.parent.query(api.app.studentDashboard, {studentId: f.ids.student})).todos).toHaveLength(0);
+    await f.coach.mutation(api.participation.setParticipation, {eventId: f.ids.event, studentId: f.ids.student, status: "confirmed"});
+    const parent = await f.parent.query(api.app.studentDashboard, {studentId: f.ids.student});
+    const permission = parent.todos.find(item => item.eventId === f.ids.event && item.label.includes("Permission"));
+    expect(permission).toMatchObject({href: null, responsible: "coach", blocked: true});
+    const student = await f.student.query(api.app.studentDashboard, {studentId: f.ids.student});
+    expect(student.todos.find(item => item.eventId === f.ids.event && item.label.includes("parent or legal guardian"))).toMatchObject({href: null, responsible: "parent", blocked: true});
+    const readiness = await f.coach.query(api.app.eventReadiness, {eventId: f.ids.event});
+    expect(readiness.students[0].permissionStatus).toBe("missing");
+  });
+  it("rejects stale profile edits and invalid required shirt sizes", async () => {
+    const f = await fixture();
+    await f.parent.mutation(api.app.updateStudentProfile, { studentId: f.ids.student, expectedRevision: 0, emergencyName: "Fictional Guardian" });
+    await expect(f.student.mutation(api.app.updateStudentProfile, { studentId: f.ids.student, expectedRevision: 0, preferredName: "Old draft" })).rejects.toThrow("Profile changed");
+    await expect(f.student.mutation(api.app.updateStudentProfile, { studentId: f.ids.student, expectedRevision: 1, shirtSize: "" })).rejects.toThrow("valid shirt");
+    await f.student.mutation(api.app.updateStudentProfile, { studentId: f.ids.student, expectedRevision: 1, shirtSize: "M" });
+    const profile = await f.parent.query(api.app.studentProfile, { studentId: f.ids.student });
+    expect(profile).toMatchObject({ preferredName: "Student", emergencyName: "Fictional Guardian", shirtSize: "M", profileRevision: 2 });
+  });
+
   it("limits family records to linked students and excludes mentor private data", async () => {
     const f = await fixture();
     expect((await f.parent.query(api.app.studentProfile, { studentId: f.ids.student })).allergies.state).toBe("reported");
@@ -50,12 +80,12 @@ describe("server boundaries", () => {
     const f = await fixture();
     expect(await f.student.mutation(api.participation.signUp, { eventId: f.ids.event })).toBe("pending");
     expect(await f.other.mutation(api.participation.signUp, { eventId: f.ids.event })).toBe("waitlist");
-    expect((await f.student.query(api.app.studentFinances, { studentId: f.ids.student })).charges).toHaveLength(0);
+    expect((await f.student.query(api.financeDetails.charges, { studentId: f.ids.student, paginationOpts: { cursor: null, numItems: 25 } })).page).toHaveLength(0);
     await expect(f.mentor.mutation(api.finance.recordFunds, { studentId: f.ids.student, kind: "payment", amountCents: 1000, reason: "Cash", idempotencyKey: "pay-123456" })).rejects.toThrow("Financial editing");
     await f.coach.mutation(api.participation.setParticipation, { eventId: f.ids.event, studentId: f.ids.student, status: "confirmed" });
     const money = await f.student.query(api.app.studentFinances, { studentId: f.ids.student });
-    expect(money.summary.chargedCents).toBe(45000);
-    expect(money.summary.dueCents).toBe(45000);
+    expect(money.summary!.chargedCents).toBe(45000);
+    expect(money.summary!.dueCents).toBe(45000);
   });
 
   it("blocks draft legal consent in live functions", async () => {
@@ -104,8 +134,8 @@ describe("server boundaries", () => {
     const eventId = await f.coach.mutation(api.admin.createEvent, { name: "Required Regional", type: "Competition", startsAt: 3000000, endsAt: 4000000, destination: "City", travel: "Vehicles", overnight: false, roomingEnabled: false, feeCents: 2500, signupMode: "assigned", assignmentScope: "travelTeam", allowWithdrawal: false, permissionRequired: false, firstRequired: false, requirements: [] });
     const view = await f.student.query(api.app.eventDetail, { eventId, studentId: f.ids.student });
     expect(view.participation).toBe("confirmed");
-    const finances = await f.student.query(api.app.studentFinances, { studentId: f.ids.student });
-    expect(finances.charges.find((x: { eventId?: string }) => x.eventId === eventId)?.amountCents).toBe(2500);
+    const finances = await f.student.query(api.financeDetails.charges, { studentId: f.ids.student, paginationOpts: { cursor: null, numItems: 25 } });
+    expect(finances.page.find((x: { eventId?: string }) => x.eventId === eventId)?.amountCents).toBe(2500);
   });
 
   it("rejects overcapacity pending reservations and confirmed downgrades without changing debt", async () => {
@@ -116,7 +146,7 @@ describe("server boundaries", () => {
     await expect(f.coach.mutation(api.participation.setParticipation, { eventId: f.ids.event, studentId: f.ids.student, status: "waitlist" })).rejects.toThrow("Reconcile");
     const detail = await f.student.query(api.app.eventDetail, { eventId: f.ids.event, studentId: f.ids.student });
     expect(detail.participation).toBe("confirmed");
-    expect((await f.student.query(api.app.studentFinances, { studentId: f.ids.student })).summary.dueCents).toBe(45000);
+    expect((await f.student.query(api.app.studentFinances, { studentId: f.ids.student })).summary!.dueCents).toBe(45000);
   });
 
   it("rejects withdrawal from an archived event without changing participation", async () => {
@@ -128,7 +158,7 @@ describe("server boundaries", () => {
     expect(row?.status).toBe("pending");
   });
 
-  it("rolls back a payment whose planned allocations exceed the ledger limit", async () => {
+  it("does not record a payment before historical financial records are prepared", async () => {
     const f = await fixture();
     await f.t.run(async ctx => {
       const coach = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", f.ids.authCoach)).unique();
@@ -136,10 +166,42 @@ describe("server boundaries", () => {
       for (let i = 0; i < 498; i++) await ctx.db.insert("ledgerEntries", { studentId: f.ids.student, kind: "adjustment", amountCents: 0, previousCents: 0, newCents: 0, reason: "fixture", recordedBy: coach._id, recordedAt: i, idempotencyKey: `fixture-${i}` });
       for (let i = 0; i < 2; i++) await ctx.db.insert("charges", { studentId: f.ids.student, label: `Charge ${i}`, amountCents: 100, appliedCents: 0, priority: i, createdBy: coach._id, createdAt: 0 });
     });
-    await expect(f.coach.mutation(api.finance.recordFunds, { studentId: f.ids.student, kind: "payment", amountCents: 200, reason: "Cash", idempotencyKey: "boundary-payment" })).rejects.toThrow("limit");
+    await expect(f.coach.mutation(api.finance.recordFunds, { studentId: f.ids.student, kind: "payment", amountCents: 200, reason: "Cash", idempotencyKey: "boundary-payment" })).rejects.toThrow("Coach rebuild");
     const rows = await f.t.run(ctx => ctx.db.query("ledgerEntries").withIndex("by_studentId_and_recordedAt", q => q.eq("studentId", f.ids.student)).take(501));
     expect(rows).toHaveLength(498);
     const finance = await f.student.query(api.app.studentFinances, { studentId: f.ids.student });
-    expect(finance.summary.dueCents).toBe(200);
+    expect(finance).toMatchObject({ state: "updating", summary: null });
   });
-});
+  it("resolves the Student viewer in the current season when an active historical profile shares the account", async () => {
+    const f = await fixture();
+    await f.t.run(async ctx => {
+      const student = await ctx.db.get(f.ids.student); if (!student) throw new Error("Fixture missing");
+      const season = await ctx.db.get(student.seasonId); if (!season) throw new Error("Season missing");
+      const old = await ctx.db.insert("seasons", { name: "Historical", year: 2025, status: "archived", startsAt: 0, permissionVersion: "DRAFT", createdBy: season.createdBy });
+      const { _id, _creationTime, ...fields } = student; void _id; void _creationTime;
+      await ctx.db.insert("students", { ...fields, seasonId: old, legalName: "Historical profile", preferredName: "Historical" });
+    });
+    const viewer = await f.student.query(api.app.viewer, {});
+    expect(viewer.students).toHaveLength(1); expect(viewer.students[0]._id).toBe(f.ids.student);
+    await expect(f.student.query(api.app.listEvents, {})).resolves.toHaveLength(1);
+  });
+  it("keeps Parent viewer and event listing independent of historical links and pages current children through empty nonfinal results", async () => {
+    const f = await fixture();
+    await f.t.run(async ctx => {
+      const student = await ctx.db.get(f.ids.student); const parent = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", f.ids.authParent)).unique(); if (!student || !parent) throw new Error("Fixture missing");
+      const season = await ctx.db.get(student.seasonId); if (!season) throw new Error("Season missing");
+      const old = await ctx.db.insert("seasons", { name: "Historical", year: 2025, status: "archived", startsAt: 0, permissionVersion: "DRAFT", createdBy: season.createdBy });
+      const { _id, _creationTime, ...fields } = student; void _id; void _creationTime;
+      for (let i = 0; i < 120; i++) { const historical = await ctx.db.insert("students", { ...fields, userId: undefined, seasonId: old, preferredName: `Historical ${i}` }); await ctx.db.insert("familyLinks", { parentUserId: parent._id, studentId: historical, seasonId: old, active: true, createdBy: season.createdBy }); }
+      const current = await ctx.db.query("familyLinks").withIndex("by_parentUserId_and_studentId", q => q.eq("parentUserId", parent._id).eq("studentId", student._id)).unique(); if (!current) throw new Error("Link missing"); await ctx.db.patch(current._id, { seasonId: student.seasonId });
+      await ctx.db.patch(student._id, { active: false });
+      await ctx.db.insert("familyLinks", { parentUserId: parent._id, studentId: f.ids.other, seasonId: student.seasonId, active: true, createdBy: season.createdBy });
+      await ctx.db.insert("familyLinkSeasonBackfill", { key: "team", state: "complete", phase: "verify", cursor: null, scanned: 244, unresolved: 0, updatedAt: 0, generation: 1, startedBy: season.createdBy });
+    });
+    expect((await f.parent.query(api.app.viewer, {})).students).toEqual([]);
+    await expect(f.parent.query(api.app.listEvents, {})).resolves.toHaveLength(1);
+    const first = await f.parent.query(api.seasonFamilyLinks.currentSeasonPage, { paginationOpts: { numItems: 1, cursor: null } }); expect(first.page).toEqual([]); expect(first.isDone).toBe(false);
+    const second = await f.parent.query(api.seasonFamilyLinks.currentSeasonPage, { paginationOpts: { numItems: 20, cursor: first.continueCursor } }); expect(second.page.map(row => row._id)).toEqual([f.ids.other]);
+    await f.t.run(async ctx => { const parent = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", f.ids.authParent)).unique(); if (!parent) throw new Error("Parent missing"); const link = await ctx.db.query("familyLinks").withIndex("by_parentUserId_and_studentId", q => q.eq("parentUserId", parent._id).eq("studentId", f.ids.other)).unique(); if (!link) throw new Error("Link missing"); await ctx.db.patch(link._id, { active: false }); });
+    await expect(f.parent.query(api.app.studentProfile, { studentId: f.ids.other })).rejects.toThrow("permission");
+  });});

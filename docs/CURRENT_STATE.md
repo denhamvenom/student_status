@@ -1,32 +1,26 @@
 # Current integration handoff
 
-Updated October 13, 2026. Verify the actual Git/worktree state before using this snapshot. This short entry point links evidence rather than replacing it.
+## October 17 — prelaunch preparation complete to deployment boundary
 
-- Active checkout: `student-status-readiness-design`; branch `feature/student-status-readiness-design`; draft PR #9. Prior verified workflow checkpoint: `51bbc3b`; current frontend checkpoint is recorded in Git history and the conformance log.
-- Current task: authorized frontend alignment resumed with both project skills, parallel Sol implementation and Astra review. Modal/sections/invitation corrections implemented; scoped visual checks completed, remaining cells stay open.
-- Frontend conformance authorized; next backend phase requires separate authorization. No main merge, production deployment or real signing authorized. Preserve sibling worktrees and paused backend drafts.
-- Astra coordinates/reviews; Sol implements independent file-owned tasks. One integration owner handles Git and shared backend changes.
+Workspace: this repository, branch `feature/student-status-completion`, draft PR10. Prior local checkpoint fa96cac; current public-page/configuration checkpoint is being committed. Check Git before continuing. Main/Pages source remains 18ef1c27b35f7a30a3c6edeb572d8eb452301538; no merge, deployment or Pages source change.
 
-## Latest decision
+- Public `/about`, `/privacy`, `/terms` prepared; all require no sign-in. Both Student Status signed-out screens and Timeclock link to them. Simple Terms exclude permission forms. Owner approved Foundation identity and internal retention/hold/export policy; public notice retains only concise family-facing information. Policy revision date October 17, not a launch-date claim.
+- Google project remains in Foundation, External/Testing. Owner-approved project-only OAuth Config Editor applied to admin@team8044.org; support email saved with Google success confirmation. Existing developer contacts, clients and domains preserved. Public URL fields await actual hosting.
+- Production amicable-eel-413 now has ten required origin/OAuth/signing/calendar/PIN setting names. Calendar source authenticated and read successfully after project move (HTTP200); three approved settings transferred privately and matching values verified in memory. Owner entered PIN; only its presence verified. Signing keys were previously validated; do not regenerate.
+- Approved season: name 2026–2027, competition year 2027, start January9 at midnight America/Chicago (`1799474400000`). This is a date boundary, not an event. FIRST link/QR remain ignored private inputs, not applied to a production season.
+- No first-Coach bootstrap, real signing, data import or synthetic migration. Automatic deletion off. Backups/paid upgrades deferred.
 
-Whole Team means every active team member. New members joining after event creation are automatically included in that event too. Confirmed October 13; supersedes the proposed creation-time snapshot/manual-add recommendation. Decision recorded, implementation and verification pending. Whole Team remains unavailable in the current UI.
+## Validation and publication
 
-Before implementing, inspect existing event lifecycle, membership, charging and participation contracts. Surface unresolved cases such as past/closed events or reactivation rather than inventing exclusions, fees or withdrawal reversals.
+Sol: focused Student Status lint/typecheck/build and Timeclock lint/typecheck/build passed. Existing Student Status bundle-size advisory remains. Astra final targeted source review found no blocker. Root observed public navigation, desktop dark About, phone dark Terms and phone light Privacy; phone document width equals scroll width375. Local evidence only; real-domain deep links/OAuth and physical concurrency remain unverified. No broad test suite repeated for static pages.
 
-## Context map
+Before development push, GitHub Pages verified main/root with only its Pages workflow; Cloudflare app Workers absent and existing Pages projects belong to unrelated repositories. Reviewed checkpoints may be pushed to this development branch, never main. Verify final remote SHA when reporting publication.
 
-- Current human progress: [DEVELOPMENT_CHECKLIST.md](DEVELOPMENT_CHECKLIST.md).
-- Product/architecture: [PLAN.md](PLAN.md), [ARCHITECTURE.md](ARCHITECTURE.md), [FINANCE_AND_CONSENT_DECISIONS.md](FINANCE_AND_CONSENT_DECISIONS.md).
-- Current outstanding visual matrix: [VISUAL_CHECKS.md](VISUAL_CHECKS.md); maintain this table rather than competing current matrices.
-- Latest frontend evidence/limits: [FRONTEND_CONFORMANCE_LOG.md](FRONTEND_CONFORMANCE_LOG.md). Root design-drift-report is a historical pre-correction baseline.
-- Backend evidence: relevant dated sections of [REVIEW.md](REVIEW.md) and [REHEARSAL_2026-10-12.md](REHEARSAL_2026-10-12.md). Older test counts describe their milestones only.
-- Timeclock: [TIMECLOCK_BACKEND_HANDOFF.md](TIMECLOCK_BACKEND_HANDOFF.md), [TIMECLOCK_COORDINATION.md](TIMECLOCK_COORDINATION.md). Verify current other-worktree status before shared changes; handoffs are snapshots.
-- Git/privacy: [REPOSITORY.md](REPOSITORY.md). Runtime: [DEVELOPMENT.md](DEVELOPMENT.md), using the verified active checkout.
+## Remaining
 
-## Remaining work
+1. Owner release approval: preserve current demo on a dedicated reference branch and switch Pages before merging main; create/configure both Cloudflare Workers (reviewed dashboard flow submits Deploy), scoped build token, Bun1.4.3, previews off, same approved revision. See LAUNCH_CONFIGURATION_PLAN.md and PRELAUNCH_DECISIONS.md.
+2. Publish pages/HTTPS; then set Google home/privacy/terms URLs and complete applicable branding/domain verification and OAuth publication. Current guidance also calls for separate testing/production Google projects; existing setup uses separate clients in one project. Resolve applicability before OAuth Production; do not silently recreate credentials or undo the approved migration.
+3. Deploy backend and frontends only after approval. Verify Coach Google identity, empty-target bootstrap, immediate flag removal, FIRST configuration, role/invitation/sign-out flows, calendar freshness and tablet/two-phone concurrency/reconnection.
+4. Real signing remains separately gated. Recovery and measured production volume remain outstanding, not reasons to reopen deferred paid upgrades during ordinary configuration.
 
-Frontend: modal/section/invitation presentation implemented; remaining role/state/viewport checks in VISUAL_CHECKS.md. Shared live-app copy extraction is recorded complete; flag specific residual literals during future checks rather than reopening wholesale migration. Backend dependencies: Whole Team, aggregate finance/roster, family Attendance, missing readiness/form/admin contracts. Inspect existing contracts before assuming each gap requires new schema.
-
-October 13 full unsandboxed check: 100/101 tests passed; existing Timeclock test fixture expired on October 13 and fails in isolation. Lint/types/build checked separately. See conformance log for exact evidence; do not claim the suite is green. Visual coverage remains partial/scaled, not whole-app pixel parity. Keep screenshots and account-specific evidence outside Git.
-
-At milestones update this handoff's scope, decision pointers, validation limits and publication status. Do not copy long histories into it.
+Context is suitable to finish this bounded checkpoint. Reassess before the release phase. Historical notes: CURRENT_STATE_HISTORY_2026-10-17.md; detailed accepted development evidence remains in VISUAL_CHECKS.md and prior reviews.

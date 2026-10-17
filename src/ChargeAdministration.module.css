@@ -1,0 +1,24 @@
+.root{display:grid;gap:18px;min-width:0;color:var(--text-body);font:15px/1.5 'Segoe UI',system-ui,sans-serif}
+.card{min-width:0;padding:20px;gap:16px;background:var(--surface-card);color:var(--text-body);border-color:var(--border-default);box-shadow:var(--shadow-sm)}
+.card h3{margin:0;font:400 24px/1.1 Anton,Impact,sans-serif}
+.card p{margin:0}
+.header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.header>div{display:grid;gap:4px;min-width:0}
+.muted{font-size:13px;color:var(--text-muted);overflow-wrap:anywhere}
+.details{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 16px;margin:0;font-size:14px}
+.details dt{color:var(--text-muted)}
+.details dd{margin:0;text-align:right;font-weight:600;overflow-wrap:anywhere}
+.form{display:grid;gap:14px;min-width:0;border:0;padding:0;margin:0}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:14px}
+.field{display:grid;gap:5px;min-width:0;font-size:14px;font-weight:600}
+.field :global(input),.field :global(select){min-height:44px;max-width:100%;font-size:16px;border-radius:4px}
+.actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.root :global([data-slot=button]){min-height:44px;min-width:44px;border-radius:4px;font-weight:700;white-space:normal}
+.root :global([data-slot=button][class*='bg-primary']){background:var(--gold-500);color:var(--primary-foreground)}
+.root :global([data-slot=button][class*='bg-primary']:hover){background:var(--gold-600)}
+.notice{padding:12px 14px;border:1px solid var(--gold-600);border-radius:6px;background:var(--gold-100);font-size:14px;overflow-wrap:anywhere}
+.error{padding:12px 14px;border:1px solid var(--stop-dot);border-radius:6px;color:var(--stop-dot);background:var(--stop-bg);font-size:14px;overflow-wrap:anywhere}
+.history{display:grid;gap:12px}
+.historyRow{display:grid;gap:8px;padding:14px 0;border-top:1px solid var(--border-default);font-size:14px;min-width:0;overflow-wrap:anywhere}
+.status{display:inline-flex;align-self:start;justify-self:start;padding:4px 10px;border-radius:18px;background:var(--surface-metal);font-size:12px;font-weight:700}
+@media(max-width:767px){.card{padding:16px}.actions>:global(button){flex:1 1 140px}.details{gap:8px 12px}.header{display:grid}}

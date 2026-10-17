@@ -1,6 +1,7 @@
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { timeclockTransitionLocked } from "./timeclockTransition";
 
 type Ctx = QueryCtx | MutationCtx;
 export type AppUser = Doc<"appUsers">;
@@ -37,11 +38,16 @@ export async function activeSeason(ctx: Ctx) {
   return season;
 }
 
+export async function requireSeasonProfileWritable(ctx: Ctx, seasonId: Id<"seasons">) {
+  if (await timeclockTransitionLocked(ctx, seasonId)) throw new Error("Season transition is in progress. Profile and roster changes are paused until it finishes.");
+}
+
 export async function studentAccess(ctx: Ctx, user: AppUser, studentId: Id<"students">): Promise<Doc<"students">> {
   const student = await ctx.db.get(studentId);
   if (!student) throw new Error("Student not found.");
   const season = await activeSeason(ctx);
   if (!student.active || student.seasonId !== season._id) throw new Error("Student is unavailable in the active season.");
+  if ("scheduler" in ctx) await requireSeasonProfileWritable(ctx, season._id);
   if (user.role === "coach" || user.travelLead) return student;
   if (user.role === "student" && student.userId === user._id) return student;
   if (user.role === "parent") {
@@ -53,20 +59,16 @@ export async function studentAccess(ctx: Ctx, user: AppUser, studentId: Id<"stud
 
 export async function ownStudent(ctx: Ctx, user: AppUser): Promise<Doc<"students">> {
   requireRole(user, "student");
-  const student = await ctx.db.query("students").withIndex("by_userId", q => q.eq("userId", user._id)).unique();
+  const season = await activeSeason(ctx);
+  const student = await ctx.db.query("students").withIndex("by_seasonId_and_userId", q => q.eq("seasonId", season._id).eq("userId", user._id)).unique();
+  if ("scheduler" in ctx) await requireSeasonProfileWritable(ctx, season._id);
   if (!student || !student.active) throw new Error("No active student profile is linked to this account.");
   return student;
 }
 
 export async function linkedStudents(ctx: Ctx, user: AppUser) {
   if (user.role === "student") return [await ownStudent(ctx, user)];
-  if (user.role === "parent") {
-    const season = await ctx.db.query("seasons").withIndex("by_status", q => q.eq("status", "active")).first();
-    if (!season) return [];
-    const links = await ctx.db.query("familyLinks").withIndex("by_parentUserId", q => q.eq("parentUserId", user._id)).take(100);
-    const students = await Promise.all(links.filter(x => x.active).map(x => ctx.db.get(x.studentId)));
-    return students.filter((x): x is Doc<"students"> => !!x && x.active && x.seasonId === season._id);
-  }
+  if (user.role === "parent") throw new Error("Parent students must be read through season-scoped roster pages.");
   return [];
 }
 
@@ -79,11 +81,15 @@ export function mentorStudent(student: Doc<"students">) {
 }
 
 export function mentorEvent(event: Doc<"events">) {
-  return { _id: event._id, name: event.name, type: event.type, startsAt: event.startsAt, endsAt: event.endsAt, destination: event.destination };
+  return { _id: event._id, name: event.name, type: event.type, startsAt: event.startsAt, endsAt: event.endsAt, destination: event.destination, enrollmentState: event.enrollmentState ?? "complete" };
 }
 
 export function privateStudent(student: Doc<"students">) {
-  return { ...publicStudent(student), email: student.email, shirtSize: student.shirtSize ?? null, emergencyName: student.emergencyName ?? null, emergencyRelationship: student.emergencyRelationship ?? null, emergencyPhone: student.emergencyPhone ?? null, allergies: student.allergies, medications: student.medications, otcAuthorization: student.otcAuthorization ?? null };
+  const confirmed = student.consentProfileV2CompletedAt !== undefined && student.consentProfileV2ConfirmedBy !== undefined && student.consentProfileV2 !== undefined;
+  const profile = confirmed ? student.consentProfileV2! : null;
+  const allergies = profile ? profile.allergies.state === "none" ? {state: "none" as const} : {state: "reported" as const, text: profile.allergies.entries.map(item => `${item.allergen}: ${item.severity}; ${item.reaction}; response: ${item.response}`).join("\n")} : student.allergies;
+  const medications = profile ? profile.prescriptions.state === "none" ? {state: "none" as const} : {state: "reported" as const, text: profile.prescriptions.entries.map(item => `${item.name} ${item.dose}; ${item.timing}; ${item.reason}; carried by ${item.carriedBy}`).join("\n")} : student.medications;
+  return { ...publicStudent(student), profileRevision: student.profileRevision ?? 0, profileSetupRequired: student.profileCompletedAt === undefined, structuredConsentProfileComplete: confirmed, email: student.email, shirtSize: student.shirtSize ?? null, emergencyName: profile?.emergency.name ?? student.emergencyName ?? null, emergencyRelationship: profile?.emergency.relationship ?? student.emergencyRelationship ?? null, emergencyPhone: profile?.emergency.phone ?? student.emergencyPhone ?? null, allergies, medications, otcAuthorization: profile ? null : student.otcAuthorization ?? null };
 }
 
 export async function audit(ctx: MutationCtx, actor: AppUser, entity: string, entityId: string, action: string, before: unknown, after: unknown, reason?: string) {

@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { describe, expect, it } from "vitest";
-import { convexTest } from "convex-test";
+import { createTest as convexTest } from "../testUtils";
 import { api } from "./_generated/api";
 import schema from "./schema";
 
@@ -22,6 +22,7 @@ async function fixture() {
     const season = await ctx.db.insert("seasons", { name: "Synthetic", year: 2026, status: "active", startsAt: 0, permissionVersion: "DRAFT-1", createdBy: coach });
     const student = await ctx.db.insert("students", { seasonId: season, userId: studentUser, legalName: "Synthetic Student", preferredName: "Student", email: "student@example.invalid", subteam: "A", active: true, travelTeam: false, roomCategoryLocked: false, allergies: { state: "unknown" }, medications: { state: "unknown" } });
     const other = await ctx.db.insert("students", { seasonId: season, userId: otherUser, legalName: "Synthetic Other", preferredName: "Other", email: "other@example.invalid", subteam: "B", active: true, travelTeam: false, roomCategoryLocked: false, allergies: { state: "unknown" }, medications: { state: "unknown" } });
+    await ctx.db.insert("familyLinkSeasonBackfill", { key: "team", state: "complete", phase: "verify", cursor: null, scanned: 0, unresolved: 0, updatedAt: 0, generation: 1, startedBy: coach });
     return { coachAuth, studentAuth, otherStudentAuth, parentAuth, wrongAuth, student, other };
   });
   return { t, ids, coach: t.withIdentity({ subject: `${ids.coachAuth}|session` }), student: t.withIdentity({ subject: `${ids.studentAuth}|session` }), otherStudent: t.withIdentity({ subject: `${ids.otherStudentAuth}|session` }), parent: t.withIdentity({ subject: `${ids.parentAuth}|session` }), wrong: t.withIdentity({ subject: `${ids.wrongAuth}|session` }) };
@@ -61,9 +62,12 @@ describe("parent invitations", () => {
     const links = await f.student.query(api.parentInvites.listFamilyLinks, { studentId: f.ids.student });
     expect(links).toHaveLength(1);
     expect(links[0].active).toBe(true);
+    const storedLink = await f.t.run(ctx => ctx.db.get(links[0]._id));
+    const storedStudent = await f.t.run(ctx => ctx.db.get(f.ids.student));
+    expect(storedLink?.seasonId).toBe(storedStudent?.seasonId);
     const parentView = await f.parent.query(api.app.viewer, {});
     expect(parentView.user?.role).toBe("parent");
-    expect(parentView.students.map((x: { _id: string }) => x._id)).toEqual([f.ids.student]);
+    expect((await f.parent.query(api.seasonFamilyLinks.currentSeasonPage, { paginationOpts: { numItems: 50, cursor: null } })).page.map(x => x._id)).toEqual([f.ids.student]);
   });
 
   it("honors outstanding invites when Coach disables new creation and replacement", async () => {
@@ -109,9 +113,13 @@ describe("parent invitations", () => {
     const link = (await f.student.query(api.parentInvites.listFamilyLinks, { studentId: f.ids.student }))[0];
     await expect(f.student.mutation(api.parentInvites.revokeFamilyLink, { linkId: link._id })).rejects.toThrow("permission");
     await f.coach.mutation(api.parentInvites.revokeFamilyLink, { linkId: link._id });
+    await f.t.run(ctx => ctx.db.patch(link._id, { seasonId: undefined }));
     await expect(f.parent.query(api.app.studentProfile, { studentId: f.ids.student })).rejects.toThrow("permission");
     await expect(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" })).rejects.toThrow("revoked family link");
     await f.coach.mutation(api.parentInvites.restoreFamilyLink, { linkId: link._id, reason: "Verified by Coach" });
+    const restoredLink = await f.t.run(ctx => ctx.db.get(link._id));
+    const restoredStudent = await f.t.run(ctx => ctx.db.get(f.ids.student));
+    expect(restoredLink?.seasonId).toBe(restoredStudent?.seasonId);
     expect((await f.parent.query(api.app.studentProfile, { studentId: f.ids.student }))._id).toBe(f.ids.student);
     const audits = await f.t.run(ctx => ctx.db.query("audit").withIndex("by_entity_and_entityId", q => q.eq("entity", "familyLinks").eq("entityId", link._id)).take(10));
     expect(audits.map(x => x.action)).toContain("restore");
@@ -126,7 +134,7 @@ describe("parent invitations", () => {
     const c = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent2@example.invalid" });
     for (const token of [a.token, b.token]) await f.parent.mutation(api.parentInvites.acceptParentInvite, { token, relationship: "Guardian", authorityAttested: true, attestationVersion: "parent-relationship-1" });
     await parent2.mutation(api.parentInvites.acceptParentInvite, { token: c.token, relationship: "Guardian", authorityAttested: true, attestationVersion: "parent-relationship-1" });
-    expect((await f.parent.query(api.app.viewer, {})).students).toHaveLength(2);
+    expect((await f.parent.query(api.seasonFamilyLinks.currentSeasonPage, { paginationOpts: { numItems: 50, cursor: null } })).page).toHaveLength(2);
     expect(await f.student.query(api.parentInvites.listFamilyLinks, { studentId: f.ids.student })).toHaveLength(2);
   });
 
@@ -141,19 +149,19 @@ describe("parent invitations", () => {
       if (!parent || !coach) throw new Error("Fixture parent or Coach missing");
       const archived = await ctx.db.insert("seasons", { name: "Synthetic prior", year: 2025, status: "archived", startsAt: 0, permissionVersion: "DRAFT-0", createdBy: coach._id });
       const child = await ctx.db.insert("students", { seasonId: archived, legalName: "Prior Child", preferredName: "Prior", email: "prior@example.invalid", subteam: "A", active: true, travelTeam: false, roomCategoryLocked: false, allergies: { state: "unknown" }, medications: { state: "unknown" } });
-      await ctx.db.insert("familyLinks", { parentUserId: parent._id, studentId: child, active: true, createdBy: coach._id });
+      await ctx.db.insert("familyLinks", { parentUserId: parent._id, studentId: child, seasonId: archived, active: true, createdBy: coach._id });
       return child;
     });
-    expect((await f.parent.query(api.app.viewer, {})).students.map((student: { _id: string }) => student._id).sort()).toEqual([f.ids.student, f.ids.other].sort());
+    expect((await f.parent.query(api.seasonFamilyLinks.currentSeasonPage, { paginationOpts: { numItems: 50, cursor: null } })).page.map((student: { _id: string }) => student._id).sort()).toEqual([f.ids.student, f.ids.other].sort());
     await expect(f.parent.query(api.app.studentProfile, { studentId: archivedChild })).rejects.toThrow("unavailable");
     const firstLink = (await f.coach.query(api.parentInvites.listFamilyLinks, { studentId: f.ids.student }))[0];
     const secondLink = (await f.coach.query(api.parentInvites.listFamilyLinks, { studentId: f.ids.other }))[0];
     await f.coach.mutation(api.parentInvites.revokeFamilyLink, { linkId: firstLink._id });
-    expect((await f.parent.query(api.app.viewer, {})).students.map((student: { _id: string }) => student._id)).toEqual([f.ids.other]);
+    expect((await f.parent.query(api.seasonFamilyLinks.currentSeasonPage, { paginationOpts: { numItems: 50, cursor: null } })).page.map((student: { _id: string }) => student._id)).toEqual([f.ids.other]);
     await expect(f.parent.query(api.app.studentProfile, { studentId: f.ids.student })).rejects.toThrow("permission");
     await expect(f.parent.query(api.app.studentFinances, { studentId: f.ids.student })).rejects.toThrow("permission");
     await f.coach.mutation(api.parentInvites.revokeFamilyLink, { linkId: secondLink._id });
-    expect((await f.parent.query(api.app.viewer, {})).students).toEqual([]);
+    expect((await f.parent.query(api.seasonFamilyLinks.currentSeasonPage, { paginationOpts: { numItems: 50, cursor: null } })).page).toEqual([]);
     await expect(f.parent.query(api.app.studentProfile, { studentId: f.ids.other })).rejects.toThrow("permission");
     await expect(f.parent.query(api.app.studentFinances, { studentId: f.ids.other })).rejects.toThrow("permission");
   });

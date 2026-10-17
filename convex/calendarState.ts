@@ -1,12 +1,14 @@
 import { env, internalMutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { viewer } from "./lib/access";
+import { activeSeason, viewer } from "./lib/access";
+import { timeclockTransitionLocked } from "./lib/timeclockTransition";
 
 const stateResult = v.union(v.null(), v.object({ syncToken: v.optional(v.string()), generation: v.number() }));
 
 export const begin = internalMutation({
   args: { calendarIdHash: v.string(), now: v.number() }, returns: stateResult,
   handler: async (ctx, args) => {
+    if (await timeclockTransitionLocked(ctx, (await activeSeason(ctx))._id)) return null;
     const existing = await ctx.db.query("timeclockCalendarSync").withIndex("by_key", q => q.eq("key", "team")).unique();
     if (existing && existing.calendarIdHash !== args.calendarIdHash) {
       await ctx.db.patch(existing._id, { lastError: "Calendar source changed; review required before synchronization", lastAttemptAt: args.now });
@@ -28,6 +30,7 @@ export const finish = internalMutation({
   handler: async (ctx, args) => {
     const row = await ctx.db.query("timeclockCalendarSync").withIndex("by_key", q => q.eq("key", "team")).unique();
     if (!row || row.generation !== args.generation) return null;
+    if (await timeclockTransitionLocked(ctx, (await activeSeason(ctx))._id)) return null;
     await ctx.db.patch(row._id, args.error
       ? { lastError: args.error }
       : { lastSuccessAt: args.now, lastError: undefined, syncToken: args.syncToken });
