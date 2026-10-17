@@ -1,5 +1,23 @@
 # Student Status Development Checklist
 
+- [x] Two-agent prelaunch pass: DEV-only Timeclock label, both builds/typechecks and Timeclock lint passed; independent auth/release review clear. See NEXT_CHAT_HANDOFF.md.
+- [x] Owner supplied January 9, 2027 kickoff/start, FIRST enrollment link/QR (private local storage), and admin support identity. Production season not yet created.
+
+- [x] Owner approved configuration batch; production Student Status and Timeclock origin settings saved and verified.
+- [x] Owner completed Google client credential handoff; AUTH_GOOGLE_ID and AUTH_GOOGLE_SECRET verified saved in production without reading values.
+- [x] Production JWT signing pair installed privately and stored pair verified with RS256 sign/verify.
+- [ ] Real-origin OAuth verification remains post-deploy; Cloudflare creation remains gated; neither app deployed.
+
+- [x] October17: prepared production configuration/build matrix and release/Pages-transition/rollback sequence in LAUNCH_CONFIGURATION_PLAN.md; verified Convex, Google and Cloudflare DNS/Worker gaps read-only.
+- [x] Cloudflare GitHub connection inspected after login: existing denhamvenom connection lists student_status.
+- [x] Consolidated configuration approval received; approved origin/OAuth/signing setup applied. Launch remains separately gated.
+
+- [x] October17: Convex administrator/plan and existing production identity/default protections checked read-only. Production reports Never deployed; owner-approved organizational Admin invitation accepted and membership verified.
+- [ ] At each phase transition, assess whether a fresh chat would improve accuracy and prepare a handoff when needed.
+
+- [x] October17: existing Google Cloud project moved into Foundation organization with owner-approved administrator roles; External OAuth verified after migration. Details: ONLINE_READINESS_HANDOFF.md.
+- [ ] OAuth remains Testing; finish branding/production configuration and verify real-origin sign-in separately. Convex organizational Admin membership verified; production configuration and Cloudflare Git hosting preparation remain open; backups/paid upgrade deferred.
+
 Updated October 16, 2026. Owner closed the development visual review cycle at 1f20ca8; Parent/Student setup and review corrections are complete. Current disposition supersedes historical unchecked boxes. Original G1–G7 scope and valid evidence are preserved.
 
 ## Completion batches

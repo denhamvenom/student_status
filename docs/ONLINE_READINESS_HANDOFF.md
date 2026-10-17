@@ -1,5 +1,19 @@
 # Development review closure and online-readiness handoff — October 16, 2026
 
+## October 17 infrastructure checkpoint
+
+Latest preparation: see LAUNCH_CONFIGURATION_PLAN.md for the concrete proposed configuration batch, two-app build matrix, Pages transition and rollback. Production environment list is empty; Google client/branding remain development-only; app Workers and exact DNS names are absent. Cloudflare GitHub connection verified after owner login: student_status is available under denhamvenom; no additional repository access grant needed. Preparation completed without external changes. Proposed settings are not applied or approved for launch.
+
+Convex administration read-only check: existing team remains Free; designated organizational administrator is now a verified team Admin. Existing production deployment amicable-eel-413 is running but reports Never deployed, with no deploy keys. Cloud and HTTP Actions URLs verified in dashboard; client logs default disabled and dashboard edit confirmation default enabled. No membership, settings, data or deployment changes made. Follow-up: owner explicitly approved the team Admin invitation; it was sent and verified under Pending Invitations. Acceptance subsequently verified in Team Members with Admin role; original administrator retained. Production configuration and real-origin authentication remain unverified.
+
+Owner workflow addition: check chat-context suitability at every phase transition. Recommend a fresh chat when accumulated history, stale assumptions or repeated corrections impair accuracy, and prepare a concise current handoff first. October17 administration check: no new chat needed.
+
+Owner confirmed denhamvenom/student_status remains the GitHub home for both apps. With explicit owner authorization, the existing Google Cloud project student-status-511411 was migrated into dsroboticsfoundation.org; the console confirmed success. The designated Foundation administrator received Organization Policy Viewer and Project Creator on the organization, plus Project IAM Admin and Project Mover on the project. Existing project Owner was preserved. Account-specific evidence remains outside Git.
+
+Reviewed active organization constraints and inspected import/domain-sharing details. The import constraint explicitly excludes imports from No organization; domain-restricted sharing permits the Workspace customer and all its associated domains. No organization policy was weakened. Google OAuth audience was verified External before and after migration. Publishing status remains Testing; branding configuration and production sign-in validation remain outstanding. This does not prove an application sign-in round trip after migration.
+
+No app deployment, main merge, Git push, OAuth credential rotation, billing change or Convex change occurred. Backups and paid upgrades remain deferred. Convex organizational administration, production configuration, Cloudflare Git integration and launch approval remain pending.
+
 Application checkpoint: 1f20ca8, feature/student-status-completion, PR10. Owner requested visual-cycle closure. A fresh independent Astra agent reviewed current evidence and targeted source once and found no concrete privacy, financial-integrity, required-flow or material visual blocker. Development review is closed; production readiness is not established.
 
 ## Independent review
