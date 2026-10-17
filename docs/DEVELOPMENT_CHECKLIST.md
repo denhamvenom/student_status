@@ -9,7 +9,8 @@
 - [x] Scoped frontend checks/builds and final Astra source review passed; representative local desktop/phone/light/dark page checks.
 - [ ] Release approval, Pages preservation/source switch, main merge, hosting, Google live URLs/publication prerequisites and real-domain/device proof. Nothing deployed.
 - [x] Resolve Google separate-project applicability from official policy and owner-confirmed audience; prepare GOOGLE_PRODUCTION_SETUP.md approval packet.
-- [ ] Owner approves and executes new production Google project/client configuration and private credential replacement. No configuration change authorized yet.
+- [x] Owner approved production Google setup; created denham-venom-production under Foundation. Creator already has project access; no manual IAM grant.
+- [ ] Finish OAuth policy acceptance, client configuration and private credential replacement. Wizard prepared; action-time policy confirmation pending.
 
 - [x] Published application checkpoint `87134fb` and verified remote development revision, unchanged main, and draft PR10 integration target. Boundary documentation audit reconciled current handoff, plan and historical status notices.
 

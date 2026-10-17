@@ -1,5 +1,7 @@
 # Student Status implementation plan
 
+Execution update October 17: owner approved the new Google project, shared client, scoped access and private production credential replacement. Created denham-venom-production under dsroboticsfoundation.org (organization 90524038636). IAM shows creator admin@team8044.org automatically has Owner; no manual role grant was made. OAuth wizard prepared with Denham Venom, admin support/contact and External audience; final User Data Policy acceptance awaits action-time confirmation. Client creation and credential replacement remain incomplete. No deployment, merge or OAuth publication. Prior approval-pending text below is historical for this batch.
+
 October 17 OAuth review: owner confirmed up to 165 users (50 students, 15 mentors, up to 100 parents) and personal/school accounts. Separate production Google project is required for the planned audience. See [GOOGLE_PRODUCTION_SETUP.md](GOOGLE_PRODUCTION_SETUP.md) for the concrete approval packet: retain existing development/calendar project; propose new Denham Venom Production project and one Web client for both apps. Execution, new-project IAM and private production credential replacement await owner approval. Nothing changed in Google or production. This supersedes earlier statements that policy applicability remains unknown.
 
 ## Current checkpoint — October 17
