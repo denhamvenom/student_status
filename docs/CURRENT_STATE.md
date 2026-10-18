@@ -13,3 +13,9 @@ October 18: controlled footer/account rehearsal completed and verified; accepted
 ## Remaining rollout boundaries
 
 The previously supplied FIRST invitation is saved for the live season and matches private owner inputs exactly. Calendar sync verified fresh (44 seconds old, no error). On October 18 the owner explicitly deferred physical tablet/two-phone concurrency/reconnection testing and stated it must not block rollout. Enrollment timing remains an owner operational decision. Student/Parent personal profile fields remain incomplete intentionally; no invented birth dates/contact/health information. Real signing disabled; backups deferred and recovery unproven. These are not covered by the completed account/footer evidence. No event, attendance, payment or signature rehearsal was performed. See PRODUCTION_ONBOARDING_RELEASE.md and PRODUCTION_ONBOARDING_PLAN.md.
+
+## Local rehearsal alignment — October 18
+
+Owner requested updating local development only. Freshly fetched origin/main is 68179f77212aef7c4f177b333271156389868a2d; local application/backend/dependency source matches that release exactly. Newer local differences are handoff documentation only. Existing dev:third-bandicoot-18 synchronized successfully with Convex typechecking; no reseed, reset, production sync, credential copying, or production configuration changes. Student Status local settings already target development; added ignored apps/timeclock/.env.local with the same public development endpoint. Existing development records remain separate from production. Google login and role preparation for the final rehearsal still require a fresh browser check; this synchronization does not claim that check passed.
+
+Validation: both application TypeScript checks and local Vite builds passed. Student Status retains its existing large-bundle warning; no build failure. No source change or repeated full test suite was needed because application source matches the already-reviewed release.

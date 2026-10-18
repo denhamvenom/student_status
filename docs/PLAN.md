@@ -1,12 +1,12 @@
 # Student Status implementation plan
 
-The owner-approved October 17 controlled hosting release is complete. Main `60505b4e04976598956bc1353a53e7d4daf63b9d` is deployed to shared production Convex and both Cloudflare Workers; its entire tree matches approved packet checkpoint `574c910`. [Student Status](https://students.team8044.org) and [Timeclock](https://timeclock.team8044.org) passed focused hosting checks. See [HOSTING_RELEASE_LOG.md](HOSTING_RELEASE_LOG.md). OAuth publication, production sign-in acceptance, bootstrap, enrollment and real signing remain separate gates.
+Current production frontends are release `68179f7`; shared backend remains approved `8c22d50`. OAuth publication, five account roles, footer changes and family readiness are verified; see CURRENT_STATE.md and PRODUCTION_ONBOARDING_RELEASE.md. Real signing remains disabled. October 18: local source matches current main and development backend synchronized only to third-bandicoot-18 for the upcoming rehearsal.
 
 ## Frontend cleanup — owner decision October 17, implemented October 18
 
 Consolidate About, Privacy and Terms navigation into one consistent, accessible footer in Student Status and Timeclock. Remove duplicate navigation links elsewhere, including sign-in/entry areas. Keep the existing public pages and direct URLs available without login; preserve any context-specific consent or acknowledgement required by a workflow. This supersedes the earlier repeated-link placement decision, not the approved policy content.
 
-Queue this for the next frontend change batch. Verify affected signed-out/signed-in layouts at phone and desktop sizes, footer keyboard access and all three destinations. Use focused checks; no backend changes are needed. Status: implemented with focused builds/layout checks; independent review and deployment pending. Controlled production account rehearsal and cleanup work are in [PRODUCTION_ONBOARDING_PLAN.md](PRODUCTION_ONBOARDING_PLAN.md).
+Queue this for the next frontend change batch. Verify affected signed-out/signed-in layouts at phone and desktop sizes, footer keyboard access and all three destinations. Use focused checks; no backend changes are needed. Status: implemented, independently reviewed and deployed through approved PR12; see the current release log. Controlled production account rehearsal and cleanup work are in [PRODUCTION_ONBOARDING_PLAN.md](PRODUCTION_ONBOARDING_PLAN.md).
 
 ## Historical planning and approval record
 

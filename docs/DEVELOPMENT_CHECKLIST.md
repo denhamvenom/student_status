@@ -765,3 +765,9 @@ Production release `8c22d50` is deployed; immutable tag `v0.1.0-onboarding.1` ve
 - Calendar sync verified fresh (44 seconds old), no error; read-only verification.
 - Owner explicitly defers physical clock-in concurrency/reconnection testing until later; it does not block rollout. No synthetic event or attendance was created.
 - Account/footer development goal complete with these accepted boundaries. Real signing remains disabled; backups/recovery deferred; test records intentionally retained with exact cleanup ledger. Enrollment timing remains the owner’s operational decision.
+
+## Local rehearsal alignment — October 18
+
+Owner requested updating local development only. Freshly fetched origin/main is 68179f77212aef7c4f177b333271156389868a2d; local application/backend/dependency source matches that release exactly. Newer local differences are handoff documentation only. Existing dev:third-bandicoot-18 synchronized successfully with Convex typechecking; no reseed, reset, production sync, credential copying, or production configuration changes. Student Status local settings already target development; added ignored apps/timeclock/.env.local with the same public development endpoint. Existing development records remain separate from production. Google login and role preparation for the final rehearsal still require a fresh browser check; this synchronization does not claim that check passed.
+
+Validation: both application TypeScript checks and local Vite builds passed. Student Status retains its existing large-bundle warning; no build failure. No source change or repeated full test suite was needed because application source matches the already-reviewed release.
