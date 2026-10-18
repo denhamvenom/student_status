@@ -1,6 +1,6 @@
 # Controlled hosting release — approval packet, October 17, 2026
 
-Owner approved the ordered RELEASE_APPROVAL_PACKET.md hosting batch on October 17. Pages preservation, PR10/PR11 merges and production backend deployment are complete. Main release is `60505b4e04976598956bc1353a53e7d4daf63b9d`, whose entire tree matches packet checkpoint `574c910`. Cloudflare Workers/custom domains are pending dashboard sign-in and narrow build access. See [HOSTING_RELEASE_LOG.md](HOSTING_RELEASE_LOG.md). Earlier no-approval/no-merge/no-deployment claims below describe historical checkpoints.
+Owner approved the ordered RELEASE_APPROVAL_PACKET.md hosting batch on October 17. Pages preservation, PR10/PR11 merges and production backend deployment are complete. Main release is `60505b4e04976598956bc1353a53e7d4daf63b9d`, whose entire tree matches packet checkpoint `574c910`. Cloudflare Workers/custom domains are pending narrow build-token creation and website deployment. See [HOSTING_RELEASE_LOG.md](HOSTING_RELEASE_LOG.md). Earlier no-approval/no-merge/no-deployment claims below describe historical checkpoints.
 
 ## Exact candidate and fresh evidence
 

@@ -2,13 +2,13 @@
 
 ## October 17 — controlled hosting release in progress
 
-Owner approved the ordered RELEASE_APPROVAL_PACKET.md hosting batch on October 17. Pages preservation, PR10/PR11 merges and production backend deployment are complete. Main release is `60505b4e04976598956bc1353a53e7d4daf63b9d`, whose entire tree matches packet checkpoint `574c910`. Cloudflare Workers/custom domains are pending dashboard sign-in and narrow build access. See [HOSTING_RELEASE_LOG.md](HOSTING_RELEASE_LOG.md). Earlier no-approval/no-merge/no-deployment claims below describe historical checkpoints.
+Owner approved the ordered RELEASE_APPROVAL_PACKET.md hosting batch on October 17. Pages preservation, PR10/PR11 merges and production backend deployment are complete. Main release is `60505b4e04976598956bc1353a53e7d4daf63b9d`, whose entire tree matches packet checkpoint `574c910`. Cloudflare Workers/custom domains are pending narrow build-token creation and website deployment. See [HOSTING_RELEASE_LOG.md](HOSTING_RELEASE_LOG.md). Earlier no-approval/no-merge/no-deployment claims below describe historical checkpoints.
 
 Current checkout: docs/controlled-hosting-progress-2026-10-17, documentation only. Do not merge this branch merely to publish the handoff or change the approved frontend build SHA. PR10 and PR11 are merged. Application files still match accepted checkpoint 87134fb.
 
 Pages uses demo-reference-2026-10-17/root at original main 18ef1c27b35f7a30a3c6edeb572d8eb452301538. Build succeeded; all four live demo files exactly matched original Git blobs. Production Convex amicable-eel-413 deployed successfully from 60505b4; typecheck/schema validation passed and no indexes were deleted. Astra independently verified the release merge tree/parents. No broad tests repeated.
 
-Next: owner signs in to the open Cloudflare dashboard, then finish the packet's two Workers/custom domains and focused hosting checks. Connector denied token-permission inspection. No target Workers/build triggers/custom domains created. Recheck inventories and main SHA before submission. Do not repeat backend deployment without a concrete reason.
+Cloudflare sign-in is restored; Team 8044 and existing denhamvenom/student_status connection verified. Main remains60505b4. Student Status creation form is prepared with the packet commands, root path, Bun1.4.3, production endpoint and previews off. Automatic token grants exceed approval and were not submitted. A separate custom-token summary is ready: Denham Venom production builds, Workers Scripts: Edit, Team 8044 only, active until revoked. Browser-required action-time confirmation was requested and remains pending; do not create until owner answers. No token/Worker/trigger/domain created. Next: create the confirmed narrow token, select it for both builds, finish hosting and checks. Do not repeat backend deployment.
 
 ## Completed configuration and boundaries
 

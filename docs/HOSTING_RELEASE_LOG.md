@@ -25,3 +25,9 @@ Validate HTTPS roots, direct deep-link reloads, About/Privacy/Terms and built pr
 ## Remaining boundaries
 
 OAuth remains External/Testing. Google URL registration/publication, guarded first-Coach/season bootstrap, enrollment, real signing and physical concurrency checks are later gates. Existing settings remain approved; no repeat secrets transfer. Paid backups deferred and recovery unproven. Goal remains unfinished until both hosted frontends and focused checks complete.
+
+## Restored access and pending token confirmation
+
+Owner restored dashboard sign-in. Verified Team 8044 and existing denhamvenom/student_status GitHub connection; remote main still60505b4. Prepared Student Status form with exact packet build/deploy commands, root path, BUN_VERSION1.4.3, production VITE_CONVEX_URL and previews disabled. No Deploy submission.
+
+Automatic token scope includes unrelated storage/database and all-zone access, so it was not submitted. Prepared custom user-token summary named Denham Venom production builds with only Workers Scripts: Edit for Team 8044, active until revoked. Browser policy requires action-time confirmation for creating persistent security access; exact confirmation is pending. No token created. Summary screenshot remains outside Git. Continue at token summary after owner answers; then select narrow token for the builds and complete the packet. Login is no longer the blocker.
