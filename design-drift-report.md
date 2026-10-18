@@ -1,3 +1,5 @@
+> Historical pre-correction baseline. See docs/CURRENT_STATE.md and docs/FRONTEND_CONFORMANCE_LOG.md for current progress; the original findings below are not all still open.
+
 # Student Status design drift audit — October 12, 2026
 
 **Consolidated audit for Coach approval. Corrections have not been made.** Available live screens show recurring drift in shared components, navigation, mobile layout and information hierarchy. Several reference workflows are unfinished. This report separates functional gaps from presentation fixes. It is not a blanket visual pass, production acceptance or evidence that every role and state was available.
@@ -133,3 +135,7 @@ Paused family Attendance/reducer and Who’s Going work was preserved at owner-r
 This audit makes no product corrections, domain-record changes, role changes, backend sync, real consent submission, Timeclock changes, production deployment or main merge. Temporary appearance preferences were changed for comparison and restored to System; Coach authentication and temporary viewport overrides were restored. No new application-check result is asserted for this documentation-only work.
 
 **Coach approval is required before corrections.** Approve or revise presentation priorities, intentional differences and deferred functional items. After approved corrections, repeat affected role/screen comparisons at both widths/themes and relevant states, retaining named limitations. Only then can visual conformance be accepted; this audit does not claim it.
+
+## Correction checkpoint — October 12, 2026
+
+The Coach approved representative Readiness and authorized wider frontend work. The historical observations above remain the audit baseline. Current fixes, source review, validation and unresolved visual/backend dependencies are tracked in `docs/FRONTEND_CONFORMANCE_LOG.md`; do not interpret this checkpoint as closing every finding or every unobserved state.

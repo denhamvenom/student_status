@@ -1,9 +1,11 @@
+import { refreshStudentFinance } from "./lib/financeSummaries";
 import { v } from "convex/values";
 import { env, internalMutation } from "./_generated/server";
 
 // This is intentionally bound to the first development deployment. It cannot
 // be reused for another project or a production deployment by changing args.
 const EXPECTED_DEV_URL = "https://third-bandicoot-18.convex.cloud";
+const EXPECTED_PRODUCTION_COACH_EMAIL = "coach@team8044.org";
 
 /** Integration-owner-only setup after the test account completes Google sign-in. */
 export const provisionDevelopmentMentor = internalMutation({
@@ -106,6 +108,44 @@ export const seedSynthetic = internalMutation({
     const eventId = await ctx.db.insert("events", { seasonId: season._id, name: "Synthetic Regional", type: "Competition", startsAt: now + 30 * 86_400_000, endsAt: now + 33 * 86_400_000, destination: "Example City", travel: "Vehicles", overnight: true, roomingEnabled: true, feeCents: 0, signupMode: "assigned", assignmentScope: "travelTeam", allowWithdrawal: false, permissionRequired: true, firstRequired: true, archived: false });
     for (const studentId of students) await ctx.db.insert("participants", { eventId, studentId, status: "confirmed", createdAt: now, updatedAt: now });
     await ctx.db.insert("audit", { actorId: coach._id, entity: "seasons", entityId: season._id, action: "seedSyntheticDevelopment", afterJson: JSON.stringify({ studentCount: students.length, eventCount: 1 }), at: now });
+    for (const studentId of students) await refreshStudentFinance(ctx, studentId);
     return { studentCount: students.length, eventCount: 1 };
+  },
+});
+
+/** One-time production setup. Keep disabled until the owner configures the exact target deployment. */
+export const productionFirstCoach = internalMutation({
+  args: {
+    seasonName: v.string(),
+    seasonYear: v.number(),
+    startsAt: v.number(),
+  },
+  returns: v.object({ coachId: v.id("appUsers"), seasonId: v.id("seasons") }),
+  handler: async (ctx, args) => {
+    const targetUrl = env.PRODUCTION_BOOTSTRAP_CLOUD_URL;
+    if (
+      env.PRODUCTION_BOOTSTRAP_ENABLED !== "true" ||
+      !targetUrl ||
+      targetUrl === EXPECTED_DEV_URL ||
+      !/^https:\/\/[a-z0-9-]+\.convex\.cloud$/.test(targetUrl) ||
+      env.CONVEX_CLOUD_URL !== targetUrl
+    ) throw new Error("Production Coach setup is disabled or bound to a different deployment.");
+
+    const seasonName = args.seasonName.trim();
+    if (!seasonName || seasonName.length > 120 || !Number.isSafeInteger(args.seasonYear) || args.seasonYear < 2026 || args.seasonYear > 2100 || !Number.isSafeInteger(args.startsAt)) throw new Error("Invalid season details.");
+
+    const authUser = await ctx.db.query("users").withIndex("email", q => q.eq("email", EXPECTED_PRODUCTION_COACH_EMAIL)).unique();
+    if (!authUser?.emailVerificationTime || authUser.isAnonymous || authUser.email !== EXPECTED_PRODUCTION_COACH_EMAIL) throw new Error("The expected verified Coach Google sign-in is required.");
+    const google = await ctx.db.query("authAccounts").withIndex("userIdAndProvider", q => q.eq("userId", authUser._id).eq("provider", "google")).first();
+    if (!google) throw new Error("The expected verified Coach Google sign-in is required.");
+
+    const existingUser = await ctx.db.query("appUsers").withIndex("by_role").first();
+    const existingSeason = await ctx.db.query("seasons").withIndex("by_status").first();
+    if (existingUser || existingSeason) throw new Error("A user or season already exists; first Coach setup will not change it.");
+
+    const coachId = await ctx.db.insert("appUsers", { authUserId: authUser._id, email: EXPECTED_PRODUCTION_COACH_EMAIL, name: authUser.name?.trim() || EXPECTED_PRODUCTION_COACH_EMAIL, role: "coach", travelLead: false, financialEdit: true, active: true });
+    const seasonId = await ctx.db.insert("seasons", { name: seasonName, year: args.seasonYear, status: "active", startsAt: args.startsAt, permissionVersion: "DRAFT-1", createdBy: coachId });
+    await ctx.db.insert("audit", { actorId: coachId, entity: "seasons", entityId: seasonId, action: "bootstrapProduction", afterJson: JSON.stringify({ name: seasonName, year: args.seasonYear }), reason: "First production Coach and season setup", at: Date.now() });
+    return { coachId, seasonId };
   },
 });

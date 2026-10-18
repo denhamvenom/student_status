@@ -4,10 +4,12 @@ This directory is the application. The sibling handoff and root npm/Convex start
 
 ## Start from any directory
 
+Verify the active checkout in CURRENT_STATE.md first; update the example path if the integration workspace changes. Review mode is the legacy fixture-only preview, not evidence that the live authenticated UI matches the prototype. Frontend-only work must not start Mode Dev, which synchronizes Convex.
+
 Run the absolute path to `start.ps1`, for example:
 
 ```powershell
-& 'C:\Users\frc80\OneDrive\Documents\2026 - 2027\Denham Venom\Logistics Work\Development Version\student-status-app\start.ps1' -Mode Review
+& 'C:\Users\frc80\OneDrive\Documents\2026 - 2027\Denham Venom\Logistics Work\Development Version\student-status-readiness-design\start.ps1' -Mode Review
 ```
 
 The launcher installs locked dependencies and starts the frontend. Visit http://localhost:5173/?review=student (also parent, coach, travelLead, mentor). Review data is fictional, memory-only and explicitly marked; it does not test live authorization. Production builds cannot enable the review switch. No shell profile or PATH changes are needed for this command.

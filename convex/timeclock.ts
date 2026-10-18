@@ -5,6 +5,8 @@ import { v, type Infer } from "convex/values";
 import { activeSeason, requireRole, viewer, type AppUser } from "./lib/access";
 import { assertIdempotencyKey, assertNoOverlap, assertProfileId, chicagoDateKey, chicagoDayBounds, classifiedTime, HALF_HOUR_MS, MAX_EXTENSION_MS, MAX_GROUP_SIZE } from "./lib/timeclock";
 import { verifyTimeclockPin } from "./lib/timeclockPin";
+import { requireTimeclockSeasonWritable, timeclockTransitionLocked } from "./lib/timeclockTransition";
+import { invalidateAttendanceSession } from "./lib/attendanceReports";
 
 const occurrenceId = v.id("timeclockOccurrences");
 const sessionId = v.id("timeclockSessions");
@@ -32,7 +34,16 @@ async function reviewedStudent(ctx: MutationCtx, id: Id<"students">, seasonId: I
 async function command(ctx: MutationCtx, actor: AppUser, key: string, fingerprint: string, run: () => Promise<Result>): Promise<Result> {
   assertIdempotencyKey(key);
   const old = await ctx.db.query("timeclockCommands").withIndex("by_actorId_and_key", q => q.eq("actorId", actor._id).eq("key", key)).unique();
-  if (old) return old.fingerprint === fingerprint ? JSON.parse(old.resultJson) as Result : fail("KEY_REUSED");
+  if (old) {
+    if (old.fingerprint !== fingerprint) return fail("KEY_REUSED");
+    const result = JSON.parse(old.resultJson) as Result;
+    const request = JSON.parse(fingerprint) as unknown[];
+    const sessionRef = result.sessionId ?? (["group", "extend", "outAll", "correct"].includes(String(request[0])) ? request[1] as Id<"timeclockSessions"> : undefined);
+    const occurrenceRef = result.occurrenceId ?? (request[0] === "open" ? request[1] as Id<"timeclockOccurrences"> : undefined);
+    const record = sessionRef ? await ctx.db.get(sessionRef) : occurrenceRef ? await ctx.db.get(occurrenceRef) : null;
+    if ((sessionRef || occurrenceRef) && (!record || record.seasonId !== (await activeSeason(ctx))._id)) return fail("FINISHED");
+    return result;
+  }
   const result = await run();
   await ctx.db.insert("timeclockCommands", { actorId: actor._id, key, fingerprint, resultJson: JSON.stringify(result), at: Date.now() });
   return result;
@@ -61,6 +72,7 @@ async function closeSession(ctx: MutationCtx, session: Doc<"timeclockSessions">,
   if (open.length > MAX_GROUP_SIZE) throw new Error("Too many open intervals to close atomically; contact a Coach.");
   for (const interval of open) await closeInterval(ctx, interval, at, reason);
   await ctx.db.patch(session._id, { state: cancelled ? "cancelled" : "closed", closedAt: at, closeReason: reason, revision: session.revision + 1, needsReview: session.needsReview || reason === "calendar_end_moved_into_past" || cancelled });
+  await invalidateAttendanceSession(ctx, session._id);
 }
 
 async function liveSession(ctx: MutationCtx, id: Id<"timeclockSessions">, now: number) {
@@ -99,7 +111,9 @@ export const applyCalendarOccurrence = internalMutation({
     const sync = await ctx.db.query("timeclockCalendarSync").withIndex("by_key", q => q.eq("key", "team")).unique();
     if (!sync || sync.generation !== args.generation) throw new Error("Calendar refresh was superseded.");
     const season = await activeSeason(ctx);
+    await requireTimeclockSeasonWritable(ctx, season._id);
     const existing = await ctx.db.query("timeclockOccurrences").withIndex("by_source_and_sourceKey", q => q.eq("source", "calendar").eq("sourceKey", args.sourceKey)).unique();
+    if (existing && existing.seasonId !== season._id) return existing._id;
     if (existing?.providerUpdatedAt !== undefined && args.providerUpdatedAt !== undefined && args.providerUpdatedAt < existing.providerUpdatedAt) return existing._id;
     const now = Date.now();
     if (!existing) return await ctx.db.insert("timeclockOccurrences", { seasonId: season._id, source: "calendar", sourceKey: args.sourceKey, title: args.title.trim(), allDay: args.allDay, scheduledStart: args.scheduledStart, scheduledEnd: args.scheduledEnd, allDayStartDate: args.allDayStartDate, allDayEndDate: args.allDayEndDate, recurringEventId: args.recurringEventId, originalStartTime: args.originalStartTime, providerVersion: args.providerVersion, providerUpdatedAt: args.providerUpdatedAt, cancelled: args.cancelled, observedAt: args.observedAt, revision: 1, needsReview: false, lastSeenGeneration: args.generation });
@@ -111,7 +125,10 @@ export const applyCalendarOccurrence = internalMutation({
     const nextAllDay = args.cancelled && args.scheduledStart === undefined ? existing.allDay : args.allDay;
     const changed = existing.scheduledStart !== nextStart || existing.scheduledEnd !== nextEnd || existing.cancelled !== args.cancelled || existing.allDay !== nextAllDay || existing.allDayStartDate !== (args.allDayStartDate ?? existing.allDayStartDate) || existing.allDayEndDate !== (args.allDayEndDate ?? existing.allDayEndDate);
     const revision = existing.revision + (changed ? 1 : 0);
-    await ctx.db.patch(existing._id, { title: args.cancelled && args.scheduledStart === undefined ? existing.title : args.title.trim(), allDay: nextAllDay, scheduledStart: nextStart, scheduledEnd: nextEnd, allDayStartDate: args.allDayStartDate ?? existing.allDayStartDate, allDayEndDate: args.allDayEndDate ?? existing.allDayEndDate, recurringEventId: args.recurringEventId ?? existing.recurringEventId, originalStartTime: args.originalStartTime ?? existing.originalStartTime, providerVersion: args.providerVersion, providerUpdatedAt: args.providerUpdatedAt, cancelled: args.cancelled, observedAt: args.observedAt, revision, lastSeenGeneration: args.generation });
+    const nextTitle = args.cancelled && args.scheduledStart === undefined ? existing.title : args.title.trim();
+    const titleChanged = nextTitle !== existing.title;
+    await ctx.db.patch(existing._id, { title: nextTitle, allDay: nextAllDay, scheduledStart: nextStart, scheduledEnd: nextEnd, allDayStartDate: args.allDayStartDate ?? existing.allDayStartDate, allDayEndDate: args.allDayEndDate ?? existing.allDayEndDate, recurringEventId: args.recurringEventId ?? existing.recurringEventId, originalStartTime: args.originalStartTime ?? existing.originalStartTime, providerVersion: args.providerVersion, providerUpdatedAt: args.providerUpdatedAt, cancelled: args.cancelled, observedAt: args.observedAt, revision, lastSeenGeneration: args.generation });
+    if (titleChanged && session && (!changed || session.state !== 'open' || now >= session.effectiveEnd)) await invalidateAttendanceSession(ctx, session._id);
     if (!changed) return existing._id;
     await ctx.db.insert("timeclockScheduleRevisions", { occurrenceId: existing._id, sessionId: session?._id, revision, observedAt: args.observedAt, previousStart: existing.scheduledStart, previousEnd: existing.scheduledEnd, newStart: nextStart, newEnd: nextEnd, cause: args.cancelled ? "cancellation" : "calendar" });
     if (!session || session.state !== "open" || now >= session.effectiveEnd) return existing._id;
@@ -120,12 +137,14 @@ export const applyCalendarOccurrence = internalMutation({
     } else if (session && existing.allDay) {
       // Once opened, the all-day operator-selected window is shared and fixed.
       await ctx.db.patch(session._id, { needsReview: true });
+        await invalidateAttendanceSession(ctx, session._id);
     } else if (!args.allDay && args.scheduledStart !== undefined && args.scheduledEnd !== undefined) {
       const effectiveEnd = args.scheduledEnd + session.extensionMs;
       if (existing.scheduledEnd !== args.scheduledEnd && args.scheduledEnd <= now) await closeSession(ctx, session, now, "calendar_end_moved_into_past");
       else {
         const nextRevision = session.revision + 1;
         await ctx.db.patch(session._id, { scheduledStart: args.scheduledStart, scheduledEnd: args.scheduledEnd, effectiveEnd, revision: nextRevision });
+        await invalidateAttendanceSession(ctx, session._id);
         await scheduleClose(ctx, session, effectiveEnd, nextRevision);
       }
     }
@@ -139,11 +158,13 @@ export const reconcileCalendarGeneration = internalMutation({
   handler: async (ctx, args) => {
     const sync = await ctx.db.query("timeclockCalendarSync").withIndex("by_key", q => q.eq("key", "team")).unique();
     if (!sync || sync.generation !== args.generation) throw new Error("Calendar refresh was superseded.");
+    const currentSeason = await activeSeason(ctx);
+    await requireTimeclockSeasonWritable(ctx, currentSeason._id);
     const page = await ctx.db.query("timeclockOccurrences").withIndex("by_source_and_sourceKey", q => q.eq("source", "calendar")).paginate({ cursor: args.cursor, numItems: 50 });
     const now = Date.now();
     const startDate = chicagoDateKey(args.windowStart);
     for (const occurrence of page.page) {
-      if (occurrence.lastSeenGeneration === args.generation || occurrence.cancelled) continue;
+      if (occurrence.seasonId !== currentSeason._id || occurrence.lastSeenGeneration === args.generation || occurrence.cancelled) continue;
       if ((occurrence.scheduledEnd ?? -Infinity) < args.windowStart && (occurrence.allDayEndDate ?? "") < startDate) continue;
       await ctx.db.patch(occurrence._id, { cancelled: true, observedAt: now, revision: occurrence.revision + 1, needsReview: true });
       const session = await ctx.db.query("timeclockSessions").withIndex("by_occurrenceId", q => q.eq("occurrenceId", occurrence._id)).unique();
@@ -161,6 +182,7 @@ export const openOccurrence = mutation({
   args: { occurrenceId, allDayEnd: v.optional(v.number()), key: v.string() }, returns: commandResult,
   handler: async (ctx, args): Promise<Result> => {
     const actor = await operator(ctx); const now = Date.now();
+    if (await timeclockTransitionLocked(ctx, (await activeSeason(ctx))._id)) return fail("SEASON_TRANSITION");
     return await command(ctx, actor, args.key, JSON.stringify(["open", args.occurrenceId, args.allDayEnd]), async () => {
       const occurrence = await ctx.db.get(args.occurrenceId);
       const season = await activeSeason(ctx);
@@ -178,6 +200,7 @@ export const openOccurrence = mutation({
       const end = occurrence.allDay ? args.allDayEnd : occurrence.scheduledEnd;
       if (start === undefined || end === undefined || !Number.isFinite(end) || end <= now || end <= start) return fail("INVALID_WINDOW");
       const id = await ctx.db.insert("timeclockSessions", { occurrenceId: occurrence._id, seasonId: season._id, state: "open", scheduledStart: start, scheduledEnd: end, effectiveEnd: end, extensionMs: 0, revision: 1, openedAt: now, openedBy: actor._id, needsReview: false });
+      await invalidateAttendanceSession(ctx, id);
       await ctx.scheduler.runAt(end, internal.timeclock.scheduledClose, { sessionId: id, expectedRevision: 1, expectedEnd: end });
       return good({ sessionId: id, existing: false });
     });
@@ -188,12 +211,14 @@ export const createUnscheduled = mutation({
   args: { title: v.string(), durationMs: v.number(), key: v.string() }, returns: commandResult,
   handler: async (ctx, args): Promise<Result> => {
     const actor = await operator(ctx); const now = Date.now();
+    if (await timeclockTransitionLocked(ctx, (await activeSeason(ctx))._id)) return fail("SEASON_TRANSITION");
     return await command(ctx, actor, args.key, JSON.stringify(["manual", args.title, args.durationMs]), async () => {
       const title = args.title.trim();
       if (!title || title.length > 160 || !Number.isFinite(args.durationMs) || args.durationMs <= 0 || !Number.isSafeInteger(now + args.durationMs)) return fail("INVALID_WINDOW");
       const season = await activeSeason(ctx); const end = now + args.durationMs;
       const occurrence = await ctx.db.insert("timeclockOccurrences", { seasonId: season._id, source: "manual", sourceKey: args.key, title, allDay: false, scheduledStart: now, scheduledEnd: end, cancelled: false, observedAt: now, revision: 1, needsReview: false });
       const session = await ctx.db.insert("timeclockSessions", { occurrenceId: occurrence, seasonId: season._id, state: "open", scheduledStart: now, scheduledEnd: end, effectiveEnd: end, extensionMs: 0, revision: 1, openedAt: now, openedBy: actor._id, needsReview: false });
+      await invalidateAttendanceSession(ctx, session);
       await ctx.scheduler.runAt(end, internal.timeclock.scheduledClose, { sessionId: session, expectedRevision: 1, expectedEnd: end });
       return good({ occurrenceId: occurrence, sessionId: session });
     });
@@ -271,7 +296,7 @@ export const previewGroup = query({
     await operator(ctx);
     if (args.studentIds.length > MAX_GROUP_SIZE || new Set(args.studentIds).size !== args.studentIds.length) throw new Error("Invalid group size or duplicate student.");
     const session = await ctx.db.get(args.sessionId);
-    if (!session || session.state !== "open") return { ok: false as const, code: "FINISHED" };
+    if (!session || session.state !== "open" || session.seasonId !== (await activeSeason(ctx))._id) return { ok: false as const, code: "FINISHED" };
     const locks = await Promise.all(args.studentIds.map(id => ctx.db.query("timeclockStudentLocks").withIndex("by_studentId", q => q.eq("studentId", id)).unique()));
     return { ok: true as const, sessionRevision: session.revision, expected: locks.map((lock, i) => ({ studentId: args.studentIds[i], intervalId: lock?.intervalId ?? null, sessionId: lock?.sessionId ?? null })), conflicts: locks.flatMap((lock, i) => lock?.sessionId && lock.sessionId !== args.sessionId ? [{ studentId: args.studentIds[i], sessionId: lock.sessionId, intervalId: lock.intervalId }] : []) };
   },
@@ -281,6 +306,7 @@ export const clockGroup = mutation({
   args: { sessionId, mode: v.union(v.literal("in"), v.literal("out"), v.literal("transfer")), expectedRevision: v.number(), expected: v.array(expected), pin: v.optional(v.string()), key: v.string() }, returns: commandResult,
   handler: async (ctx, args): Promise<Result> => {
     const actor = await operator(ctx); const now = Date.now();
+    if (args.mode !== "out" && await timeclockTransitionLocked(ctx, (await activeSeason(ctx))._id)) return fail("SEASON_TRANSITION");
     if (args.expected.length < 1 || args.expected.length > MAX_GROUP_SIZE || new Set(args.expected.map(x => x.studentId)).size !== args.expected.length) return fail("INVALID_GROUP");
     const fingerprint = JSON.stringify(["group", args.sessionId, args.mode, args.expectedRevision, args.expected]);
     return await command(ctx, actor, args.key, fingerprint, async () => {
@@ -318,18 +344,22 @@ export const clockGroup = mutation({
         const alreadyOpen = await ctx.db.query("timeclockIntervals").withIndex("by_sessionId_and_outAt", q => q.eq("sessionId", session._id).eq("outAt", undefined)).take(MAX_GROUP_SIZE + 1);
         if (alreadyOpen.length + args.expected.length > MAX_GROUP_SIZE) return fail("EVENT_CAPACITY", { limit: MAX_GROUP_SIZE });
       }
+      const changedSessions = new Set<Id<"timeclockSessions">>();
       for (let i = 0; i < args.expected.length; i++) {
         const student = args.expected[i].studentId; const lock = locks[i];
         if (lock?.intervalId) {
           const interval = await ctx.db.get(lock.intervalId);
           if (!interval || interval.outAt !== undefined) throw new Error("Active interval pointer is inconsistent.");
           await closeInterval(ctx, interval, now, args.mode === "transfer" ? "transfer" : "operator", actor._id);
+          changedSessions.add(interval.sessionId);
         }
         if (args.mode !== "out") {
           const interval = await ctx.db.insert("timeclockIntervals", { sessionId: session._id, studentId: student, inAt: now, openedBy: actor._id, openCommandKey: args.key, scheduleRevision: session.revision });
           await putLock(ctx, student, session._id, interval);
+          changedSessions.add(session._id);
         }
       }
+      for (const changedSession of changedSessions) await invalidateAttendanceSession(ctx, changedSession);
       return good({ at: now, count: args.expected.length });
     });
   },
@@ -346,6 +376,7 @@ export const clockOutAll = mutation({
       const open = await ctx.db.query("timeclockIntervals").withIndex("by_sessionId_and_outAt", q => q.eq("sessionId", args.sessionId).eq("outAt", undefined)).take(MAX_GROUP_SIZE + 1);
       if (open.length > MAX_GROUP_SIZE) return fail("GROUP_TOO_LARGE", { limit: MAX_GROUP_SIZE });
       for (const interval of open) await closeInterval(ctx, interval, now, "operator_all", actor._id);
+      if (open.length) await invalidateAttendanceSession(ctx, args.sessionId);
       return good({ at: now, count: open.length });
     });
   },
@@ -355,6 +386,7 @@ export const extend = mutation({
   args: { sessionId, halfHours: v.number(), expectedRevision: v.number(), pin: v.string(), key: v.string() }, returns: commandResult,
   handler: async (ctx, args): Promise<Result> => {
     const actor = await operator(ctx); const now = Date.now();
+    if (await timeclockTransitionLocked(ctx, (await activeSeason(ctx))._id)) return fail("SEASON_TRANSITION");
     return await command(ctx, actor, args.key, JSON.stringify(["extend", args.sessionId, args.halfHours, args.expectedRevision]), async () => {
       const checked = await liveSession(ctx, args.sessionId, now);
       if (!checked.session) return fail(checked.expired ? "EXPIRED" : "FINISHED");
@@ -366,6 +398,7 @@ export const extend = mutation({
       if (!verified.ok) return fail(verified.reason === "unconfigured" ? "PIN_UNCONFIGURED" : verified.reason === "rate_limited" ? "PIN_RATE_LIMITED" : "PIN_INVALID");
       const end = session.effectiveEnd + addedMs; const revision = session.revision + 1;
       await ctx.db.patch(session._id, { extensionMs: session.extensionMs + addedMs, effectiveEnd: end, revision });
+      await invalidateAttendanceSession(ctx, session._id);
       await ctx.db.insert("timeclockExtensions", { sessionId: session._id, actorId: actor._id, at: now, addedMs, previousEnd: session.effectiveEnd, newEnd: end, commandKey: args.key });
       await scheduleClose(ctx, session, end, revision);
       return good({ effectiveEnd: end, extensionMs: session.extensionMs + addedMs, revision });
@@ -425,16 +458,9 @@ export const correctionEvidence = query({
   },
 });
 
-export const correctInterval = mutation({
-  args: { sessionId, studentId, originalIntervalId: v.optional(v.id("timeclockIntervals")), targetCorrectionId: v.optional(v.id("timeclockCorrections")), kind: v.union(v.literal("add"), v.literal("replace"), v.literal("void")), inAt: v.optional(v.number()), outAt: v.optional(v.number()), reason: v.string(), key: v.string() }, returns: commandResult,
-  handler: async (ctx, args): Promise<Result> => {
-    const actor = await viewer(ctx); requireRole(actor, "coach");
-    // Check before command replay so an archived season cannot return a prior
-    // success as if a correction were still accepted.
-    const season = await activeSeason(ctx);
-    const currentSession = await ctx.db.get(args.sessionId);
-    if (!currentSession || currentSession.seasonId !== season._id) return fail("INVALID_SESSION");
-    return await command(ctx, actor, args.key, JSON.stringify(["correct", args.sessionId, args.studentId, args.originalIntervalId, args.targetCorrectionId, args.kind, args.inAt, args.outAt, args.reason]), async () => {
+export const intervalCorrectionArgs = { sessionId, studentId, originalIntervalId: v.optional(v.id("timeclockIntervals")), targetCorrectionId: v.optional(v.id("timeclockCorrections")), kind: v.union(v.literal("add"), v.literal("replace"), v.literal("void")), inAt: v.optional(v.number()), outAt: v.optional(v.number()), reason: v.string(), key: v.string() };
+
+export async function applyIntervalCorrection(ctx: MutationCtx, actor: AppUser, args: Infer<typeof _intervalCorrectionValidator>): Promise<Result> {
       const session = await ctx.db.get(args.sessionId);
       if (!session || session.state === "open") return fail("SESSION_OPEN");
       const reason = args.reason.trim(); if (reason.length < 5 || reason.length > 1000) return fail("REASON_REQUIRED");
@@ -465,7 +491,23 @@ export const correctInterval = mutation({
         for (const next of proposed) for (const previous of effective) if (next.inAt < previous.outAt && previous.inAt < next.outAt) return fail("CROSS_EVENT_OVERLAP");
       }
       const id = await ctx.db.insert("timeclockCorrections", { sessionId: session._id, studentId: args.studentId, originalIntervalId: args.originalIntervalId, targetCorrectionId: args.targetCorrectionId, kind: args.kind, inAt: args.inAt, outAt: args.outAt, reason, actorId: actor._id, at: Date.now(), commandKey: args.key });
+      await invalidateAttendanceSession(ctx, session._id);
       return good({ correctionId: id });
+}
+const _intervalCorrectionValidator = v.object(intervalCorrectionArgs);
+
+export const correctInterval = mutation({
+  args: intervalCorrectionArgs, returns: commandResult,
+  handler: async (ctx, args): Promise<Result> => {
+    const actor = await viewer(ctx); requireRole(actor, "coach");
+    // Check before command replay so an archived season cannot return a prior
+    // success as if a correction were still accepted.
+    const season = await activeSeason(ctx);
+    if (await timeclockTransitionLocked(ctx, season._id)) return fail("SEASON_TRANSITION");
+    const currentSession = await ctx.db.get(args.sessionId);
+    if (!currentSession || currentSession.seasonId !== season._id) return fail("INVALID_SESSION");
+    return await command(ctx, actor, args.key, JSON.stringify(["correct", args.sessionId, args.studentId, args.originalIntervalId, args.targetCorrectionId, args.kind, args.inAt, args.outAt, args.reason]), async () => {
+      return applyIntervalCorrection(ctx, actor, args);
     });
   },
 });

@@ -111,7 +111,7 @@ export const reviewNames = mutation({
     if (!student?.active || student.seasonId !== season._id) throw new Error("Student unavailable in active season.");
     const firstName = args.firstName.trim(), lastName = args.lastName.trim(), reason = args.reason.trim();
     if (!firstName || !lastName || firstName.length > 100 || lastName.length > 100 || !reason || reason.length > 500) throw new Error("Reviewed names and a short reason are required.");
-    const after = { firstName, lastName, structuredNameReviewed: true };
+    const after = { firstName, lastName, structuredNameReviewed: true, profileRevision: (student.profileRevision ?? 0) + 1 };
     await ctx.db.patch(student._id, after);
     await audit(ctx, actor, "students", student._id, "reviewStructuredName", { firstName: student.firstName ?? null, lastName: student.lastName ?? null, structuredNameReviewed: student.structuredNameReviewed ?? false }, after, reason);
     return null;

@@ -8,9 +8,11 @@ describe("OAuth redirect allowlist", () => {
   it("accepts only configured entry paths", () => {
     expect(allowedAuthRedirect("/", student, clock)).toBe(`${student}/`);
     expect(allowedAuthRedirect(`${student}/invite-parent`, student, clock)).toBe(`${student}/invite-parent`);
+    expect(allowedAuthRedirect("/invite-adult", student, clock)).toBe(`${student}/invite-adult`);
+    expect(allowedAuthRedirect(`${student}/invite-adult`, student, clock)).toBe(`${student}/invite-adult`);
     expect(allowedAuthRedirect(`${clock}/`, student, clock)).toBe(`${clock}/`);
   });
-  it.each(["//evil.example/", "https://evil.example/", "https://clock.example.test.evil.example/", "javascript:alert(1)", "https://clock.example.test/admin", "https://clock.example.test@evil.example/", "https://clock.example.test/#fragment"])("rejects %s", value => {
+  it.each(["//evil.example/", "https://evil.example/", "https://clock.example.test.evil.example/", "javascript:alert(1)", "https://clock.example.test/admin", "https://clock.example.test/invite-adult", "https://clock.example.test@evil.example/", "https://clock.example.test/#fragment", "https://students.example.test/invite-adult#token=secret", "/invite-adult/", "/invite-adult-extra"])("rejects %s", value => {
     expect(() => allowedAuthRedirect(value, student, clock)).toThrow();
   });
 });

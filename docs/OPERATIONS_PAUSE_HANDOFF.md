@@ -1,3 +1,5 @@
+> Historical pause/resume record. The resume outcome at the end completed this pause. Do not execute the old resume list as current instructions; start with CURRENT_STATE.md.
+
 # Operations milestone pause checkpoint
 
 Resumed October 12, 2026 after the user explicitly said to continue. This file records the earlier pause checkpoint; final milestone evidence will be recorded in the checklist and review.

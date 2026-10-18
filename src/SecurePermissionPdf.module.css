@@ -1,0 +1,4 @@
+.preview { display: grid; gap: .75rem; min-width: 0; }
+.frame { width: 100%; min-height: 620px; border: 1px solid var(--border-default, #d6d0df); border-radius: 6px; background: white; }
+.download { justify-self: start; font-weight: 700; text-decoration: underline; }
+@media (max-width: 650px) { .frame { min-height: 460px; } }

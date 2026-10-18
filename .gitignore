@@ -32,6 +32,8 @@ blob-report/
 logs/
 tmp/
 temp/
+.local-test-temp*/
+.test-temp/
 exports/
 backups/
 private-data/
@@ -54,3 +56,11 @@ Desktop.ini
 *.swp
 *.swo
 ~$*
+
+# First-party project skills only; vendor bundles/caches remain ignored
+!.agents/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/student-status-context-checkpoint/
+!.agents/skills/student-status-prototype-verification/

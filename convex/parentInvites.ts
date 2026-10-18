@@ -3,34 +3,16 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { activeSeason, audit, ownStudent, requireRole, viewer } from "./lib/access";
+import { activeSeason, audit, ownStudent, requireRole, requireSeasonProfileWritable, viewer } from "./lib/access";
+import { emailKey, tokenHash, newToken, verifiedGoogle } from "./lib/invitationIdentity";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const ATTESTATION_VERSION = "parent-relationship-1";
 const ATTESTATION_TEXT = "I attest that I am this student's parent or legal guardian, that I have legal authority to access this student's information, and that the relationship I entered is accurate. Linking my account does not sign travel or medication consent.";
 type Ctx = QueryCtx | MutationCtx;
 
-function emailKey(value: string) { return value.trim().toLowerCase(); }
-async function tokenHash(token: string) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
-  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
-}
-function newToken() {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
-}
 async function setting(ctx: Ctx) {
   return ctx.db.query("parentInvitationSettings").withIndex("by_key", q => q.eq("key", "team")).unique();
-}
-async function verifiedGoogle(ctx: Ctx) {
-  const id = await getAuthUserId(ctx);
-  if (!id) return null;
-  const user = await ctx.db.get(id as Id<"users">);
-  if (!user?.email || user.isAnonymous || !user.emailVerificationTime) return null;
-  const accounts = await ctx.db.query("authAccounts").withIndex("userIdAndProvider", q => q.eq("userId", user._id).eq("provider", "google")).take(2);
-  const verifiedEmail = emailKey(user.email);
-  if (!accounts.some(account => account.emailVerified && emailKey(account.emailVerified) === verifiedEmail)) return null;
-  return { authUserId: user._id, email: emailKey(user.email), name: user.name?.trim() || user.email };
 }
 async function eligibleStudent(ctx: Ctx, studentId: Id<"students">) {
   const season = await activeSeason(ctx);
@@ -137,6 +119,7 @@ export const acceptParentInvite = mutation({
     const relationship = args.relationship.trim();
     if (!relationship || relationship.length > 80 || !args.authorityAttested || args.attestationVersion !== ATTESTATION_VERSION) throw new Error("Current relationship and legal guardian authority attestation are required.");
     const student = await eligibleStudent(ctx, row.studentId);
+    await requireSeasonProfileWritable(ctx, student.seasonId);
     if (who.email === emailKey(student.email)) throw new Error("A student cannot link their own identity as a parent.");
     let parent = await existingParent(ctx, who.authUserId);
     if ((parent && (!parent.active || parent.role !== "parent")) || await emailAccountConflict(ctx, who.email, who.authUserId)) throw new Error("This account has another role or is inactive. Ask a Coach for help.");
@@ -147,7 +130,9 @@ export const acceptParentInvite = mutation({
     }
     const link = await ctx.db.query("familyLinks").withIndex("by_parentUserId_and_studentId", q => q.eq("parentUserId", parent._id).eq("studentId", student._id)).unique();
     if (link && !link.active) throw new Error("A Coach must resolve this revoked family link.");
-    if (!link) await ctx.db.insert("familyLinks", { parentUserId: parent._id, studentId: student._id, active: true, createdBy: parent._id });
+    if (link?.seasonId && link.seasonId !== student.seasonId) throw new Error("Family link season changed; a Coach must review it.");
+    if (link && !link.seasonId) await ctx.db.patch(link._id, { seasonId: student.seasonId });
+    if (!link) await ctx.db.insert("familyLinks", { parentUserId: parent._id, studentId: student._id, seasonId: student.seasonId, active: true, createdBy: parent._id });
     const now = Date.now();
     await ctx.db.patch(row._id, { status: "accepted", acceptedBy: parent._id, acceptedAt: now, relationship, attestationVersion: ATTESTATION_VERSION, attestationText: ATTESTATION_TEXT, attestedAt: now });
     await audit(ctx, parent, "parentInvitations", row._id, "accept", { status: "pending" }, { studentId: student._id, parentEmail: row.parentEmail, relationship, attestationVersion: ATTESTATION_VERSION, attestationText: ATTESTATION_TEXT, attestedAt: now });
@@ -227,6 +212,20 @@ export const revokeFamilyLink = mutation({
     const link = await ctx.db.get(args.linkId);
     if (!link || !link.active) throw new Error("Active family link not found.");
     await ctx.db.patch(link._id, { active: false, revokedAt: Date.now(), revokedBy: actor._id });
+    const source = await ctx.db.get(link.studentId);
+    if (source) {
+      const plan = await ctx.db.query("seasonTransitionPlans").withIndex("by_sourceSeasonId_and_open", q => q.eq("sourceSeasonId", source.seasonId).eq("open", true)).unique();
+      if (plan) {
+        const mapping = await ctx.db.query("seasonTransitionRosterDecisions").withIndex("by_planId_and_sourceStudentId", q => q.eq("planId", plan._id).eq("sourceStudentId", source._id)).unique();
+        if (mapping?.targetStudentId) {
+          const target = await ctx.db.query("familyLinks").withIndex("by_parentUserId_and_studentId", q => q.eq("parentUserId", link.parentUserId).eq("studentId", mapping.targetStudentId!)).unique();
+          if (target?.active) {
+            await ctx.db.patch(target._id, { active: false, revokedAt: Date.now(), revokedBy: actor._id });
+            await audit(ctx, actor, "familyLinks", target._id, "revokeDuringTransition", true, false);
+          }
+        }
+      }
+    }
     await audit(ctx, actor, "familyLinks", link._id, "revoke", true, false);
     return null;
   },
@@ -239,9 +238,11 @@ export const restoreFamilyLink = mutation({
     const link = await ctx.db.get(args.linkId);
     if (!link || link.active || !args.reason.trim()) throw new Error("Revoked family link and reason are required.");
     const student = await eligibleStudent(ctx, link.studentId);
+    await requireSeasonProfileWritable(ctx, student.seasonId);
     const parent = await ctx.db.get(link.parentUserId);
     if (!parent || !parent.active || parent.role !== "parent" || parent.email === student.email) throw new Error("This family link cannot be restored.");
-    await ctx.db.patch(link._id, { active: true, revokedAt: undefined, revokedBy: undefined });
+    if (link.seasonId && link.seasonId !== student.seasonId) throw new Error("Family link season changed; a Coach must review it.");
+    await ctx.db.patch(link._id, { active: true, seasonId: student.seasonId, revokedAt: undefined, revokedBy: undefined });
     await audit(ctx, actor, "familyLinks", link._id, "restore", false, true, args.reason.trim());
     return null;
   },

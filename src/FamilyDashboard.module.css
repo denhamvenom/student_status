@@ -1,0 +1,34 @@
+.moneyCard { min-width: 0; }
+.moneyGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 20px; }
+.moneyGrid > div { min-width: 0; }
+.moneyGrid span, .chargeAmounts span { display: block; color: var(--text-muted); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.moneyGrid strong { display: block; margin-top: 3px; font: 400 28px/1.1 Anton, Impact, sans-serif; overflow-wrap: anywhere; }
+.todoGroups { display: grid; gap: 24px; }
+.todoGroup h3 { margin: 0 0 10px; padding-bottom: 8px; border-bottom: 2px solid var(--gold-500); font: 400 22px/1.15 Anton, Impact, sans-serif; }
+.todoCards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 12px; }
+.todoCard { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; min-height: 160px; }
+.todoCard > a { width: 100%; margin-top: auto; }
+.financeMetrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
+.financeMetrics > :last-child { border-top: 3px solid var(--gold-500); }
+.sourceBalances { display: flex; flex-wrap: wrap; gap: 12px 24px; margin-bottom: 8px; }
+.sourceBalances > span { overflow-wrap: anywhere; }
+.chargeGroups { margin-block: 24px; }
+.chargeGroups > h2 { margin-bottom: 14px; }
+.chargeGroup { margin-bottom: 22px; }
+.chargeGroup > h3 { margin-bottom: 10px; font: 400 22px/1.15 Anton, Impact, sans-serif; }
+.chargeCards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); gap: 12px; }
+.chargeCard { min-width: 0; }
+.chargeCardHead { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.chargeCardHead > strong { min-width: 0; overflow-wrap: anywhere; }
+.chargeAmounts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.chargeAmounts strong { display: block; margin-top: 3px; font: 400 22px/1.1 Anton, Impact, sans-serif; overflow-wrap: anywhere; }
+.chargeCard > p { margin-top: 12px; }
+@media (max-width: 767px) {
+  .financeMetrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .moneyGrid { gap: 18px 12px; }
+  .moneyGrid strong { font-size: 26px; }
+  .sourceBalances { display: grid; gap: 6px; }
+  .chargeCards { grid-template-columns: 1fr; }
+}
+
+.chargeCard > button{margin-top:12px}

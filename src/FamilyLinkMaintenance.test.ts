@@ -1,0 +1,13 @@
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { beforeEach, expect, it, vi } from 'vitest'
+const mocks = vi.hoisted(() => ({ useQuery: vi.fn(), useMutation: vi.fn() }))
+vi.mock('convex/react', () => mocks)
+import { FamilyLinkMaintenance } from './FamilyLinkMaintenance'
+beforeEach(() => { mocks.useQuery.mockReturnValue(undefined); mocks.useMutation.mockReturnValue(vi.fn()) })
+const render = () => renderToStaticMarkup(createElement(FamilyLinkMaintenance))
+it('shows initial loading without a premature start or completion claim', () => { const html = render(); expect(html).toContain('Loading maintenance status'); expect(html).not.toContain('Start maintenance'); expect(html).not.toContain('have been verified') })
+it('offers start for missing or pending server records', () => { for (const status of [null, { state: 'pending', phase: 'backfill', scanned: 0, unresolved: 0 }]) { mocks.useQuery.mockReturnValue(status); const html = render(); expect(html).toContain('Start maintenance'); expect(html).not.toContain('Retry maintenance'); expect(html).not.toContain('have been verified') } })
+it('distinguishes active preparation and verification without optimistic completion', () => { for (const [phase, label] of [['backfill', 'Preparing season information'], ['verify', 'Verifying every family link']]) { mocks.useQuery.mockReturnValue({ state: 'running', phase, scanned: 42, unresolved: 0 }); const html = render(); expect(html).toContain(label); expect(html).toContain('Records checked across both passes'); expect(html).not.toContain('Start maintenance'); expect(html).not.toContain('have been verified') } })
+it('requires a reasoned retry and shows the reported unresolved count and error', () => { mocks.useQuery.mockReturnValue({ state: 'failed', phase: 'verify', scanned: 50, unresolved: 1, lastError: 'Reviewed link needs reconciliation.' }); const html = render(); expect(html).toContain('Reviewed link needs reconciliation.'); expect(html).toContain('Reported unresolved links'); expect(html).toContain('Reason for retry'); expect(html).toContain('maxLength="500"'); expect(html).toContain('disabled=""'); expect(html).not.toContain('have been verified') })
+it('declares completion only for the complete server state and hides maintenance commands', () => { mocks.useQuery.mockReturnValue({ state: 'complete', phase: 'verify', scanned: 100, unresolved: 0 }); const html = render(); expect(html).toContain('Family links have been verified for season lookup.'); expect(html).not.toContain('Start maintenance'); expect(html).not.toContain('Retry maintenance') })

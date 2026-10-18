@@ -1,0 +1,15 @@
+export const rosterManagementCopy = {
+  active: 'Active', archived: 'Archived', status: 'Status', actions: 'Actions',
+  showArchived: 'Show archived students', showActive: 'Show active students',
+  archive: 'Archive student', reactivate: 'Reactivate student',
+  archiveDescription: 'Archive this current-season student profile. Records and balances are retained. This changes roster status; it does not deactivate or reactivate the linked Google account.',
+  reactivateDescription: 'Restore this current-season student profile. Eligible upcoming Whole Team events include reactivated students while preserving earlier withdrawals. This changes roster status; it does not deactivate or reactivate the linked Google account.',
+  reason: 'Reason for this change', cancel: 'Cancel', saving: 'Saving…',
+  archiveSaved: 'Student profile archived. Open archived students to reactivate it.',
+  reactivateSaved: 'Student profile reactivated.',
+  changed: 'This student profile changed. Review the latest record before saving.',
+  unavailable: 'This profile is no longer in the current roster.',
+  statusChanged: 'Student status changed. Review the current roster and choose the appropriate action again.',
+  reviewLatest: 'Review latest', failed: 'Unable to update this student profile.',
+  unassigned: 'Unassigned', currentSeasonOnly: 'Manage active and archived student profiles in the current season.',
+} as const
