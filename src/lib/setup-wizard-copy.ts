@@ -7,6 +7,8 @@ export const setupWizardCopy = {
   saving: 'Saving…', saved: 'Saved', reload: 'Reload latest information', changed: 'This information changed in another session. Reload the latest version before saving.',
   saveFailed: 'This step could not be saved. Your answers are still here. Review them and try again.',
   teamCoachNote: 'Ask a Coach to change your subteam, rooming or Travel Team.',
+  shirt: 'Shirt size',
+  travelTeamHelp: 'The Travel Team is chosen by mentors and Coaches through an application. Travel Team students go to all out-of-state events and our local event.',
   medicalNote: 'Choose None reported if there are none.',
   firstTitle: 'FIRST registration and Consent & Release',
   firstAdultGuide: 'Use the team invitation to register with FIRST and sign this season\'s Consent & Release. Your Coach checks both.',

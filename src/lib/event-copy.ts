@@ -6,7 +6,7 @@ export const eventCopy = {
   enrollment: {
     running: 'Adding the Whole Team',
     failed: 'Team enrollment needs attention',
-    description: 'Participation and event fees are being prepared. Event arrangements will be available when enrollment is complete.',
+    description: 'Students and event fees are being added. The rest of the event page will open when this is done.',
     progress: (processed: number, assigned: number) => `${processed} profiles reviewed · ${assigned} members assigned`,
     retry: 'Retry enrollment', retrying: 'Retrying…', retryError: 'Enrollment could not be restarted.',
   },
@@ -16,7 +16,7 @@ export const eventCopy = {
   stepCount: (step: number, total: number) => `New event · step ${step} of ${total}`,
   steps: uiCopy.wizard.steps,
   actions: uiCopy.wizard,
-  types: { competition: 'Competition', outreach: 'Outreach', team: 'Team' },
+  types: { competition: 'Competition', outreach: 'Outreach', team: 'Team activity' },
   fields: {
     name: 'Name', type: 'Type', starts: 'Starts', ends: 'Ends', destination: 'Destination',
     capacity: 'Participant limit (optional)', fee: 'Event fee (USD)',
@@ -36,10 +36,10 @@ export const eventCopy = {
     wholeTeamDetail: 'Every active member is included. New members join upcoming events automatically.',
     open: uiCopy.audiences.open,
     openDetail: 'Students may sign up; set an optional capacity below.',
-    individualNote: 'Individual student selection is not available in this creation flow.',
+    individualNote: "You can't pick single students here.",
   },
   notes: {
-    fee: 'Pending signups are charged only when confirmed. Additional charges can be added from student finances after creation.',
+    fee: 'Pending signups are charged only when confirmed. You can add other charges on the Money page later.',
     requiredPayment: 'Required payment is tracked because this event has a fee.',
     drivers: 'Drivers and passenger seats are assigned from the event page after creation.',
   },

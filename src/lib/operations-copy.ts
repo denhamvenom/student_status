@@ -47,7 +47,7 @@ export const operationsCopy = {
     "unavailableDriver": "Unavailable driver",
     "unapprovedVehicleNotice": " · Does not count until approved and active",
     "vehicleDefault": "Vehicle",
-    "teamTransportationRequired": "Team transportation required",
+    "teamTransportationRequired": "Students must ride team transport",
     "trailerRequiresTow": "Trailer requires assigned tow driver",
     "travelingIndependently": "Traveling independently",
     "approvedToDrive": "Approved to drive",
@@ -143,11 +143,11 @@ export const operationsCopy = {
     "clockOutTime": "Clock-out time",
     "reason": "Reason",
     "attendance": "Attendance",
-    "reviewTimeclockAttendanceAndMakeAuditedCorrectionsClockInAndClockOutStayInTheSep": "Review Timeclock attendance and make audited corrections. Clock-in and clock-out stay in the separate Timeclock app.",
+    "reviewTimeclockAttendanceAndMakeAuditedCorrectionsClockInAndClockOutStayInTheSep": "Check Timeclock attendance and fix mistakes. Every fix is logged. Students clock in and out in the separate Timeclock app.",
     "loadingSessions": "Loading sessions...",
     "sessionReview": "Session review",
     "noTimeclockSessionsHaveBeenOpenedInThisSeason": "No Timeclock sessions have been opened in this season.",
-    "legacyAttendanceCheckmarksRemainSeparateTheyDoNotRepresentVerifiedClockIntervals": "Earlier attendance checkmarks are shown separately from clocked time.",
+    "legacyAttendanceCheckmarksRemainSeparateTheyDoNotRepresentVerifiedClockIntervals": "Old checkmark records are listed apart from Timeclock time.",
     "choose": "Choose...",
     "reviewedNameSaved": "Reviewed name saved.",
     "unableToSaveName": "Unable to save name.",
@@ -205,11 +205,11 @@ export const operationsCopy = {
     "requirementKey": "Short name",
     "requirementLabel": "Display name",
     "requirementInstructions": "Instructions",
-    "requirementLink": "HTTPS link",
+    "requirementLink": "Web link (https://)",
     "requirementDue": "Due",
-    "placesReserved": " places reserved",
-    "pendingReserveNotice": ". Pending signups reserve a place; charges begin at confirmation.",
-    "waitlistNotice": ". Waitlisted students are promoted manually in signup order.",
+    "placesReserved": " places taken",
+    "pendingReserveNotice": ". A pending signup holds a place. The fee is charged only when the student is confirmed.",
+    "waitlistNotice": ". Waitlisted students move up only when someone presses Promote. They move up one at a time, in signup order.",
     "signupCloses": "Signup closes:",
     "confirmed": "Confirmed:"
   },
@@ -312,8 +312,8 @@ export const operationsCopy = {
     "chooseARecipientStudent": "Choose a recipient student.",
     "cashCheckRefundRecordedThisRecordDoesNotSendMoney": "Cash/check refund recorded. This record does not send money.",
     "fundraisingCreditTransferredAndAppliedToTheRecipientSChargesWhereDue": "Fundraising credit transferred and applied to the recipient’s charges where due.",
-    "unallocatedPersonal": "Unallocated personal payments",
-    "availableFundraising": "Available fundraising credits",
+    "unallocatedPersonal": "Unused personal payments",
+    "availableFundraising": "Unused fundraising credit",
     "recording": "Recording…",
     "recordMoneyReturned": "Record money returned"
   }
@@ -322,7 +322,7 @@ export const operationsCopy = {
 // Sentences with live values stay here so components supply data without owning UI prose.
 export const operationsText = {
   travel: {
-    capacity: (seats: number, riders: number, students: number, adults: number) => `${seats} passenger seats for ${riders} riders (${students} students, ${adults} additional adults).`,
+    capacity: (seats: number, riders: number, students: number, adults: number) => `${seats} passenger seats for ${riders} riders (${students} student${students === 1 ? '' : 's'}, ${adults} more adult${adults === 1 ? '' : 's'}).`,
     seats: (count: number) => `${count} passenger seats`,
   },
   withdrawals: {
@@ -332,8 +332,8 @@ export const operationsText = {
     pendingReview: (count: number) => `Pending review · ${count}`,
   },
   event: {
-    reserved: (count: number, capacity: number | undefined, available: number | null) => `${count} places reserved${capacity !== undefined ? ` of ${capacity}` : ''}${available !== null ? ` · ${available} available` : ''}. Pending signups reserve a place; charges begin at confirmation.`,
-    signupCloses: (date: string) => `Signup closes: ${date}. Waitlisted students are promoted manually in signup order.`,
+    reserved: (count: number, capacity: number | undefined, available: number | null) => `${count}${capacity !== undefined ? ` of ${capacity}` : ''} place${count === 1 && capacity === undefined ? '' : 's'} taken${available !== null ? ` · ${available} left` : ''}. A pending signup holds a place. The fee is charged only when the student is confirmed.`,
+    signupCloses: (date: string) => `Signup closes: ${date}. Waitlisted students move up only when someone presses Promote. They move up one at a time, in signup order.`,
     approved: (name: string) => `${name} approved.`,
     declined: (name: string) => `${name} declined.`,
     promoted: (name: string) => `${name} promoted and confirmed.`,

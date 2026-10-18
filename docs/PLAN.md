@@ -2,7 +2,7 @@
 
 ## October 18 plain-language audit
 
-Owner approved the [master audit](audit-2026-10-18/master_report_2026-10-18.md), with development-only work and a stop/report after each batch. [Batch 0 facts](audit-2026-10-18/batch-0-findings.md) are investigated, including server read-only checks of the two fixture issues and production wording gates. No implementation batch has started. Next: Batch 1 exact safe copy, then stop; preserve stored values, consent source wording, financial/safety guards and production boundaries. Baseline lint/test failures are documented separately from future regressions.
+Owner approved the [master audit](audit-2026-10-18/master_report_2026-10-18.md), with development-only work and a stop/report after each batch. [Batch 0 facts](audit-2026-10-18/batch-0-findings.md) are investigated and published. [Batch 1 safe copy](audit-2026-10-18/batch-1-report.md) is implemented, including approved display formatting and pinned-test updates; final role check is recorded in CURRENT_STATE. Stop before Batch 2. Stored values, consent source wording, financial/safety guards and production boundaries remain intact. Baseline lint/test failures remain explicitly distinguished from regressions; shared fixture repairs require separate data-write authorization.
 
 Current production frontends are release `68179f7`; shared backend remains approved `8c22d50`. OAuth publication, five account roles, footer changes and family readiness are verified; see CURRENT_STATE.md and PRODUCTION_ONBOARDING_RELEASE.md. Real signing remains disabled. October 18: local source matches current main and development backend synchronized only to third-bandicoot-18 for the upcoming rehearsal.
 

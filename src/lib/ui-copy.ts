@@ -19,7 +19,7 @@ export const uiCopy = {
     declined: 'Declined',
   },
   finance: { editDescription: 'Review a student account and record payments.', readDescription: 'Review a student account.', description: 'Charges, credits and transaction history.' },
-  event: { staffRequirements: 'Review student requirements in Event readiness.', readiness: 'Event readiness', noRequirements: 'No requirements apply to this participation.', participants: 'Participants', requirements: 'Requirements', transport: 'Transport', rooming: 'Rooming', overview: 'Overview' },
+  event: { staffRequirements: 'Review student requirements in Event readiness.', readiness: 'Event readiness', noRequirements: 'No requirements for this event.', participants: 'Signups', requirements: 'Requirements', transport: 'Transport', rooming: 'Rooming', overview: 'Overview' },
   readiness: { noEvents: 'No events yet.', noStudents: 'No students are registered for this event.', allComplete: 'All applicable requirements are complete.', students: 'Students', transportation: 'Transportation', rooming: 'Rooming' },
   theme: { dark: 'Dark mode', light: 'Light mode', failed: 'Appearance could not be saved. Please try again.' },
   wizard: { steps: reference.options.newEventSteps, cancel: 'Cancel', back: 'Back', continue: 'Continue', create: 'Create event' },

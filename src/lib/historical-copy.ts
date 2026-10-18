@@ -1,7 +1,7 @@
 export const historicalCopy = {
   title: 'Historical corrections',
-  warning: 'Historical records are locked. Corrections preserve the original evidence and record your identity, time and reason. Access expires after 15 minutes.',
-  acknowledge: 'I understand that this changes historical records and reports.',
+  warning: 'Past records are locked. A fix keeps the original and saves who made it, when and why. Fix mode ends after 15 minutes.',
+  acknowledge: 'I understand this changes past records and reports.',
   reason: 'Reason for correction', open: 'Open correction mode', close: 'Return to read-only',
   chooseStudent: 'Choose a student', chooseSession: 'Choose a session', more: 'Load more',
   reviewLatest: 'Review latest / start another correction',
