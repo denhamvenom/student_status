@@ -7,14 +7,16 @@
 - [x] Preserve exact demo/reference branch, switch Pages and verify build/four file blobs.
 - [x] Merge PR10/PR11; Astra verifies candidate-preserving tree. Main release 60505b4.
 - [x] Deploy production Convex amicable-eel-413 from 60505b4; typecheck/schema validation passed, no index deletions.
-- [ ] Temporary build-registration permission confirmation, two Workers/domains and focused hosting checks; see HOSTING_RELEASE_LOG.md.
+- [x] Temporary registration scope approved, used and removed; both Workers/domains deployed from 60505b4 and hosting checks passed. See HOSTING_RELEASE_LOG.md.
 
 - [x] Public About/Privacy/Terms and signed-out links in both apps; Terms exclude permission forms. Owner-approved concise public privacy; detailed operations internal.
 - [x] Approved Google project-only OAuth Config Editor and saved organizational support email.
 - [x] Post-migration calendar read verified; three production calendar settings privately installed/verified; owner PIN presence verified.
 - [x] Exact season name/year/date boundary approved; FIRST inputs remain private.
 - [x] Scoped frontend checks/builds and final Astra source review passed; representative local desktop/phone/light/dark page checks.
-- [ ] Finish frontend hosting, Google live URLs/publication prerequisites and real-domain/device proof. Backend is deployed; later bootstrap/signing gates remain separate.
+- [x] Frontend hosting complete; main-only builds and HTTPS domains verified.
+- [ ] Google live URL registration/publication prerequisites, real login/device proof and later bootstrap/signing gates remain separate.
+- [ ] Before the next frontend deployment, explicitly preserve disabled workers.dev and version preview URLs.
 - [x] Resolve Google separate-project applicability from official policy and owner-confirmed audience; prepare GOOGLE_PRODUCTION_SETUP.md approval packet.
 - [x] Owner approved production Google setup; created denham-venom-production under Foundation. Creator already has project access; no manual IAM grant.
 - [x] Owner authorized User Data Policy acceptance; branding, identity scopes and shared production Web client saved. External/Testing verified.

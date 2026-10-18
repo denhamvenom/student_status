@@ -1,5 +1,38 @@
 # Controlled hosting release evidence — October 17, 2026
 
+The owner-approved October 17 controlled hosting release is complete. Main `60505b4e04976598956bc1353a53e7d4daf63b9d` is deployed to shared production Convex and both Cloudflare Workers; its entire tree matches approved packet checkpoint `574c910`. [Student Status](https://students.team8044.org) and [Timeclock](https://timeclock.team8044.org) passed focused hosting checks. See [HOSTING_RELEASE_LOG.md](HOSTING_RELEASE_LOG.md). OAuth publication, production sign-in acceptance, bootstrap, enrollment and real signing remain separate gates.
+
+Release identifier: `v0.1.0-hosting.1`, an immutable hosting prerelease tag at the deployed main revision. This is not enrollment or OAuth launch acceptance.
+
+## Completed frontend release
+
+| Website | Build ID | Deployed Worker version |
+| --- | --- | --- |
+| Student Status | `31cfb766-3c41-4c89-a35b-57f5d6e55360` | `baa2e310-f446-414a-9c71-62baad2edd83` |
+| Timeclock | `7a5b2586-0b02-47fe-810b-8a66a40acf94` | `597db35f-ceda-452b-8943-8ffd298a1d7d` |
+
+Both builds succeeded at exact main `60505b4e04976598956bc1353a53e7d4daf63b9d`. Student Status deployed October 18 00:53:52 UTC; Timeclock 00:55:05 UTC (October 17 Chicago). Workers are `denham-venom-student-status` and `denham-venom-timeclock` in Team 8044. Existing unrelated Worker preserved. Active free team8044.org zone; exact new hostnames were empty before attachment. Custom domains and managed HTTPS are active.
+
+Existing GitHub installation connected repo denhamvenom/student_status, root `/`, main only, one trigger per Worker, no preview builds. Bun 1.4.3 and VITE_CONVEX_URL=https://amicable-eel-413.convex.cloud. Commands: Student `bun install --frozen-lockfile && bun run build`, then `bunx wrangler deploy --config wrangler.jsonc`; Timeclock `bun install --frozen-lockfile && bun run build:timeclock`, then `bunx wrangler deploy --config apps/timeclock/wrangler.jsonc`. No frontend OAuth/Convex secrets added.
+
+Owner approved the temporary Workers Builds Configuration: Edit addition. Registered the existing token privately, then removed that extra permission immediately. Final dashboard shows only Workers Scripts: Edit for Team 8044, Active until revoked. Build-token UUID `71e5e916-22f9-4505-9fa8-e96861d496d2`. Private ignored transfer file deleted, browser secret variables cleared; token value never printed or committed.
+
+## Focused verification and limitations
+
+- Both HTTPS roots return 200 and render the expected signed-out apps in Chrome. Entry bundles contain the production backend URL and no development deployment name.
+- Student About/Privacy/Terms render correctly; direct SPA routes and reloads work. Timeclock `/hosting-check` reload renders the signed-out app; its public links target the correct Student Status pages.
+- Wrangler enabled default workers.dev/preview URL settings because configuration omits explicit flags. After deployment both were disabled through Cloudflare and fresh reads verified false for both Workers. Custom domains stay enabled. The next controlled deployment must preserve this explicitly; no source change or redundant redeploy was made.
+- No Google sign-in, Coach bootstrap, enrollment or real signing attempted. Page loading is hosting proof only. Google remains External/Testing; live public URL registration and publication are later gates.
+- Astra independently verified main matches the approved tree and documentation branch changes no application files; final review found no current-hosting blocker using the integration owner's external evidence. No repeated broad application tests.
+- Screenshots of both live apps and final token metadata saved outside Git. No secrets or student records included in release documentation.
+
+Main now automatically deploys both frontends on future changes. Keep progress documentation on its own branch; do not merge merely to publish evidence. Existing development configuration preserved. Paid backups deferred; recovery unproven.
+
+## Historical execution record
+
+Intermediate pending statements below are superseded by the completed status above.
+
+
 Owner approved the ordered RELEASE_APPROVAL_PACKET.md batch. This is a partial hosting release, not enrollment or production-login acceptance.
 
 ## Completed

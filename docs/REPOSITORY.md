@@ -10,7 +10,7 @@ The original four standalone demo HTML files are preserved byte-for-byte under `
 
 Student records must never be stored in Git or GitHub, regardless of whether the repository is public or private. This includes commits, issues, pull requests, comments, attachments, and CI logs or artifacts. Never commit real student records, signed forms, health information, exports, database snapshots, OAuth credentials or environment values. Use synthetic student data only in fixtures, tests and documentation. `.gitignore` excludes common local artifacts but cannot detect sensitive content saved under arbitrary filenames. Review staged changes before every push.
 
-As of the approved October 17 release, GitHub Pages publishes demo-reference-2026-10-17/root at original main 18ef1c2. Never point Pages at application main. PR10/PR11 are merged; main release 60505b4 deployed to production Convex. Cloudflare setup remains pending under RELEASE_APPROVAL_PACKET.md. Main builds will deploy both Workers once connected, so subsequent merges remain release-controlled. Do not merge progress documentation merely to publish evidence or move the approved release SHA.
+As of the approved October 17 release, GitHub Pages publishes demo-reference-2026-10-17/root at original main 18ef1c2. Never point Pages at application main. PR10/PR11 are merged; main release 60505b4 deployed to production Convex. Both Cloudflare Workers and HTTPS domains are deployed and verified at the same revision. Main-only builds now automatically deploy both Workers, so subsequent merges remain release-controlled. Do not merge progress documentation merely to publish evidence or move the approved release SHA.
 
 ## Included and excluded
 

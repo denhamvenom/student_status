@@ -1,6 +1,10 @@
 # Controlled hosting release — approval packet, October 17, 2026
 
-Owner approved the ordered RELEASE_APPROVAL_PACKET.md hosting batch on October 17. Pages preservation, PR10/PR11 merges and production backend deployment are complete. Main release is `60505b4e04976598956bc1353a53e7d4daf63b9d`, whose entire tree matches packet checkpoint `574c910`. Cloudflare Workers/custom domains are pending build-token registration and website deployment. See [HOSTING_RELEASE_LOG.md](HOSTING_RELEASE_LOG.md). Earlier no-approval/no-merge/no-deployment claims below describe historical checkpoints.
+The owner-approved October 17 controlled hosting release is complete. Main `60505b4e04976598956bc1353a53e7d4daf63b9d` is deployed to shared production Convex and both Cloudflare Workers; its entire tree matches approved packet checkpoint `574c910`. [Student Status](https://students.team8044.org) and [Timeclock](https://timeclock.team8044.org) passed focused hosting checks. See [HOSTING_RELEASE_LOG.md](HOSTING_RELEASE_LOG.md). OAuth publication, production sign-in acceptance, bootstrap, enrollment and real signing remain separate gates.
+
+## Historical planning and approval record
+
+The following records earlier checkpoints; current status above supersedes pending/undeployed statements.
 
 ## Exact candidate and fresh evidence
 
