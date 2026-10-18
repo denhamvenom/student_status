@@ -1,8 +1,9 @@
 /// <reference types="vite/client" />
 import { describe, expect, it } from "vitest";
-import { convexTest } from "convex-test";
+import { createTest as convexTest } from "../testUtils";
 import { api } from "./_generated/api";
 import schema from "./schema";
+import { ensureFinancialAccount } from "./lib/financialSources";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -25,11 +26,14 @@ async function fixture() {
     async function student(userId: typeof studentUser.user, name: string) { return ctx.db.insert("students", { seasonId: season, userId, legalName: name, preferredName: name, email: `${name}@example.invalid`, subteam: "A", active: true, travelTeam: true, roomCategoryLocked: false, allergies: { state: "unknown" }, medications: { state: "unknown" } }); }
     const studentId = await student(studentUser.user, "student");
     const otherId = await student(otherUser.user, "other");
+    await ensureFinancialAccount(ctx, studentId);
+    await ensureFinancialAccount(ctx, otherId);
     await ctx.db.insert("familyLinks", { parentUserId: parent.user, studentId, active: true, createdBy: coach.user });
     const event = await ctx.db.insert("events", { seasonId: season, name: "Synthetic trip", type: "Competition", startsAt: 100, endsAt: 200, destination: "Example", travel: "Vehicles", overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "assigned", allowWithdrawal: true, permissionRequired: false, firstRequired: false, archived: false });
     const oldEvent = await ctx.db.insert("events", { seasonId: oldSeason, name: "Old", type: "Team", startsAt: 1, endsAt: 2, destination: "Example", travel: "Vehicles", overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "assigned", allowWithdrawal: false, permissionRequired: false, firstRequired: false, archived: false });
     const participant = await ctx.db.insert("participants", { eventId: event, studentId, status: "confirmed", createdAt: 0, updatedAt: 0 });
     await ctx.db.insert("participants", { eventId: event, studentId: otherId, status: "confirmed", createdAt: 0, updatedAt: 0 });
+    for (const targetStudentId of [studentId,otherId]) await ctx.db.insert("firstRegistrationStates",{studentId:targetStudentId,seasonId:season,status:"verified",revision:1,teamAccepted:true,consentRelease:true,verifiedBy:coach.user,verifiedAt:0});
     return { coach, lead, mentor, parent, studentUser, otherUser, season, studentId, otherId, event, oldEvent, participant };
   });
   const as = (auth: typeof ids.coach.auth) => t.withIdentity({ subject: `${auth}|session` });
@@ -115,5 +119,26 @@ describe("travel operations", () => {
     const records = await f.coach.query(api.travel.listDrivers, {});
     expect(records).toHaveLength(200);
     expect(records.some((d: { name: string }) => d.name === "Overflow")).toBe(false);
+  });
+
+  it("keeps readiness open when financial or requirement evidence exceeds its supported bound", async () => {
+    const f = await fixture();
+    await f.coach.mutation(api.travel.setEventTransport, { eventId: f.ids.event, transportEnabled: false, busSeats: 0, additionalAdults: 0, trailerRequired: false });
+    expect((await f.mentor.query(api.app.eventReadiness, { eventId: f.ids.event })).overall).toBe("ready");
+    const charges = await f.t.run(async ctx => {
+      const ids = [];
+      for (let i = 0; i < 101; i++) ids.push(await ctx.db.insert("charges", { studentId: f.ids.studentId, eventId: f.ids.event, label: "Synthetic settled charge", amountCents: 1, appliedCents: 1, priority: i, createdBy: f.ids.coach.user, createdAt: i }));
+      return ids;
+    });
+    expect((await f.mentor.query(api.app.eventReadiness, { eventId: f.ids.event })).overall).toBe("open");
+    await f.t.run(async ctx => {
+      for (const id of charges) await ctx.db.delete(id);
+      for (let i = 0; i < 101; i++) {
+        await ctx.db.insert("requirements", { eventId: f.ids.event, key: `synthetic-${i}`, label: "Synthetic requirement" });
+        await ctx.db.insert("requirementCompletions", { eventId: f.ids.event, studentId: f.ids.studentId, key: `synthetic-${i}`, completedBy: f.ids.coach.user, completedAt: i });
+        await ctx.db.insert("requirementCompletions", { eventId: f.ids.event, studentId: f.ids.otherId, key: `synthetic-${i}`, completedBy: f.ids.coach.user, completedAt: i });
+      }
+    });
+    expect((await f.mentor.query(api.app.eventReadiness, { eventId: f.ids.event })).overall).toBe("open");
   });
 });

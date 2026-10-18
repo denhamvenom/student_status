@@ -67,11 +67,11 @@ export function EventTransport({ id }: { id: string }) {
     {error && <p role="alert" className="open-text">{error}</p>}</section>
 }
 
-export function IndependentTravel({ id, student }: { id: string; student: string }) {
+export function IndependentTravel({ id, student, ownProfile=false }: { id: string; student: string; ownProfile?:boolean }) {
   const data = useQuery(api.travel.ownTravel, { eventId: eventId(id), studentId: studentId(student) })
   const set = useMutation(api.travel.setIndependentTravel)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   if (!data || !data.transportEnabled || !data.eligible) return null
-  return <section className={`${styles.root} card`}><div className="card-head"><h2>{operationsCopy.travel.yourTransportation}</h2></div><p>{operationsCopy.travel.chooseWhetherThisStudentWillRideWithTheTeamOrTravelIndependentlyTeamSeatDemandUp}</p><label className="checkbox-label"><Checkbox checked={data.independentTravel} disabled={busy} onCheckedChange={checked => { setBusy(true); setError(''); void set({ eventId: eventId(id), studentId: studentId(student), independentTravel: checked }).catch(err => setError(issue(err))).finally(() => setBusy(false)) }}/> {operationsCopy.travel.travelingIndependently}</label>{error && <p role="alert" className="open-text">{error}</p>}</section>
+  return <section className={`${styles.root} card`}><div className="card-head"><h2>{ownProfile?'How are you getting there?':operationsCopy.travel.yourTransportation}</h2></div><p>{ownProfile?'Choose whether to ride with the team or travel independently.':'Choose whether your student will ride with the team or travel independently.'}</p><label className="checkbox-label"><Checkbox checked={data.independentTravel} disabled={busy} onCheckedChange={checked => { setBusy(true); setError(''); void set({ eventId: eventId(id), studentId: studentId(student), independentTravel: checked }).catch(err => setError(issue(err))).finally(() => setBusy(false)) }}/> {operationsCopy.travel.travelingIndependently}</label>{error && <p role="alert" className="open-text">{error}</p>}</section>
 }

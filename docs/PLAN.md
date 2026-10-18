@@ -1,5 +1,27 @@
 # Student Status implementation plan
 
+Current release proposal: [RELEASE_APPROVAL_PACKET.md](RELEASE_APPROVAL_PACKET.md) defines exact candidate, Pages preservation, known merge conflicts, deployment matrix and stop/rollback gates. Awaiting owner approval; no release action performed. It supersedes historical pending setup items below.
+
+Execution complete October 17: owner approved setup and User Data Policy acceptance. Google project denham-venom-production created under Foundation; Denham Venom Production Web client serves both approved origins and exact amicable-eel-413 callback. Branding/support and production domains saved; only openid/userinfo.email/userinfo.profile declared. External/Testing verified; public URL fields await hosting. Creator admin has automatic Owner access, so no manual IAM grant was needed. Owner privately replaced production AUTH_GOOGLE_ID and AUTH_GOOGLE_SECRET. Both saved values were compared in memory against the new Google client and matched; no values were printed or persisted in documentation. Production dashboard shows both settings present with no pending Save. Development, Calendar, signing keys and PIN were not changed by this setup. No deployment, merge, OAuth publication, bootstrap or real signing. Live OAuth remains unverified until authorized hosting. Earlier approval/transfer-pending text below is historical.
+
+October 17 OAuth review: owner confirmed up to 165 users (50 students, 15 mentors, up to 100 parents) and personal/school accounts. Separate production Google project is required for the planned audience. See [GOOGLE_PRODUCTION_SETUP.md](GOOGLE_PRODUCTION_SETUP.md) for the concrete approval packet: retain existing development/calendar project; propose new Denham Venom Production project and one Web client for both apps. Execution, new-project IAM and private production credential replacement await owner approval. Nothing changed in Google or production. This supersedes earlier statements that policy applicability remains unknown.
+
+## Current checkpoint — October 17
+
+Public About/Privacy/Terms and approved prelaunch configuration are complete at published application checkpoint `87134fb`. Boundary documentation reconciled October 17; implementation checks are retained from that checkpoint, not rerun for this documentation audit. See CURRENT_STATE.md for verified configuration, targeted checks and release-only gates. No deployment or merge.
+
+## Historical checkpoint — October 15
+
+Parent and Student setup batch implemented under PARENT_SETUP_BATCH.md; owner visual review next. Season FIRST verification automatically applies to every Competition. Preserve completed G1–G7 and approved PDF. CURRENT_STATE.md and VISUAL_CHECKS.md hold current evidence.
+
+## Preserved authorized PDF batch — October 14
+
+Implement [populated field-trip PDF consent](FIELD_TRIP_PDF_PLAN.md): completed student setup and Parent profile before PDF review/signing, structured allergy/prescription entries, no active Medication Choices/OTC policy, minor first aid retained, immutable exact PDF and checkbox/typed signature. Preserve legacy receipts and existing gates. This scoped batch supersedes the consent details below; broader G1–G7 scope is unchanged.
+
+## Historical completion checkpoint — October 13
+
+Follow CURRENT_STATE.md and GOAL_ACCEPTANCE.md for active G1-G7 scope. Published source checkpoint f156744 is synchronized to development. The synthetic season transition, historical roster and attendance corrections, CSV payment import and receipt correction have completed scoped live rehearsals. Existing integrated checks and Astra review remain valid for their recorded checkpoints. The next implementation closes the missing Coach roster archive/reactivate controls using the existing backend contract, followed by combined account-lifecycle and upcoming Whole Team enrollment rehearsal. Historical financial correction, remaining role journeys, selected-scope download evidence and representative prototype comparisons remain open. Production, real signing and automatic deletion remain separately gated.
+
 ## Scope and evidence
 
 Build a new application in this directory. Preserve the root Convex starter and every file in `../Devel_Vs_Handoff/design_handoff_student_status`.
@@ -25,7 +47,7 @@ Stack: React, Vite, strict TypeScript, React Router 7 Data Mode, Tailwind 4, sha
 | Join | Coach creates/revokes codes for 24 h, 1 week or 2 weeks. Five invalid tries impose a 15-minute lock. One request per Google account; submitted requests remain approvable after code expiry. Coach/Travel Lead approve. Archived matches require explicit resolution. |
 | Onboarding | Legal name comes from join approval; shirt size and Boys/Girls rooming category collected, parent contact skippable. Category locks after setup; Coach handles later changes. |
 | Status | Money, participation, event readiness, and attendance are distinct. To-dos group by event and include due dates. Parent sees selected linked child and a Viewing banner. |
-| Profiles | Student edits preferred name, shirt and parent contacts. Parent/Coach edit health and emergency contact. Missing health is Not completed, distinct from None reported. Seasonal OTC authorization is Yes / Contact me first / No. |
+| Profiles | Student edits preferred name, shirt and parent contacts. Parent/Coach edit health and emergency contact. Missing health is Not completed, distinct from None reported. New workflows remove seasonal OTC authorization; structured Parent-confirmed fields follow FIELD_TRIP_PDF_PLAN.md. |
 | Parent linking | Student invites parent by email; recipient signs in with the matching Google email and attests their relationship/authority. Valid acceptance establishes the link without routine Coach approval. Coach handles exceptions. One-time invitations expire after 7 days; landing reveals no student data before validation. Disabling new invitations preserves outstanding valid invitations and existing access. Multiple linked children supported. This is good-faith attestation, not independently verified guardianship. |
 | Parent invitation control (implemented October 12, 2026) | Coach-only **Allow new parent invitations** toggle in **Join Requests**. Persist the setting in Convex and enforce it on every invitation-creation/replacement path. Show a clear explanation where inviting is disabled. Implemented with the parent-invitation milestone; see verification below. |
 | Events | Competition, Outreach and Team event types; six setup steps. Travel Team/Required assignment differs from optional signup. Pending reservations consume capacity but incur no charge until confirmed. Waitlist promotion is manual. |
@@ -214,3 +236,42 @@ Validation for this workflow checkpoint: both skills passed the skill-creator fo
 ## October 13 frontend continuation
 
 Modal/event sections/invitation presentation implemented with existing contracts; staff personal participation labels removed. Both workflow skills used, parallel Sol ownership and Astra source review completed. See FRONTEND_CONFORMANCE_LOG.md and VISUAL_CHECKS.md for scoped browser evidence. Whole Team and other backend dependencies remain unimplemented. Full check100/101 due to expired existing Timeclock fixture; isolated failure confirmed and separately flagged. No production authorization.
+
+## Seven-item goal authorization — October 13
+
+Complete all allowable frontend/backend checklist work to readiness for Coach visual approval. Current integration branch feature/student-status-completion derives from5343092. GOAL_ACCEPTANCE.md maps requirements/evidence without reducing scope. Upcoming-only Whole Team additions confirmed by user. Real wording approval/signing, retention deletion policy, production/main remain gates. Maintain one owner for shared schema/generated/deployment and coordinate Timeclock branch753b236. Local WholeTeam/reporting candidates need scale corrections before acceptance; do not claim fixture-only success as completion.
+
+## Accounts and report integration review — October 13
+
+Whole Team source checkpoint is published; upcoming-only live rehearsal remains pending. Timeclock frontend753b236 is integrated locally through3946b88, with combined Timeclock checks passing. Account setup/corrections/adult management and aggregate-backed finance/attendance are now implemented locally. Final review fixes cover token handling, query fanout and correction queue scaling. Combined145tests/lint/build passed before those fixes; rerun affected checks and review before development sync. Permission signing, administration, full visual matrix and final multirole acceptance remain open in GOAL_ACCEPTANCE.md.
+
+## October 13 administration and live financial continuation
+
+Published fundraiser submit correction04c14d7 and verified Parent gross/travel/available reconciliation. Current charge correction/cancellation and fundraising-to-team slice is in parallel backend/UI implementation with Astra review; generated types and strict typecheck pass. Complete this slice's integrated validation before development synchronization. Shared season-wide fees/priorities, season transition/carryover and retention preview/holds remain required, followed by outstanding live roles and VISUAL_CHECKS. Skills remain mandatory at context and visual checkpoints. No G1–G7 closure or production authorization follows from this milestone.
+
+Charge/team-transfer slice now reviewed, integrated, validated and synchronized to development10:54:14. Proceed with live verification and shared season-wide fee definitions/priorities/custom-fee workflows in separately owned files. Preserve source history and explicit historical-correction restriction; season transition/carryover and retention remain subsequent required outcomes.
+
+October 13 continuation: charge adjustment and cancellation now verified live with fictional records, preserving original amounts/reasons and returning credit to its original source. Fresh rendered Coach Finance comparison identifies primary student table/top action/recent-change structure still required beyond shared fees; Astra contract inventory is in FINANCE_ADMIN_IMPLEMENTATION.md. Sol retention owner is assigned new non-destructive review/hold backend/UI modules; the shared-fee owner remains the sole schema editor and root owns generated/route integration, Git and sync. No deletion, production or main merge.
+
+October 13 permission continuation: live synthetic re-sign request/replacement/acceptance, paper provenance/acceptance and minimized-versus-health exports verified. Retention source review is clear after stale-reactivation/read-budget fixes; route integration and live/visual verification remain required. Shared-fee bulk work uses durable zero-money preparation with immutable paginated scope, review fences and explicit commit; do not mark unfinished contracts accepted. Overall scope estimate remains approximately 74%.
+
+Next parallel slice: finish immutable shared-fee bulk preparation/review/commit; independently complete Mentor/Travel own-profile route from prototype and auth-derived identity. Retention integration is source-ready awaiting coherent development sync. Coach finance table/feed/export contract is now specified in FINANCE_ADMIN_IMPLEMENTATION, including separate applied personal/fundraising totals and fundraising-only Travel account column.
+
+
+October13: Whole Team zero-fee creation live journey confirmed all six active fictional members. Next G3 proof remains later joining/reactivation and full visual states. Attendance build boundary now follows officially verified FIRST kickoff day automatically (2027Jan9), with unknown years explicit rather than guessed; Outreach classification awaits user response. Isolated season-calendar helper can proceed in parallel with shared fee review fixes and adult profile rereview.
+
+## October 13 administration integration checkpoint
+
+Shared fees, retention preview/holds and Mentor profile/Coach driver reconciliation are source-reviewed and synchronized to development at12:30:56. Full integrated check passed266tests/48files, lint/types/build; final UI recovery13tests and archived enrollment retry1test passed separately. Timeclock usability commit0df2fb1 is integrated as59f58d3 with a root lint-compatible window.innerWidth assertion follow-up. Complete live/visual evidence next; finance team table/change feed/export, historical correction/season carryover and attendance season/category integration remain required. Official kickoff helper is tested but not yet wired to reports. No production or real signatures/deletion authorized.
+
+## October 13 source-separated Finance continuation
+
+Continue the reviewed FINANCE_ADMIN_IMPLEMENTATION contract: Sol owns shared schema and all monetary writer/projection changes; root owns the unmounted Finance table/feed presentation and later integration; Astra reviews each slice before synchronization. The table presentation has four focused tests and source clearance; the feed has two focused tests and review pending. Backend owner reports28focused v4 tests passing, with feed emission/backfill still in progress. No new development sync is claimed. Reviewed SEASON_ADMIN_IMPLEMENTATION is planning only, including the superseding no-family-authorization departure policy. Preserve all G1-G7 acceptance requirements and the single VISUAL_CHECKS queue.
+
+## Completion-first working policy — October 13
+
+The Coach requested explicit protection against minutiae and context churn. Follow COMPLETION_WORKFLOW.md for workflow-sized delivery, blocking-versus-follow-up decisions, convergent reviews, proportionate verification and concise handoffs. Finish connected Finance next; retain all G1-G7 requirements and privacy/production gates. This supersedes habits of fragment-sized repeated reviews and per-step narrative updates, not required acceptance evidence.
+
+October13 connected Finance milestone: source-separated table/history and recovery/payment integration reviewed, tested and synchronized to development13:21:10. Fictional account preparation/history/payment reconciliation verified. Next complete scoped export and remaining financial workflows while independent season-link migration proceeds; retain visual/role acceptance queue. See CURRENT_STATE and checklist for exact validation limits.
+
+October13 completion-first update: Coach explicitly reduced verification scope to essential risk-based checks and representative visual coverage; exhaustive state/viewport matrices are superseded. Parent season pagination and Coach season draft/roster are source-reviewed and integrating. Family-link maintenance is live-complete with zero unresolved links. Finish full season transition/carryover and outstanding financial/attendance workflows; use CURRENT_STATE for the checkpoint.

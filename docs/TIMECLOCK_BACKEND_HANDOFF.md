@@ -1,6 +1,8 @@
 # Timeclock backend handoff
 
-Status: implemented in development; frontend scaffold only. Final Git checkpoint and PR are recorded in the publication section below. This document is the contract for the separate frontend chat, not permission to deploy production.
+Current-status note (October 17): this is the historical backend contract/foundation handoff. Its scaffold, worktree and frc8044.org hostname statements describe that earlier stage. The integrated frontend now resides in the Student Status completion branch; approved production host is `timeclock.team8044.org`. Calendar settings and operator PIN presence are verified on production, but production application deployment and live-device proof remain pending. See CURRENT_STATE.md and NEXT_CHAT_HANDOFF.md for current ownership, evidence and release gates.
+
+Historical foundation status: implemented in development; frontend scaffold only. Final Git checkpoint and PR are recorded in the publication section below. This document is the contract for the separate frontend chat, not permission to deploy production.
 
 ## Ownership and starting point
 

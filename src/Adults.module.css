@@ -1,0 +1,38 @@
+.page { display: grid; gap: 16px; }
+.surface { min-width: 0; }
+.columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.form { display: grid; gap: 14px; }
+.form > label:not(.check), .rolePicker { display: grid; gap: 6px; font-weight: 600; }
+.form > p { margin: 0; }
+.form > button { justify-self: start; }
+.check { display: flex; gap: 10px; align-items: center; font-weight: 400; min-height: 44px; }
+.rolePicker { max-width: 320px; margin-bottom: 16px; }
+.table { width: 100%; overflow-x: auto; margin-bottom: 14px; }
+.table table { width: 100%; }
+.table th { text-align: left; }
+.table td { vertical-align: top; }
+.table td:first-child { width: 30%; }
+.table td > span { display: block; margin-top: 4px; }
+.table td, .invites strong { overflow-wrap: anywhere; }
+.actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.dialog { width: min(520px, calc(100vw - 32px)); max-height: 90vh; overflow-y: auto; padding: 24px; }
+.invites > div { display: flex; gap: 12px; justify-content: space-between; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid var(--border-default); }
+.invites > div > div { min-width: 0; }
+.invites p { margin: 5px 0 0; }
+.invites > div > button { flex-shrink: 0; }
+.share { margin-top: 20px; padding: 16px; border: 1px solid var(--border-default); border-top: 3px solid var(--gold-500); border-radius: 8px; background: var(--surface-metal); }
+.share h3 { margin: 0 0 12px; }
+.shareControls { display: flex; flex-wrap: wrap; gap: 8px; }
+.shareControls input { min-width: 0; flex: 1 1 220px; font-family: ui-monospace, monospace; }
+@media (max-width: 767px) {
+  .columns { grid-template-columns: 1fr; }
+  .table { overflow: visible; }
+  .table table, .table tbody, .table tr, .table td { display: block; width: 100%; }
+  .table thead { display: none; }
+  .table tr { padding: 12px 0; border-bottom: 1px solid var(--border-default); }
+  .table td { border: 0; padding: 6px 0; }
+  .table td:first-child { width: 100%; }
+  .table td[data-label]::before { content: attr(data-label); display: block; font-size: 12px; font-weight: 700; color: var(--text-muted); }
+  .rolePicker { max-width: none; }
+  .dialog { padding: 20px; }
+}

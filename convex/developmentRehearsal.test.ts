@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
+import { makeFunctionReference } from "convex/server";
 import { afterEach, describe, expect, it } from "vitest";
-import { convexTest } from "convex-test";
+import { createTest as convexTest } from "../testUtils";
 import { internal } from "./_generated/api";
 import schema from "./schema";
 
@@ -84,4 +85,24 @@ describe("development rehearsal fixture", () => {
     expect(await f.t.run(ctx => ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", f.ids.season)).take(10))).toHaveLength(2);
     expect(await f.t.run(ctx => ctx.db.query("events").withIndex("by_seasonId_and_startsAt", q => q.eq("seasonId", f.ids.season)).take(10))).toHaveLength(1);
   });
+  it("guards and creates an idempotent isolated archived charge fixture without touching existing season records", async () => {
+    const reference = makeFunctionReference<"mutation", { expectedCoachEmail: string }, { seasonId: import("./_generated/dataModel").Id<"seasons">; studentId: import("./_generated/dataModel").Id<"students">; chargeId: import("./_generated/dataModel").Id<"charges">; paymentId: import("./_generated/dataModel").Id<"ledgerEntries">; created: boolean }>("developmentRehearsal:ensureHistoricalChargeFixture");
+    const f = await fixture();
+    process.env.CONVEX_CLOUD_URL = "https://unapproved.convex.cloud";
+    await expect(f.t.mutation(reference, { expectedCoachEmail: "coach@example.invalid" })).rejects.toThrow("development-only");
+    process.env.CONVEX_CLOUD_URL = devUrl;
+    const before = await f.t.run(async ctx => ({ season: await ctx.db.get(f.ids.season), student: await ctx.db.get(f.ids.oldStudent), event: await ctx.db.get(f.ids.oldEvent) }));
+    const first = await f.t.mutation(reference, { expectedCoachEmail: "coach@example.invalid" });
+    expect(await f.t.mutation(reference, { expectedCoachEmail: "coach@example.invalid" })).toEqual({ ...first, created: false });
+    await f.t.run(async ctx => {
+      expect(await ctx.db.get(f.ids.season)).toEqual(before.season); expect(await ctx.db.get(f.ids.oldStudent)).toEqual(before.student); expect(await ctx.db.get(f.ids.oldEvent)).toEqual(before.event);
+      expect(await ctx.db.get(first.seasonId)).toMatchObject({ status: "archived" });
+      expect(await ctx.db.get(first.studentId)).toMatchObject({ active: false, email: "rehearsal.historical-charge@example.invalid" });
+      expect((await ctx.db.get(first.studentId))?.userId).toBeUndefined();
+      const summary = await ctx.db.query("studentFinanceSummaries").withIndex("by_studentId", q => q.eq("studentId", first.studentId)).unique();
+      expect(summary).toMatchObject({ chargedCents: 100, paidCents: 100, dueCents: 0, personalAvailableCents: 0, fundraisingAvailableCents: 0, version: 4 });
+      expect(await ctx.db.get(first.chargeId)).toMatchObject({ amountCents: 100, appliedCents: 100 });
+    });
+  });
+
 });

@@ -1,3 +1,4 @@
+import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
@@ -8,6 +9,7 @@ async function eligible(ctx: MutationCtx, eventId: Id<"events">, studentId: Id<"
   const event = await ctx.db.get(eventId); const student = await ctx.db.get(studentId);
   const season = await activeSeason(ctx);
   if (!event || event.archived || !student || !student.active || event.seasonId !== season._id || !event.overnight || !event.roomingEnabled || event.seasonId !== student.seasonId || event.roomDeadline !== undefined && Date.now() > event.roomDeadline) throw new Error("Room selection is unavailable.");
+    requireEnrollmentComplete(event);
   const p = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", eventId).eq("studentId", studentId)).unique();
   if (p?.status !== "confirmed" || !student.roomCategory) throw new Error("Confirmed participation and a rooming category are required.");
   return { event, student };
@@ -207,6 +209,7 @@ export const finalize = mutation({
     const group = await ctx.db.get(args.groupId); if (!group) throw new Error("Room group not found.");
     const season = await activeSeason(ctx); const event = await ctx.db.get(group.eventId);
     if (!event || event.archived || event.seasonId !== season._id || !event.overnight || !event.roomingEnabled) throw new Error("Room group is unavailable.");
+    requireEnrollmentComplete(event);
     const members = await ctx.db.query("roomMemberships").withIndex("by_groupId", q => q.eq("groupId", group._id)).take(6);
     if (!members.length) throw new Error("An empty room cannot be finalized.");
     if (members.length > 5 || members.length === 5 && (!args.allowFifth || !args.reason?.trim())) throw new Error("A fifth occupant requires an adult reason; six are never allowed.");
@@ -244,6 +247,7 @@ export const adultCreateGroup = mutation({
     const user = await viewer(ctx); if (user.role !== "coach" && !user.travelLead) throw new Error("Room management denied.");
     const season = await activeSeason(ctx); const event = await ctx.db.get(args.eventId);
     if (!event || event.archived || event.seasonId !== season._id || !event.roomingEnabled || !event.overnight || !args.name.trim() || args.name.length > 80) throw new Error("Room group unavailable.");
+    requireEnrollmentComplete(event);
     if (event.roomDeadline !== undefined && Date.now() > event.roomDeadline && !args.reason?.trim()) throw new Error("A reason is required after the room deadline.");
     const groups = await ctx.db.query("roomGroups").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(100);
     if (groups.length >= 100) throw new Error("Room group limit reached.");
@@ -260,6 +264,7 @@ export const adultAssign = mutation({
     const group = await ctx.db.get(args.groupId); const season = await activeSeason(ctx);
     const event = group ? await ctx.db.get(group.eventId) : null; const student = await ctx.db.get(args.studentId);
     if (!group || !event || event.archived || !event.overnight || !event.roomingEnabled || !student || event.seasonId !== season._id || student.seasonId !== season._id || !student.active || student.roomCategory !== group.category) throw new Error("Room category or season conflict.");
+    requireEnrollmentComplete(event);
     if ((event.roomDeadline !== undefined && Date.now() > event.roomDeadline || group.finalized) && !args.reason?.trim()) throw new Error("A reason is required for this room correction.");
     const p = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
     if (p?.status !== "confirmed") throw new Error("Only confirmed students may be assigned.");
@@ -288,6 +293,7 @@ export const adultUnassign = mutation({
     const user = await viewer(ctx); if (user.role !== "coach" && !user.travelLead) throw new Error("Room management denied.");
     const season = await activeSeason(ctx); const event = await ctx.db.get(args.eventId);
     if (!event || event.archived || event.seasonId !== season._id || !event.overnight || !event.roomingEnabled) throw new Error("Rooming is unavailable.");
+    requireEnrollmentComplete(event);
     if (!args.reason.trim()) throw new Error("A reason is required to remove an assignment.");
     const membership = await ctx.db.query("roomMemberships").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", args.studentId)).unique();
     if (!membership) return null;

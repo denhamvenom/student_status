@@ -1,0 +1,11 @@
+.mobileList{display:none}
+@media(max-width:767px){
+  .tableWrap{display:none}
+  .mobileList{display:grid;gap:0}
+  .mobileRow{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;min-width:0;padding:12px 0;border-bottom:1px solid var(--border-default)}
+  .mobileRow:last-child{border-bottom:0}
+  .mobileRow strong{flex:1 1 100%;min-width:0;overflow-wrap:anywhere}
+  .mobileRow span{color:var(--text-muted);font-size:13px}
+  .mobileRow span+span::before{content:'·';padding-right:8px}
+  .mobileRow small{flex:1 1 100%;color:var(--text-muted)}
+}
