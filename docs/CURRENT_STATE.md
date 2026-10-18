@@ -1,6 +1,6 @@
 # Current integration handoff
 
-October 18: controlled footer/account rehearsal completed and verified; broader rollout checks remain below. Current branch docs/parent-readiness-2026-10-18. Root owns Git/backend/releases; Sol implementation and Astra review.
+October 18: controlled footer/account rehearsal completed and verified; accepted operational deferrals are recorded below. Current branch docs/parent-readiness-2026-10-18. Root owns Git/backend/releases; Sol implementation and Astra review.
 
 ## Verified production state
 
@@ -12,4 +12,4 @@ October 18: controlled footer/account rehearsal completed and verified; broader 
 
 ## Remaining rollout boundaries
 
-Actual FIRST invitation configuration, calendar freshness check, tablet/two-phone concurrency/reconnection and owner opening enrollment remain unverified rollout items. Student/Parent personal profile fields remain incomplete intentionally; no invented birth dates/contact/health information. Real signing disabled; backups deferred and recovery unproven. These are not covered by the completed account/footer evidence. No event, attendance, payment or signature rehearsal was performed. See PRODUCTION_ONBOARDING_RELEASE.md and PRODUCTION_ONBOARDING_PLAN.md.
+The previously supplied FIRST invitation is saved for the live season and matches private owner inputs exactly. Calendar sync verified fresh (44 seconds old, no error). On October 18 the owner explicitly deferred physical tablet/two-phone concurrency/reconnection testing and stated it must not block rollout. Enrollment timing remains an owner operational decision. Student/Parent personal profile fields remain incomplete intentionally; no invented birth dates/contact/health information. Real signing disabled; backups deferred and recovery unproven. These are not covered by the completed account/footer evidence. No event, attendance, payment or signature rehearsal was performed. See PRODUCTION_ONBOARDING_RELEASE.md and PRODUCTION_ONBOARDING_PLAN.md.

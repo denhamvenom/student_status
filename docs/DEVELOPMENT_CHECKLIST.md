@@ -757,3 +757,11 @@ Production release `8c22d50` is deployed; immutable tag `v0.1.0-onboarding.1` ve
 - [x] PR14 recovery control released and used successfully; both website builds verified. Mentor Timeclock signed-in footer verified.
 - [x] Private current synthetic inventory refreshed (38 selected rows, <=40/table); permanent Coach/season/family readiness protected. Test accounts retained; no cleanup executed.
 - [ ] Broader rollout: actual FIRST link, calendar freshness, physical multi-device concurrency/reconnection and owner enrollment opening. Backups/recovery deferred; real signing disabled/separately gated. Earlier pending account-recovery checks are superseded by this checkpoint.
+
+
+## October 18 final configuration and owner deferral
+
+- FIRST invitation saved through actual Coach Settings from previously supplied private owner inputs; exact production match verified. Permanent setting retained in private preservation ledger.
+- Calendar sync verified fresh (44 seconds old), no error; read-only verification.
+- Owner explicitly defers physical clock-in concurrency/reconnection testing until later; it does not block rollout. No synthetic event or attendance was created.
+- Account/footer development goal complete with these accepted boundaries. Real signing remains disabled; backups/recovery deferred; test records intentionally retained with exact cleanup ledger. Enrollment timing remains the owner’s operational decision.

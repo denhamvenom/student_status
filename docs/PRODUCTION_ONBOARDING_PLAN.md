@@ -23,4 +23,4 @@ Private current inventory includes 38 selected rows, within 40/table scan and 10
 
 ## Remaining broader rollout checks
 
-Actual FIRST invitation configuration; calendar freshness; physical tablet/two-phone concurrency and reconnection; owner opening enrollment. Backups deferred/recovery unproven, real signing remains disabled and separately gated. These are explicit remaining launch items, not failures of the completed controlled account/footer batch. Retain prior G1–G7 development closure and evidence limits; no redundant whole-app audit.
+FIRST invitation saved from the previously supplied private owner inputs and exact-match verified. Calendar sync fresh (44 seconds old, no error). Owner explicitly deferred physical tablet/two-phone concurrency and reconnection on October 18 and instructed that it not block rollout. Enrollment timing remains an owner operational decision. Backups deferred/recovery unproven, real signing remains disabled and separately gated. These are accepted operational boundaries, not blockers to the completed development/account goal. Retain prior G1–G7 development closure and evidence limits; no redundant whole-app audit.
