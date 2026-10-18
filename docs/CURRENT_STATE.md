@@ -1,5 +1,9 @@
 # Current integration handoff
 
+## October 18 plain-language audit checkpoint
+
+Batch 0 source and read-only development investigation is complete; stop before Batch 1 for owner review. See [facts, wording gates and baseline failures](audit-2026-10-18/batch-0-findings.md) and the owner-provided [master audit](audit-2026-10-18/master_report_2026-10-18.md). No application/data changes or backend sync. Family forms converge after confirmation; Draft indicates incomplete reports; the missing Whole Team signup and UTC-midnight trip originate in development fixtures. Typecheck passed; baseline has nine private-helper lint errors and eight test failures (390 pass). Existing local Mentor screen opened without fixture mode. All implementation batches remain pending. Current development branch remains `feature/development-review-fixtures-2026-10-18`; production is out of scope.
+
 October 18: controlled footer/account rehearsal completed and verified; accepted operational deferrals are recorded below. Current branch feature/development-review-fixtures-2026-10-18. Root owns Git/backend/releases; Sol implementation and Astra review.
 
 ## Verified production state

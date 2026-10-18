@@ -1,5 +1,9 @@
 # Student Status implementation plan
 
+## October 18 plain-language audit
+
+Owner approved the [master audit](audit-2026-10-18/master_report_2026-10-18.md), with development-only work and a stop/report after each batch. [Batch 0 facts](audit-2026-10-18/batch-0-findings.md) are investigated, including server read-only checks of the two fixture issues and production wording gates. No implementation batch has started. Next: Batch 1 exact safe copy, then stop; preserve stored values, consent source wording, financial/safety guards and production boundaries. Baseline lint/test failures are documented separately from future regressions.
+
 Current production frontends are release `68179f7`; shared backend remains approved `8c22d50`. OAuth publication, five account roles, footer changes and family readiness are verified; see CURRENT_STATE.md and PRODUCTION_ONBOARDING_RELEASE.md. Real signing remains disabled. October 18: local source matches current main and development backend synchronized only to third-bandicoot-18 for the upcoming rehearsal.
 
 ## Frontend cleanup — owner decision October 17, implemented October 18

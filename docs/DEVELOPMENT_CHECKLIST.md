@@ -1,5 +1,14 @@
 # Student Status Development Checklist
 
+## Plain-language audit October 18
+
+- [x] Batch 0: confirm six prerequisite facts and inventory development wording gates; see [findings and baseline validation](audit-2026-10-18/batch-0-findings.md).
+- [ ] Owner review of Batch 0; Batch 1 safe text replacements and corresponding pinned tests.
+- [ ] Batch 2 money/consent/FIRST/health/safety wording; stop for review.
+- [ ] Batch 3 navigation/layout; stop for review.
+- [ ] Batch 4 approved behavior and later bug/data fixes, with shared-data writes separately authorized.
+- [ ] Green integrated checks and role-specific live browser checks for implementation batches. Current baseline: typecheck passes, nine private-helper lint errors, 390 tests pass/eight fail. No implementation or release is claimed by Batch 0.
+
 ## Controlled onboarding — October 18
 
 - [x] Save live Google information URLs; publish OAuth after explicit action-time approval.
