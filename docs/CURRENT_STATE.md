@@ -1,20 +1,18 @@
 # Current integration handoff
 
-## October 17 — controlled hosting packet ready for approval
+October 18 active goal: finish footer cleanup and controlled production role rehearsal. Current branch `feature/production-onboarding-2026-10-18`. See [PRODUCTION_ONBOARDING_PLAN.md](PRODUCTION_ONBOARDING_PLAN.md). Root owns Git/backend/releases; Sol implementation and Astra consolidated review.
 
-Workspace: this repository, feature/student-status-completion. Candidate 75f1f31ee2f160cbaa4d3a99964a87b9ee34fca2 is remote-verified; subsequent release-packet work is documentation only. PR10 remains draft against feature/student-status-readiness-design. Application files match accepted checkpoint 87134fb. Main/Pages remains 18ef1c27b35f7a30a3c6edeb572d8eb452301538, main/root.
+## Completed
 
-Next: owner reviews [RELEASE_APPROVAL_PACKET.md](RELEASE_APPROVAL_PACKET.md). No hosting/merge approval yet. Packet covers exact-demo preservation, Pages source transition, integration/main release, backend and two Workers. Read-only merge simulation identified index.html and three root demo modify/delete conflicts; approved resolution must preserve current demo on its reference branch and retain candidate application files. No merge performed.
+- Existing production main `60505b4` hosts both apps and shared Convex `amicable-eel-413`. Exact approved tree and preserved demo verified; see [HOSTING_RELEASE_LOG.md](HOSTING_RELEASE_LOG.md). Main merges automatically deploy both frontends; do not merge casually.
+- Google live /about homepage, /privacy and /terms URLs saved. Owner explicitly approved publication; Google confirms External / In production; automated branding verification passed and verified branding was published.
+- Real Coach Google login succeeded. Read-only preflight confirmed verified identity and empty appUsers/seasons/events. Guarded production first-Coach operation created the approved 2026–2027 season (year 2027, startsAt 1799474400000). Both temporary bootstrap settings removed. Live Coach dashboard shows empty roster.
+- Owner explicitly confirmed four other named identities are test roles on live sites: Student, ordinary Mentor, Travel Lead and Parent. Account list, baseline IDs and cleanup ledger are Git-ignored at private-data/launch-testing-2026-10-18/ledger.json. Baseline confirms none of those four identities previously existed in production. Do not put their identifiers or test records in Git.
+- Footer cleanup implemented in both apps; Sol reports focused lint/types/build and representative 390 dark/1280 light checks pass with one footer and keyboard access. Astra source review passed; release pending. Authenticated Timeclock footer not yet observed.
+- Worker configs now explicitly disable workers.dev and preview URLs; local packaging dry runs completed, with sandbox-denied log-file writes only. Changes not deployed.
 
-## Completed configuration
+## In progress / boundaries
 
-- Google production project denham-venom-production under Foundation; one Web client for both apps, exact production callback, basic identity scopes only. External/Testing verified. Owner privately replaced production credentials; both matched the new client in memory without output. Public URL fields await hosting. See GOOGLE_PRODUCTION_SETUP.md.
-- Existing student-status-511411 retains development login and approved Calendar service account. Production amicable-eel-413 has ten expected settings; approved Calendar read previously verified HTTP200, signing pair previously validated, owner PIN presence verified. Do not regenerate or request secrets.
-- Public About/Privacy/Terms prepared and linked from both apps; approved organization and retention policy recorded in PRELAUNCH_DECISIONS.md.
-- Season approved: 2026–2027, year 2027, January 9 midnight America/Chicago (1799474400000). FIRST inputs remain private, not applied.
-
-## Evidence and boundaries
-
-Accepted development visual/source/build evidence remains in VISUAL_CHECKS.md and earlier reviews. No application changes or broad tests for Google/release documentation. Fresh release check verified remote candidate, main, Pages source and PR target; Cloudflare absence is earlier evidence and must be rechecked before creation.
-
-No deployment, main merge, Pages change, OAuth publication, bootstrap, data import or real signing. Bootstrap/signing gates unset; automatic deletion off. Real-domain sign-in, onboarding, calendar freshness and physical concurrency remain release checks. Paid backups deferred; recovery unproven. Completed settings and owner decisions need no repeat approval.
+- Minimal internal exact-ID cleanup preview/commit implemented; four focused real-flow/refusal tests, lint/typecheck and Astra consolidated review passed. Root Convex-specific typecheck passed. Release approval pending before synthetic profiles are provisioned. Archival alone is not physical deletion. Initial rehearsal excludes event participation, money, attendance and signatures until cleanup scope covers their dependencies.
+- Preserve the real Coach, season, existing credentials, Calendar/PIN settings and unrelated records. Test identities must use actual verified Google sign-in and supported account flows; no impersonation.
+- Footer/backend changes need reviewed release checkpoint before production deployment. No cleanup execution or synthetic role provisioning yet. Real signing disabled; paid backups deferred/recovery unproven. Existing development evidence remains valid; no whole-app re-audit.

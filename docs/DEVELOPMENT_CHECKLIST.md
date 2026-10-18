@@ -1,16 +1,35 @@
 # Student Status Development Checklist
 
-## Current prelaunch checkpoint — October17
+## Controlled onboarding — October 18
+
+- [x] Save live Google information URLs; publish OAuth after explicit action-time approval.
+- [x] Verify real Coach Google login and empty-target preflight; initialize real Coach/approved season; remove bootstrap switches; observe Coach dashboard.
+- [x] Initialize private account baseline and synthetic cleanup ledger; owner confirmed live-site rehearsal.
+- [x] Implement exact-ID synthetic cleanup support; four focused tests, lint/types and Astra source review passed. Not yet deployed; preserve real Coach/season.
+- [ ] Provision and verify Student, Mentor, Travel Lead and Parent using supported identity flows.
+- [ ] Release footer and explicit disabled Worker default/preview URL settings after review.
+
+## Frontend cleanup — implementation October 18
+
+- [ ] Consolidate About, Privacy and Terms into a single consistent, accessible footer in both apps; remove duplicate navigation elsewhere. Preserve public URLs and required workflow acknowledgements. Verify affected phone/desktop layouts and links before the next approved frontend release. Implemented with focused checks; Astra review passed; release pending. See [PLAN.md](PLAN.md).
+
+## Current prelaunch checkpoint — October 17
 
 - [x] Prepare RELEASE_APPROVAL_PACKET.md with verified remote/Pages identity, known four-file demo merge conflicts, hosting matrix and rollback gates.
-- [ ] Owner authorizes controlled hosting release; no merge, Pages change or deployment yet.
+- [x] Owner approved the ordered hosting batch on October 17.
+- [x] Preserve exact demo/reference branch, switch Pages and verify build/four file blobs.
+- [x] Merge PR10/PR11; Astra verifies candidate-preserving tree. Main release 60505b4.
+- [x] Deploy production Convex amicable-eel-413 from 60505b4; typecheck/schema validation passed, no index deletions.
+- [x] Temporary registration scope approved, used and removed; both Workers/domains deployed from 60505b4 and hosting checks passed. See HOSTING_RELEASE_LOG.md.
 
 - [x] Public About/Privacy/Terms and signed-out links in both apps; Terms exclude permission forms. Owner-approved concise public privacy; detailed operations internal.
 - [x] Approved Google project-only OAuth Config Editor and saved organizational support email.
 - [x] Post-migration calendar read verified; three production calendar settings privately installed/verified; owner PIN presence verified.
 - [x] Exact season name/year/date boundary approved; FIRST inputs remain private.
 - [x] Scoped frontend checks/builds and final Astra source review passed; representative local desktop/phone/light/dark page checks.
-- [ ] Release approval, Pages preservation/source switch, main merge, hosting, Google live URLs/publication prerequisites and real-domain/device proof. Nothing deployed.
+- [x] Frontend hosting complete; main-only builds and HTTPS domains verified.
+- [ ] Google live URL registration/publication prerequisites, real login/device proof and later bootstrap/signing gates remain separate.
+- [ ] Before the next frontend deployment, explicitly preserve disabled workers.dev and version preview URLs.
 - [x] Resolve Google separate-project applicability from official policy and owner-confirmed audience; prepare GOOGLE_PRODUCTION_SETUP.md approval packet.
 - [x] Owner approved production Google setup; created denham-venom-production under Foundation. Creator already has project access; no manual IAM grant.
 - [x] Owner authorized User Data Policy acceptance; branding, identity scopes and shared production Web client saved. External/Testing verified.
@@ -30,14 +49,14 @@ Earlier checklist entries are historical where superseded by CURRENT_STATE.md; u
 - [x] Production JWT signing pair installed privately and stored pair verified with RS256 sign/verify.
 - [ ] Real-origin OAuth verification remains post-deploy; Cloudflare creation remains gated; neither app deployed.
 
-- [x] October17: prepared production configuration/build matrix and release/Pages-transition/rollback sequence in LAUNCH_CONFIGURATION_PLAN.md; verified Convex, Google and Cloudflare DNS/Worker gaps read-only.
+- [x] October 17: prepared production configuration/build matrix and release/Pages-transition/rollback sequence in LAUNCH_CONFIGURATION_PLAN.md; verified Convex, Google and Cloudflare DNS/Worker gaps read-only.
 - [x] Cloudflare GitHub connection inspected after login: existing denhamvenom connection lists student_status.
 - [x] Consolidated configuration approval received; approved origin/OAuth/signing setup applied. Launch remains separately gated.
 
-- [x] October17: Convex administrator/plan and existing production identity/default protections checked read-only. Production reports Never deployed; owner-approved organizational Admin invitation accepted and membership verified.
+- [x] October 17: Convex administrator/plan and existing production identity/default protections checked read-only. Production reports Never deployed; owner-approved organizational Admin invitation accepted and membership verified.
 - [ ] At each phase transition, assess whether a fresh chat would improve accuracy and prepare a handoff when needed.
 
-- [x] October17: existing Google Cloud project moved into Foundation organization with owner-approved administrator roles; External OAuth verified after migration. Details: ONLINE_READINESS_HANDOFF.md.
+- [x] October 17: existing Google Cloud project moved into Foundation organization with owner-approved administrator roles; External OAuth verified after migration. Details: ONLINE_READINESS_HANDOFF.md.
 - [ ] OAuth remains Testing; finish branding/production configuration and verify real-origin sign-in separately. Convex organizational Admin membership verified; production configuration and Cloudflare Git hosting preparation remain open; backups/paid upgrade deferred.
 
 Updated October 16, 2026. Owner closed the development visual review cycle at 1f20ca8; Parent/Student setup and review corrections are complete. Current disposition supersedes historical unchecked boxes. Original G1–G7 scope and valid evidence are preserved.

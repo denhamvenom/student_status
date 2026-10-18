@@ -1,6 +1,6 @@
 # Timeclock backend handoff
 
-Current-status note (October 17): this is the historical backend contract/foundation handoff. Its scaffold, worktree and frc8044.org hostname statements describe that earlier stage. The integrated frontend now resides in the Student Status completion branch; approved production host is `timeclock.team8044.org`. Calendar settings and operator PIN presence are verified on production, but production application deployment and live-device proof remain pending. See CURRENT_STATE.md and NEXT_CHAT_HANDOFF.md for current ownership, evidence and release gates.
+Current-status note (October 17): this is a historical foundation handoff; scaffold/worktree/frc8044.org statements describe that earlier stage. Integrated frontend is now in main release 60505b4; approved host timeclock.team8044.org. Shared production Convex deployed successfully from that revision with existing Calendar/PIN settings. Worker/domain hosting is complete; signed-out page and deep-link reload verified. Production sign-in and live-device proof remain pending. See CURRENT_STATE.md and HOSTING_RELEASE_LOG.md.
 
 Historical foundation status: implemented in development; frontend scaffold only. Final Git checkpoint and PR are recorded in the publication section below. This document is the contract for the separate frontend chat, not permission to deploy production.
 

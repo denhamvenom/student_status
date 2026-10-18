@@ -1,6 +1,16 @@
 # Student Status implementation plan
 
-Current release proposal: [RELEASE_APPROVAL_PACKET.md](RELEASE_APPROVAL_PACKET.md) defines exact candidate, Pages preservation, known merge conflicts, deployment matrix and stop/rollback gates. Awaiting owner approval; no release action performed. It supersedes historical pending setup items below.
+The owner-approved October 17 controlled hosting release is complete. Main `60505b4e04976598956bc1353a53e7d4daf63b9d` is deployed to shared production Convex and both Cloudflare Workers; its entire tree matches approved packet checkpoint `574c910`. [Student Status](https://students.team8044.org) and [Timeclock](https://timeclock.team8044.org) passed focused hosting checks. See [HOSTING_RELEASE_LOG.md](HOSTING_RELEASE_LOG.md). OAuth publication, production sign-in acceptance, bootstrap, enrollment and real signing remain separate gates.
+
+## Frontend cleanup — owner decision October 17, implemented October 18
+
+Consolidate About, Privacy and Terms navigation into one consistent, accessible footer in Student Status and Timeclock. Remove duplicate navigation links elsewhere, including sign-in/entry areas. Keep the existing public pages and direct URLs available without login; preserve any context-specific consent or acknowledgement required by a workflow. This supersedes the earlier repeated-link placement decision, not the approved policy content.
+
+Queue this for the next frontend change batch. Verify affected signed-out/signed-in layouts at phone and desktop sizes, footer keyboard access and all three destinations. Use focused checks; no backend changes are needed. Status: implemented with focused builds/layout checks; independent review and deployment pending. Controlled production account rehearsal and cleanup work are in [PRODUCTION_ONBOARDING_PLAN.md](PRODUCTION_ONBOARDING_PLAN.md).
+
+## Historical planning and approval record
+
+The following records earlier checkpoints; current status above supersedes pending/undeployed statements.
 
 Execution complete October 17: owner approved setup and User Data Policy acceptance. Google project denham-venom-production created under Foundation; Denham Venom Production Web client serves both approved origins and exact amicable-eel-413 callback. Branding/support and production domains saved; only openid/userinfo.email/userinfo.profile declared. External/Testing verified; public URL fields await hosting. Creator admin has automatic Owner access, so no manual IAM grant was needed. Owner privately replaced production AUTH_GOOGLE_ID and AUTH_GOOGLE_SECRET. Both saved values were compared in memory against the new Google client and matched; no values were printed or persisted in documentation. Production dashboard shows both settings present with no pending Save. Development, Calendar, signing keys and PIN were not changed by this setup. No deployment, merge, OAuth publication, bootstrap or real signing. Live OAuth remains unverified until authorized hosting. Earlier approval/transfer-pending text below is historical.
 

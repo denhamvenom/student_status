@@ -33,6 +33,10 @@ select,[data-slot="native-select-wrapper"]{max-width:100%}
 .roster-filters{display:flex;flex-wrap:wrap;gap:12px}.roster-filters>*{flex:1;min-width:180px}.roster-filters [aria-pressed=true]{background:var(--purple-700);color:white}
 
 /* Keep section headings below the sticky shell and event navigation. */
+.app-frame{min-height:100vh;display:flex;flex-direction:column}
+.app-frame>:first-child{flex:1}
+.app-frame>.signin,.app-frame>.app-shell{min-height:0}
+@media(max-width:1023px){.app-frame footer{padding-bottom:84px}}
 [id^="event-"]{scroll-margin-top:232px}
 @media(max-width:1023px){.event-workspace-nav{top:72px}[id^="event-"]{scroll-margin-top:156px}}
 

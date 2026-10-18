@@ -30,11 +30,13 @@ import type { DataModel } from "./dataModel.js";
 type Env = {
   readonly CONVEX_CLOUD_URL: string;
   readonly CONVEX_SITE_URL: string;
-  readonly SITE_URL: string | undefined;
-  readonly PERMISSION_REAL_SIGNING_ENABLED: string | undefined;
   readonly PERMISSION_REAL_SIGNING_CLOUD_URL: string | undefined;
-  readonly PRODUCTION_BOOTSTRAP_ENABLED: string | undefined;
+  readonly PERMISSION_REAL_SIGNING_ENABLED: string | undefined;
   readonly PRODUCTION_BOOTSTRAP_CLOUD_URL: string | undefined;
+  readonly PRODUCTION_BOOTSTRAP_ENABLED: string | undefined;
+  readonly SITE_URL: string | undefined;
+  readonly SYNTHETIC_REHEARSAL_CLEANUP_CLOUD_URL: string | undefined;
+  readonly SYNTHETIC_REHEARSAL_CLEANUP_ENABLED: string | undefined;
   readonly TIMECLOCK_CALENDAR_ID: string | undefined;
   readonly TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_EMAIL: string | undefined;
   readonly TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_PRIVATE_KEY: string | undefined;
