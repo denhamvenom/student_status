@@ -1,20 +1,21 @@
 # Current integration handoff
 
-## October 17 — controlled hosting packet ready for approval
+## October 17 — controlled hosting release in progress
 
-Workspace: this repository, feature/student-status-completion. Candidate 75f1f31ee2f160cbaa4d3a99964a87b9ee34fca2 is remote-verified; subsequent release-packet work is documentation only. PR10 remains draft against feature/student-status-readiness-design. Application files match accepted checkpoint 87134fb. Main/Pages remains 18ef1c27b35f7a30a3c6edeb572d8eb452301538, main/root.
+Owner approved the ordered RELEASE_APPROVAL_PACKET.md hosting batch on October 17. Pages preservation, PR10/PR11 merges and production backend deployment are complete. Main release is `60505b4e04976598956bc1353a53e7d4daf63b9d`, whose entire tree matches packet checkpoint `574c910`. Cloudflare Workers/custom domains are pending dashboard sign-in and narrow build access. See [HOSTING_RELEASE_LOG.md](HOSTING_RELEASE_LOG.md). Earlier no-approval/no-merge/no-deployment claims below describe historical checkpoints.
 
-Next: owner reviews [RELEASE_APPROVAL_PACKET.md](RELEASE_APPROVAL_PACKET.md). No hosting/merge approval yet. Packet covers exact-demo preservation, Pages source transition, integration/main release, backend and two Workers. Read-only merge simulation identified index.html and three root demo modify/delete conflicts; approved resolution must preserve current demo on its reference branch and retain candidate application files. No merge performed.
+Current checkout: docs/controlled-hosting-progress-2026-10-17, documentation only. Do not merge this branch merely to publish the handoff or change the approved frontend build SHA. PR10 and PR11 are merged. Application files still match accepted checkpoint 87134fb.
 
-## Completed configuration
+Pages uses demo-reference-2026-10-17/root at original main 18ef1c27b35f7a30a3c6edeb572d8eb452301538. Build succeeded; all four live demo files exactly matched original Git blobs. Production Convex amicable-eel-413 deployed successfully from 60505b4; typecheck/schema validation passed and no indexes were deleted. Astra independently verified the release merge tree/parents. No broad tests repeated.
 
-- Google production project denham-venom-production under Foundation; one Web client for both apps, exact production callback, basic identity scopes only. External/Testing verified. Owner privately replaced production credentials; both matched the new client in memory without output. Public URL fields await hosting. See GOOGLE_PRODUCTION_SETUP.md.
-- Existing student-status-511411 retains development login and approved Calendar service account. Production amicable-eel-413 has ten expected settings; approved Calendar read previously verified HTTP200, signing pair previously validated, owner PIN presence verified. Do not regenerate or request secrets.
-- Public About/Privacy/Terms prepared and linked from both apps; approved organization and retention policy recorded in PRELAUNCH_DECISIONS.md.
-- Season approved: 2026–2027, year 2027, January 9 midnight America/Chicago (1799474400000). FIRST inputs remain private, not applied.
+Next: owner signs in to the open Cloudflare dashboard, then finish the packet's two Workers/custom domains and focused hosting checks. Connector denied token-permission inspection. No target Workers/build triggers/custom domains created. Recheck inventories and main SHA before submission. Do not repeat backend deployment without a concrete reason.
 
-## Evidence and boundaries
+## Completed configuration and boundaries
 
-Accepted development visual/source/build evidence remains in VISUAL_CHECKS.md and earlier reviews. No application changes or broad tests for Google/release documentation. Fresh release check verified remote candidate, main, Pages source and PR target; Cloudflare absence is earlier evidence and must be rechecked before creation.
+- Google project denham-venom-production under Foundation; shared Web client, exact production callback and basic identity scopes. External/Testing. Owner privately replaced both credentials; exact in-memory comparison passed without output. Public URLs await hosting. See GOOGLE_PRODUCTION_SETUP.md.
+- Existing student-status-511411 retains development login and Calendar service account. Production has ten expected settings; prior Calendar read/signing-pair validation/PIN presence accepted. Do not regenerate or request secrets.
+- Public About/Privacy/Terms linked from both apps. Approved organization/retention policy in PRELAUNCH_DECISIONS.md.
+- Season 2026–2027, year 2027, January 9 midnight America/Chicago (1799474400000) approved. FIRST inputs private, not applied.
+- No OAuth publication, bootstrap, data import, enrollment or real signing. Bootstrap/signing gates unset; automatic deletion off. Real-origin sign-in, onboarding, calendar freshness and physical concurrency remain later checks. Paid backups deferred; recovery unproven.
 
-No deployment, main merge, Pages change, OAuth publication, bootstrap, data import or real signing. Bootstrap/signing gates unset; automatic deletion off. Real-domain sign-in, onboarding, calendar freshness and physical concurrency remain release checks. Paid backups deferred; recovery unproven. Completed settings and owner decisions need no repeat approval.
+Completed settings and owner decisions need no repeat approval. Browser action-time security-grant confirmation may still apply when creating build access. Accepted development evidence remains in VISUAL_CHECKS.md and prior reviews.

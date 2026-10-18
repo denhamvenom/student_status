@@ -1,9 +1,11 @@
-# Next step: controlled hosting approval
+# Next step: finish approved Cloudflare hosting
 
-Read AGENTS.md, the context-checkpoint skill, CURRENT_STATE.md and RELEASE_APPROVAL_PACKET.md. Verify checkout/remote before acting. Branch feature/student-status-completion; draft PR10 targets feature/student-status-readiness-design. Main is 18ef1c27b35f7a30a3c6edeb572d8eb452301538; Pages main/root.
+Read AGENTS.md, the context-checkpoint skill, CURRENT_STATE.md, HOSTING_RELEASE_LOG.md and RELEASE_APPROVAL_PACKET.md. Verify checkout and remote before acting.
 
-Google setup and private production credential transfer are complete; preserve External/Testing. No credentials needed from the owner. Public pages and existing Calendar/signing/PIN configuration are prepared. See GOOGLE_PRODUCTION_SETUP.md and PRELAUNCH_DECISIONS.md.
+Owner approved the ordered RELEASE_APPROVAL_PACKET.md hosting batch on October 17. Pages preservation, PR10/PR11 merges and production backend deployment are complete. Main release is `60505b4e04976598956bc1353a53e7d4daf63b9d`, whose entire tree matches packet checkpoint `574c910`. Cloudflare Workers/custom domains are pending dashboard sign-in and narrow build access. See [HOSTING_RELEASE_LOG.md](HOSTING_RELEASE_LOG.md). Earlier no-approval/no-merge/no-deployment claims below describe historical checkpoints.
 
-Release approval is pending. The packet proposes demo-reference-2026-10-17 from exact current main, Pages switch and verification before main merge, candidate-preserving conflict resolution, and one coordinated Convex/two-Worker deployment. Four root demo files conflict with the application layout; no release merge has occurred. Preserve the actual live demo rather than relying on older demo/ archives.
+Current documentation branch: docs/controlled-hosting-progress-2026-10-17. Keep main at 60505b4 during this release. Do not repeat completed deployment or accepted tests without a concrete failure.
 
-After approved hosting, Google URLs/verification/publication and first-Coach setup remain subsequent gates; do not silently include them. Coach identity coach@team8044.org; shared Timeclock uses ordinary Mentor. Season values and private FIRST inputs are settled. Real signing and recovery remain separately gated, paid backups deferred. No broad audit repetition.
+Cloudflare dashboard needs owner sign-in. Connector can inspect Workers/DNS/build-token metadata but denied token-permission inspection. No target Workers, triggers, build tokens or custom domains created. After sign-in, recheck inventory/repository connection, apply the exact packet matrix/narrow access and deploy both frontends from 60505b4. Verify HTTPS/deep links/public pages/production endpoint and record build IDs/versions. Browser action-time confirmation may apply to granting build access; explain that specific requirement if needed.
+
+Google setup/private credential transfer complete; preserve External/Testing. No secrets needed from owner. Google URLs/verification/publication, first-Coach initialization, enrollment and real signing remain later gates. Coach identity coach@team8044.org; Timeclock uses ordinary Mentor. Season/FIRST decisions settled. Paid backups deferred; recovery unproven.
