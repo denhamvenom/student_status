@@ -322,9 +322,13 @@ function Settings({viewer}:{viewer:Viewer}){const saveTheme=useMutation(mSetThem
 export default function LiveApp(){const viewer=useQuery(qViewer,{}) as Viewer|undefined;const location=useLocation();const {setTheme}=useTheme();useEffect(()=>{if(viewer?.user?.theme)setTheme(viewer.user.theme)},[viewer?.user?.theme,setTheme]);if(location.pathname==='/invite-adult')return <AdultInvitationLanding viewer={viewer}/>;if(location.pathname==='/invite-parent')return <ParentInvitationLanding viewer={viewer}/>;if(!viewer)return <div className="signin-content"><State>{liveCopy.states.connecting}</State></div>;if(viewer.status==='signedOut')return <SignIn/>;if(viewer.status==='pending')return <PendingJoin/>;if(viewer.user?.role==='parent')return <SetupEntryGate key={`${viewer.user.id}:${viewer.season?._id}`}><ParentRosterGate viewer={viewer}/></SetupEntryGate>;if(viewer.user?.role==='student')return <SetupEntryGate key={`${viewer.user.id}:${viewer.season?._id}`}><LiveRoutes viewer={viewer}/></SetupEntryGate>;return <LiveRoutes viewer={viewer}/>}
 function SetupEntryGate({children}:{children:React.ReactNode}) {
   const getSummary=useMutation(api.setupWizard.summary)
+  const {signOut}=useAuthActions()
   const [ready,setReady]=useState(false)
   const [error,setError]=useState('')
+  const [signOutError,setSignOutError]=useState('')
+  const [signingOut,setSigningOut]=useState(false)
   const navigate=useNavigate(),location=useLocation(),checked=useRef(false)
+  const exit=async()=>{setSignOutError('');setSigningOut(true);try{await signOut()}catch{setSignOutError(liveCopy.join.signOutFailed)}finally{setSigningOut(false)}}
   useEffect(()=>{
     if(checked.current)return
     checked.current=true
@@ -333,7 +337,7 @@ function SetupEntryGate({children}:{children:React.ReactNode}) {
       setReady(true)
     }).catch(()=>setError('We could not check your setup information. Please reload to try again.'))
   },[getSummary,navigate,location.pathname])
-  if(error)return <div className="content"><p role="alert">{error}</p><Button onClick={()=>window.location.reload()}>Reload</Button></div>
+  if(error)return <div className="content"><p role="alert">{error}</p><div className="action-row"><Button onClick={()=>window.location.reload()}>Reload</Button><Button variant="outline" disabled={signingOut} onClick={()=>void exit()}>{liveCopy.settings.signOut}</Button></div>{signOutError&&<p role="alert">{signOutError}</p>}</div>
   if(!ready)return <div className="content"><p role="status">Checking setup information…</p></div>
   return children
 }

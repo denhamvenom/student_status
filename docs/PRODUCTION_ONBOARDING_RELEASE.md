@@ -42,3 +42,8 @@ Production release `8c22d50` is deployed; immutable tag `v0.1.0-onboarding.1` ve
 Owner explicitly approved candidate 5c2a9f42118311c9eefdd3ecb7758ca9001b2cc8. PR13 merged at f4bd7dc8eeaa6bca7584ca55bff949339070debb; exact tree comparison was empty. Student build 264e93be-1507-4114-bb90-3d19efcbd191 succeeded at 15:08:41Z; Timeclock build f3603601-8556-4779-b377-7ab79fde6b1e succeeded at 15:09:19Z, both from that merge SHA. No backend deployment.
 
 Travel invitation accepted using the approved Google identity; dashboard and read-only permission check confirm Travel Lead without finance editing or health export. After loading the released site, sign-out and ordinary Google login returned directly to the root Travel dashboard. Parent invitation acceptance remains pending. Private ledger updated. No cleanup or real signing. Release tag: v0.1.0-onboarding.2.
+
+
+## Pending Parent recovery packet
+
+Parent accepted the authorized synthetic invitation, but production has never completed familyLinkSeasonBackfill. Existing Parent summary intentionally withholds access. One synthetic family link confirmed by bounded private preflight. Add only a normal Sign out action to the error fallback so the operator can switch to actual Coach; Reload and backend access guards stay intact. Scoped lint and TypeScript/build passed. After approved frontend release, use existing Coach Settings maintenance on production amicable-eel-413, verify backfill plus verification pass complete, then verify Parent's own setup/dashboard. No new backend deployment, no real personal-data entry, no cleanup or signing.

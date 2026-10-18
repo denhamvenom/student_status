@@ -745,3 +745,7 @@ Production release `8c22d50` is deployed; immutable tag `v0.1.0-onboarding.1` ve
 - [x] Investigate and implement explicit root destination for ordinary Google sign-in after observed stale invitation redirects; scoped lint/types/build and independent source review pass.
 - [x] PR13 approved/released; both website builds succeeded; fresh Travel Google login returned directly to root dashboard. Travel invitation accepted and permissions verified.
 - [ ] Finish Parent Google login and invitation acceptance with honest relationship-authority handling; authenticated Timeclock footer evidence remains open.
+
+- [x] Production Parent Google login and synthetic invitation acceptance, explicitly approved simulated relationship/attestation logged privately.
+- [x] Production Timeclock Mentor Google login and authenticated footer verified.
+- [ ] Complete existing production family-link readiness setup through Coach maintenance and verify Parent dashboard. Add sign-out recovery to setup-error screen; no season guard bypass.
