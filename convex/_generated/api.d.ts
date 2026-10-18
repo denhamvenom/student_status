@@ -98,6 +98,7 @@ import type * as permissionsV2Pdf from "../permissionsV2Pdf.js";
 import type * as profileSetup from "../profileSetup.js";
 import type * as retentionReview from "../retentionReview.js";
 import type * as retentionSchema from "../retentionSchema.js";
+import type * as reviewerRehearsal from "../reviewerRehearsal.js";
 import type * as rooms from "../rooms.js";
 import type * as seasonAdmin from "../seasonAdmin.js";
 import type * as seasonConfirmation from "../seasonConfirmation.js";
@@ -211,6 +212,7 @@ declare const fullApi: ApiFromModules<{
   profileSetup: typeof profileSetup;
   retentionReview: typeof retentionReview;
   retentionSchema: typeof retentionSchema;
+  reviewerRehearsal: typeof reviewerRehearsal;
   rooms: typeof rooms;
   seasonAdmin: typeof seasonAdmin;
   seasonConfirmation: typeof seasonConfirmation;
