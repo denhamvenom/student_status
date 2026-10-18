@@ -1,0 +1,91 @@
+import { SignJWT, importPKCS8 } from "jose";
+import { env, internalAction } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { normalizeCalendarEvent } from "./lib/calendarNormalize";
+import { v } from "convex/values";
+
+const scope = "https://www.googleapis.com/auth/calendar.readonly";
+const tokenEndpoint = "https://oauth2.googleapis.com/token";
+
+async function serviceToken(email: string, privateKey: string): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const key = await importPKCS8(privateKey.replace(/\\n/g, "\n"), "RS256");
+  const assertion = await new SignJWT({ scope }).setProtectedHeader({ alg: "RS256", typ: "JWT" })
+    .setIssuer(email).setAudience(tokenEndpoint).setIssuedAt(now).setExpirationTime(now + 3600).sign(key);
+  const response = await fetch(tokenEndpoint, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion }) });
+  if (!response.ok) throw new Error(`Calendar token request failed (${response.status})`);
+  const body: unknown = await response.json();
+  if (!body || typeof body !== "object" || !("access_token" in body) || typeof body.access_token !== "string") throw new Error("Calendar token response was invalid");
+  return body.access_token;
+}
+
+async function hashId(id: string) {
+  const bytes = new TextEncoder().encode(id);
+  return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))).map(x => x.toString(16).padStart(2, "0")).join("");
+}
+
+export const refresh = internalAction({
+  args: {}, returns: v.null(),
+  handler: async (ctx) => {
+    const calendarId = env.TIMECLOCK_CALENDAR_ID;
+    const email = env.TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_EMAIL;
+    const privateKey = env.TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_PRIVATE_KEY;
+    if (!calendarId || !email || !privateKey) return null;
+    const now = Date.now();
+    const state = await ctx.runMutation(internal.calendarState.begin, { calendarIdHash: await hashId(calendarId), now });
+    if (!state) return null;
+    try {
+      const token = await serviceToken(email, privateKey);
+      let pageToken: string | undefined;
+      let syncToken: string | undefined;
+      let attemptedFullRetry = false;
+      let priorToken = state.syncToken;
+      let pages = 0;
+      while (true) {
+        const url = new URL(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`);
+        url.searchParams.set("singleEvents", "true");
+        url.searchParams.set("showDeleted", "true");
+        url.searchParams.set("maxResults", "2500");
+        if (priorToken) url.searchParams.set("syncToken", priorToken);
+        else url.searchParams.set("timeMin", new Date(now - 60 * 86_400_000).toISOString());
+        if (pageToken) url.searchParams.set("pageToken", pageToken);
+        const response = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+        if (response.status === 410 && priorToken && !attemptedFullRetry) {
+          priorToken = undefined; pageToken = undefined; attemptedFullRetry = true; pages = 0; continue;
+        }
+        if (!response.ok) throw new Error(`Calendar events request failed (${response.status})`);
+        const data: unknown = await response.json();
+        if (!data || typeof data !== "object") throw new Error("Calendar events response was invalid");
+        const payload = data as { items?: unknown; nextPageToken?: unknown; nextSyncToken?: unknown };
+        const items = payload.items === undefined ? [] : payload.items;
+        if (!Array.isArray(items)) throw new Error("Calendar events list was invalid");
+        for (const item of items) {
+          if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error("Calendar event was invalid");
+          const event = normalizeCalendarEvent(item as Record<string, unknown>, now, state.generation);
+          if (!event) throw new Error("Calendar event was invalid");
+          await ctx.runMutation(internal.timeclock.applyCalendarOccurrence, event);
+        }
+        pageToken = typeof payload.nextPageToken === "string" ? payload.nextPageToken : undefined;
+        syncToken = typeof payload.nextSyncToken === "string" ? payload.nextSyncToken : undefined;
+        if (++pages > 20) throw new Error("Calendar sync exceeded its page limit");
+        if (!pageToken) break;
+      }
+      if (!syncToken) throw new Error("Calendar did not return a sync token");
+      if (!state.syncToken || attemptedFullRetry) {
+        let cursor: string | null = null;
+        for (let batch = 0; batch < 100; batch++) {
+          const progress: { continueCursor: string | null; isDone: boolean } = await ctx.runMutation(internal.timeclock.reconcileCalendarGeneration, { generation: state.generation, cursor, windowStart: now - 60 * 86_400_000 });
+          if (progress.isDone) break;
+          if (!progress.continueCursor || batch === 99) throw new Error("Calendar reconciliation exceeded its batch limit");
+          cursor = progress.continueCursor;
+        }
+      }
+      await ctx.runMutation(internal.calendarState.finish, { generation: state.generation, now: Date.now(), syncToken });
+    } catch (error) {
+      const message = error instanceof Error && /^(Calendar (?:token request failed|events request failed|events response was invalid|events list was invalid|event was invalid|did not return a sync token|sync exceeded its page limit|reconciliation exceeded its batch limit))/.test(error.message)
+        ? error.message : "Calendar authentication or synchronization failed";
+      await ctx.runMutation(internal.calendarState.finish, { generation: state.generation, now: Date.now(), error: message });
+    }
+    return null;
+  },
+});

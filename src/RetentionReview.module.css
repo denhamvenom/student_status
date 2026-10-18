@@ -1,0 +1,23 @@
+.page { display: grid; gap: 1.25rem; }
+.header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.header p, .muted { color: var(--muted-foreground); }
+.tabs { display: flex; flex-wrap: wrap; gap: .5rem; }
+.list { display: grid; gap: .75rem; }
+.row { display: grid; grid-template-columns: minmax(12rem, 1fr) minmax(10rem, auto) auto; gap: .75rem 1rem; align-items: center; padding: .9rem 0; border-top: 1px solid var(--border); }
+.name { display: grid; gap: .2rem; min-width: 0; }
+.name strong { overflow-wrap: anywhere; }
+.meta { display: grid; gap: .15rem; font-size: .875rem; }
+.held { color: var(--destructive); font-weight: 600; }
+.detail { display: grid; gap: 1rem; max-height: 72vh; overflow-y: auto; }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
+.facts div { display: grid; gap: .15rem; }
+.facts dt { color: var(--muted-foreground); font-size: .8rem; }
+.facts dd { margin: 0; font-weight: 600; }
+.notice { border: 1px solid var(--border); border-radius: .65rem; padding: .8rem; background: var(--muted); }
+.classes { margin: 0; padding-left: 1.3rem; }
+.form { display: grid; gap: .7rem; }
+.form label { display: grid; gap: .35rem; font-weight: 600; }
+.history { display: grid; gap: .55rem; }
+.historyItem { border-top: 1px solid var(--border); padding-top: .6rem; }
+.historyItem p { margin: .2rem 0; overflow-wrap: anywhere; }
+@media (max-width: 42rem) { .row { grid-template-columns: 1fr; } .facts { grid-template-columns: 1fr; } }

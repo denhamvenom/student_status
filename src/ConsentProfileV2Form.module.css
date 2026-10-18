@@ -1,0 +1,14 @@
+.card { display: grid; gap: 1rem; }
+.form, .form fieldset { display: grid; gap: 1rem; min-width: 0; border: 0; padding: 0; margin: 0; }
+.form section { display: grid; gap: .75rem; border-top: 1px solid var(--border, #ded8e8); padding-top: 1rem; }
+.form h3, .form h4 { margin: 0; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+.form label { display: grid; gap: .3rem; min-width: 0; font-weight: 600; }
+.form input, .form textarea, .form select { width: 100%; min-width: 0; }
+.row { display: grid; gap: .75rem; border: 1px solid var(--border, #ded8e8); border-radius: .75rem; padding: 1rem; }
+.row button { justify-self: start; }
+.notice, .ready, .error { padding: .75rem 1rem; border-radius: .5rem; }
+.notice { background: #fff5db; }
+.ready { background: #e9f6ee; }
+.error { background: #fce8e8; color: #7d1818; }
+@media (max-width: 650px) { .fields { grid-template-columns: minmax(0, 1fr); } }

@@ -1,0 +1,19 @@
+* text=auto
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.mjs text eol=lf
+*.json text eol=lf
+*.jsonc text eol=lf
+*.css text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.ps1 text eol=crlf
+# Preserve the imported bundled prototype byte-for-byte.
+demo/*.html -text
+*.png binary
+*.jpg binary
+*.ttf binary
+*.woff binary
+*.woff2 binary

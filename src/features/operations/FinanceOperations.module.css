@@ -1,0 +1,18 @@
+.panel { margin-top: 1.5rem; padding: 1.25rem; border: 1px solid var(--border-default); border-radius: 8px; background: var(--surface-card); box-shadow: var(--shadow-sm); }
+.panel h2 { margin: 0 0 .5rem; font: 400 24px/1.1 Anton, Impact, sans-serif; }
+.note { color: var(--muted-foreground); margin: 0 0 1rem; }
+.balances { display: flex; flex-wrap: wrap; gap: .75rem 1.5rem; margin-bottom: 1.25rem; padding: .75rem 0; border-block: 1px solid var(--border-default); }
+.balances span { display: flex; flex-wrap: wrap; gap: .4rem; }
+.switch { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
+.form { margin: 0; }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: 1rem; align-items: end; border: 0; margin: 0; padding: 0; min-width: 0; }
+.form label { display: grid; gap: .35rem; }
+.wide { grid-column: 1 / -1; }
+.error { color: var(--destructive); margin-top: 1rem; }
+.success { color: var(--go-dot); margin-top: 1rem; }
+@media (max-width: 767px) {
+  .panel { padding: 1rem; }
+  .balances { display: grid; gap: .75rem; }
+  .switch > button { flex: 1 1 100%; white-space: normal; }
+  .fields > button { width: 100%; white-space: normal; }
+}
