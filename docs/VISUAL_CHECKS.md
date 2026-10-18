@@ -1,5 +1,9 @@
 # Visual review closed — October 16, 2026
 
+## October 18 footer follow-up
+
+Footer-only navigation implementation and representative local evidence are recorded in [FRONTEND_CONFORMANCE_LOG.md](FRONTEND_CONFORMANCE_LOG.md). Public/signed-out phone and desktop checks passed; authenticated Timeclock footer remains to observe during the authorized Mentor production rehearsal. Do not reopen completed October 16 visual acceptance or repeat unrelated captures.
+
 Owner closed the development visual cycle at1f20ca8. Fresh independent Astra review found no blocking findings. Prior accepted evidence and explicitly unobserved states remain below; they are not a new visual queue. Item5 reopened explanation is implemented. Next phase and production gates: [ONLINE_READINESS_HANDOFF.md](ONLINE_READINESS_HANDOFF.md). No production approval implied.
 
 ## FIRST reopened explanation — October 16 follow-up

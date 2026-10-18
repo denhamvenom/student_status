@@ -1,4 +1,5 @@
 .review{--rr-card:var(--surface-card,#fff);--rr-page:var(--surface-page,#fff);--rr-text:var(--text-body,#222);--rr-muted:var(--text-muted,#6b6b6b);--rr-border:var(--border-default,#c9cccf);--rr-link:var(--text-link,#461d7c);--rr-accent:var(--accent-text,#461d7c);--rr-purple:var(--purple-700,#461d7c);--rr-metal:var(--surface-metal,#edeeef);--rr-ready-bg:var(--go-bg,#e3f1e5);--rr-ready:var(--go-dot,#2e7d32);--rr-open-bg:var(--stop-bg,#f8e1df);--rr-open:var(--stop-dot,#b3261e);min-height:100vh;background:var(--rr-page);color:var(--rr-text);font:15px/1.5 'Segoe UI',system-ui,-apple-system,sans-serif}
+:global(.app-frame)>.review{min-height:0}
 .review *{box-sizing:border-box}
 .review h1,.review h2,.review h3{font-family:Anton,Impact,sans-serif;font-weight:400;line-height:1.1;margin:0}
 .review h1{font-size:clamp(28px,4vw,40px)}

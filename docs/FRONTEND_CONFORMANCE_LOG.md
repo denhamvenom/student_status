@@ -1,5 +1,9 @@
 # Frontend conformance work log
 
+## October 18 footer-only public navigation
+
+Owner requested About/Privacy/Terms only in a consistent footer. Sol implemented shared Student Status footer across app/public routes and removed sign-in/header duplicates; Timeclock footer now owns the three existing links and remains visible in the active shell. Public content, routes, consent workflows and mobile navigation clearance preserved. Sol reported focused root typecheck/build/scoped lint and Timeclock lint/typecheck/build passed. Local Chrome 390 dark/1280 light checks on public pages, signed-out entry, synthetic Coach review and Timeclock entry found one footer, all three links and no horizontal overflow; keyboard About-to-Privacy and Student privacy navigation verified. Authenticated Timeclock not visually observed. Astra source review found no blocking findings; no redundant builds rerun. Representative screenshot saved outside Git. Not yet deployed.
+
 ## October 15 wizard-review correction checkpoint
 
 Updated report cutting pass applied while retaining prototype fonts, colors, navigation, full-page wizard cards and later features. B1 controls wrap; B2 next-item labels match saved setup stages; B3 uses one FIRST report control. All rows mapped in VISUAL_CHECKS.md. Representative live desktop Student Home/setup/completion and Coach FIRST/settings inspected; Parent FIRST checked at360 and390 with no horizontal overflow. Private evidence under wizard-corrections. Focused regressions, lint/types/build, packaging and scoped Astra review pass. Approved PDF unchanged. Owner recheck remains open.

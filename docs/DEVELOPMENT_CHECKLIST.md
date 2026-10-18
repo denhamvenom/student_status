@@ -1,8 +1,17 @@
 # Student Status Development Checklist
 
-## Pending frontend cleanup — October 17
+## Controlled onboarding — October 18
 
-- [ ] Consolidate About, Privacy and Terms into a single consistent, accessible footer in both apps; remove duplicate navigation elsewhere. Preserve public URLs and required workflow acknowledgements. Verify affected phone/desktop layouts and links before the next approved frontend release. Agreed, not implemented; see [PLAN.md](PLAN.md).
+- [x] Save live Google information URLs; publish OAuth after explicit action-time approval.
+- [x] Verify real Coach Google login and empty-target preflight; initialize real Coach/approved season; remove bootstrap switches; observe Coach dashboard.
+- [x] Initialize private account baseline and synthetic cleanup ledger; owner confirmed live-site rehearsal.
+- [x] Implement exact-ID synthetic cleanup support; four focused tests, lint/types and Astra source review passed. Not yet deployed; preserve real Coach/season.
+- [ ] Provision and verify Student, Mentor, Travel Lead and Parent using supported identity flows.
+- [ ] Release footer and explicit disabled Worker default/preview URL settings after review.
+
+## Frontend cleanup — implementation October 18
+
+- [ ] Consolidate About, Privacy and Terms into a single consistent, accessible footer in both apps; remove duplicate navigation elsewhere. Preserve public URLs and required workflow acknowledgements. Verify affected phone/desktop layouts and links before the next approved frontend release. Implemented with focused checks; Astra review passed; release pending. See [PLAN.md](PLAN.md).
 
 ## Current prelaunch checkpoint — October 17
 

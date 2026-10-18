@@ -1,27 +1,22 @@
 import { Link } from 'react-router'
 import styles from './PublicPages.module.css'
+import { PublicFooter } from './PublicFooter'
 
 function PublicLayout({ children }: { children: React.ReactNode }) {
   return <div className={styles.page}>
     <header className={styles.header}>
       <div className={styles.headerInner}>
-        <Link to="/about" className={styles.brand} aria-label="Denham Venom home">
+        <Link to="/" className={styles.brand} aria-label="Denham Venom home">
           <img src="/assets/logos/logo-mark-white-text.png" alt="Denham Venom" />
           <span>STUDENT STATUS</span>
         </Link>
         <nav className={styles.navigation} aria-label="Public pages">
-          <Link to="/about">About</Link>
-          <Link to="/privacy">Privacy</Link>
-          <Link to="/terms">Terms</Link>
           <Link to="/">Sign in</Link>
         </nav>
       </div>
     </header>
     <main className={styles.main}>{children}</main>
-    <footer className={styles.footer}>
-      <span>DS Robotics Foundation · Denham Venom Team 8044</span>
-      <div><Link to="/about">About</Link><Link to="/privacy">Privacy</Link><Link to="/terms">Terms</Link></div>
-    </footer>
+    <PublicFooter />
   </div>
 }
 

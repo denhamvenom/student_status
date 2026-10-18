@@ -6,6 +6,7 @@ import { ConvexAuthProvider } from '@convex-dev/auth/react'
 import { ThemeProvider } from 'next-themes'
 import App from './App'
 import { AboutPage, PrivacyPage, TermsPage } from './PublicPages'
+import { PublicFooter } from './PublicFooter'
 import { uiCopy } from './lib/ui-copy'
 import { Toaster } from './components/ui/sonner'
 import './shadcn.css'
@@ -19,7 +20,7 @@ class AppErrorBoundary extends React.Component<{children:React.ReactNode},{faile
   static getDerivedStateFromError(){return {failed:true}}
   render(){return this.state.failed?<div className="signin-content" role="alert"><h1>{uiCopy.errors.pageTitle}</h1><p>{uiCopy.errors.pageBody}</p><button className="button button-primary" onClick={()=>window.location.reload()}>{uiCopy.errors.reload}</button></div>:this.props.children}
 }
-const app = client?<ConvexAuthProvider client={client}><App /></ConvexAuthProvider>:<App />
+const app = <div className="app-frame">{client?<ConvexAuthProvider client={client}><App /></ConvexAuthProvider>:<App />}<PublicFooter /></div>
 const router = createBrowserRouter([
   {path:'/about',element:<AppErrorBoundary><AboutPage /></AppErrorBoundary>},
   {path:'/privacy',element:<AppErrorBoundary><PrivacyPage /></AppErrorBoundary>},
