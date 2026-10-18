@@ -35,3 +35,15 @@ Documentation continues on docs/onboarding-progress-2026-10-18 without triggerin
 ### October 18 approved test-role checkpoint
 
 Production release `8c22d50` is deployed; immutable tag `v0.1.0-onboarding.1` verified remotely. Owner approved all four test-role grants. Mentor Google login, invitation acceptance and live role dashboard verified. Travel Lead invitation created with financial editing and health export disabled; account-holder Google password entry remains necessary. Student Google login, Coach approval and own setup screen verified; Parent invitation created for that synthetic Student, acceptance pending. Exact invitation and Mentor account identifiers are in the ignored private ledger; no emails, cleanup or real signing executed. Owner confirms Timeclock works on phone; Chrome ERR_BLOCKED_BY_CLIENT remains a local, unidentified blocker. This supersedes earlier pending-release/access-approval statements.
+
+
+## PR13 sign-in follow-up released October 18
+
+Owner explicitly approved candidate 5c2a9f42118311c9eefdd3ecb7758ca9001b2cc8. PR13 merged at f4bd7dc8eeaa6bca7584ca55bff949339070debb; exact tree comparison was empty. Student build 264e93be-1507-4114-bb90-3d19efcbd191 succeeded at 15:08:41Z; Timeclock build f3603601-8556-4779-b377-7ab79fde6b1e succeeded at 15:09:19Z, both from that merge SHA. No backend deployment.
+
+Travel invitation accepted using the approved Google identity; dashboard and read-only permission check confirm Travel Lead without finance editing or health export. After loading the released site, sign-out and ordinary Google login returned directly to the root Travel dashboard. Parent invitation acceptance remains pending. Private ledger updated. No cleanup or real signing. Release tag: v0.1.0-onboarding.2.
+
+
+## Pending Parent recovery packet
+
+Parent accepted the authorized synthetic invitation, but production has never completed familyLinkSeasonBackfill. Existing Parent summary intentionally withholds access. One synthetic family link confirmed by bounded private preflight. Add only a normal Sign out action to the error fallback so the operator can switch to actual Coach; Reload and backend access guards stay intact. Scoped lint and TypeScript/build passed. After approved frontend release, use existing Coach Settings maintenance on production amicable-eel-413, verify backfill plus verification pass complete, then verify Parent's own setup/dashboard. No new backend deployment, no real personal-data entry, no cleanup or signing.

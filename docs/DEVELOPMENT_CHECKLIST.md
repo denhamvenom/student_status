@@ -743,4 +743,9 @@ October 14 visual-review follow-up: [x] Join/waiting screens offer Sign out for 
 Production release `8c22d50` is deployed; immutable tag `v0.1.0-onboarding.1` verified remotely. Owner approved all four test-role grants. Mentor Google login, invitation acceptance and live role dashboard verified. Travel Lead invitation created with financial editing and health export disabled; account-holder Google password entry remains necessary. Student Google login, Coach approval and own setup screen verified; Parent invitation created for that synthetic Student, acceptance pending. Exact invitation and Mentor account identifiers are in the ignored private ledger; no emails, cleanup or real signing executed. Owner confirms Timeclock works on phone; Chrome ERR_BLOCKED_BY_CLIENT remains a local, unidentified blocker. This supersedes earlier pending-release/access-approval statements.
 
 - [x] Investigate and implement explicit root destination for ordinary Google sign-in after observed stale invitation redirects; scoped lint/types/build and independent source review pass.
-- [ ] Approve/release this follow-up fix and verify production account switching; finish Travel and Parent Google login/acceptance with account-holder participation.
+- [x] PR13 approved/released; both website builds succeeded; fresh Travel Google login returned directly to root dashboard. Travel invitation accepted and permissions verified.
+- [ ] Finish Parent Google login and invitation acceptance with honest relationship-authority handling; authenticated Timeclock footer evidence remains open.
+
+- [x] Production Parent Google login and synthetic invitation acceptance, explicitly approved simulated relationship/attestation logged privately.
+- [x] Production Timeclock Mentor Google login and authenticated footer verified.
+- [ ] Complete existing production family-link readiness setup through Coach maintenance and verify Parent dashboard. Add sign-out recovery to setup-error screen; no season guard bypass.
