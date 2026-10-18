@@ -1,5 +1,9 @@
 # Student Status Development Checklist
 
+## Pending frontend cleanup — October 17
+
+- [ ] Consolidate About, Privacy and Terms into a single consistent, accessible footer in both apps; remove duplicate navigation elsewhere. Preserve public URLs and required workflow acknowledgements. Verify affected phone/desktop layouts and links before the next approved frontend release. Agreed, not implemented; see [PLAN.md](PLAN.md).
+
 ## Current prelaunch checkpoint — October 17
 
 - [x] Prepare RELEASE_APPROVAL_PACKET.md with verified remote/Pages identity, known four-file demo merge conflicts, hosting matrix and rollback gates.

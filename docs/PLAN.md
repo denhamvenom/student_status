@@ -2,6 +2,12 @@
 
 The owner-approved October 17 controlled hosting release is complete. Main `60505b4e04976598956bc1353a53e7d4daf63b9d` is deployed to shared production Convex and both Cloudflare Workers; its entire tree matches approved packet checkpoint `574c910`. [Student Status](https://students.team8044.org) and [Timeclock](https://timeclock.team8044.org) passed focused hosting checks. See [HOSTING_RELEASE_LOG.md](HOSTING_RELEASE_LOG.md). OAuth publication, production sign-in acceptance, bootstrap, enrollment and real signing remain separate gates.
 
+## Pending frontend cleanup — owner decision October 17
+
+Consolidate About, Privacy and Terms navigation into one consistent, accessible footer in Student Status and Timeclock. Remove duplicate navigation links elsewhere, including sign-in/entry areas. Keep the existing public pages and direct URLs available without login; preserve any context-specific consent or acknowledgement required by a workflow. This supersedes the earlier repeated-link placement decision, not the approved policy content.
+
+Queue this for the next frontend change batch. Verify affected signed-out/signed-in layouts at phone and desktop sizes, footer keyboard access and all three destinations. Use focused checks; no backend changes are needed. Status: agreed and queued, not implemented or deployed. Merge/release approval remains separate.
+
 ## Historical planning and approval record
 
 The following records earlier checkpoints; current status above supersedes pending/undeployed statements.

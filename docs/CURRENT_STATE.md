@@ -1,5 +1,7 @@
 # Current integration handoff
 
+Owner follow-up October 17: footer-only About/Privacy/Terms navigation cleanup is queued for the next frontend batch in [PLAN.md](PLAN.md) and [DEVELOPMENT_CHECKLIST.md](DEVELOPMENT_CHECKLIST.md). Not yet implemented or deployed; hosting completion and separate launch gates are unchanged.
+
 The owner-approved October 17 controlled hosting release is complete. Main `60505b4e04976598956bc1353a53e7d4daf63b9d` is deployed to shared production Convex and both Cloudflare Workers; its entire tree matches approved packet checkpoint `574c910`. [Student Status](https://students.team8044.org) and [Timeclock](https://timeclock.team8044.org) passed focused hosting checks. See [HOSTING_RELEASE_LOG.md](HOSTING_RELEASE_LOG.md). OAuth publication, production sign-in acceptance, bootstrap, enrollment and real signing remain separate gates.
 
 Documentation branch: `docs/controlled-hosting-progress-2026-10-17`. Do not merge documentation merely to publish evidence: main now automatically builds both production websites. No application source changes in this closeout.

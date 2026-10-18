@@ -1,5 +1,7 @@
 # Next step: Google launch prerequisites and controlled onboarding
 
+Owner follow-up October 17: footer-only About/Privacy/Terms navigation cleanup is queued for the next frontend batch in [PLAN.md](PLAN.md) and [DEVELOPMENT_CHECKLIST.md](DEVELOPMENT_CHECKLIST.md). Not yet implemented or deployed; hosting completion and separate launch gates are unchanged.
+
 The owner-approved October 17 controlled hosting release is complete. Main `60505b4e04976598956bc1353a53e7d4daf63b9d` is deployed to shared production Convex and both Cloudflare Workers; its entire tree matches approved packet checkpoint `574c910`. [Student Status](https://students.team8044.org) and [Timeclock](https://timeclock.team8044.org) passed focused hosting checks. See [HOSTING_RELEASE_LOG.md](HOSTING_RELEASE_LOG.md). OAuth publication, production sign-in acceptance, bootstrap, enrollment and real signing remain separate gates.
 
 Read AGENTS.md, the context-checkpoint skill, CURRENT_STATE.md, HOSTING_RELEASE_LOG.md and GOOGLE_PRODUCTION_SETUP.md. Verify checkout and remote before acting. Documentation is on `docs/controlled-hosting-progress-2026-10-17`; production main remains 60505b4. Do not repeat hosting deployment or accepted tests without a concrete failure.
