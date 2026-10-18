@@ -30,3 +30,8 @@ Cloudflare automatic main builds both succeeded from the same merged SHA:
 Fresh Worker reads confirm workers.dev and version preview URLs remain disabled for both; custom domains unchanged. Live Student Status About shows one footer with the three links, header Sign in only. Timeclock server returns HTTPS200, but Chrome returned ERR_BLOCKED_BY_CLIENT on refresh and fresh tab; owner asked to resolve local browser access. Do not classify that as a failed deploy or alter browser protections. Authenticated Timeclock verification still pending.
 
 Documentation continues on docs/onboarding-progress-2026-10-18 without triggering another main build. Synthetic account grants are awaiting browser-required bundled action-time approval; no synthetic role records created yet. Real Coach/season preserved.
+
+
+### October 18 approved test-role checkpoint
+
+Production release `8c22d50` is deployed; immutable tag `v0.1.0-onboarding.1` verified remotely. Owner approved all four test-role grants. Mentor Google login, invitation acceptance and live role dashboard verified. Travel Lead invitation created with financial editing and health export disabled; account-holder Google password entry remains necessary. Student Google login, Coach approval and own setup screen verified; Parent invitation created for that synthetic Student, acceptance pending. Exact invitation and Mentor account identifiers are in the ignored private ledger; no emails, cleanup or real signing executed. Owner confirms Timeclock works on phone; Chrome ERR_BLOCKED_BY_CLIENT remains a local, unidentified blocker. This supersedes earlier pending-release/access-approval statements.

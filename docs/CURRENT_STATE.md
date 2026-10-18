@@ -1,6 +1,6 @@
 # Current integration handoff
 
-October 18 active goal: finish footer cleanup and controlled production role rehearsal. Current documentation branch `docs/onboarding-progress-2026-10-18`. See [PRODUCTION_ONBOARDING_PLAN.md](PRODUCTION_ONBOARDING_PLAN.md). Root owns Git/backend/releases; Sol implementation and Astra consolidated review.
+October 18 active goal: finish footer cleanup and controlled production role rehearsal. Current development branch `fix/google-signin-return-2026-10-18`. See [PRODUCTION_ONBOARDING_PLAN.md](PRODUCTION_ONBOARDING_PLAN.md). Root owns Git/backend/releases; Sol implementation and Astra consolidated review.
 
 ## Completed
 
@@ -13,6 +13,8 @@ October 18 active goal: finish footer cleanup and controlled production role reh
 
 ## In progress / boundaries
 
-- Minimal internal exact-ID cleanup preview/commit implemented; four focused real-flow/refusal tests, lint/typecheck and Astra consolidated review passed. Root Convex-specific typecheck passed. Owner-approved release deployed, tool disabled. Synthetic profiles await bundled browser access-grant confirmation. Archival alone is not physical deletion. Initial rehearsal excludes event participation, money, attendance and signatures until cleanup scope covers their dependencies.
+- Minimal internal exact-ID cleanup preview/commit implemented; four focused real-flow/refusal tests, lint/typecheck and Astra consolidated review passed. Root Convex-specific typecheck passed. Owner-approved release deployed, tool disabled. Owner approved all four test-role grants; Mentor Google sign-in, invitation acceptance and dashboard verified. Travel Lead invitation created without finance/health-export extras; its Google password step awaits account-holder participation. Student Google login, Coach approval and own setup screen verified; Parent invitation created for that synthetic Student, acceptance pending. Archival alone is not physical deletion. Initial rehearsal excludes event participation, money, attendance and signatures until cleanup scope covers their dependencies.
 - Preserve the real Coach, season, existing credentials, Calendar/PIN settings and unrelated records. Test identities must use actual verified Google sign-in and supported account flows; no impersonation.
-- Footer/backend release completed at 8c22d50; no cleanup execution or synthetic role provisioning yet. Chrome locally blocks Timeclock (ERR_BLOCKED_BY_CLIENT), while HTTPS server returns200; owner asked to check. Real signing disabled; paid backups deferred/recovery unproven. Existing development evidence remains valid; no whole-app re-audit.
+- Footer/backend release completed at 8c22d50; no cleanup execution; Mentor provisioning verified. Chrome locally blocks Timeclock (ERR_BLOCKED_BY_CLIENT), while HTTPS server returns200; owner confirms phone access works; exact local blocking component remains unidentified. Real signing disabled; paid backups deferred/recovery unproven. Existing development evidence remains valid; no whole-app re-audit.
+
+- Follow-up fix: ordinary Google login now explicitly returns to the site root, avoiding a stale invitation redirect after account switches. Sol scoped lint/TypeScript, root production build and Astra source review passed. Not deployed. Account holder away; retain Travel password handoff and private Parent invitation.
