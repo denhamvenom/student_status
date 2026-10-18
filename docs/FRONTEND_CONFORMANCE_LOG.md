@@ -290,3 +290,8 @@ Refreshed ignored rehearsal preview from current source and built CSS. Inspected
 
 ## October16 FIRST reopened message
 Private preview refreshed from current source: Parent and adult reopened show exact message above Needs completion; initial adult example omits it. Fixture render checks pass. Parent phone390 screenshot inspected, private-data/visual-checks/final-targeted/first-reopened-phone.png. No live FIRST transition performed; isolated lifecycle tests provide behavior evidence.
+
+
+## October 18 — Batch 2 wording checkpoint
+
+Approved sensitive-area text updated without layout or workflow changes. Live Travel Lead Drivers and Permission forms checked in the existing narrow dark-theme session; disabled Health export access preserved. Other roles and rare recovery/signing states were source/test verified, not a new all-role or all-theme visual pass. See [Batch 2 report](audit-2026-10-18/batch-2-report.md). Stop before Batch 3.

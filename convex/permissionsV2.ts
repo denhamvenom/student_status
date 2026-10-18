@@ -160,7 +160,7 @@ export const receipt = query({
   args: {submissionId: v.id("permissionSubmissions")}, returns: v.object({snapshot: consentSnapshotV2Validator, reviewedPdfSha256: v.string(), signedPdfSha256: v.string()}),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); formReader(actor); const submission = await ctx.db.get(args.submissionId);
-    if (!submission) throw new Error("Receipt not found."); await studentAccess(ctx, actor, submission.studentId);
+    if (!submission) throw new Error("Signed form not found."); await studentAccess(ctx, actor, submission.studentId);
     const snapshot = await sealedSnapshotV2(ctx, submission);
     return {snapshot, reviewedPdfSha256: submission.reviewedPdfSha256!, signedPdfSha256: submission.signedPdfSha256!};
   },
@@ -176,7 +176,7 @@ export const pdfAccess = internalQuery({
       await currentDraft(ctx, draft, actor, args.now);
       return {storageId: draft.reviewedPdfId, sha256: draft.reviewedPdfSha256};
     }
-    const submission = await ctx.db.get(args.submissionId!); if (!submission) throw new Error("PDF receipt not found.");
+    const submission = await ctx.db.get(args.submissionId!); if (!submission) throw new Error("Signed form PDF not found.");
     await studentAccess(ctx, actor, submission.studentId); await sealedSnapshotV2(ctx, submission);
     return args.rendition === "reviewed" ? {storageId: submission.reviewedPdfId!, sha256: submission.reviewedPdfSha256!} : {storageId: submission.signedPdfId!, sha256: submission.signedPdfSha256!};
   },

@@ -16,7 +16,7 @@ describe('permission export collection',()=>{
   })
   it('labels earlier signed forms without claiming they lost current coverage',()=>{
     expect(receiptHistoryLabels({controlledCoverage:[{eventId,revision:2}]},1)).toEqual(['Earlier signed form'])
-    expect(receiptHistoryLabels({controlledCoverage:[]},1)).toEqual(['Earlier signed form','This form does not currently cover an event.'])
+    expect(receiptHistoryLabels({controlledCoverage:[]},1)).toEqual(['Earlier signed form','This form does not cover any event now.'])
   })
   it('starts every medication category without a preselected answer',()=>{expect(emptyChoices()).toEqual({pain:'',allergy:'',cold:''})})
   it('collects 500 students across 50 bounded pages before producing one collection-range file',async()=>{

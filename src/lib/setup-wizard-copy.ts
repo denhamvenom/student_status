@@ -11,6 +11,7 @@ export const setupWizardCopy = {
   travelTeamHelp: 'The Travel Team is chosen by mentors and Coaches through an application. Travel Team students go to all out-of-state events and our local event.',
   medicalNote: 'Choose None reported if there are none.',
   firstTitle: 'FIRST registration and Consent & Release',
+  consentReleaseExplanation: "FIRST's yearly form that a parent signs on the FIRST website.",
   firstAdultGuide: 'Use the team invitation to register with FIRST and sign this season\'s Consent & Release. Your Coach checks both.',
   firstMinorStudent: 'Your parent completes FIRST registration.',
   firstUnavailable: 'The FIRST team invitation is not available yet. Contact your Coach.',

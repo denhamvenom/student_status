@@ -67,7 +67,7 @@ export const recordPayout = mutation({
     await activeStudent(ctx, args.studentId);
     validAmount(args.amountCents);
     const reason = requiredText(args.reason, "Reason", 500);
-    const reference = requiredText(args.reference, "Method reference", 150);
+    const reference = requiredText(args.reference, "Check or receipt number", 150);
     const key = requiredText(args.idempotencyKey, "Transaction key", 150);
     if (key.length < 8 || !Number.isSafeInteger(args.occurredAt) || args.occurredAt < 0 || args.occurredAt > Date.now()) throw new Error("Provide a valid transaction key and payout date.");
     const existing = await ctx.db.query("financeOperations").withIndex("by_idempotencyKey", q => q.eq("idempotencyKey", key)).unique();

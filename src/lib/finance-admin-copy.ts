@@ -15,7 +15,7 @@ export const financeChangesCopy = {
   title: 'Recent changes', when: 'When', student: 'Student', change: 'Change', amounts: 'Previous → updated', actor: 'By · reason',
   team: 'Team', other: 'Financial change', unavailable: 'Not recorded', loading: 'Loading financial changes...',
   empty: 'No financial changes are available in the current coverage.', continuing: 'More financial records are available. Continue loading to review them.',
-  more: 'More changes', progress: 'In progress. Only amounts shown as committed are final.', historical: 'Earlier recorded change',
+  more: 'More changes', progress: 'Still processing. This amount may still change.', historical: 'Earlier recorded change',
   coverageStarted: 'Historical preparation started', coverageCompleted: 'Historical preparation completed',
   coverageNote: "Each before and after amount is for that one change. It is not the student's balance now. Older amounts show only if the old record has them.",
   coverage: { updating: 'Earlier changes are still being prepared; this list may be incomplete.', ready: 'Available earlier changes are included.', failed: 'Earlier changes need Coach review; this list may be incomplete.' },

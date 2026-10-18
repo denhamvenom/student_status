@@ -12,7 +12,7 @@ export const accountCopy = {
   adults: {
     list: 'Adult accounts', mentorLead: 'Mentor + Travel Lead', chooseRole: 'Show role',
     inactive: 'Access removed', activeStatus: 'Access active', coachAccess: 'Coach access includes team management, finance and health exports.',
-    grantNotice: 'Financial editing and health exports are separate permissions for Travel Leads.',
+    grantNotice: 'These are extra permissions for Travel Leads. Financial editing lets them record and correct money (payments, charges, refunds). Health export lets them download health records and signed form copies.',
     noInvitations: 'No invitations yet.', pendingStatus: 'Pending', acceptedStatus: 'Accepted', revokedStatus: 'Revoked', replacedStatus: 'Replaced', expiredStatus: 'Expired',
     createLink: 'Create invitation link', creating: 'Creating…', invitationLink: 'Invitation link', noEmail: 'No email is sent by this app. Copy the link and share it privately with the invited adult.',
     copyFailed: 'Could not copy the link. Select and copy the invitation link below.', saved: 'Account access saved.', revoked: 'Invitation revoked.',

@@ -27,7 +27,7 @@ export function SecurePermissionPdf({ draftId, submissionId, rendition, expected
     }).catch(() => { if (alive) { setError('The PDF is unavailable. Retry or prepare a new form.'); onReady?.(false) } })
     return () => { alive = false; onReady?.(false); if (objectUrl) URL.revokeObjectURL(objectUrl) }
   }, [draftId, submissionId, rendition, expectedSha256, fetchPdf, onReady])
-  return <section className={styles.preview} aria-label={rendition === 'reviewed' ? 'PDF to review' : 'Signed PDF receipt'}>
+  return <section className={styles.preview} aria-label={rendition === 'reviewed' ? 'PDF to review' : 'Signed form PDF'}>
     {url ? <><iframe className={styles.frame} src={url} title={rendition === 'reviewed' ? 'Prepared field trip PDF' : 'Signed field trip PDF'} /><a className={styles.download} href={url} download={rendition === 'reviewed' ? 'field-trip-review.pdf' : 'field-trip-signed.pdf'}>Download PDF</a></> : <p role={error ? 'alert' : 'status'}>{error || 'Loading PDF…'}</p>}
   </section>
 }

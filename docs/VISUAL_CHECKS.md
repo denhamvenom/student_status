@@ -172,7 +172,7 @@ Reconciled the updated 30 KB wizard report once. Row numbers below follow each c
 | Coach 6 | Removed health explanation; retained correction-request link | CoachStudentRecord.tsx |
 | Coach 7 | Open permission forms link only | CoachStudentRecord.tsx |
 | Coach 8 | Covers every Competition this season | FirstRegistration.tsx |
-| Coach 9 | Check both in FIRST, then verify | FirstRegistration.tsx |
+| Coach 9 | Look up both in FIRST. Then check both boxes and press Verify. | FirstRegistration.tsx |
 | Coach 10 | One Attendance heading | CoachStudentRecord.tsx; DashboardReports.tsx |
 | Coach 11 | Attendance totals start at kickoff | report-copy.ts |
 | Coach 12 | Removed roster explanation | CoachRosterManagement.tsx |
