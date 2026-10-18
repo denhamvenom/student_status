@@ -736,3 +736,11 @@ October 14 visual-review follow-up: [x] Join/waiting screens offer Sign out for 
 
 - [x] October16 local launch-preparation batch: integrated Timeclock frontend, focused read reductions, guarded production signing and first-Coach procedure; focused validation and final Astra review passed. See LAUNCH_PREPARATION.md. No deployment/push or live changes.
 - [ ] Launch configuration, billing/backup decision, recovery drill, ownership/origins and physical-device checks remain open; production authorization still required.
+
+
+### October 18 approved test-role checkpoint
+
+Production release `8c22d50` is deployed; immutable tag `v0.1.0-onboarding.1` verified remotely. Owner approved all four test-role grants. Mentor Google login, invitation acceptance and live role dashboard verified. Travel Lead invitation created with financial editing and health export disabled; account-holder Google password entry remains necessary. Student Google login, Coach approval and own setup screen verified; Parent invitation created for that synthetic Student, acceptance pending. Exact invitation and Mentor account identifiers are in the ignored private ledger; no emails, cleanup or real signing executed. Owner confirms Timeclock works on phone; Chrome ERR_BLOCKED_BY_CLIENT remains a local, unidentified blocker. This supersedes earlier pending-release/access-approval statements.
+
+- [x] Investigate and implement explicit root destination for ordinary Google sign-in after observed stale invitation redirects; scoped lint/types/build and independent source review pass.
+- [ ] Approve/release this follow-up fix and verify production account switching; finish Travel and Parent Google login/acceptance with account-holder participation.
