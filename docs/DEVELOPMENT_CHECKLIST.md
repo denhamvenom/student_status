@@ -749,3 +749,11 @@ Production release `8c22d50` is deployed; immutable tag `v0.1.0-onboarding.1` ve
 - [x] Production Parent Google login and synthetic invitation acceptance, explicitly approved simulated relationship/attestation logged privately.
 - [x] Production Timeclock Mentor Google login and authenticated footer verified.
 - [ ] Complete existing production family-link readiness setup through Coach maintenance and verify Parent dashboard. Add sign-out recovery to setup-error screen; no season guard bypass.
+
+
+### October 18 controlled onboarding verified
+
+- [x] All requested actual Google identities/roles established; Parent own synthetic child setup/dashboard verified after Coach family maintenance complete with zero unresolved.
+- [x] PR14 recovery control released and used successfully; both website builds verified. Mentor Timeclock signed-in footer verified.
+- [x] Private current synthetic inventory refreshed (38 selected rows, <=40/table); permanent Coach/season/family readiness protected. Test accounts retained; no cleanup executed.
+- [ ] Broader rollout: actual FIRST link, calendar freshness, physical multi-device concurrency/reconnection and owner enrollment opening. Backups/recovery deferred; real signing disabled/separately gated. Earlier pending account-recovery checks are superseded by this checkpoint.
