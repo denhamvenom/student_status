@@ -1,8 +1,10 @@
 # Current integration handoff
 
+Latest October 17 update: owner approved and created Denham Venom production builds with only Workers Scripts: Edit for Team 8044; dashboard shows Active. Build service does not list ordinary user tokens automatically. Direct registration with this token returned HTTP403; official API requires Workers Builds Configuration: Edit. Prepared a temporary addition at the browser summary, NOT saved. Owner confirmation pending to add that permission, register the token, and immediately remove the extra permission. No Worker/build trigger/domain created. Existing secret is held privately in an ignored transfer file and browser memory; never print it or ask owner to re-enter it. Remove the file and clear memory after registration. Earlier token-creation-pending statements below are superseded.
+
 ## October 17 — controlled hosting release in progress
 
-Owner approved the ordered RELEASE_APPROVAL_PACKET.md hosting batch on October 17. Pages preservation, PR10/PR11 merges and production backend deployment are complete. Main release is `60505b4e04976598956bc1353a53e7d4daf63b9d`, whose entire tree matches packet checkpoint `574c910`. Cloudflare Workers/custom domains are pending narrow build-token creation and website deployment. See [HOSTING_RELEASE_LOG.md](HOSTING_RELEASE_LOG.md). Earlier no-approval/no-merge/no-deployment claims below describe historical checkpoints.
+Owner approved the ordered RELEASE_APPROVAL_PACKET.md hosting batch on October 17. Pages preservation, PR10/PR11 merges and production backend deployment are complete. Main release is `60505b4e04976598956bc1353a53e7d4daf63b9d`, whose entire tree matches packet checkpoint `574c910`. Cloudflare Workers/custom domains are pending build-token registration and website deployment. See [HOSTING_RELEASE_LOG.md](HOSTING_RELEASE_LOG.md). Earlier no-approval/no-merge/no-deployment claims below describe historical checkpoints.
 
 Current checkout: docs/controlled-hosting-progress-2026-10-17, documentation only. Do not merge this branch merely to publish the handoff or change the approved frontend build SHA. PR10 and PR11 are merged. Application files still match accepted checkpoint 87134fb.
 

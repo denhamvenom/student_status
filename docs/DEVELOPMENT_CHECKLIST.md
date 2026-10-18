@@ -7,7 +7,7 @@
 - [x] Preserve exact demo/reference branch, switch Pages and verify build/four file blobs.
 - [x] Merge PR10/PR11; Astra verifies candidate-preserving tree. Main release 60505b4.
 - [x] Deploy production Convex amicable-eel-413 from 60505b4; typecheck/schema validation passed, no index deletions.
-- [ ] Narrow build-token confirmation, two Workers/domains and focused hosting checks; see HOSTING_RELEASE_LOG.md.
+- [ ] Temporary build-registration permission confirmation, two Workers/domains and focused hosting checks; see HOSTING_RELEASE_LOG.md.
 
 - [x] Public About/Privacy/Terms and signed-out links in both apps; Terms exclude permission forms. Owner-approved concise public privacy; detailed operations internal.
 - [x] Approved Google project-only OAuth Config Editor and saved organizational support email.

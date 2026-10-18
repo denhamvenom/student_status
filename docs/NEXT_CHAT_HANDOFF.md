@@ -1,8 +1,10 @@
 # Next step: finish approved Cloudflare hosting
 
+Latest October 17 update: owner approved and created Denham Venom production builds with only Workers Scripts: Edit for Team 8044; dashboard shows Active. Build service does not list ordinary user tokens automatically. Direct registration with this token returned HTTP403; official API requires Workers Builds Configuration: Edit. Prepared a temporary addition at the browser summary, NOT saved. Owner confirmation pending to add that permission, register the token, and immediately remove the extra permission. No Worker/build trigger/domain created. Existing secret is held privately in an ignored transfer file and browser memory; never print it or ask owner to re-enter it. Remove the file and clear memory after registration. Earlier token-creation-pending statements below are superseded.
+
 Read AGENTS.md, the context-checkpoint skill, CURRENT_STATE.md, HOSTING_RELEASE_LOG.md and RELEASE_APPROVAL_PACKET.md. Verify checkout and remote before acting.
 
-Owner approved the ordered RELEASE_APPROVAL_PACKET.md hosting batch on October 17. Pages preservation, PR10/PR11 merges and production backend deployment are complete. Main release is `60505b4e04976598956bc1353a53e7d4daf63b9d`, whose entire tree matches packet checkpoint `574c910`. Cloudflare Workers/custom domains are pending narrow build-token creation and website deployment. See [HOSTING_RELEASE_LOG.md](HOSTING_RELEASE_LOG.md). Earlier no-approval/no-merge/no-deployment claims below describe historical checkpoints.
+Owner approved the ordered RELEASE_APPROVAL_PACKET.md hosting batch on October 17. Pages preservation, PR10/PR11 merges and production backend deployment are complete. Main release is `60505b4e04976598956bc1353a53e7d4daf63b9d`, whose entire tree matches packet checkpoint `574c910`. Cloudflare Workers/custom domains are pending build-token registration and website deployment. See [HOSTING_RELEASE_LOG.md](HOSTING_RELEASE_LOG.md). Earlier no-approval/no-merge/no-deployment claims below describe historical checkpoints.
 
 Current documentation branch: docs/controlled-hosting-progress-2026-10-17. Keep main at 60505b4 during this release. Do not repeat completed deployment or accepted tests without a concrete failure.
 
