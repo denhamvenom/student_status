@@ -5,7 +5,7 @@ export const rosterManagementCopy = {
   archiveDescription: 'This moves the student to the archived list. Their records and balances stay. Their Google sign-in does not change.',
   reactivateDescription: 'This moves the student back to the active list. They rejoin upcoming Whole Team events, but not events they left. Their Google sign-in does not change.',
   reason: 'Reason for this change', cancel: 'Cancel', saving: 'Saving…',
-  archiveSaved: 'Student profile archived. Open archived students to reactivate it.',
+  archiveSaved: 'Student profile archived. To undo, press Reactivate student.',
   reactivateSaved: 'Student profile reactivated.',
   changed: 'This student profile changed. Review the latest record before saving.',
   unavailable: 'This profile is no longer in the current roster.',

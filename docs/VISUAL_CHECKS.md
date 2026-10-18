@@ -1,5 +1,16 @@
 # Visual review closed — October 16, 2026
 
+## October 18 Batch 3 current checks
+
+| Check | Evidence / remaining work |
+|---|---|
+| Travel Lead grouped navigation and Join requests | Observed at 390px and 1440px in dark theme; no Coach-only tools shown |
+| Coach New event draft preservation | Observed at 1440px dark: group opens Events; backdrop click preserves draft after fix; Cancel closes without saving |
+| Parent/Student Edit profile and awaiting FIRST | Source-reviewed; fresh role browser checks remain unobserved |
+| Light-theme comparison | Unobserved; saved user theme unchanged |
+
+See [Batch 3 report](audit-2026-10-18/batch-3-report.md). Historical accepted visual checks below remain historical.
+
 ## October 18 footer follow-up
 
 Footer-only navigation implementation and representative local evidence are recorded in [FRONTEND_CONFORMANCE_LOG.md](FRONTEND_CONFORMANCE_LOG.md). Public/signed-out phone and desktop checks passed; authenticated Timeclock footer remains to observe during the authorized Mentor production rehearsal. Do not reopen completed October 16 visual acceptance or repeat unrelated captures.

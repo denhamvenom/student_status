@@ -1,5 +1,5 @@
 export const retentionCopy = {
-  title: 'Retention review',
+  title: 'Archived records',
   unknown: 'Unknown',
   status: 'Status',
   policyStatus: 'Retention policy status',
@@ -37,7 +37,7 @@ export const retentionCopy = {
   save: 'Record decision',
   saving: 'Recording…',
   saved: 'Decision recorded.',
-  failed: 'Retention review could not be loaded. Try again.',
+  failed: 'Archived records could not be loaded. Try again.',
   close: 'Close review',
   refresh: 'Refresh review date',
   asOf: 'Review threshold shown as of',

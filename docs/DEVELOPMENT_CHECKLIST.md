@@ -6,10 +6,10 @@
 - [x] Owner review of Batch 0 and approved publication of its documentation checkpoint.
 - [x] Batch 1 safe text replacements and corresponding pinned tests implemented; typecheck/build/changed-file lint pass, source review complete. See [batch report](audit-2026-10-18/batch-1-report.md).
 - [x] Coach, Parent, Student and Travel Lead live spot-checks completed without shared-data saves.
-- [x] Batch 2 money/consent/FIRST/health/safety wording implemented and independently reviewed; development-only message sync passed. See [report](audit-2026-10-18/batch-2-report.md). Stop before Batch 3.
-- [ ] Batch 3 navigation/layout; stop for review.
+- [x] Batch 2 money/consent/FIRST/health/safety wording implemented and independently reviewed; development-only message sync passed. See [report](audit-2026-10-18/batch-2-report.md).
+- [x] Batch 3 navigation/layout implemented and source/test reviewed; development sync passed. Travel Lead navigation and Coach draft preservation checked live. Stop before Batch 4. See [report](audit-2026-10-18/batch-3-report.md).
 - [ ] Batch 4 approved behavior and later bug/data fixes, with shared-data writes separately authorized.
-- [ ] Green integrated checks: current full-suite result is 395 passed/four pre-existing stale assertions; nine private-helper lint errors remain. The large financial test passed in the Batch 2 full run. No production release is authorized by the audit.
+- [ ] Green integrated checks: current full-suite result is 399 passed/four pre-existing stale assertions; nine private-helper lint errors remain. The large financial test passed in the Batch 2 full run. No production release is authorized by the audit.
 
 ## Controlled onboarding — October 18
 

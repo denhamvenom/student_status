@@ -3,7 +3,7 @@ export const setupWizardCopy = {
   parentTitle: 'Complete student information', studentTitle: 'Set up your profile',
   parentSteps: ['Student details', 'Contacts', 'Medical', 'FIRST registration'],
   studentSteps: ['About you', 'Team details', 'Parent connection & FIRST'],
-  back: 'Back', continue: 'Save and continue', later: 'Finish later', finish: 'Finish setup', home: 'Go to Home',
+  back: 'Back', continue: 'Save and continue', later: 'Finish later', finish: 'Finish setup', saveProfile: 'Save profile', editProfile: 'Edit profile', home: 'Go to Home',
   saving: 'Saving…', saved: 'Saved', reload: 'Reload latest information', changed: 'This information changed in another session. Reload the latest version before saving.',
   saveFailed: 'This step could not be saved. Your answers are still here. Review them and try again.',
   teamCoachNote: 'Ask a Coach to change your subteam, rooming or Travel Team.',

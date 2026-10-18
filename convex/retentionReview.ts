@@ -143,8 +143,8 @@ export const setHold = mutation({
     const reason = args.reason.trim();
     if (!reason || reason.length > 1000) throw new Error("A reason under 1000 characters is required.");
     const state = await current(ctx, args.subject);
-    if (args.action === "hold" && (state.active || state.archivedAt === null)) throw new Error("This account is active or has no archive date. Reload retention review.");
-    if (state.fingerprint !== args.expectedArchiveFingerprint) throw new Error("Archive status changed. Reload retention review before recording a decision.");
+    if (args.action === "hold" && (state.active || state.archivedAt === null)) throw new Error("This account is active or has no archive date. Reload Archived records.");
+    if (state.fingerprint !== args.expectedArchiveFingerprint) throw new Error("Archive status changed. Reload Archived records before recording a decision.");
     const previous = await latestEvent(ctx, args.subject);
     if ((previous?._id ?? null) !== args.expectedLatestHoldEventId) throw new Error("Hold history changed. Reload before recording a decision.");
     if (args.action === "hold" && previous?.action === "hold") throw new Error("A hold is already active for this archive instance.");

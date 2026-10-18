@@ -88,6 +88,17 @@ describe('shared fee presentation', () => {
     expect(html).toContain('$90,071,992,547,409.91')
     expect(html).not.toContain('<button')
   })
+  it('shows event context for equal fee names without changing their order', () => {
+    const html = renderToStaticMarkup(createElement(FeePriorityRows, { disabled: false, rows: [
+      { key: 'first', label: 'Travel fee', summary: 'Connected to: Synthetic North event', priority: 40, amountCents: 2500, cancelled: false },
+      { key: 'second', label: 'Travel fee', summary: 'Connected to: Synthetic South event', priority: 80, amountCents: 2500, cancelled: false },
+    ] }))
+    expect(html).toContain('Connected to: Synthetic North event')
+    expect(html).toContain('Connected to: Synthetic South event')
+    expect(html.indexOf('Synthetic North event')).toBeLessThan(html.indexOf('Synthetic South event'))
+    expect(html).toContain('Displayed fee order position 1')
+    expect(html).toContain('Displayed fee order position 2')
+  })
   it('keeps priority actions as non-submit buttons and blocks them during maintenance', () => {
     const html = renderToStaticMarkup(createElement(FeePriorityRows, { disabled: true, rows: [{ key: 'synthetic', label: 'Synthetic shared fee', priority: 40, amountCents: 29, cancelled: false, actions: { up: () => undefined, down: () => undefined } }] }))
     const buttons = Array.from(html.matchAll(/<button\b[^>]*>/g), match => match[0])

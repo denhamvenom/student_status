@@ -5,7 +5,7 @@ export const readinessCopy = {
   seasonFallback: 'Current season',
   development: 'Development workspace — synthetic data only',
   role: 'Coach',
-  navigation: { joinRequests: 'Join requests', withdrawals: 'Withdrawals', fundraising: 'Fundraising', users: 'Users & Roles', season: 'Season', team: 'Team', events: 'Events', money: 'Money', reports: 'Reports', admin: 'Admin', readiness: 'Readiness', eventReadiness: 'Event readiness', drivers: 'Drivers', permissionForms: 'Permission forms', attendance: 'Attendance', settings: 'Settings', more: 'More', close: 'Close menu', signOut: 'Sign out' },
+  navigation: { joinRequests: 'Join requests', withdrawals: 'Withdrawal requests', fundraising: 'Fundraising', users: 'Users & Roles', season: 'Season', team: 'Team', events: 'Events', money: 'Money', reports: 'Team reports', admin: 'Admin', readiness: 'Readiness', eventReadiness: 'Readiness', drivers: 'Drivers', permissionForms: 'Permission forms', attendance: 'Attendance fixes', archived: 'Archived records', settings: 'Settings', more: 'More', close: 'Close menu', signOut: 'Sign out' },
   chooseEvent: 'Choose event',
   selectedEvent: 'Selected event summary',
   manageEvent: 'Manage event',

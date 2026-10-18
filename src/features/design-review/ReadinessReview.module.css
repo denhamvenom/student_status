@@ -162,9 +162,9 @@
   .printRegion tr,.printRegion section{break-inside:avoid}
 }
 
-.groupNav button{display:inline-flex;align-items:center;min-height:48px;padding:0 14px;border:0;border-bottom:3px solid transparent;background:transparent;color:var(--rr-muted);font-size:15px;font-weight:700}
-.groupNav button.activeGroup{border-bottom-color:var(--gold-500);color:var(--rr-text)}
-.groupNav button:hover{background:var(--rr-metal)}
+.groupNav a[aria-current=page]{border-bottom-color:var(--gold-500);color:var(--rr-text)}
+.moreGroup{display:flex;flex-direction:column}
+.moreGroup h3{margin:14px 0 2px;color:var(--rr-muted);font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
 .moreSheet{max-height:80vh;overflow-y:auto}
 
 .eventChoices button{font-size:14px;line-height:normal}

@@ -1,5 +1,9 @@
 # Frontend conformance work log
 
+## October 18 Batch 3 navigation/layout
+
+Grouped navigation, phone More headings, profile entry, rooming context and collapsed rare tools follow the approved master audit. Travel Lead dark-theme phone390/desktop1440 navigation and Join requests checked without shared-data writes. Build/types/scoped lint pass; independent source review correction applied. Coach desktop group navigation and draft preservation checked live; backdrop dismissal fixed and retested, Cancel verified. Fresh family-role checks and light-theme comparison remain unobserved; current scope/evidence in [Batch 3 report](audit-2026-10-18/batch-3-report.md) and [visual checks](VISUAL_CHECKS.md). Development backend display changes synchronized; no production release.
+
 ## October 18 footer-only public navigation
 
 Owner requested About/Privacy/Terms only in a consistent footer. Sol implemented shared Student Status footer across app/public routes and removed sign-in/header duplicates; Timeclock footer now owns the three existing links and remains visible in the active shell. Public content, routes, consent workflows and mobile navigation clearance preserved. Sol reported focused root typecheck/build/scoped lint and Timeclock lint/typecheck/build passed. Local Chrome 390 dark/1280 light checks on public pages, signed-out entry, synthetic Coach review and Timeclock entry found one footer, all three links and no horizontal overflow; keyboard About-to-Privacy and Student privacy navigation verified. Authenticated Timeclock not visually observed. Astra source review found no blocking findings; no redundant builds rerun. Representative screenshot saved outside Git. Not yet deployed.
