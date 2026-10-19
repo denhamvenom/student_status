@@ -1,5 +1,9 @@
 # Frontend conformance work log
 
+## October 19 linked Calendar screens
+
+Reused existing event wizard dialog, cards, disclosures, controls, typography and colors. Inspected actual components with fictional backend at 1440px light and 390px dark. Matching entry adopted its details; checked media request appeared on Review; linked-event controls remained readable without horizontal overflow. No real Calendar writes or authenticated save verification. See [details](EVENT_CALENDAR_SYNC.md).
+
 ## October 19 fee payment CSV
 
 Actual component with isolated synthetic backend: CSV upload reached Review, showing server-provided name/balances, selected fee and total. Desktop 1440px light and phone 390px dark layouts inspected with no horizontal overflow. Existing shared cards, controls, typography and colors reused. Backend saves, authenticated browser operation and remaining viewport/theme combinations are not claimed. See [workflow evidence](FEE_PAYMENT_CSV.md).

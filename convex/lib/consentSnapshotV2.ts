@@ -56,7 +56,7 @@ export async function selectedEventsV2(ctx: Ctx, student: Doc<"students">, event
   const result: ConsentSnapshotV2["events"] = [];
   for (const eventId of [...eventIds].sort()) {
     const event = await ctx.db.get(eventId);
-    if (!event || event.archived || event.seasonId !== student.seasonId) throw new Error("A covered event is unavailable.");
+    if (!event || event.archived || event.cancelled || event.seasonId !== student.seasonId) throw new Error("A covered event is unavailable.");
     requireEnrollmentComplete(event);
     const participant = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", eventId).eq("studentId", student._id)).unique();
     if (participant?.status !== "confirmed") throw new Error("Permission forms cover confirmed event participation only.");

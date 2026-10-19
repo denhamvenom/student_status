@@ -102,7 +102,7 @@ export const studentDashboard = query({
     }
     for (const event of events) {
       const participation = participations.find(x => x.eventId === event._id)?.status ?? null;
-      if (event.archived || (!participation && event.signupMode === "assigned")) continue;
+      if (event.archived || event.cancelled || (!participation && event.signupMode === "assigned")) continue;
       const readiness = await studentReadiness(ctx, event, student);
       rows.push({ event, participation, readiness });
       if (participation === "confirmed" && readiness.state === "open") {
@@ -189,7 +189,7 @@ export const eventReadiness = query({
     const memberships = await Promise.all(rows.map(x => ctx.db.query("roomMemberships").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", x.student._id)).unique()));
     const roomingCovered = memberships.every(m => m && groups.some(g => g._id === m.groupId && g.finalized && !g.needsReview));
     const rooming = !event.overnight || !event.roomingEnabled ? { state: "notApplicable", open: 0 } : { state: roomingComplete && participantsComplete && groups.every(x => x.finalized && !x.needsReview) && roomingCovered ? "ready" : "open", open: groups.filter(x => !x.finalized || x.needsReview).length + memberships.filter(x => !x).length };
-    const overall = !participantsComplete || !roomingComplete || openStudents || transportation?.state === "open" || rooming.state === "open" ? "open" : "ready";
+    const overall = event.cancelled || !participantsComplete || !roomingComplete || openStudents || transportation?.state === "open" || rooming.state === "open" ? "open" : "ready";
     if (user.role === "mentor" && !user.travelLead) return { event: { _id: event._id, name: event.name }, students: [], transportation: null, rooming: null, overall };
     return { event: { _id: event._id, name: event.name }, students: rows.sort((a, b) => (a.state === "open" ? -1 : 1) - (b.state === "open" ? -1 : 1)), transportation, rooming, overall, coverage: { participantsComplete, roomingComplete } };
   },

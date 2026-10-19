@@ -1,5 +1,9 @@
 # Student Status implementation plan
 
+## Linked Calendar development candidate
+
+Implemented event create/link, Media Support Requested, linked title/schedule/location/cancellation sync, conflict recovery and permission/cancellation safeguards. Development and source/synthetic verification passed. Calendar editor sharing verified; development Calendar writes explicitly prohibited and blocked in code. Production activation pending. See [scope and evidence](EVENT_CALENDAR_SYNC.md).
+
 ## Bulk Payment full-name correction - October 19
 
 Owner explicitly authorized the production correction. Export and payment review now use the full student legal name, preserving last names when a preferred name is only a first name. CSV columns, identifiers, financial behavior and settings are unchanged. Existing downloaded files need to be downloaded again to show the corrected names.

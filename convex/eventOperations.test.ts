@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { createTest as convexTest } from "../testUtils";
 import { api } from "./_generated/api";
 import schema from "./schema";
+import { selectedEvents } from "./lib/consentSnapshot";
+import { selectedEventsV2 } from "./lib/consentSnapshotV2";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -31,6 +33,30 @@ async function fixture() {
 }
 
 describe("event operations", () => {
+
+  it("keeps cancelled events visible while blocking new signup, approval and roster charges", async () => {
+    const f = await fixture();
+    await f.student[0].mutation(api.participation.signUp, { eventId: f.ids.event });
+    await f.lead.mutation(api.eventOperations.reviewSignup, { eventId: f.ids.event, studentId: f.ids.students[0], decision: "approve" });
+    await f.student[1].mutation(api.participation.signUp, { eventId: f.ids.event });
+    const before = await f.t.run(async ctx => ({ participants: await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", f.ids.event)).take(20), charges: await ctx.db.query("charges").withIndex("by_eventId_and_studentId", q => q.eq("eventId", f.ids.event)).take(20) }));
+    await f.t.run(ctx => ctx.db.patch(f.ids.event, { cancelled: true }));
+    await expect(f.student[2].mutation(api.participation.signUp, { eventId: f.ids.event })).rejects.toThrow("unavailable");
+    await expect(f.coach.mutation(api.participation.setParticipation, { eventId: f.ids.event, studentId: f.ids.students[2], status: "confirmed" })).rejects.toThrow("not found");
+    await expect(f.lead.mutation(api.eventOperations.reviewSignup, { eventId: f.ids.event, studentId: f.ids.students[1], decision: "promote" })).rejects.toThrow("cancelled");
+    expect((await f.coach.query(api.eventOperations.workspace, { eventId: f.ids.event })).event.cancelled).toBe(true);
+    expect((await f.student[0].query(api.app.eventDetail, { eventId: f.ids.event })).event.cancelled).toBe(true);
+    const after = await f.t.run(async ctx => ({ participants: await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", f.ids.event)).take(20), charges: await ctx.db.query("charges").withIndex("by_eventId_and_studentId", q => q.eq("eventId", f.ids.event)).take(20) }));
+    expect(after).toEqual(before);
+    const readiness = await f.student[0].query(api.app.eventReadiness, { eventId: f.ids.event, studentId: f.ids.students[0] });
+    expect(readiness.students[0]).toMatchObject({ state: "open", open: ["This event is cancelled."] });
+
+    for (const select of [selectedEvents, selectedEventsV2]) {
+      await expect(f.t.run(async ctx => select(ctx, (await ctx.db.get(f.ids.students[0]))!, [f.ids.event]))).rejects.toThrow("unavailable");
+    }
+
+  });
+
   it("approves a pending reserved seat at capacity, then manually promotes waitlist in signup order", async () => {
     const f = await fixture();
     expect(await f.student[0].mutation(api.participation.signUp, { eventId: f.ids.event })).toBe("pending");

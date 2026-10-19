@@ -217,3 +217,22 @@ describe("Whole Team enrollment", () => {
     await expect(f.coach.mutation(api.admin.createEvent, { ...details(), assignedStudentIds: [f.ids.students[0]] })).rejects.toThrow("cannot use capacity");
   });
 });
+
+
+describe("cancelled Whole Team events", () => {
+  it("stops queued assignment and cannot retry or enroll newly activated students", async () => {
+    const f = await fixture();
+    vi.useFakeTimers();
+    try {
+      const event = await f.coach.mutation(api.admin.createEvent, details());
+      await f.t.run(ctx => ctx.db.patch(event, { cancelled: true }));
+      await f.t.finishAllScheduledFunctions(vi.runAllTimers);
+      const status = await f.coach.query(api.eventEnrollment.status, { eventId: event });
+      expect(status).toMatchObject({ state: "cancelled", canRetry: false, assigned: 0 });
+      await expect(f.coach.mutation(api.eventEnrollment.retry, { eventId: event })).rejects.toThrow("unavailable");
+      await setActive(f, f.ids.students[2], true);
+      expect(await f.t.run(ctx => ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", event)).take(10))).toEqual([]);
+      expect(await f.t.run(ctx => ctx.db.query("charges").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event)).take(10))).toEqual([]);
+    } finally { vi.useRealTimers(); }
+  });
+});

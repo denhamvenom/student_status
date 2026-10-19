@@ -41,6 +41,7 @@ type Env = {
   readonly RESEND_API_KEY: string | undefined;
   readonly SIGN_IN_MAINTENANCE_COACH_EMAIL: string | undefined;
   readonly SITE_URL: string | undefined;
+  readonly STUDENT_STATUS_CALENDAR_WRITE_ENABLED: string | undefined;
   readonly SYNTHETIC_REHEARSAL_CLEANUP_CLOUD_URL: string | undefined;
   readonly SYNTHETIC_REHEARSAL_CLEANUP_ENABLED: string | undefined;
   readonly TIMECLOCK_CALENDAR_ID: string | undefined;

@@ -14,4 +14,8 @@ describe('event wizard validation', () => {
     expect(eventDraftIssue({ ...draft, fee: '-1' }, 2)?.field).toBe('event-fee')
     expect(eventDraftIssue(draft)).toBeNull()
   })
+  it('accepts a linked Calendar entry with no location while requiring one for a separate entry', () => {
+    expect(eventDraftIssue({...draft,destination:'',calendarChoice:'existing-1'},0)).toBeNull()
+    expect(eventDraftIssue({...draft,destination:'',calendarChoice:'create'},0)?.field).toBe('event-destination')
+  })
 })

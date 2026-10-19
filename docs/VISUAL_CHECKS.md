@@ -1,5 +1,9 @@
 # Visual review closed — October 16, 2026
 
+## October 19 linked Calendar screens
+
+Actual components with fictional backend: 1440px light match selection and wizard review verified; 390px dark linked-event editor and lower controls inspected without horizontal overflow. No real saves. Authenticated production create/edit/cancel remains pending. See [evidence](EVENT_CALENDAR_SYNC.md).
+
 ## October 19 fee payment CSV
 
 Actual component with isolated synthetic backend: CSV upload reached Review, showing server-provided name/balances, selected fee and total. Desktop 1440px light and phone 390px dark layouts inspected with no horizontal overflow. Existing shared cards, controls, typography and colors reused. Backend saves, authenticated browser operation and remaining viewport/theme combinations are not claimed. See [workflow evidence](FEE_PAYMENT_CSV.md).

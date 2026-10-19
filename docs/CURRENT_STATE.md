@@ -1,5 +1,11 @@
 # Current integration handoff
 
+## Current development candidate - linked event Calendar
+
+Workspace student-status-readiness-design; branch feature/development-review-fixtures-2026-10-18. Implemented creation/linking to the shared Timeclock Calendar, Media Support Requested, linked schedule sync and recovery. Development sync passed; lint/types, 506 tests, both app builds and representative synthetic UI checks passed. See [behavior and evidence](EVENT_CALENDAR_SYNC.md). Root owns Git and shared backend synchronization.
+
+Owner changed Calendar sharing; read-only verification reports writer access. Owner explicitly prohibits development Calendar writes. Code requires the exact production deployment plus an explicit enable flag; development remains read-only. No real Calendar events were created or changed. This feature is not deployed to production; production activation and real end-to-end saves remain pending. Main production baseline remains PR20 / 5d1b219.
+
 ## Bulk Payment full-name correction - October 19
 
 Owner explicitly authorized the production correction. Export and payment review now use the full student legal name, preserving last names when a preferred name is only a first name. CSV columns, identifiers, financial behavior and settings are unchanged. Existing downloaded files need to be downloaded again to show the corrected names.
