@@ -11,6 +11,20 @@ Actual component with isolated synthetic backend: CSV upload reached Review, sho
 | Automatic full-list review, original reason, explicit confirmation | Source reviewed and focused tests passed; live browser interaction unobserved |
 | Close details and collapsed cancellation on phone/desktop/light/dark | Source reviewed; fresh authenticated visual comparison remains pending |
 
+## October 19 parent invitation resend
+
+Actual StudentParents component with mocked Convex passed countdown, resend rejection/success, refreshed Share/Copy link and busy controls at 1440px light and 390px dark. Screenshots inspected: no overflow. Uses existing card/button styles. Local synthetic evidence only; real Google redemption and physical device share remain unverified. Screenshots remain ignored under .test-temp/parent-email-ui. Other audit-screen visual checks below remain separate.
+
+## October 19 parent email/share candidate
+
+| Check | Evidence / remaining work |
+|---|---|
+| Student Parents email/share controls | Actual component with mocked backend, 1440px light and 390px dark inspected; wrapping and controls readable, no overflow |
+| Status and fallback behavior | Synthetic browser check passed queued/sent/failed/not_sent, configuration message, native-share mock, cancellation/failure and copy fallback |
+| Integrated delivery and device sharing | Real email/OAuth link and physical phone share sheet remain unverified; requires sender configuration and authorized test recipient |
+
+See [current evidence](PARENT_INVITATION_EMAIL.md) and [conformance detail](FRONTEND_CONFORMANCE_LOG.md). No production changes.
+
 ## October 18 Batch 4 current checks
 
 | Check | Evidence / remaining work |

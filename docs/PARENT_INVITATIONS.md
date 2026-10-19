@@ -1,5 +1,9 @@
 # Parent invitations
 
+## October 19 local email/share update
+
+Automatic email and Share invitation are implemented and tested locally; see [current implementation and verification](PARENT_INVITATION_EMAIL.md). The manual-only statements below describe the earlier deployed milestone. Google login, seven-day lifetime and relationship attestation remain unchanged. No rollout is authorized for the email/share update.
+
 ## Scope
 
 This milestone links parent accounts to students. It does not sign permission slips, authorize medication, or independently verify guardianship. The approved process assumes good faith: the recipient verifies control of the invited Google email and explicitly attests that they are the student's parent or legal guardian with authority to provide consent.

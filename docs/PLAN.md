@@ -4,10 +4,6 @@
 
 Implemented fee selection, All/Paid/Unpaid assessed-student export, blank-row skipping, authoritative review, and new receipts applied only to the selected fee. Durable row replay prevents duplicate posting; stale/overpayment and authorization checks remain server-side. Focused backend/CSV/regression checks and independent source review pass. See [workflow and evidence](FEE_PAYMENT_CSV.md). Integrated checks and shared development sync pending; no production deployment. Coordinating reviewed parent-email branch integration before the sole shared development sync.
 
-## October 19 fee-specific Bulk Payment CSV
-
-Implemented fee selection, All/Paid/Unpaid assessed-student export, blank-row skipping, authoritative review, and new receipts applied only to the selected fee. Durable row replay prevents duplicate posting; stale/overpayment and authorization checks remain server-side. Focused backend/CSV/regression checks and independent source review pass. See [workflow and evidence](FEE_PAYMENT_CSV.md). Integrated checks and shared development sync pending; no production deployment. Coordinating reviewed parent-email branch integration before the sole shared development sync.
-
 ## October 19 simplified charge workflow (PR19)
 
 Implemented development work follows the owner-approved Add charge → Review → Confirm charges flow: enter the reason once, load all student pages automatically, preserve exact reviewed-scope checks, and include Close details without changing charges. Validation: full lint, typecheck, 462 tests and build passed (existing bundle-size warning); independent source review found no blockers. Live browser/visual checks remain pending. Backend contracts remain unchanged. PR19 is the development candidate; main merge and production UI deployment remain separate.
@@ -20,6 +16,15 @@ PR18 is already merged as `4d21466`, with both production frontend builds verifi
 
 Added Close details while charge details are loading or open. Closing only dismisses the panel locally; it does not cancel, confirm or change charges. View charge details reopens it. A dismissed automatically selected job stays hidden, while a different new automatic job can still appear. No backend changes. Focused fee tests (14), source lint, typecheck and build validation recorded for this frontend checkpoint; live UI verification remains pending. Production read-only inspection confirmed the reported missing fee was still prepared, not committed; no financial action was taken. No student-specific evidence is stored here.
 
+## October 19 parent email resend checkpoint
+
+Implemented and locally verified: automatic parent email, Share/Copy, and Resend invitation after one server-enforced hour. Exact invited Google login remains required; resend invalidates the prior link. Lint/types/build and scoped review pass; all 482 regression cases passed across the full run and isolated timeout rerun. Synthetic phone/desktop checks passed. See [detailed evidence and rollout](PARENT_INVITATION_EMAIL.md).
+
+Current main audit fixes are preserved. Audit chat owns the next shared development sync after merging this candidate with its fee-payment CSV work. Production deployment/main merge and real invitation-to-Google rehearsal remain pending. Development mail stays disabled; the prior direct connectivity email was confirmed received.
+
+## October 19 parent email invitation candidate
+
+Owner approved local implementation of automatic parent invitation email and native Share invitation, retaining exact invited Google-account sign-in. See [scope, configuration and evidence](PARENT_INVITATION_EMAIL.md). This work does not authorize backend synchronization, production email, or a main merge. Bulk Invite's earlier release remains unchanged.
 
 ## October 19 charge review wording
 

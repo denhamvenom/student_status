@@ -1,57 +1,17 @@
 # Current integration handoff
 
-## October 19 fee-specific Bulk Payment CSV
+## Active development candidate - October 19
 
-Implemented fee selection, All/Paid/Unpaid assessed-student export, blank-row skipping, authoritative review, and new receipts applied only to the selected fee. Durable row replay prevents duplicate posting; stale/overpayment and authorization checks remain server-side. Focused backend/CSV/regression checks and independent source review pass. See [workflow and evidence](FEE_PAYMENT_CSV.md). Integrated checks and shared development sync pending; no production deployment. Coordinating reviewed parent-email branch integration before the sole shared development sync.
+Workspace: Development Version/student-status-readiness-design. Branch: feature/development-review-fixtures-2026-10-18; existing PR19. Root owns Git and the sole shared development sync. Production merge/deployment remains separately authorized.
 
-## October 19 fee-specific Bulk Payment CSV
+Implemented charge flow: Add charge -> Review -> Confirm charges, original reason once, automatic student-list loading, and Close details. The owner separately authorized posting the existing production fee; that operation completed with no held rows. Private account evidence remains outside Git. Earlier prepared-only observations are superseded.
 
-Implemented fee selection, All/Paid/Unpaid assessed-student export, blank-row skipping, authoritative review, and new receipts applied only to the selected fee. Durable row replay prevents duplicate posting; stale/overpayment and authorization checks remain server-side. Focused backend/CSV/regression checks and independent source review pass. See [workflow and evidence](FEE_PAYMENT_CSV.md). Integrated checks and shared development sync pending; no production deployment. Coordinating reviewed parent-email branch integration before the sole shared development sync.
+Implemented fee-specific Bulk Payment CSV: fee selection; All/Paid/Unpaid assessed-student export; blank amount skipping; authoritative review; new receipts allocated directly to the selected fee; stale/overpayment checks; durable cross-actor replay and partial recovery. See [workflow and evidence](FEE_PAYMENT_CSV.md). Focused backend/CSV/regression checks, types and source review pass. Synthetic actual-component desktop/light and phone/dark review passed. Full integrated checks and shared development sync pending.
 
-## October 19 simplified charge workflow (PR19)
+Parent-email branch through 01ec5fe is being integrated additively: automatic parent invitations, Share/Copy, and one-hour student resend. Source/schema/API merged without source conflicts; documentation preserves both features. See [email feature and evidence](PARENT_INVITATION_EMAIL.md). Development email settings exist with sending disabled; keep disabled. Real invitation/Google redemption and physical sharing remain unverified. No parent-email production deployment.
 
-Implemented development work follows the owner-approved Add charge → Review → Confirm charges flow: enter the reason once, load all student pages automatically, preserve exact reviewed-scope checks, and include Close details without changing charges. Validation: full lint, typecheck, 462 tests and build passed (existing bundle-size warning); independent source review found no blockers. Live browser/visual checks remain pending. Backend contracts remain unchanged. PR19 is the development candidate; main merge and production UI deployment remain separate.
+## Production baseline
 
-The owner separately authorized confirmation of the existing production fee. That one prepared operation completed successfully for the entire reviewed active roster, with no held rows. Private verification remains outside Git; no student records or account-specific evidence are included here. This supersedes the earlier observation that the fee was only prepared. No duplicate fee was created.
+Main 4d21466 (PR18) has both production frontend builds verified. Bulk Invite was released through PR17; see [release evidence](BULK_INVITE_RELEASE_2026-10-19.md). The October 18 synthetic cleanup is historical: real student records have since been created. Never rerun that cleanup. Credentials and real settings remain intact.
 
-PR18 is already merged as `4d21466`, with both production frontend builds verified successful. The older pre-merge and empty-roster notes below describe historical checkpoints, not current production state.
-
-## October 19 charge-details close control
-
-Added Close details while charge details are loading or open. Closing only dismisses the panel locally; it does not cancel, confirm or change charges. View charge details reopens it. A dismissed automatically selected job stays hidden, while a different new automatic job can still appear. No backend changes. Focused fee tests (14), source lint, typecheck and build validation recorded for this frontend checkpoint; live UI verification remains pending. Production read-only inspection confirmed the reported missing fee was still prepared, not committed; no financial action was taken. No student-specific evidence is stored here.
-
-
-## October 19 charge review wording
-
-Implemented frontend-only simplification: View charge details; Review students and charges; explicit eight-character Reason input guidance; student names, planned/current amounts and readable saved/pending/review status replace internal revisions and processing counters. New unposted charges no longer produce false load errors. Missing existing charges still need review; held rows retain their explanation. Partial money release amounts and all confirmation/retry safeguards remain. No backend or production data changes.
-
-Validation: integrated lint/typecheck, 425 tests and build passed (existing bundle-size warning); final held-row wording refinement passed 14 focused tests and source lint. Independent review found the held-row case and it was corrected. Rendered-markup evidence only; fresh authenticated browser/phone/theme comparison remains pending. Owner authorized PR18 merge and production frontend deployment on October 19; deployment verification is in progress.
-
-## Bulk Invite notes carried from PR17 (historical pre-merge status)
-
-October 19 owner change supersedes direct linking: five-digit Bulk Invite codes submit connection requests; only a Coach can connect the verified Google account to the existing student. Six-digit ordinary team requests remain separate. Local backend, student waiting/retry UI and Coach approval queue implemented; 26 backend cases and isolated actual-component browser tests pass, including concurrency, 100 students, daily limits and stale requests. See BULK_INVITE.md. No backend sync (including development) is authorized for this revision. Local frontend server stopped to avoid mixing new UI with the old deployed API. Real Google redemption remains deferred by owner; no production deployment or main merge.
-
-## Bulk Invite local candidate - October 18
-
-October 19 update: development-only sync and Coach browser rehearsal passed. Individual Bulk Invite codes now have five digits; regular Coach team codes have six digits, with separate signup routing and collision checks. Targeted automated signup/redemption tests, lint, types and build passed. Real Google redemption explicitly deferred by owner. No production deployment or main merge. See BULK_INVITE.md for evidence and limits.
-
-Branch `feature/bulk-invite` in `student-status-bulk-invite`, based on main `46d526a`. Coach Bulk Invite, CSV preview/export, individual Google-account linking, and whole-roster connection filtering implemented locally. See [feature and verification notes](BULK_INVITE.md). No deployment or main merge; live development Google-sign-in rehearsal remains separate. Earlier production evidence below is preserved.
-
-
-## October 18 production changeover completed
-
-Owner-authorized production cleanup and release completed. Application source `09289d4` was pushed to the development branch, deployed to Convex production `amicable-eel-413`, and merged through PR15 as `d3d2e9e368dbbb52d6031ebae0dc5007c11f356b`. Both production websites built and deployed that merge successfully; its tree exactly matches the reviewed source.
-
-The verified permanent Coach is the sole remaining application user and Google auth account. All four other accounts/sign-ins, the one synthetic student and their reviewed dependencies were deleted atomically. Fresh snapshot checks found zero students, no remaining removed-identity references, no stored files and no report aggregate entries. Real season/FIRST/family-readiness settings, Coach identity and 63 calendar occurrences were preserved. Normal calendar sync timestamps advanced; configuration did not change. Credentials were neither changed nor exported. Private recovery exports remain ignored and outside Git.
-
-Temporary cleanup switches and Coach-only maintenance restriction are removed. The old team join code was revoked and deleted; no replacement was created. Student Status and Timeclock public sign-in pages load; Coach backend access passes. The owner confirmed successful production Coach browser sign-in on October 18 and reported that everything looked good. Full student onboarding remains deferred by the owner to tomorrow; real signing remains disabled. Production needs no old-subteam conversion because there are zero student records.
-
-The four stale tests are fixed. Full application check passed 423 tests before the final invitation regression; final maintenance suite passed 5/5 plus typecheck/lint. Timeclock checks and production backend compile passed. See [execution evidence](PRODUCTION_CHANGEOVER_2026-10-18.md). Earlier restrictions and pending-cleanup statements below are historical, superseded by this authorized release.
-
-## Workspace and next work
-
-Branch: `feature/development-review-fixtures-2026-10-18`; merged release PR15. Development remains `third-bandicoot-18` with separate synthetic review data; production is `amicable-eel-413`. Root owns Git/backend/releases; Sol implementation and Astra review. Keep private snapshots/manifests outside Git.
-
-Tomorrow: owner-directed live student journey, fresh team join code when requested, and any resulting fixes. Physical tablet/two-phone concurrency/reconnection checks remain explicitly deferred. Actual signing remains disabled; event, attendance, payment and signature rehearsals are not claimed. Recovery exports passed archive integrity checks; restore drill and scheduled backups are not proven by this release.
-
-Batch 1–4 wording/navigation/workflow evidence is under `docs/audit-2026-10-18/`. Approved subteams are Build, Electrical, Machining, Programming, Business/Media. Historical planning/release details remain in PLAN.md, DEVELOPMENT_CHECKLIST.md and PRODUCTION_ONBOARDING_RELEASE.md; later owner decisions prevail.
+Development target: third-bandicoot-18. Production target: amicable-eel-413. Do not publish development synthetic records or private evidence. No production release of PR19 changes is authorized by the current implementation request. Next: combined validation, coordinated development sync, publish the reviewed development checkpoint and update PR19. Current visual gaps remain in [VISUAL_CHECKS.md](VISUAL_CHECKS.md).

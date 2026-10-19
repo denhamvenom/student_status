@@ -16,6 +16,22 @@ PR18 is already merged as `4d21466`, with both production frontend builds verifi
 
 Added Close details while charge details are loading or open. Closing only dismisses the panel locally; it does not cancel, confirm or change charges. View charge details reopens it. A dismissed automatically selected job stays hidden, while a different new automatic job can still appear. No backend changes. Focused fee tests (14), source lint, typecheck and build validation recorded for this frontend checkpoint; live UI verification remains pending. Production read-only inspection confirmed the reported missing fee was still prepared, not committed; no financial action was taken. No student-specific evidence is stored here.
 
+## October 19 parent email resend checkpoint
+
+Implemented and locally verified: automatic parent email, Share/Copy, and Resend invitation after one server-enforced hour. Exact invited Google login remains required; resend invalidates the prior link. Lint/types/build and scoped review pass; all 482 regression cases passed across the full run and isolated timeout rerun. Synthetic phone/desktop checks passed. See [detailed evidence and rollout](PARENT_INVITATION_EMAIL.md).
+
+Current main audit fixes are preserved. Audit chat owns the next shared development sync after merging this candidate with its fee-payment CSV work. Production deployment/main merge and real invitation-to-Google rehearsal remain pending. Development mail stays disabled; the prior direct connectivity email was confirmed received.
+
+## October 19 parent email invitations — local candidate
+
+- [x] Automatic invitation email, safe sending status, bounded retry/rate limits and interrupted-job recovery implemented.
+- [x] Share invitation and Copy fallback implemented; matching Google account and existing acceptance rules preserved.
+- [x] Full 478-test suite, lint, application/backend types and application build pass; actual-component synthetic browser checks at desktop/light and phone/dark pass.
+- [x] Scoped Astra review closed without blockers. No production requests or real emails sent.
+- [ ] Configure verified sender/domain/key and approved origin; authorized real-email and Google-link round-trip check before release.
+- [ ] Separate authorization for backend sync and production rollout; no deployment in this checkpoint.
+
+See [configuration and detailed evidence](PARENT_INVITATION_EMAIL.md). Earlier dated checkpoints below are historical.
 
 ## October 19 charge review wording
 
