@@ -809,3 +809,8 @@ Owner-authorized development-only enrichment and private reviewer guide/index co
 - [x] All 436 synthetic tests, lint/types, Timeclock checks, and isolated component phone/desktop check; see BULK_INVITE.md for evidence limits.
 - [ ] Live development Google-sign-in rehearsal.
 - [ ] Separate approved production release (not authorized in this task).
+
+- [x] October 19: five-digit Bulk Invite / six-digit Coach team-code separation; collision and cross-workflow tests, local build, development sync, and Coach browser generation verified. Real Google redemption deferred by owner; production unchanged.
+
+- [x] October 19 local revision: Coach approval required before Bulk Invite account connection; no preapproval data access; competing approvals, 100-student import, daily limits and stale-request retry tested. Student/Coach component workflows tested in isolated browser.
+- [ ] Owner-authorized backend sync and live integration rehearsal of approval revision (explicitly not deployed).

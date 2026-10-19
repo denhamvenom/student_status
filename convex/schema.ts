@@ -10,6 +10,16 @@ const permissionField = v.union(v.literal("general"), v.literal("emergencyName")
 const report = v.object({ state: v.union(v.literal("unknown"), v.literal("none"), v.literal("reported")), text: v.optional(v.string()) });
 
 export default defineSchema({
+  bulkInviteCodeReservations: defineTable({ codeHash: v.string() }).index("by_codeHash", ["codeHash"]),
+  bulkInviteConnectionRequests: defineTable({
+    authUserId: v.id("users"), inviteId: v.id("bulkStudentInvites"), codeHash: v.string(),
+    studentId: v.id("students"), seasonId: v.id("seasons"), googleName: v.string(), googleEmail: v.string(),
+    status: v.union(v.literal("pending"), v.literal("approved"), v.literal("declined")),
+    createdAt: v.number(), decidedAt: v.optional(v.number()), decidedBy: v.optional(v.id("appUsers")),
+  }).index("by_authUserId", ["authUserId"])
+    .index("by_authUserId_and_status", ["authUserId", "status"])
+    .index("by_authUserId_and_inviteId_and_codeHash", ["authUserId", "inviteId", "codeHash"])
+    .index("by_seasonId_and_status", ["seasonId", "status"]),
   ...authTables,
   ...retentionTables,
   historicalCorrectionSessions: defineTable({ seasonId: v.id("seasons"), actorId: v.id("appUsers"), reason: v.string(), openedAt: v.number(), expiresAt: v.number(), closedAt: v.optional(v.number()) }).index("by_actorId_and_seasonId", ["actorId", "seasonId"]),

@@ -1,5 +1,27 @@
 # Bulk Invite - local implementation
 
+## Coach approval requirement — October 19
+
+Owner superseded automatic account linking: keep five-digit individual codes, but require Coach approval before connecting any Google account to a precreated student record. Code entry submits an account-connection request. A pending request grants no student access and does not reserve or consume the invitation. Coaches review the intended student alongside the verified Google account name/email and explicitly approve or decline. Student names must not be disclosed by code preview before approval.
+
+Approval must revalidate the current invitation version, expiry, active season/student, verified Google identity and account/email conflicts. Replacement or revocation invalidates prior requests. Successful approval links the same student record and preserves existing Coach assignments and finances. Six-digit general team requests retain their existing approval path.
+
+This revision is local-source-only: do not sync even the development backend until separately authorized. The local frontend server was stopped to avoid mixing the new interface with the old deployed API. Earlier direct-linking descriptions and deployment evidence are historical and do not apply to this revision.
+
+Verification: 26 backend cases pass, including no preapproval profile/finance access, Coach-only decisions, simultaneous competing requests/approvals (exactly one link), 100-student import, shared daily/minute attempt limits, identity/email collisions, inactive/cross-season/expired/stale invitations, decline/new-code retry, and preservation of assignments/charges. Stale requests do not strand applicants or consume the live-request allowance; Coach queue stale entries remain manually declinable, with approval safely refused.
+
+Actual React components passed an isolated browser harness with mocked backend responses: delayed five-to-six and five-to-different-five preview switching, ordinary six-digit request routing, no student-name display, waiting and decline/retry, Coach identity confirmation, cancel without write, mutation error/retry, approval and decline. Desktop 1440 light and phone 390 dark reviewed; no phone overflow. Three presentation regression tests also pass. Harness/screenshots are ignored under .test-temp/approval-ui. This is not live backend or Google OAuth verification, which remains explicitly deferred by owner. Independent source review found no remaining concrete blocker in the revised approval path.
+
+## October 19 development rehearsal
+
+Regular Coach team codes now generate six digits (100000–999999), distinct from five-digit individual invitations. Allocation checks all stored team codes and retries collisions, including revoked/expired codes. Frontend routing recognizes six digits as the existing name-entry/join-request workflow; five digits retain direct linking. Existing prefixed codes remain compatible. Tests prove cross-type rejection, a pending team request followed by individual redemption, revoked team-code rejection, collision retries, and frontend format routing. Fifteen targeted tests, lint, types and build passed; development sync passed and Coach browser generation displayed a six-digit code with the selected one-week expiry. Owner deferred real Google redemption in favor of automated tests.
+
+Synced only to development `third-bandicoot-18`; local frontend at localhost:5173. Coach browser checks passed: template download, rejection of a missing last name, four-row upload with one repeated name defaulting to skip, three created students, code export, replacement, revocation, and an updated export omitting the revoked code. All three students appeared as Not connected, with zero balance due, no Travel Team status, and no upcoming enrolled events. Coach assigned Build to one unconnected student successfully. Connected filtering excluded all three.
+
+Owner requested exactly five digits. New invitations and replacements now use random 10000–99999 codes (avoids spreadsheet leading-zero loss), reserved transactionally in bulkInviteCodeReservations so collisions retry and replaced codes cannot be reissued. Existing long codes remain readable for compatibility; both remaining unused rehearsal codes were replaced and the resulting two-row CSV verified. Verified Google authentication and per-account limits (10 calls/minute, 30/day across preview/redemption) remain required. The finite pool supports 90,000 lifetime allocations; reservations must not be deleted to recycle codes. Five-digit codes have less guessing resistance than the original format.
+
+Updated synthetic tests: 16 passed across backend invitations, roster pagination and CSV, including forced random collisions, old-code rejection and five-digit redemption. TypeScript and lint passed. Real Google redemption with an unconnected test account remains pending; automated redemption uses mocked verified Google identities. No production changes or main merge.
+
 Implemented on feature/bulk-invite from main checkpoint 46d526a. No production deployment, main merge, or live student import was performed.
 
 ## Coach workflow
@@ -35,3 +57,5 @@ Independent Astra source review found no remaining blockers after code-replaceme
 3. Deploy the backward-compatible backend before exposing the UI. Merging main automatically deploys both frontends, so merge only as part of that approved release.
 4. Verify a small Coach-selected batch before importing the full roster. Keep all real names, codes, exports and recovery snapshots outside Git.
 5. If an issue arises, stop imports and revoke affected unused invitations; preserve imported records, claimed accounts and Coach assignments. Do not remove populated tables as a rollback.
+
+Final approval-revision validation: all 459 tests in 94 files, application lint/typecheck/build, Convex-specific typecheck, and Timeclock lint/typecheck/build passed. Existing application bundle-size warning remains non-fatal. No deployment performed.

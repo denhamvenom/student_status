@@ -10,6 +10,7 @@ import { emailKey, tokenHash, verifiedGoogle } from "./lib/invitationIdentity";
 
 const limiter = new RateLimiter(components.rateLimiter, {
   studentCodeAttempts: { kind: "fixed window", rate: 10, period: 60_000 },
+  studentCodeDailyAttempts: { kind: "fixed window", rate: 30, period: 86_400_000 },
 });
 const nameInput = v.object({ firstName: v.string(), lastName: v.string() });
 const entryInput = v.object({ firstName: v.string(), lastName: v.string(), resolution: v.union(v.literal("skip"), v.literal("create"), v.literal("link")), existingStudentId: v.optional(v.id("students")), confirmDuplicate: v.optional(v.boolean()) });
@@ -26,12 +27,22 @@ function cleanRows<T extends { firstName: string; lastName: string }>(rows: T[])
   if (rows.length < 1 || rows.length > 100) throw new Error("Upload 1 to 100 students at a time.");
   return rows.map(row => ({ ...row, firstName: name(row.firstName), lastName: name(row.lastName) }));
 }
-function newCode() {
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  return `DV-${Array.from(bytes, x => x.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
+async function newCode(ctx: MutationCtx) {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const value = crypto.getRandomValues(new Uint32Array(1))[0];
+    // Rejection sampling avoids modulo bias; no leading zero to lose in Excel.
+    if (value >= 4_294_890_000) continue;
+    const code = String(10_000 + value % 90_000);
+    const codeHash = await tokenHash(code);
+    const used = await ctx.db.query("bulkInviteCodeReservations").withIndex("by_codeHash", q => q.eq("codeHash", codeHash)).unique();
+    if (used) continue;
+    await ctx.db.insert("bulkInviteCodeReservations", { codeHash });
+    return code;
+  }
+  throw new Error("Could not allocate an unused invitation code. Try again.");
 }
 function normalizedCode(value: string) { return value.trim().toUpperCase(); }
-function validCode(value: string) { return /^DV-[0-9A-F]{32}$/.test(value); }
+function validCode(value: string) { return /^\d{5}$/.test(value) || /^DV-[0-9A-F]{32}$/.test(value); }
 function effectiveExpiry(inviteExpiry: number | undefined, seasonExpiry: number | undefined) {
   if (inviteExpiry === undefined) return seasonExpiry ?? null;
   return seasonExpiry === undefined ? inviteExpiry : Math.min(inviteExpiry, seasonExpiry);
@@ -145,7 +156,7 @@ export const createBatch = mutation({
         const oldBatch = await ctx.db.get(previousCode.batchId);
         if (oldBatch) await ctx.db.patch(oldBatch._id, { pendingCount: oldBatch.pendingCount - 1 });
       }
-      const code = newCode();
+      const code = await newCode(ctx);
       const inviteId = await ctx.db.insert("bulkStudentInvites", { batchId, seasonId: season._id, studentId, code, codeHash: await tokenHash(code), status: "pending", createdBy: actor._id, createdAt: now, expiresAt });
       await audit(ctx, actor, "bulkStudentInvites", inviteId, "create", null, { studentId, batchId, expiresAt });
     }
@@ -214,7 +225,7 @@ export const replace = mutation({
       const otherBatch = await ctx.db.get(other.batchId);
       if (otherBatch) await ctx.db.patch(otherBatch._id, { pendingCount: otherBatch.pendingCount - 1 });
     }
-    const code = newCode(); const expiresAt = season.endsAt;
+    const code = await newCode(ctx); const expiresAt = season.endsAt;
     await ctx.db.patch(invite._id, { code, codeHash: await tokenHash(code), status: "pending", createdBy: actor._id, createdAt: now, expiresAt });
     if (invite.status !== "pending") {
       const batch = await ctx.db.get(invite.batchId);
@@ -231,60 +242,131 @@ export const previewCode = mutation({
     const person = await applicant(ctx);
     if (!person?.who) return { status: "signInRequired" as const, studentName: null };
     const attempt = await limiter.limit(ctx, "studentCodeAttempts", { key: person.authUserId });
-    if (!attempt.ok) return { status: "unavailable" as const, studentName: null };
+    if (!attempt.ok || !(await limiter.limit(ctx, "studentCodeDailyAttempts", { key: person.authUserId })).ok) return { status: "unavailable" as const, studentName: null };
     const found = await usableCode(ctx, args.code);
     if (!found) return { status: "unavailable" as const, studentName: null };
     const who = person.who;
     const account = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", person.authUserId)).unique();
     const emailAccounts = await ctx.db.query("appUsers").withIndex("by_email", q => q.eq("email", who.email)).take(2);
     if (account || emailAccounts.length) return { status: "accountConflict" as const, studentName: null };
-    return { status: "valid" as const, studentName: found.student.legalName };
+    return { status: "valid" as const, studentName: null };
   },
 });
 
+// A code proves possession only. Account access is created exclusively by a Coach decision.
 export const redeem = mutation({
-  args: { code: v.string() }, returns: v.object({ studentId: v.union(v.id("students"), v.null()) }),
+  args: { code: v.string() }, returns: v.object({ studentId: v.null(), requestId: v.union(v.id("bulkInviteConnectionRequests"), v.null()) }),
   handler: async (ctx, args) => {
+    const refused = { studentId: null, requestId: null };
     const person = await applicant(ctx);
-    if (!person?.who) return { studentId: null };
-    const who = person.who;
+    if (!person?.who) return refused;
     const attempt = await limiter.limit(ctx, "studentCodeAttempts", { key: person.authUserId });
-    if (!attempt.ok) return { studentId: null };
-    const normalized = normalizedCode(args.code);
-    if (validCode(normalized)) {
-      const hash = await tokenHash(normalized);
-      const prior = await ctx.db.query("bulkStudentInvites").withIndex("by_codeHash", q => q.eq("codeHash", hash)).unique();
-      if (prior?.status === "redeemed" && prior.redeemedBy) {
-        const linked = await ctx.db.get(prior.redeemedBy);
-        if (linked?.authUserId === person.authUserId) return { studentId: prior.studentId };
-      }
-    }
+    if (!attempt.ok || !(await limiter.limit(ctx, "studentCodeDailyAttempts", { key: person.authUserId })).ok) return refused;
     const found = await usableCode(ctx, args.code);
-    if (!found) return { studentId: null };
+    if (!found) return refused;
     const { row, student } = found;
     await requireSeasonProfileWritable(ctx, student.seasonId);
-    const account = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", person.authUserId)).unique();
-    const emailAccounts = await ctx.db.query("appUsers").withIndex("by_email", q => q.eq("email", who.email)).take(2);
-    const emailStudents = await ctx.db.query("students").withIndex("by_seasonId_and_email", q => q.eq("seasonId", student.seasonId).eq("email", who.email)).take(2);
-    if (account || emailAccounts.length || emailStudents.some(other => other._id !== student._id)) return { studentId: null };
+    if (await accountConflict(ctx, person.authUserId, person.who.email, student)) return refused;
+    const previous = await ctx.db.query("bulkInviteConnectionRequests").withIndex("by_authUserId_and_inviteId_and_codeHash", q => q.eq("authUserId", person.authUserId).eq("inviteId", row._id).eq("codeHash", row.codeHash)).unique();
+    // Decline blocks this account/code version. A Coach must replace the code to permit retry.
+    if (previous) return previous.status === "pending" ? { studentId: null, requestId: previous._id } : refused;
+    const outstanding = await ctx.db.query("bulkInviteConnectionRequests").withIndex("by_authUserId_and_status", q => q.eq("authUserId", person.authUserId).eq("status", "pending")).take(4);
+    let liveCount = 0;
+    for (const pending of outstanding) {
+      if (await connectionCurrent(ctx, pending, Date.now())) liveCount++;
+      else await ctx.db.patch(pending._id, { status: "declined", decidedAt: Date.now() });
+    }
+    if (liveCount >= 3) return refused;
+    const requestId = await ctx.db.insert("bulkInviteConnectionRequests", {
+      authUserId: person.authUserId, inviteId: row._id, codeHash: row.codeHash,
+      studentId: student._id, seasonId: student.seasonId, googleName: person.who.name,
+      googleEmail: person.who.email, status: "pending", createdAt: Date.now(),
+    });
+    return { studentId: null, requestId };
+  },
+});
+
+async function accountConflict(ctx: Ctx, authUserId: Id<"users">, email: string, student: Doc<"students">) {
+  const account = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", authUserId)).unique();
+  const emailAccounts = await ctx.db.query("appUsers").withIndex("by_email", q => q.eq("email", email)).take(1);
+  const emailStudents = await ctx.db.query("students").withIndex("by_seasonId_and_email", q => q.eq("seasonId", student.seasonId).eq("email", email)).take(2);
+  return !!account || emailAccounts.length > 0 || emailStudents.some(other => other._id !== student._id);
+}
+
+async function connectionCurrent(ctx: Ctx, request: Doc<"bulkInviteConnectionRequests">, asOf?: number) {
+  const invite = await ctx.db.get(request.inviteId);
+  const student = await ctx.db.get(request.studentId);
+  const season = await ctx.db.get(request.seasonId);
+  return !!invite && invite.codeHash === request.codeHash && invite.status === "pending" &&
+    invite.studentId === request.studentId && invite.seasonId === request.seasonId &&
+    !!student && student.active && !student.userId && student.seasonId === request.seasonId &&
+    season?.status === "active" && (asOf === undefined ||
+      ((invite.expiresAt === undefined || invite.expiresAt > asOf) && (season.endsAt === undefined || season.endsAt > asOf)));
+}
+
+const connectionStatus = v.union(v.literal("pending"), v.literal("approved"), v.literal("declined"));
+export const myConnectionRequests = query({
+  args: { asOf: v.optional(v.number()) }, returns: v.array(v.object({ requestId: v.id("bulkInviteConnectionRequests"), status: connectionStatus, createdAt: v.number() })),
+  handler: async (ctx, args) => {
+    const authUserId = await getAuthUserId(ctx);
+    if (!authUserId) return [];
+    const rows = await ctx.db.query("bulkInviteConnectionRequests").withIndex("by_authUserId", q => q.eq("authUserId", authUserId)).order("desc").take(20);
+    return Promise.all(rows.map(async row => ({ requestId: row._id, status: row.status === "pending" && !(await connectionCurrent(ctx, row, args.asOf)) ? "declined" as const : row.status, createdAt: row.createdAt })));
+  },
+});
+
+export const listConnectionRequests = query({
+  args: {}, returns: v.array(v.object({ requestId: v.id("bulkInviteConnectionRequests"), studentName: v.string(), googleName: v.string(), googleEmail: v.string(), createdAt: v.number() })),
+  handler: async ctx => {
+    const actor = await viewer(ctx); requireRole(actor, "coach");
+    const season = await activeSeason(ctx);
+    const rows = await ctx.db.query("bulkInviteConnectionRequests").withIndex("by_seasonId_and_status", q => q.eq("seasonId", season._id).eq("status", "pending")).take(100);
+    return Promise.all(rows.map(async row => ({ requestId: row._id, studentName: (await ctx.db.get(row.studentId))?.legalName ?? "Unavailable student", googleName: row.googleName, googleEmail: row.googleEmail, createdAt: row.createdAt })));
+  },
+});
+
+export const decideConnection = mutation({
+  args: { requestId: v.id("bulkInviteConnectionRequests"), approve: v.boolean() }, returns: v.null(),
+  handler: async (ctx, args) => {
+    const actor = await viewer(ctx); requireRole(actor, "coach");
+    const request = await ctx.db.get(args.requestId);
+    if (!request) throw new Error("Connection request unavailable.");
+    if (request.status !== "pending") {
+      if (request.status === (args.approve ? "approved" : "declined")) return null;
+      throw new Error("This connection request has already been decided.");
+    }
     const now = Date.now();
-    const userId = await ctx.db.insert("appUsers", { authUserId: person.authUserId, email: emailKey(who.email), name: who.name, role: "student", travelLead: false, financialEdit: false, active: true });
-    await ctx.db.patch(student._id, { userId, email: who.email });
+    if (!args.approve) {
+      await ctx.db.patch(request._id, { status: "declined", decidedAt: now, decidedBy: actor._id });
+      await audit(ctx, actor, "bulkInviteConnectionRequests", request._id, "decline", "pending", "declined");
+      return null;
+    }
+    const row = await ctx.db.get(request.inviteId);
+    const student = await ctx.db.get(request.studentId);
+    const season = await activeSeason(ctx);
+    if (!row || row.codeHash !== request.codeHash || row.status !== "pending" || row.studentId !== request.studentId || row.seasonId !== request.seasonId ||
+        season._id !== request.seasonId || (season.endsAt !== undefined && season.endsAt <= now) || (row.expiresAt !== undefined && row.expiresAt <= now) ||
+        !student || !student.active || student.userId || student.seasonId !== season._id) {
+      throw new Error("This request is stale. Decline it and ask the student to use a current invitation.");
+    }
+    await requireSeasonProfileWritable(ctx, season._id);
+    const authUser = await ctx.db.get(request.authUserId);
+    const googleAccounts = await ctx.db.query("authAccounts").withIndex("userIdAndProvider", q => q.eq("userId", request.authUserId).eq("provider", "google")).take(2);
+    if (!authUser?.emailVerificationTime || authUser.isAnonymous || !authUser.email || emailKey(authUser.email) !== request.googleEmail ||
+        !googleAccounts.some(account => account.emailVerified && emailKey(account.emailVerified) === request.googleEmail)) {
+      throw new Error("The verified Google identity has changed. Decline this request and issue a new invitation.");
+    }
+    if (await accountConflict(ctx, request.authUserId, request.googleEmail, student)) throw new Error("This Google account or email is already connected. Decline this request.");
+    const userId = await ctx.db.insert("appUsers", { authUserId: request.authUserId, email: request.googleEmail, name: request.googleName, role: "student", travelLead: false, financialEdit: false, active: true });
+    await ctx.db.patch(student._id, { userId, email: request.googleEmail });
     await ctx.db.patch(row._id, { status: "redeemed", code: "", redeemedBy: userId, redeemedAt: now });
+    await ctx.db.patch(request._id, { status: "approved", decidedAt: now, decidedBy: actor._id });
     const batch = await ctx.db.get(row.batchId);
     if (batch) await ctx.db.patch(batch._id, { pendingCount: batch.pendingCount - 1, connectedCount: batch.connectedCount + 1 });
-    const otherCodes = await ctx.db.query("bulkStudentInvites").withIndex("by_studentId_and_status", q => q.eq("studentId", student._id).eq("status", "pending")).take(101);
-    if (otherCodes.length > 100) throw new Error("Invitation history requires Coach review.");
-    for (const other of otherCodes) if (other._id !== row._id) {
-      await ctx.db.patch(other._id, { status: "replaced", code: "" });
-      const otherBatch = await ctx.db.get(other.batchId);
-      if (otherBatch) await ctx.db.patch(otherBatch._id, { pendingCount: otherBatch.pendingCount - 1 });
-    }
-    const requests = await ctx.db.query("joinRequests").withIndex("by_authUserId", q => q.eq("authUserId", person.authUserId)).take(21);
+    const requests = await ctx.db.query("joinRequests").withIndex("by_authUserId", q => q.eq("authUserId", request.authUserId)).take(21);
     if (requests.length > 20) throw new Error("Join request history requires Coach review.");
-    for (const request of requests) if (request.status === "pending" && request.seasonId === student.seasonId) await ctx.db.patch(request._id, { status: "approved", decidedAt: now, decidedBy: userId });
-    const redeemed = await ctx.db.get(userId);
-    if (redeemed) await audit(ctx, redeemed, "bulkStudentInvites", row._id, "redeem", "pending", { studentId: student._id });
-    return { studentId: student._id };
+    for (const pending of requests) if (pending.status === "pending" && pending.seasonId === student.seasonId) await ctx.db.patch(pending._id, { status: "approved", decidedAt: now, decidedBy: actor._id });
+    await audit(ctx, actor, "bulkInviteConnectionRequests", request._id, "approve", "pending", { studentId: student._id, userId });
+    return null;
   },
 });

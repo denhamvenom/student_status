@@ -3,7 +3,7 @@ import { ConfirmAction } from './ConfirmAction'
 import { SetupWizard } from './SetupWizard'
 import { setupWizardCopy } from './lib/setup-wizard-copy'
 import { FirstInvitationSettings } from './FirstRegistration'
-import { PendingJoinView } from './PendingJoinView'
+import { PendingJoin } from './PendingJoin'
 import { BulkInvite } from './BulkInvite'
 import { WithdrawnEventFee } from './WithdrawnEventFee'
 import { eventDraftIssue } from './lib/new-event-validation'
@@ -87,7 +87,6 @@ const qJoinRequests=api.admin.listJoinRequests
 const mJoinDecision=api.admin.approveJoin
 const mCreateJoinCode=api.admin.createJoinCode
 const mCreateEvent=api.admin.createEvent
-const mRequestJoin=api.app.requestJoin
 const sid=(id:string)=>id as Id<'students'>
 const eid=(id:string)=>id as Id<'events'>
 
@@ -102,27 +101,7 @@ function Heading({title,description}:{title:string;description?:string}){const s
 function Box({title,children}:{title?:string;children:React.ReactNode}){return <section className="card">{title&&<div className="card-head"><h2>{title}</h2></div>}{children}</section>}
 function State({children}:{children:React.ReactNode}){return <div className="card"><p>{children}</p></div>}
 function SignIn(){const {signIn}=useAuthActions();const [error,setError]=useState('');return <main className="signin"><div className="signin-brand"><img src="/assets/logos/logo-mark-white-text.png" alt={liveCopy.brand.imageAlt}/></div><div className="signin-content"><p className="eyebrow">{liveCopy.brand.team}</p><h1>{liveCopy.signIn.title}</h1><p>{liveCopy.signIn.description}</p><p>New student? You will be asked for an invitation or team code after you sign in.</p><div className="signin-card"><h2>{liveCopy.signIn.heading}</h2><p>{liveCopy.signIn.instruction}</p><Button className="button button-primary" onClick={()=>void signIn('google', {redirectTo: `${window.location.origin}/`}).catch(()=>setError(uiCopy.errors.signIn))}><img className="icon" src="/assets/icons/google-g.svg" alt=""/>{liveCopy.signIn.action}</Button>{error&&<p role="alert" className="open-text">{error}</p>}</div></div></main>}
-function PendingJoin(){
-  const request=useMutation(mRequestJoin)
-  const redeem=useMutation(api.bulkInvites.redeem)
-  const {signOut}=useAuthActions()
-  const [code,setCode]=useState(''),[first,setFirst]=useState(''),[last,setLast]=useState('')
-  const individual=code.trim().toUpperCase().startsWith('DV-')
-  const individualCodeValid=/^DV-[0-9A-F]{32}$/i.test(code.trim())
-  const previewCode=useMutation(api.bulkInvites.previewCode)
-  const [codePreview,setCodePreview]=useState<Awaited<ReturnType<typeof previewCode>>|null>(null)
-  useEffect(()=>{
-    if(!individualCodeValid)return
-    let canceled=false
-    const timer=window.setTimeout(()=>{void previewCode({code:code.trim()}).then(result=>{if(!canceled)setCodePreview(result)}).catch(()=>{if(!canceled)setCodePreview(null)})},350)
-    return ()=>{canceled=true;window.clearTimeout(timer)}
-  },[code,individualCodeValid,previewCode])
-  const joinStatus=useQuery(api.app.joinStatus,{});const submitted=joinStatus?.status==='pending'||joinStatus?.status==='approved';const [error,setError]=useState(''),[signOutError,setSignOutError]=useState(''),[busy,setBusy]=useState(false)
-  const submit=async(e:FormEvent)=>{e.preventDefault();setBusy(true);setError('');try{if(individual){if(!individualCodeValid){setError('Check the individual invitation code and try again.');return}const result=await redeem({code:code.trim()});if(!result.studentId){setError('This invitation code cannot be used. Ask your Coach for a current code.');return}setCode('');return}const requestId=await request({code:code.trim(),firstName:first.trim(),lastName:last.trim()});if(!requestId){setError(liveCopy.join.invalidCode);return}setCode('')}catch(err){setError(err instanceof Error?err.message:String(err))}finally{setBusy(false)}}
-  const exit=async()=>{setBusy(true);setSignOutError('');try{await signOut()}catch{setSignOutError(liveCopy.join.signOutFailed)}finally{setBusy(false)}}
-  if(!joinStatus)return <State>Checking your join request…</State>;
-  return <PendingJoinView declined={joinStatus.status==='declined'} submitted={submitted} busy={busy} signOutError={signOutError} onSignOut={()=>void exit()}><Box title={submitted||joinStatus.status==='declined'?'Have an individual invitation?':liveCopy.join.heading}><p>{submitted||joinStatus.status==='declined'?'Enter the individual code your Coach gave you to connect your account.':'Enter the code your Coach gave you. A named invitation connects you directly to your student profile. A team code sends a request for review.'}</p><form className="form-grid" onSubmit={e=>void submit(e)}><label>{liveCopy.join.code} <Input value={code} onChange={e=>{setCode(e.target.value);setCodePreview(null);setError('')}} autoComplete="off" required/></label>{individual?<>{codePreview?.status==='valid'&&<p role="status">Invitation for <strong>{codePreview.studentName}</strong></p>}{codePreview&&codePreview.status!=='valid'&&<p className="open-text">This individual invitation is unavailable. Ask your Coach for help.</p>}</>:!submitted&&joinStatus.status!=='declined'?<><label>{liveCopy.join.first} <Input value={first} onChange={e=>setFirst(e.target.value)} required/></label><label>{liveCopy.join.last} <Input value={last} onChange={e=>setLast(e.target.value)} required/></label><p className="muted">{liveCopy.join.studentNote}</p></>:null}<Button className="button button-primary" type="submit" disabled={busy||individual&&(!individualCodeValid||codePreview?.status!=='valid')||!individual&&(submitted||joinStatus.status==='declined')}>{individual?'Connect my account':liveCopy.join.submit}</Button></form>{error&&<p role="alert" className="open-text">{error}</p>}</Box></PendingJoinView>
-}
+
 function Home({viewer,studentId}:{viewer:Viewer;studentId:string|null}){const r=role(viewer);if(r==='mentor')return <Mentor year={viewer.season?.year??null}/>;if(r==='coach'||r==='travelLead')return <Roster viewer={viewer}/>;if(!studentId)return <State>{liveCopy.states.noLinkedStudent}</State>;return <><p><Link className="button button-outline" to="/setup?edit=1">Edit profile</Link></p><DashboardPage studentId={studentId} viewerRole={r}/></>}
 type WaitingTodo={eventName:string;label:string;responsible:'student'|'parent'|'coach'}
 function waitingSentence(todo:WaitingTodo,studentName:string,viewerRole:string){

@@ -24,8 +24,15 @@ export const createJoinCode = mutation({
   handler: async (ctx, args) => {
     const user = await viewer(ctx); if (user.role !== "coach") throw new Error("Join code management is coach only.");
     const season = await activeSeason(ctx);
-    const bytes = crypto.getRandomValues(new Uint8Array(8));
-    const code = `VENOM-${Array.from(bytes, x => x.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
+    let code = "";
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const value = crypto.getRandomValues(new Uint32Array(1))[0];
+      if (value >= 4_294_800_000) continue;
+      const candidate = String(100_000 + value % 900_000);
+      const existing = await ctx.db.query("joinCodes").withIndex("by_code", q => q.eq("code", candidate)).first();
+      if (!existing) { code = candidate; break; }
+    }
+    if (!code) throw new Error("Could not allocate an unused team code. Try again.");
     const expiresAt = Date.now() + { "24h": 86_400_000, "1w": 604_800_000, "2w": 1_209_600_000 }[args.duration];
     await ctx.db.insert("joinCodes", { seasonId: season._id, code, expiresAt, revoked: false, createdBy: user._id });
     await audit(ctx, user, "joinCodes", code, "create", null, { expiresAt });
