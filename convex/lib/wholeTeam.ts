@@ -5,7 +5,7 @@ import { addCharge, addCharges, type ChargeDraft } from "./money";
 
 /** Enrollment is additive: existing participation and reviewed withdrawals retain their history. */
 async function enrollWholeTeamMember(ctx: MutationCtx, actor: Doc<"appUsers">, event: Doc<"events">, student: Doc<"students">) {
-  if (!student.active || student.seasonId !== event.seasonId || event.archived || event.signupMode !== "assigned" || event.assignmentScope !== "wholeTeam") return false;
+  if (!student.active || student.seasonId !== event.seasonId || event.archived || event.cancelled || event.signupMode !== "assigned" || event.assignmentScope !== "wholeTeam") return false;
   const prior = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
   if (prior) return false;
   const withdrawals = await ctx.db.query("withdrawalRequests").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(101);

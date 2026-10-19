@@ -15,6 +15,7 @@ const app = defineApp({ env: {
   TIMECLOCK_CALENDAR_ID: v.optional(v.string()),
   TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_EMAIL: v.optional(v.string()),
   TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_PRIVATE_KEY: v.optional(v.string()),
+  STUDENT_STATUS_CALENDAR_WRITE_ENABLED: v.optional(v.string()),
   TIMECLOCK_OPERATOR_PIN: v.optional(v.string()),
   TIMECLOCK_SITE_URL: v.optional(v.string()),
   PARENT_INVITE_EMAIL_ENABLED: v.optional(v.string()),

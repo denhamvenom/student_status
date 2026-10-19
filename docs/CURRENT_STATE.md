@@ -10,6 +10,12 @@ The other chat released Calendar as main b1f730a and is separately fixing full-n
 
 ## Earlier released checkpoints
 
+## Current release - linked event Calendar (PR21)
+
+Workspace student-status-readiness-design; branch feature/development-review-fixtures-2026-10-18. Implemented creation/linking to the shared Timeclock Calendar, Media Support Requested, linked schedule sync and recovery. Development sync passed; lint/types, 506 tests, both app builds and representative synthetic UI checks passed. See [behavior and evidence](EVENT_CALENDAR_SYNC.md). Root owns Git and shared backend synchronization.
+
+Owner changed Calendar sharing; read-only verification reports writer access. Owner explicitly prohibits development Calendar writes. Code requires the exact production deployment plus an explicit enable flag; development remains read-only. No real Calendar events were created or changed. Source 2c5fae7 is deployed to production amicable-eel-413 with typecheck/schema validation. Production Calendar writes are enabled; the development flag remains unset. Production authentication and Calendar writer access passed read-only checks. PR21 carries this release and documentation onto main; exact website build outcomes are recorded in the PR. A real-event end-to-end save remains unperformed to avoid creating test entries on the team Calendar.
+
 ## Bulk Payment full-name correction - October 19
 
 Owner explicitly authorized the production correction. Export and payment review now use the full student legal name, preserving last names when a preferred name is only a first name. CSV columns, identifiers, financial behavior and settings are unchanged. Existing downloaded files need to be downloaded again to show the corrected names.
