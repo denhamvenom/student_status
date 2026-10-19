@@ -1,34 +1,17 @@
 # Current integration handoff
 
-## Production release — October 19
+## Parent email invitations — October 19 local candidate
 
-Owner-authorized Bulk Invite release completed: backend `amicable-eel-413` deployed, PR17 merged as `f7c205c`, both Cloudflare builds succeeded. Coach Google sign-in, roster, Bulk Invite/approval queue and Timeclock sign-in verified. One regular six-digit team code generated; no requests, student records or bulk batches created. Private pre-release backup verified. Student acceptance testing deferred by owner to actual alpha testers. See BULK_INVITE_RELEASE_2026-10-19.md. The local-only restrictions below are historical and superseded by this explicit release authorization.
+Workspace: Development Version/student-status-bulk-invite. Branch: feature/parent-email-invitations. Owner requested automatic email plus Share invitation while keeping Google login; local implementation/testing only. Do not sync either backend, merge main, deploy, send real mail or create production requests without further authorization.
 
-## Current local candidate — Coach approval required
+Implemented Resend invitation delivery with explicit server configuration, safe status, per-recipient/hour and per-student/day limits, three-attempt retries and a 20-minute stalled-job timeout. Share/Copy controls preserve exact invited Google-email acceptance. Full 478-test suite across 95 files, lint, application/backend types and build pass. Actual-component mocked browser checks pass at 1440px light and 390px dark. Astra scoped review closed without blockers. The first full test run hit the known sandbox temporary-file ENOENT issue; unsandboxed rerun passed unchanged tests.
 
-October 19 owner change supersedes direct linking: five-digit Bulk Invite codes submit connection requests; only a Coach can connect the verified Google account to the existing student. Six-digit ordinary team requests remain separate. Local backend, student waiting/retry UI and Coach approval queue implemented; 26 backend cases and isolated actual-component browser tests pass, including concurrency, 100 students, daily limits and stale requests. See BULK_INVITE.md. No backend sync (including development) is authorized for this revision. Local frontend server stopped to avoid mixing new UI with the old deployed API. Real Google redemption remains deferred by owner; no production deployment or main merge.
+Next: verified sender/domain/key and trusted origin setup, followed by an explicitly authorized real-email and Google-link rehearsal. Native phone sharing is only simulated. No real email, cloud sync or production change occurred. See [feature/configuration/evidence](PARENT_INVITATION_EMAIL.md) and [human checklist](DEVELOPMENT_CHECKLIST.md). Screenshots and test harness remain ignored under .test-temp/parent-email-ui/.
 
-## Bulk Invite local candidate - October 18
+## Production baseline — October 19
 
-October 19 update: development-only sync and Coach browser rehearsal passed. Individual Bulk Invite codes now have five digits; regular Coach team codes have six digits, with separate signup routing and collision checks. Targeted automated signup/redemption tests, lint, types and build passed. Real Google redemption explicitly deferred by owner. No production deployment or main merge. See BULK_INVITE.md for evidence and limits.
+Bulk Invite release completed with explicit owner authorization: Convex production amicable-eel-413, PR17 merge f7c205c, both Cloudflare builds succeeded. Five-digit individual codes require Coach approval; ordinary team codes use six digits. Coach sign-in, roster, Bulk Invite queue and Timeclock sign-in checked. One regular team code was generated; no requests, students or bulk batches were created during release. Owner subsequently reported the first real student joined successfully. See [release receipt](BULK_INVITE_RELEASE_2026-10-19.md).
 
-Branch `feature/bulk-invite` in `student-status-bulk-invite`, based on main `46d526a`. Coach Bulk Invite, CSV preview/export, individual Google-account linking, and whole-roster connection filtering implemented locally. See [feature and verification notes](BULK_INVITE.md). No deployment or main merge; live development Google-sign-in rehearsal remains separate. Earlier production evidence below is preserved.
+Timeclock includes active students with reviewed first/last names regardless of linked Google account. Bulk Invite creates these fields, so imported unconnected students can clock through a Coach/Mentor-signed-in station. Existing attendance stays on their student record when linked.
 
-
-## October 18 production changeover completed
-
-Owner-authorized production cleanup and release completed. Application source `09289d4` was pushed to the development branch, deployed to Convex production `amicable-eel-413`, and merged through PR15 as `d3d2e9e368dbbb52d6031ebae0dc5007c11f356b`. Both production websites built and deployed that merge successfully; its tree exactly matches the reviewed source.
-
-The verified permanent Coach is the sole remaining application user and Google auth account. All four other accounts/sign-ins, the one synthetic student and their reviewed dependencies were deleted atomically. Fresh snapshot checks found zero students, no remaining removed-identity references, no stored files and no report aggregate entries. Real season/FIRST/family-readiness settings, Coach identity and 63 calendar occurrences were preserved. Normal calendar sync timestamps advanced; configuration did not change. Credentials were neither changed nor exported. Private recovery exports remain ignored and outside Git.
-
-Temporary cleanup switches and Coach-only maintenance restriction are removed. The old team join code was revoked and deleted; no replacement was created. Student Status and Timeclock public sign-in pages load; Coach backend access passes. The owner confirmed successful production Coach browser sign-in on October 18 and reported that everything looked good. Full student onboarding remains deferred by the owner to tomorrow; real signing remains disabled. Production needs no old-subteam conversion because there are zero student records.
-
-The four stale tests are fixed. Full application check passed 423 tests before the final invitation regression; final maintenance suite passed 5/5 plus typecheck/lint. Timeclock checks and production backend compile passed. See [execution evidence](PRODUCTION_CHANGEOVER_2026-10-18.md). Earlier restrictions and pending-cleanup statements below are historical, superseded by this authorized release.
-
-## Workspace and next work
-
-Branch: `feature/development-review-fixtures-2026-10-18`; merged release PR15. Development remains `third-bandicoot-18` with separate synthetic review data; production is `amicable-eel-413`. Root owns Git/backend/releases; Sol implementation and Astra review. Keep private snapshots/manifests outside Git.
-
-Tomorrow: owner-directed live student journey, fresh team join code when requested, and any resulting fixes. Physical tablet/two-phone concurrency/reconnection checks remain explicitly deferred. Actual signing remains disabled; event, attendance, payment and signature rehearsals are not claimed. Recovery exports passed archive integrity checks; restore drill and scheduled backups are not proven by this release.
-
-Batch 1–4 wording/navigation/workflow evidence is under `docs/audit-2026-10-18/`. Approved subteams are Build, Electrical, Machining, Programming, Business/Media. Historical planning/release details remain in PLAN.md, DEVELOPMENT_CHECKLIST.md and PRODUCTION_ONBOARDING_RELEASE.md; later owner decisions prevail.
+Development remains third-bandicoot-18; production is amicable-eel-413. Main merges automatically deploy both frontends. Root owns integration/Git/backend/releases, Sol implementation and Astra review. Keep student records, credentials, snapshots and account-specific browser evidence out of Git. Earlier production cleanup details are in PRODUCTION_CHANGEOVER_2026-10-18.md; physical-device concurrency/reconnection and recovery restore drills remain unproven. Actual signing remains disabled.

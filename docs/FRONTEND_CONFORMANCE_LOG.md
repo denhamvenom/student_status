@@ -1,5 +1,9 @@
 # Frontend conformance work log
 
+## October 19 parent email/share
+
+Actual StudentParents component inspected with mocked Convex at 1440px light and 390px dark. Reused existing FamilyOperations surface, type, spacing, gold action and wrapping share controls; no new CSS required. Share/Copy and live email status remain readable without horizontal overflow. Synthetic browser behavior covers queued/sent/failed/not_sent, explicit unconfigured message, share cancellation/failure and copy fallback. Screenshots remain ignored in `.test-temp/parent-email-ui/`. This is component-level evidence, not integrated Google login or a physical phone share sheet. No fresh pixel comparison against the hosted prototype was performed; existing component/design tokens were preserved. See PARENT_INVITATION_EMAIL.md.
+
 ## October 18 Batch 4 workflow changes
 
 Batch 4 implementation, independent review and role spot-checks are complete on `feature/development-review-fixtures-2026-10-18`. See [Batch 4 report](audit-2026-10-18/batch-4-report.md) and [copy inventory](audit-2026-10-18/batch-4-copy-inventory.md). Owner clarified the only selectable subteams: Build, Electrical, Machining, Programming, Business/Media. Owner explicitly deferred stored-record conversion; no production access or backfill. Final development backend sync, build/typecheck, source lint and 18 focused tests passed. Full suite before that last update: 412 passed, four existing stale assertions; full lint nine existing private-helper errors. Coach confirmation Cancel and staff Money tools/New event checks passed without shared-data writes. Parent Money/Home and event signup guidance checked. Student Home money, read-only independent travel, Whole Team leave confirmation and Cancel checked; participation stayed confirmed. This report accompanies the reviewed development checkpoint. Stop after Batch 4. No main merge or production rollout.

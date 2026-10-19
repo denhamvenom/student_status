@@ -1,5 +1,9 @@
 # Student Status implementation plan
 
+## October 19 parent email invitation candidate
+
+Owner approved local implementation of automatic parent invitation email and native Share invitation, retaining exact invited Google-account sign-in. See [scope, configuration and evidence](PARENT_INVITATION_EMAIL.md). This work does not authorize backend synchronization, production email, or a main merge. Bulk Invite's earlier release remains unchanged.
+
 ## October 18 production changeover completed
 
 Owner-authorized production cleanup and release completed. Application source `09289d4` was pushed to the development branch, deployed to Convex production `amicable-eel-413`, and merged through PR15 as `d3d2e9e368dbbb52d6031ebae0dc5007c11f356b`. Both production websites built and deployed that merge successfully; its tree exactly matches the reviewed source.

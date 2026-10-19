@@ -17,6 +17,10 @@ const app = defineApp({ env: {
   TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_PRIVATE_KEY: v.optional(v.string()),
   TIMECLOCK_OPERATOR_PIN: v.optional(v.string()),
   TIMECLOCK_SITE_URL: v.optional(v.string()),
+  PARENT_INVITE_EMAIL_ENABLED: v.optional(v.string()),
+  RESEND_API_KEY: v.optional(v.string()),
+  PARENT_INVITE_EMAIL_FROM: v.optional(v.string()),
+  PARENT_INVITE_APP_ORIGIN: v.optional(v.string()),
 } });
 app.use(rateLimiter);
 app.use(aggregate, { name: "reportAggregates" });

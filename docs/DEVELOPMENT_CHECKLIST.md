@@ -1,5 +1,16 @@
 # Student Status Development Checklist
 
+## October 19 parent email invitations — local candidate
+
+- [x] Automatic invitation email, safe sending status, bounded retry/rate limits and interrupted-job recovery implemented.
+- [x] Share invitation and Copy fallback implemented; matching Google account and existing acceptance rules preserved.
+- [x] Full 478-test suite, lint, application/backend types and application build pass; actual-component synthetic browser checks at desktop/light and phone/dark pass.
+- [x] Scoped Astra review closed without blockers. No production requests or real emails sent.
+- [ ] Configure verified sender/domain/key and approved origin; authorized real-email and Google-link round-trip check before release.
+- [ ] Separate authorization for backend sync and production rollout; no deployment in this checkpoint.
+
+See [configuration and detailed evidence](PARENT_INVITATION_EMAIL.md). Earlier dated checkpoints below are historical.
+
 ## October 18 production changeover completed
 
 Owner-authorized production cleanup and release completed. Application source `09289d4` was pushed to the development branch, deployed to Convex production `amicable-eel-413`, and merged through PR15 as `d3d2e9e368dbbb52d6031ebae0dc5007c11f356b`. Both production websites built and deployed that merge successfully; its tree exactly matches the reviewed source.
