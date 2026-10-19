@@ -1,16 +1,16 @@
 # Student Status implementation plan
 
-## October 18 production changeover authorized
+## October 18 production changeover completed
 
-Owner explicitly authorized fixing stale tests, publishing development changes, removing all production synthetic data and all non-Coach application accounts/sign-ins, preserving the verified permanent Coach and real settings/credentials, then releasing the upgrades. Full live student onboarding is deferred to tomorrow by owner. Credentials must remain in place and must not be copied locally.
+Owner-authorized production cleanup and release completed. Application source `09289d4` was pushed to the development branch, deployed to Convex production `amicable-eel-413`, and merged through PR15 as `d3d2e9e368dbbb52d6031ebae0dc5007c11f356b`. Both production websites built and deployed that merge successfully; its tree exactly matches the reviewed source.
 
-Private production data/storage recovery export saved; original Coach identity matched the private initialization ledger. Inventory: four other accounts, one test student, related invitations/links/auth/zero-money summaries; no event/payment/signature records. Real calendar occurrences and Coach/season/FIRST/family-readiness records remain preserved. Exact manifest, snapshots and account identities are ignored private evidence only.
+The verified permanent Coach is the sole remaining application user and Google auth account. All four other accounts/sign-ins, the one synthetic student and their reviewed dependencies were deleted atomically. Fresh snapshot checks found zero students, no remaining removed-identity references, no stored files and no report aggregate entries. Real season/FIRST/family-readiness settings, Coach identity and 63 calendar occurrences were preserved. Normal calendar sync timestamps advanced; configuration did not change. Credentials were neither changed nor exported. Private recovery exports remain ignored and outside Git.
 
-The four stale assertions are fixed. Full application check passed with 423 tests before the final invitation-acceptance regression test; that final focused maintenance suite passes 5/5 and typecheck passes. Timeclock checks pass. Lint now excludes ignored private operator files; shipping source remains checked. Cleanup tests 7/7 cover exact fingerprints, protected Coach auth/session chain, signed orphan verifier cleanup and 63 unrelated real calendar rows. Temporary maintenance gate protects Google login, ordinary access, join requests and invitation acceptance. Development sync passed before the final invitation guard; final sync/release verification remains pending.
+Temporary cleanup switches and Coach-only maintenance restriction are removed. The old team join code was revoked and deleted; no replacement was created. Student Status and Timeclock public sign-in pages load; Coach backend access passes. A fresh Coach browser login is requested separately. Full student onboarding remains deferred by the owner to tomorrow; real signing remains disabled. Production needs no old-subteam conversion because there are zero student records.
 
-Production cleanup/deployment has not yet executed. Existing credentials, FIRST/Calendar settings, real season and Coach must remain. Planned sequence: publish reviewed feature checkpoint; deploy necessary maintenance/cleanup backend under Coach-only maintenance; revoke old join code; refresh backup/manifest; preview and atomically remove reviewed test rows; disable cleanup switches; merge matching frontend release and verify both hosts and remaining production records. Remove temporary maintenance closure after verification so normal onboarding can proceed; no new team code is created until requested.
+The four stale tests are fixed. Full application check passed 423 tests before the final invitation regression; final maintenance suite passed 5/5 plus typecheck/lint. Timeclock checks and production backend compile passed. See [execution evidence](PRODUCTION_CHANGEOVER_2026-10-18.md). Earlier restrictions and pending-cleanup statements below are historical, superseded by this authorized release.
 
-See [production changeover report](PRODUCTION_CHANGEOVER_2026-10-18.md) for execution evidence. Earlier development-only stop instructions and retained-test-account notes below are historical and superseded by this authorization.
+## Historical checkpoints (superseded where noted)
 
 ## October 18 Batch 4 workflow changes
 

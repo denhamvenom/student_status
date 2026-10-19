@@ -1,13 +1,26 @@
 # Production changeover — October 18, 2026
 
-## October 18 production changeover authorized
+## October 18 production changeover completed
 
-Owner explicitly authorized fixing stale tests, publishing development changes, removing all production synthetic data and all non-Coach application accounts/sign-ins, preserving the verified permanent Coach and real settings/credentials, then releasing the upgrades. Full live student onboarding is deferred to tomorrow by owner. Credentials must remain in place and must not be copied locally.
+Owner-authorized production cleanup and release completed. Application source `09289d4` was pushed to the development branch, deployed to Convex production `amicable-eel-413`, and merged through PR15 as `d3d2e9e368dbbb52d6031ebae0dc5007c11f356b`. Both production websites built and deployed that merge successfully; its tree exactly matches the reviewed source.
 
-Private production data/storage recovery export saved; original Coach identity matched the private initialization ledger. Inventory: four other accounts, one test student, related invitations/links/auth/zero-money summaries; no event/payment/signature records. Real calendar occurrences and Coach/season/FIRST/family-readiness records remain preserved. Exact manifest, snapshots and account identities are ignored private evidence only.
+The verified permanent Coach is the sole remaining application user and Google auth account. All four other accounts/sign-ins, the one synthetic student and their reviewed dependencies were deleted atomically. Fresh snapshot checks found zero students, no remaining removed-identity references, no stored files and no report aggregate entries. Real season/FIRST/family-readiness settings, Coach identity and 63 calendar occurrences were preserved. Normal calendar sync timestamps advanced; configuration did not change. Credentials were neither changed nor exported. Private recovery exports remain ignored and outside Git.
 
-The four stale assertions are fixed. Full application check passed with 423 tests before the final invitation-acceptance regression test; that final focused maintenance suite passes 5/5 and typecheck passes. Timeclock checks pass. Lint now excludes ignored private operator files; shipping source remains checked. Cleanup tests 7/7 cover exact fingerprints, protected Coach auth/session chain, signed orphan verifier cleanup and 63 unrelated real calendar rows. Temporary maintenance gate protects Google login, ordinary access, join requests and invitation acceptance. Development sync passed before the final invitation guard; final sync/release verification remains pending.
+Temporary cleanup switches and Coach-only maintenance restriction are removed. The old team join code was revoked and deleted; no replacement was created. Student Status and Timeclock public sign-in pages load; Coach backend access passes. A fresh Coach browser login is requested separately. Full student onboarding remains deferred by the owner to tomorrow; real signing remains disabled. Production needs no old-subteam conversion because there are zero student records.
 
-Production cleanup/deployment has not yet executed. Existing credentials, FIRST/Calendar settings, real season and Coach must remain. Planned sequence: publish reviewed feature checkpoint; deploy necessary maintenance/cleanup backend under Coach-only maintenance; revoke old join code; refresh backup/manifest; preview and atomically remove reviewed test rows; disable cleanup switches; merge matching frontend release and verify both hosts and remaining production records. Remove temporary maintenance closure after verification so normal onboarding can proceed; no new team code is created until requested.
+The four stale tests are fixed. Full application check passed 423 tests before the final invitation regression; final maintenance suite passed 5/5 plus typecheck/lint. Timeclock checks and production backend compile passed. See [execution evidence](PRODUCTION_CHANGEOVER_2026-10-18.md). Earlier restrictions and pending-cleanup statements below are historical, superseded by this authorized release.
 
-See [production changeover report](PRODUCTION_CHANGEOVER_2026-10-18.md) for execution evidence. Earlier development-only stop instructions and retained-test-account notes below are historical and superseded by this authorization.
+## Execution receipt
+
+- Recovery snapshot archive passed integrity testing; refreshed pre-cleanup and post-cleanup snapshots are stored privately, ignored by Git. No credential export was performed.
+- Reviewed cleanup fingerprint: `350fefcdc4e1924e796b73bd09b352d2dbfaff909911f54581489e4223b1dff2`. The atomic commit matched the preview exactly.
+- Deleted: 4 application users, 4 auth users, 4 Google account links, 2 auth sessions, 21 refresh tokens, 3 orphan verifiers, 1 student, 1 family link, 2 adult invitations, 1 parent invitation, 1 join request, 1 revoked join code, 1 empty financial account, 1 empty finance summary and 9 related audit rows. A non-identifying cleanup audit receipt remains alongside 4 real setup/readiness audit records.
+- Ten synthetic aggregate entries removed; empty aggregate containers remain. No event, payment, attendance, signature or storage rows existed to remove.
+- Student Status Cloudflare build `f9637016-5c05-40af-aadb-7e955541d971`: success on release merge `d3d2e9e368dbbb52d6031ebae0dc5007c11f356b`.
+- Timeclock Cloudflare build `fcec2fae-4af8-4c6e-8c62-7c7ddb594e7b`: success on the same merge.
+- Live browser sign-in pages verified at https://students.team8044.org and https://timeclock.team8044.org. A direct script HTTP probe received 403; normal browser page loads succeeded. No protection was disabled.
+- Backend Coach read verified active after cleanup. Fresh interactive Coach login remains distinct from this backend check.
+
+## Limits and next use
+
+No new test accounts or students were created in production during verification. Normal new Google sign-ins can create a pending identity, but deleted accounts have no retained team role or family link. A new team code must be created by Coach for the next student enrollment session. Full student journey is intentionally deferred to tomorrow. Existing signing restrictions and previously accepted device-testing deferrals remain.
