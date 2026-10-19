@@ -52,7 +52,7 @@ describe("Coach student roster and record",()=>{
     await expect(f.t.query(list,page)).rejects.toThrow();
     const rows=await f.coach.query(list,page);
     expect(rows.page).toHaveLength(1);
-    expect(rows.page[0]).toMatchObject({name:"Synthetic",account:{linkage:"unlinked",access:"unknown"},balance:{state:"uninitialized",dueCents:null},readinessCoverage:"complete"});
+    expect(rows.page[0]).toMatchObject({name:"Synthetic Student",account:{linkage:"unlinked",access:"unknown"},balance:{state:"uninitialized",dueCents:null},readinessCoverage:"complete"});
     expect(rows.page[0]).not.toHaveProperty("email");
     expect(rows.page[0]).not.toHaveProperty("allergies");
     expect(rows.page[0].missingSummary).toEqual(expect.arrayContaining(["Profile setup","Shirt size","Room category","Guardian contact","Emergency contact","Health information"]));
@@ -66,6 +66,8 @@ describe("Coach student roster and record",()=>{
     await f.t.run(async ctx=>{const account=await ensureFinancialAccount(ctx,f.ids.student);await ctx.db.patch(account._id,{state:"ready",allocationSourceVersion:1,personalAppliedCents:0,fundraisingAppliedCents:0})});
     const roster=(await f.coach.query(list,page)).page[0];
     const source=(await f.coach.query(finance,{paginationOpts:{numItems:20,cursor:null}})).page[0];
+    expect(roster.name).toBe("Synthetic Student");
+    expect(source.name).toBe("Synthetic Student");
     expect(roster.balance.state).toBe(source.state);
     expect(roster.balance.dueCents).toBe(source.dueCents);
     expect(roster.balance.personalAvailableCents).toBe(source.personalAvailableCents);

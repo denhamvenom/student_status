@@ -17,7 +17,7 @@ async function fixture() {
     const auth = await ctx.db.insert("users", { email: "v4@example.invalid" });
     const actor = await ctx.db.insert("appUsers", { authUserId: auth, name: "Coach", email: "v4@example.invalid", role: "coach", active: true, travelLead: false, financialEdit: false });
     const season = await ctx.db.insert("seasons", { name: "V4", year: 2026, status: "active", startsAt: 0, permissionVersion: "DRAFT", createdBy: actor });
-    const student = await ctx.db.insert("students", { seasonId: season, legalName: "Synthetic", preferredName: "Synthetic", email: "v4-student@example.invalid", subteam: "A", active: true, travelTeam: false, roomCategoryLocked: false, allergies: { state: "unknown" }, medications: { state: "unknown" } });
+    const student = await ctx.db.insert("students", { seasonId: season, legalName: "Synthetic Student", preferredName: "Synthetic", email: "v4-student@example.invalid", subteam: "A", active: true, travelTeam: false, roomCategoryLocked: false, allergies: { state: "unknown" }, medications: { state: "unknown" } });
     return { auth, actor, season, student };
   });
   return { t, ids, coach: t.withIdentity({ subject: `${ids.auth}|session` }) };
@@ -52,10 +52,10 @@ const rebuildRef = makeFunctionReference<"mutation">("financialSources:rebuild")
       await f.t.mutation(rebuildPage, { accountId: account._id, generation: account.generation, phase: account.phase, cursor: account.cursor });
     }
     const result = await f.coach.query(rows, { paginationOpts: { numItems: 20, cursor: null } });
-    expect(result.page[0]).toMatchObject({ state: "ready", personalAppliedCents: 40, fundraisingAppliedCents: 45, dueCents: 15, fundraisingAvailableCents: 15 });
+    expect(result.page[0]).toMatchObject({ name: "Synthetic Student", state: "ready", personalAppliedCents: 40, fundraisingAppliedCents: 45, dueCents: 15, fundraisingAvailableCents: 15 });
     const changes = await f.coach.query(feed, { paginationOpts: { numItems: 20, cursor: null } });
     expect(changes.page.filter((item: { kind: string }) => item.kind === "release")).toHaveLength(1);
-    expect(changes.page.find((item: { kind: string }) => item.kind === "fundraisingCredit")).toMatchObject({ meaning: "receipt", beforeCents: null, afterCents: 60 });
+    expect(changes.page.find((item: { kind: string }) => item.kind === "fundraisingCredit")).toMatchObject({ studentName: "Synthetic Student", meaning: "receipt", beforeCents: null, afterCents: 60 });
   });
   it("finishes a pre-migration allocator as v3 but refuses the same v3 account for a new v4 job", async () => {
     const f = await fixture();

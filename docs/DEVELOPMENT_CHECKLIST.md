@@ -4,6 +4,13 @@
 
 Owner-approved local replacement for student Share/Copy: private inbox-only first sign-in, one-hour resend, parent email-code recovery/returning login, and unchanged student Google sign-in. Implementation and synthetic verification are in progress. Production still runs the previous shared-link feature. See [design, boundaries and checks](PRIVATE_PARENT_SIGN_IN.md). Coordinate Calendar/main and the parallel name/Money fix before shared development sync.
 
+## October 19 legal student names and Money scrolling
+
+Student lists and financial/report projections now prefer the stored full legal name, with preferred name only as a fallback. Preferred-name editing and immutable signed records are preserved. Money uses the full content width; its focusable table scrolls vertically and horizontally with sticky column headings. Phone account cards remain available.
+
+Verification: focused backend tests and source review passed. Actual Money component with fictional rows checked at desktop/light, narrower desktop with keyboard scrolling, and phone/dark; no page-width overflow. No payment writes or production deployment. Parent-login chat owns the coordinated development sync and overlapping SetupWizard/Mentor/permission-export labels. Authenticated local review is pending Coach sign-in.
+
+
 ## Linked Calendar workflow
 
 - [x] Event creation/linking, Media Support Requested, linked editing and recovery.

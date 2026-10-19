@@ -59,7 +59,7 @@ async function nextEvent(ctx: QueryCtx, student: Doc<"students">, upcoming: Upco
 async function rosterRow(ctx: QueryCtx, student: Doc<"students">, upcoming: Upcoming) {
   const [finance, account, firstRegistrationState] = await Promise.all([financeRow(ctx, student._id), accountStatus(ctx, student), firstStatus(ctx, student._id)]);
   const event = await nextEvent(ctx, student, upcoming, finance.state);
-  return { studentId: student._id, name: student.preferredName || student.legalName, subteam: student.subteam, travelTeam: student.travelTeam, active: student.active, profileRevision: student.profileRevision ?? 0, firstRegistrationState, account, balance: { state: finance.state, dueCents: finance.dueCents, personalAvailableCents: finance.personalAvailableCents, fundraisingAvailableCents: finance.fundraisingAvailableCents, updatedAt: finance.updatedAt }, ...event, missingSummary: missingInformation(student) };
+  return { studentId: student._id, name: student.legalName || student.preferredName, subteam: student.subteam, travelTeam: student.travelTeam, active: student.active, profileRevision: student.profileRevision ?? 0, firstRegistrationState, account, balance: { state: finance.state, dueCents: finance.dueCents, personalAvailableCents: finance.personalAvailableCents, fundraisingAvailableCents: finance.fundraisingAvailableCents, updatedAt: finance.updatedAt }, ...event, missingSummary: missingInformation(student) };
 }
 
 export const list = query({

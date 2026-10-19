@@ -1,12 +1,15 @@
 .root{min-width:0;display:grid;gap:var(--space-4);color:var(--text-body)}
-.workspace{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,1fr);gap:var(--space-4);align-items:start}
+.workspace{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--space-4);align-items:start;min-width:0}
 .workspace>aside{min-width:0}
 @media(max-width:1023px){.workspace{grid-template-columns:minmax(0,1fr)}}
 .root h2,.root h3{margin:0;font-family:var(--font-heading);font-weight:400;line-height:var(--leading-tight)}
 .root h2{font-size:var(--text-xl)}
 .root h3{font-size:var(--text-lg)}
 .note{display:block;margin:0;color:var(--text-muted);font-size:var(--text-sm);overflow-wrap:anywhere}
-.desktop{border:1px solid var(--border-default);border-radius:var(--radius-md);background:var(--surface-card);overflow:hidden}
+.desktop{min-width:0;max-width:100%;border:1px solid var(--border-default);border-radius:var(--radius-md);background:var(--surface-card);overflow:hidden}
+.desktop [data-slot="table-container"]{max-width:100%;max-height:70vh;overflow:auto;scrollbar-gutter:stable}
+.desktop table{min-width:900px}
+.desktop th{position:sticky;top:0;z-index:1;background:var(--surface-card)}
 .desktop th{color:var(--text-muted);text-transform:uppercase;font-size:var(--text-xs)}
 .desktop td,.desktop th{padding:var(--space-3)}
 .money{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}

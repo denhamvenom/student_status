@@ -33,7 +33,7 @@ async function summary(ctx: Context, user: Doc<"appUsers">, data: Awaited<Return
   const job = pending?.jobId ? await ctx.db.get(pending.jobId) : null;
   const wholeTeamLeft = data.participant.status === "withdrawn" && data.event.assignmentScope === "wholeTeam" && !!await ctx.db.query("wholeTeamLeaveNotices").withIndex("by_participantId", q => q.eq("participantId", data.participant._id)).first();
   const progress = job ? { jobId: job._id, state: job.state, committedCents: job.committedCents, totalCents: job.amountCents, lastError: job.lastError ?? null } : null;
-  return { progress, canRetry: user.role === "coach" && job?.state === "failed", eventName: data.event.name, studentName: data.student.preferredName || data.student.legalName, allowWithdrawal: data.event.allowWithdrawal && !data.event.archived, wholeTeam: data.event.assignmentScope === "wholeTeam" && data.event.signupMode === "assigned", wholeTeamLeft, revision: revision(data), status: data.participant.status, requestId: pending?._id ?? null, requestStatus: pending?.status ?? null, charges, paidMainCents: charges.filter(c => c.category === "main").reduce((n, c) => n + c.paidCents, 0), paidExtraCents: charges.filter(c => c.category === "extra").reduce((n, c) => n + c.paidCents, 0), unpaidMainCents: charges.filter(c => c.category === "main").reduce((n, c) => n + c.unpaidCents, 0), unpaidExtraCents: charges.filter(c => c.category === "extra").reduce((n, c) => n + c.unpaidCents, 0) };
+  return { progress, canRetry: user.role === "coach" && job?.state === "failed", eventName: data.event.name, studentName: data.student.legalName || data.student.preferredName, allowWithdrawal: data.event.allowWithdrawal && !data.event.archived, wholeTeam: data.event.assignmentScope === "wholeTeam" && data.event.signupMode === "assigned", wholeTeamLeft, revision: revision(data), status: data.participant.status, requestId: pending?._id ?? null, requestStatus: pending?.status ?? null, charges, paidMainCents: charges.filter(c => c.category === "main").reduce((n, c) => n + c.paidCents, 0), paidExtraCents: charges.filter(c => c.category === "extra").reduce((n, c) => n + c.paidCents, 0), unpaidMainCents: charges.filter(c => c.category === "main").reduce((n, c) => n + c.unpaidCents, 0), unpaidExtraCents: charges.filter(c => c.category === "extra").reduce((n, c) => n + c.unpaidCents, 0) };
 }
 
 function revision(data: Awaited<ReturnType<typeof details>>) {
@@ -60,7 +60,7 @@ export const pendingWithdrawals = query({
       const event = await ctx.db.get(row.eventId), student = await ctx.db.get(row.studentId);
       const job = row.jobId ? await ctx.db.get(row.jobId) : null;
       const progress = job ? { jobId: job._id, state: job.state, committedCents: job.committedCents, totalCents: job.amountCents, lastError: job.lastError ?? null } : null;
-      if (event?.seasonId === season._id && student?.seasonId === season._id) result.push({ requestId: row._id, eventId: row.eventId, studentId: row.studentId, eventName: event.name, studentName: student.preferredName || student.legalName, requestedAt: row.requestedAt, status: row.status as "pending" | "processing", progress });
+      if (event?.seasonId === season._id && student?.seasonId === season._id) result.push({ requestId: row._id, eventId: row.eventId, studentId: row.studentId, eventName: event.name, studentName: student.legalName || student.preferredName, requestedAt: row.requestedAt, status: row.status as "pending" | "processing", progress });
     }
     return result;
   },
@@ -85,7 +85,7 @@ export const wholeTeamLeaveNotices = query({
       const student = await ctx.db.get(notice.studentId);
       const noticeEvent = event ?? await ctx.db.get(notice.eventId);
       if (!student || !noticeEvent || student.seasonId !== season._id || noticeEvent.seasonId !== season._id) continue;
-      rows.push({ noticeId: notice._id, eventId: notice.eventId, eventName: noticeEvent.name, studentName: student.preferredName || student.legalName, leftAt: notice.leftAt });
+      rows.push({ noticeId: notice._id, eventId: notice.eventId, eventName: noticeEvent.name, studentName: student.legalName || student.preferredName, leftAt: notice.leftAt });
     }
     return rows;
   },

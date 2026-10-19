@@ -97,7 +97,7 @@ const money=(n:number)=> (n/100).toLocaleString('en-US',{style:'currency',curren
 const date=(n:number)=>new Date(n).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})
 const eventDateRange=(startsAt:number,endsAt:number)=>date(startsAt)+(date(endsAt)===date(startsAt)?'':` – ${date(endsAt)}`)
 const status=statusLabel
-const name=(s:Student)=>s.preferredName||s.legalName||'Student'
+const name=(s:Student)=>s.legalName||s.preferredName||'Student'
 const role=(v:Viewer)=>v.user?.travelLead?'travelLead':v.user?.role??'student'
 const SeasonContext=createContext('Current season')
 function Heading({title,description}:{title:string;description?:string}){const season=useContext(SeasonContext);return <div className="page-head"><div><p className="eyebrow">{season}</p><h1>{title}</h1>{description&&<p className="muted lead">{description}</p>}</div></div>}

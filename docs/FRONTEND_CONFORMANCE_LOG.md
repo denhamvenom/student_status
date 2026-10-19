@@ -1,5 +1,12 @@
 # Frontend conformance work log
 
+## October 19 legal student names and Money scrolling
+
+Student lists and financial/report projections now prefer the stored full legal name, with preferred name only as a fallback. Preferred-name editing and immutable signed records are preserved. Money uses the full content width; its focusable table scrolls vertically and horizontally with sticky column headings. Phone account cards remain available.
+
+Verification: focused backend tests and source review passed. Actual Money component with fictional rows checked at desktop/light, narrower desktop with keyboard scrolling, and phone/dark; no page-width overflow. No payment writes or production deployment. Parent-login chat owns the coordinated development sync and overlapping SetupWizard/Mentor/permission-export labels. Authenticated local review is pending Coach sign-in.
+
+
 ## October 19 linked Calendar screens
 
 Reused existing event wizard dialog, cards, disclosures, controls, typography and colors. Inspected actual components with fictional backend at 1440px light and 390px dark. Matching entry adopted its details; checked media request appeared on Review; linked-event controls remained readable without horizontal overflow. No real Calendar writes or authenticated save verification. See [details](EVENT_CALENDAR_SYNC.md).

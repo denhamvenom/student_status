@@ -134,7 +134,7 @@ export const rows = query({
     const page = await ctx.db.query("fundraiserPostingRows").withIndex("by_jobId", q => q.eq("jobId", args.jobId)).paginate({ ...args.paginationOpts, maximumRowsRead: 31 });
     if (page.page.length > 30) throw new Error("Fundraiser page exceeded its read budget.");
     const named = [];
-    for (const row of page.page) { const student = await ctx.db.get(row.studentId); named.push({ ...row, name: student?.preferredName || student?.legalName || "Unavailable student" }); }
+    for (const row of page.page) { const student = await ctx.db.get(row.studentId); named.push({ ...row, name: student?.legalName || student?.preferredName || "Unavailable student" }); }
     return { page: named, isDone: page.isDone, continueCursor: page.continueCursor };
   },
 });
@@ -156,7 +156,7 @@ export const retryPreview = query({
       const required = Math.max(0, (previous?.travelCreditCents ?? 0) - split.travelCreditCents);
       const available = account ? await availableOriginalFundraiserCredit(ctx, studentId, account.generation, fundraiser._id) : 0;
       const state = !student?.active || student.seasonId !== fundraiser.seasonId || account?.state !== "ready" || account?.allocationSourceVersion !== 1 ? "updating" as const : required > available ? "hold" as const : "ready" as const;
-      result.push({ studentId, name: student?.preferredName || student?.legalName || "Unavailable student", grossCents: row.grossCents, expectedRowRevision: previous?.revision ?? 0, expectedFinancialRevision: account?.state === "ready" && account.allocationSourceVersion === 1 ? account.revision : null, requiredReductionCents: required, availableOriginalCents: available, state, message: state === "hold" ? "Original credit remains spent or transferred; balances remain unchanged." : state === "updating" ? "Student financial preparation must finish." : null });
+      result.push({ studentId, name: student?.legalName || student?.preferredName || "Unavailable student", grossCents: row.grossCents, expectedRowRevision: previous?.revision ?? 0, expectedFinancialRevision: account?.state === "ready" && account.allocationSourceVersion === 1 ? account.revision : null, requiredReductionCents: required, availableOriginalCents: available, state, message: state === "hold" ? "Original credit remains spent or transferred; balances remain unchanged." : state === "updating" ? "Student financial preparation must finish." : null });
     }
     return result;
   },

@@ -35,20 +35,20 @@ export const mine = query({
     if (invites.length > 100) throw new Error("Invitation limit reached.");
     const group = membership ? await ctx.db.get(membership.groupId) : null;
     const members = membership ? await ctx.db.query("roomMemberships").withIndex("by_groupId", q => q.eq("groupId", membership.groupId)).take(5) : [];
-    const names = await Promise.all(members.map(async m => ({ studentId: m.studentId, preferredName: (await ctx.db.get(m.studentId))?.preferredName ?? "Student" })));
+    const names = await Promise.all(members.map(async m => { const member = await ctx.db.get(m.studentId); return { studentId: m.studentId, legalName: member?.legalName || member?.preferredName || "Student", preferredName: member?.preferredName ?? "Student" }; }));
     const sent = membership ? await ctx.db.query("roomInvites").withIndex("by_groupId", q => q.eq("groupId", membership.groupId)).take(101) : [];
     if (sent.length > 100) throw new Error("Group invitation limit reached.");
     const received = await Promise.all(invites.filter(x => x.eventId === args.eventId && x.status === "pending").map(async x => {
       const invitedGroup = await ctx.db.get(x.groupId);
       const inviter = await ctx.db.get(x.invitedBy);
-      return { _id: x._id, groupId: x.groupId, groupName: invitedGroup?.name ?? "Room group", invitedBy: inviter?.preferredName || inviter?.legalName || "Teammate" };
+      return { _id: x._id, groupId: x.groupId, groupName: invitedGroup?.name ?? "Room group", invitedBy: inviter?.legalName || inviter?.preferredName || "Teammate" };
     }));
     return { roomDeadline: event.roomDeadline ?? null, group: group ? { _id: group._id, name: group.name, finalized: group.finalized, members: names } : null, requestedAssignment: !!request, invites: received, sentInvites: sent.filter(x => x.status === "pending" && x.invitedBy === student._id).map(x => ({ _id: x._id, studentId: x.studentId })) };
   },
 });
 
 export const eligiblePeers = query({
-  args: { eventId: v.id("events") }, returns: v.array(v.object({ studentId: v.id("students"), preferredName: v.string() })),
+  args: { eventId: v.id("events") }, returns: v.array(v.object({ studentId: v.id("students"), legalName: v.string(), preferredName: v.string() })),
   handler: async (ctx, args) => {
     const user = await viewer(ctx); const own = await ownStudent(ctx, user);
     const event = await ctx.db.get(args.eventId); const season = await activeSeason(ctx);
@@ -57,13 +57,13 @@ export const eligiblePeers = query({
     if (self?.status !== "confirmed") throw new Error("Confirmed participation is required.");
     const rows = await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(501);
     if (rows.length > 500) throw new Error("Event roster limit reached.");
-    const result: { studentId: Id<"students">; preferredName: string }[] = [];
+    const result: { studentId: Id<"students">; legalName: string; preferredName: string }[] = [];
     for (const row of rows) {
       if (row.status !== "confirmed" || row.studentId === own._id) continue;
       const student = await ctx.db.get(row.studentId);
-      if (student?.active && student.roomCategory === own.roomCategory) result.push({ studentId: student._id, preferredName: student.preferredName || student.legalName });
+      if (student?.active && student.roomCategory === own.roomCategory) result.push({ studentId: student._id, legalName: student.legalName || student.preferredName, preferredName: student.preferredName || student.legalName });
     }
-    return result.sort((a, b) => a.preferredName.localeCompare(b.preferredName));
+    return result.sort((a, b) => a.legalName.localeCompare(b.legalName));
   },
 });
 
@@ -84,7 +84,7 @@ export const workspace = query({
       if (!student?.active || student.seasonId !== season._id) continue;
       const membership = await ctx.db.query("roomMemberships").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
       const request = await ctx.db.query("roomRequests").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
-      students.push({ studentId: student._id, name: student.preferredName || student.legalName, category: student.roomCategory ?? null, groupId: membership?.groupId ?? null, requestedAssignment: !!request });
+      students.push({ studentId: student._id, name: student.legalName || student.preferredName, category: student.roomCategory ?? null, groupId: membership?.groupId ?? null, requestedAssignment: !!request });
     }
     return { event: { _id: event._id, name: event.name, roomDeadline: event.roomDeadline ?? null }, groups: groups.map(g => ({ _id: g._id, name: g.name, category: g.category, finalized: g.finalized, needsReview: g.needsReview, adultFifthException: g.adultFifthException, members: students.filter(s => s.groupId === g._id) })), students: students.sort((a, b) => a.name.localeCompare(b.name)) };
   },
