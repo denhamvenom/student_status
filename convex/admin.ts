@@ -71,6 +71,9 @@ export const approveJoin = mutation({
       await audit(ctx, actor, "joinRequests", request._id, "decline", "pending", "declined");
       return null;
     }
+    const adultEmailIdentity = await ctx.db.query("adultEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", request.authUserId)).unique();
+    const parentEmailIdentity = await ctx.db.query("parentEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", request.authUserId)).unique();
+    if (adultEmailIdentity || parentEmailIdentity) throw new Error("Email sign-in identities cannot be approved as student accounts. Ask a Coach to review the adult invitation instead.");
     const userExisting = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", request.authUserId)).unique();
     if (userExisting) throw new Error("Account already exists.");
     const sameEmail = await ctx.db.query("students").withIndex("by_seasonId_and_email", q => q.eq("seasonId", season._id).eq("email", request.email)).take(2);

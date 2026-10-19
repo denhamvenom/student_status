@@ -391,3 +391,6 @@ October13 completion-first update: Coach explicitly reduced verification scope t
 ## October 18 development reviewer data
 
 Owner-authorized development-only enrichment and private reviewer guide/index completed. Reviewed fixture, three focused tests, lint, typecheck/dev sync and exact saved-data checks passed. See DEVELOPMENT_REVIEW_DATA.md. Existing identities/history preserved; production unchanged. Google browser acceptance, physical device checks and cleanup are not implied by data availability.
+
+## October 19 — local sign-in chooser implemented
+Student Google-only path and Parent/team staff Google-or-email path implemented using existing components. Approved adult identity reuse and invitation email authentication retain server role boundaries and explicit acceptance. Development synced; 522 tests, final 44 focused regressions, lint/typecheck/build and independent review pass. Production promotion and real-inbox checks remain separate.

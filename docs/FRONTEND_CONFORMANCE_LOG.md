@@ -353,3 +353,6 @@ Actual new component rendered with synthetic mocked Convex hooks, no backend con
 
 ## October 19 — Bulk Invite account approval
 Added Coach connection queue using existing cards, responsive table, buttons and ConfirmAction dialog. Extracted PendingJoin with waiting/declined states and stale-preview protection. Actual-component isolated browser checks passed at desktop1440 light and phone390 dark (no horizontal overflow). Evidence: ignored .test-temp/approval-ui; mocked backend only, no deployment or live Google claim.
+
+## October 19 — sign-in chooser local milestone
+Reused signin brand/card layout, gold/purple tokens, Anton/Geist typography and shared Button components; no new visual system. Actual SignIn and ParentEmailSignIn components exercised in isolated mocked-auth harness: chooser, Student Google-only, adult Google/email, Back, Google failure recovery, email/code screens, initial 1:00 resend cooldown, focused code field and enabled Back after request completion. Desktop light and narrow dark screenshots inspected; dark DOM measured 487px viewport and 487px document, no horizontal overflow. Requested device dimensions were scaled by browser capture, so no exact 390/1440 claim. Live inbox, OAuth round trip and full theme/viewport matrix are not verified. Screenshots/cache remain outside Git.

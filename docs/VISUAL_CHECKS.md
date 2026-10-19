@@ -560,3 +560,8 @@ Frontend wording and rendered-markup regression checks complete. Pending: authen
 | BULK-1 Coach component | 1440 light/390 dark actual component with mocked hooks inspected; template/upload/confirmation/download passed. Live development Join Requests navigation and real Google redemption remain unobserved. See BULK_INVITE.md. |
 
 October 19 approval revision: isolated actual-component Coach queue reviewed at 1440px light and 390px dark; identity/email/actions legible, no phone overflow. Live integrated backend/Google check remains deferred; no backend sync authorized.
+
+## SIGNIN-2026-10-19 — local role chooser
+| Scope | Evidence | Remaining |
+|---|---|---|
+| Student / Parent or team staff sign-in | Actual components, mocked hooks: desktop light and narrow dark inspected; dark measured487px with no overflow; choices/Back/error/code focus/resend checked. | Coach acceptance; exact390/1440 opposite-theme comparison and real-inbox/OAuth integration unverified. Dev email disabled. |
