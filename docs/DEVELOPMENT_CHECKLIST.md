@@ -919,3 +919,7 @@ Owner-authorized development-only enrichment and private reviewer guide/index co
 - [x] Automated checks, independent review and development backend sync.
 - [ ] Coach acceptance and real-inbox email sign-in (development mail remains disabled).
 - [x] Owner authorized production release; backend deployed without record mutations. Website checks tracked on release PR.
+
+## October 19 - Mentor/Staff invitation wording
+
+Owner authorized development and production publication of frontend-only invitation copy. Heading is Invite Mentor/Staff; Email address and instructions describe Google or email-code sign-in using the invited address. Landing and account-mismatch copy agree; link creation is distinguished from sending an email. No auth logic, backend, records, credentials or settings changed. Focused lint, application typecheck/build and live local heading/instructions checks passed. Exact production merge/build and live verification are recorded on the release PR.
