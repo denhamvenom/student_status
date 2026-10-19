@@ -23,7 +23,7 @@ export const maintenance = query({
   },
 });
 
-const item = v.object({ definition: schema.doc("feeDefinitions"), canMoveUp: v.boolean(), canMoveDown: v.boolean(), canEdit: v.boolean(), canCancel: v.boolean() });
+const item = v.object({ definition: schema.doc("feeDefinitions"), eventName: v.union(v.string(), v.null()), canMoveUp: v.boolean(), canMoveDown: v.boolean(), canEdit: v.boolean(), canCancel: v.boolean() });
 export const status = query({
   args: { jobId: v.id("feePriorityJobs") }, returns: v.object({ job: schema.doc("feePriorityJobs"), originalActorName: v.string(), processingActorName: v.string(), canRetry: v.boolean() }),
   handler: async (ctx, args) => {
@@ -89,6 +89,7 @@ export const list = query({
     const result = await ctx.db.query("feeDefinitions").withIndex("by_seasonId_and_priority", q => q.eq("seasonId", season._id)).paginate({ ...opts, maximumRowsRead: Math.min(opts.maximumRowsRead ?? 21, 21) });
     if (result.page.length > 20) throw new Error("Fee page exceeded its supported size.");
     const page = await Promise.all(result.page.map(async definition => {
+      const event = definition.eventId ? await ctx.db.get(definition.eventId) : null;
       const before = canMove ? await ctx.db.query("feeDefinitions").withIndex("by_seasonId_and_priority", q => q.eq("seasonId", season._id).lt("priority", definition.priority)).order("desc").first() : null;
       const after = canMove ? await ctx.db.query("feeDefinitions").withIndex("by_seasonId_and_priority", q => q.eq("seasonId", season._id).gt("priority", definition.priority)).first() : null;
       const ownJob = definition.latestJobId ? await ctx.db.get(definition.latestJobId) : null;
@@ -96,7 +97,7 @@ export const list = query({
       const afterJob = after?.latestJobId ? await ctx.db.get(after.latestJobId) : null;
       const ownReady = !definition.latestJobId || ownJob?.state === "complete" || ownJob?.state === "cancelled";
       const manage = canMove && definition.kind === "custom" && definition.state === "active";
-      return { definition, canEdit: manage && ownReady, canCancel: manage && (ownReady || ownJob?.state === "held"), canMoveUp: !!before && ownReady && (!before.latestJobId || beforeJob?.state === "complete" || beforeJob?.state === "cancelled"), canMoveDown: !!after && ownReady && (!after.latestJobId || afterJob?.state === "complete" || afterJob?.state === "cancelled") };
+      return { definition, eventName: event?.seasonId === season._id ? event.name : null, canEdit: manage && ownReady, canCancel: manage && (ownReady || ownJob?.state === "held"), canMoveUp: !!before && ownReady && (!before.latestJobId || beforeJob?.state === "complete" || beforeJob?.state === "cancelled"), canMoveDown: !!after && ownReady && (!after.latestJobId || afterJob?.state === "complete" || afterJob?.state === "cancelled") };
     }));
     return { ...result, page };
   },

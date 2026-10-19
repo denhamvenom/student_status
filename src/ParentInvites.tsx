@@ -1,3 +1,4 @@
+import { ConfirmAction } from './ConfirmAction'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useAuthActions } from '@convex-dev/auth/react'
 import { useMutation, useQuery } from 'convex/react'
@@ -49,7 +50,7 @@ function InviteRecords({student}:{student:RosterStudent}) {
     <h3>{familyCopy.parent.access}</h3>
     {!links ? <p>{familyCopy.parent.loadingParents}</p> : links.length === 0 ? <p className="muted">{familyCopy.parent.noLinked}</p> : <div className="simple-list">{links.map(link => <div className="parent-record" key={link._id}>
       <div><strong>{link.parentName}</strong><p className="muted tiny">{link.parentEmail} · {link.active ? familyCopy.parent.accessActive : familyCopy.parent.accessRevoked}</p></div>
-      {link.active ? <Button className="button button-outline" disabled={busy !== null} onClick={() => void run(link._id,()=>revokeLink({linkId:link._id}))}>{familyCopy.parent.revokeAccess}</Button> : <form className="parent-restore" onSubmit={e=>{e.preventDefault();void run(link._id,()=>restoreLink({linkId:link._id,reason:reason.trim()})).then(()=>setReason(''))}}><label>{familyCopy.parent.restoreReason} <Input value={reason} onChange={e=>setReason(e.target.value)} required minLength={8}/></label><Button className="button button-outline" type="submit" disabled={busy !== null || reason.trim().length < 8}>{familyCopy.parent.restoreAccess}</Button></form>}
+      {link.active ? <ConfirmAction disabled={busy !== null} description={`Revoke access for ${link.parentName} to ${student.name}? They will no longer be able to view this student through this link.`} onConfirm={async () => { await revokeLink({linkId:link._id}) }}>{familyCopy.parent.revokeAccess}</ConfirmAction> : <form className="parent-restore" onSubmit={e=>{e.preventDefault();void run(link._id,()=>restoreLink({linkId:link._id,reason:reason.trim()})).then(()=>setReason(''))}}><label>{familyCopy.parent.restoreReason} <Input value={reason} onChange={e=>setReason(e.target.value)} required minLength={8}/></label><Button className="button button-outline" type="submit" disabled={busy !== null || reason.trim().length < 8}>{familyCopy.parent.restoreAccess}</Button></form>}
     </div>)}</div>}
     {error && <p role="alert" className="open-text">{error}</p>}
   </div>

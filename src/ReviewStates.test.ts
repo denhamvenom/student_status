@@ -44,8 +44,8 @@ describe('synthetic review states', () => {
     ]
     const view = html(createElement(FinanceOperations,{studentId}))
     expect(view).toContain('Needs Coach review')
-    expect(view).toContain('Committed $1.00 of $2.00')
-    expect(view).toContain('Remaining amounts have not been committed')
+    expect(view).toContain('Amount already saved: $1.00 of $2.00')
+    expect(view).toContain('The rest is still waiting to finish')
     expect(view).toContain('Retry remaining work')
     expect(view).toContain('Synthetic processing stopped')
   })
@@ -62,6 +62,7 @@ describe('synthetic review states', () => {
   it('offers a guarded retry to a Coach when withdrawal processing fails', () => {
     mock.queryQueue = [
       [{requestId:'synthetic-request',eventId,studentId}],
+      [],
       {studentName:'Synthetic student',eventName:'Synthetic event',requestStatus:'processing',canRetry:true,progress:{jobId:'synthetic-job',state:'failed',committedCents:100,totalCents:200,lastError:'Synthetic return failed'}},
     ]
     const view = html(createElement(WithdrawalQueue))
@@ -87,9 +88,9 @@ describe('synthetic review states', () => {
       job:{_id:'synthetic-posting',state,committed:1,held:1,processed:2,lastError:state==='failed'?'Synthetic posting stopped':null},
     }
     const view = html(createElement(Fundraising))
-    expect(view).toContain(state==='held'?'Some amounts held for Coach review':'Posting stopped; Coach review needed')
-    expect(view).toContain('1 committed · 1 held · 2 processed')
-    expect(view).toContain(state==='held'?'Held balances remain unchanged':'Remaining rows have not been posted yet')
+    expect(view).toContain(state==='held'?'Some amounts need Coach review':'Posting stopped; a Coach needs to review it')
+    expect(view).toContain('1 saved · 1 need review · 2 checked')
+    expect(view).toContain(state==='held'?'Amounts on hold have not changed':'Remaining rows have not been posted yet')
     expect(view).toContain('Retry remaining rows')
     expect(view).toContain('Reason for retry')
     mock.fundraiserWorkspace = null

@@ -100,7 +100,7 @@ export const workspace = query({
     const canSign = !!who && who.authUserId === actor.authUserId && (v2 ? await v2SigningAllowed(ctx, student._id, actor._id) : await syntheticAllowed(ctx, student._id, actor._id));
     const canRecordPaper = (v2 ? actor.role === "coach" || actor.role === "mentor" && actor.travelLead && actor.healthExport === true : canReview) && (v2 ? await v2SigningAllowed(ctx, student._id) : await syntheticAllowed(ctx, student._id));
     const projected = privateStudent(student);
-    return {student: {studentId: student._id, legalName: student.legalName, preferredName: student.preferredName, profileRevision: student.profileRevision ?? 0, emergencyName: projected.emergencyName, emergencyRelationship: projected.emergencyRelationship, emergencyPhone: projected.emergencyPhone, allergies: projected.allergies, medications: projected.medications}, actor: {name: who?.name ?? actor.name, email: who?.email ?? actor.email, role: actor.role, travelLead: actor.travelLead, healthExport: actor.healthExport ?? false}, version: version ? {...publicVersion(version), formFormat: version.formFormat === 2 ? 2 as const : 1 as const} : null, events, coverage, receipts: await Promise.all(submissions.map(submission => summary(ctx, submission))), signingMode, canSign, canRecordPaper, canReview, canHealthExport: actor.role === "coach" || actor.role === "mentor" && actor.travelLead && (actor.healthExport ?? false), gateReason: canSign || canRecordPaper ? null : signingMode === "synthetic" ? "Only registered fictional development subjects may use consent." : "Permission signing is closed for this deployment or account."};
+    return {student: {studentId: student._id, legalName: student.legalName, preferredName: student.preferredName, profileRevision: student.profileRevision ?? 0, emergencyName: projected.emergencyName, emergencyRelationship: projected.emergencyRelationship, emergencyPhone: projected.emergencyPhone, allergies: projected.allergies, medications: projected.medications}, actor: {name: who?.name ?? actor.name, email: who?.email ?? actor.email, role: actor.role, travelLead: actor.travelLead, healthExport: actor.healthExport ?? false}, version: version ? {...publicVersion(version), formFormat: version.formFormat === 2 ? 2 as const : 1 as const} : null, events, coverage, receipts: await Promise.all(submissions.map(submission => summary(ctx, submission))), signingMode, canSign, canRecordPaper, canReview, canHealthExport: actor.role === "coach" || actor.role === "mentor" && actor.travelLead && (actor.healthExport ?? false), gateReason: canSign || canRecordPaper ? null : signingMode === "synthetic" ? "Only registered fictional development subjects may use consent." : "You cannot sign for this student right now."};
   },
 });
 
@@ -110,7 +110,7 @@ export const listSubmissions = query({
 });
 export const receipt = query({
   args: {submissionId: v.id("permissionSubmissions")}, returns: receiptValidator,
-  handler: async (ctx, args) => {const actor = await viewer(ctx); formAccess(actor); const submission = await ctx.db.get(args.submissionId); if (!submission) throw new Error("Receipt not found."); await studentAccess(ctx, actor, submission.studentId); const recorder = submission.recordedBy ? await ctx.db.get(submission.recordedBy) : null; return {summary: await summary(ctx, submission), snapshot: submission.snapshotFormat === 1 ? await sealedSnapshot(ctx, submission) : null, recorderName: recorder?.name ?? "Historical recorder unavailable"}},
+  handler: async (ctx, args) => {const actor = await viewer(ctx); formAccess(actor); const submission = await ctx.db.get(args.submissionId); if (!submission) throw new Error("Signed form not found."); await studentAccess(ctx, actor, submission.studentId); const recorder = submission.recordedBy ? await ctx.db.get(submission.recordedBy) : null; return {summary: await summary(ctx, submission), snapshot: submission.snapshotFormat === 1 ? await sealedSnapshot(ctx, submission) : null, recorderName: recorder?.name ?? "Historical recorder unavailable"}},
 });
 export const prepare = mutation({
   args: {studentId: v.id("students"), eventIds: v.array(v.id("events"))}, returns: v.object({draftId: v.id("permissionDrafts"), expiresAt: v.number(), snapshot: consentSnapshotValidator, expectedCoverage: v.array(expectedCoverageValidator)}),
@@ -150,7 +150,7 @@ export const submitDraft = mutation({
     if (!args.acknowledged || args.typedName.trim() !== who.name.trim()) throw new Error("Type the verified account name exactly and acknowledge the permission wording.");
     if (draft.usedSubmissionId) {
       const original = await ctx.db.get(draft.usedSubmissionId);
-      if (!original || original.signedBy !== actor._id) throw new Error("Used draft receipt is unavailable.");
+      if (!original || original.signedBy !== actor._id) throw new Error("The signed form from this draft is unavailable.");
       const sealed = await sealedSnapshot(ctx, original);
       if (sealed.typedName !== args.typedName.trim() || JSON.stringify(sealed.choices) !== JSON.stringify(args.choices)) throw new Error("This draft was already signed with different answers.");
       return original._id;
@@ -202,7 +202,7 @@ export const review = mutation({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); operations(actor); boundedText(args.idempotencyKey, 128, "Retry key");
     const submission = await ctx.db.get(args.submissionId); if (!submission) throw new Error("Submission not found.");
-    await studentAccess(ctx, actor, submission.studentId); if (submission.snapshotFormat === 2) {if (actor.role === "mentor" && !actor.healthExport) throw new Error("Separate health-review permission is required for PDF receipts."); await sealedSnapshotV2(ctx, submission);} else await sealedSnapshot(ctx, submission);
+    await studentAccess(ctx, actor, submission.studentId); if (submission.snapshotFormat === 2) {if (actor.role === "mentor" && !actor.healthExport) throw new Error("The Health export permission is required to review signed form PDFs."); await sealedSnapshotV2(ctx, submission);} else await sealedSnapshot(ctx, submission);
     if (args.status === "correction") boundedText(args.note ?? "", 1000, "Correction note");
     if ((args.note?.length ?? 0) > 1000) throw new Error("Review note is too long.");
     const operationHash = await tokenHash(JSON.stringify({...args, expectedCoverage: [...args.expectedCoverage].sort((a,b) => a.eventId.localeCompare(b.eventId))}));
@@ -212,7 +212,7 @@ export const review = mutation({
     if ((latest[0]?._id ?? null) !== args.expectedLatestReviewId) throw new Error("Review changed. Reload before deciding.");
     const rows = await controlledCoverage(ctx, submission._id);
     if (rows.some(row => row.studentId !== submission.studentId || row.seasonId !== submission.seasonId || row.versionId !== submission.versionId || !submission.eventIds.includes(row.eventId))) throw new Error("Current permission coverage is inconsistent.");
-    if (!rows.length) throw new Error("This receipt no longer controls an actionable event or a new signature was requested.");
+    if (!rows.length) throw new Error("This signed form no longer covers an event that can be reviewed, or a new signature was requested.");
     await compareCoverage(ctx, submission.studentId, args.expectedCoverage, rows.map(row => row.eventId));
     const reviewId = await ctx.db.insert("permissionReviews", {submissionId: submission._id, status: args.status, note: args.note?.trim() || undefined, field: args.field, controlledCoverage: rows.map(row => ({eventId: row.eventId, priorRevision: row.revision})), snapshotHash: submission.snapshotHash, reviewedBy: actor._id, reviewedAt: Date.now(), idempotencyKey: args.idempotencyKey, operationHash});
     for (const row of rows) await ctx.db.patch(row._id, {state: args.status, latestReviewId: reviewId, revision: row.revision + 1, updatedAt: Date.now(), updatedBy: actor._id, reason: args.status === "correction" ? args.note?.trim() : undefined, correctionField: args.status === "correction" ? args.field ?? "general" : undefined});

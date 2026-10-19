@@ -2,6 +2,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { timeclockTransitionLocked } from "./timeclockTransition";
+import { requireMaintenanceAccess } from "./maintenanceAccess";
 
 type Ctx = QueryCtx | MutationCtx;
 export type AppUser = Doc<"appUsers">;
@@ -11,6 +12,7 @@ export async function identity(ctx: Ctx) {
   if (!authUserId) throw new Error("Sign in with Google to continue.");
   const authUser = await ctx.db.get(authUserId as Id<"users">);
   if (!authUser?.email || authUser.isAnonymous) throw new Error("A Google account with an email is required.");
+  requireMaintenanceAccess(authUser.email);
   return { authUserId: authUser._id, email: authUser.email, name: authUser.name ?? authUser.email };
 }
 
@@ -25,6 +27,7 @@ export async function maybeViewer(ctx: Ctx): Promise<AppUser | null> {
   const authUserId = await getAuthUserId(ctx);
   if (!authUserId) return null;
   const user = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", authUserId as Id<"users">)).unique();
+  if (user) requireMaintenanceAccess(user.email);
   return user?.active ? user : null;
 }
 

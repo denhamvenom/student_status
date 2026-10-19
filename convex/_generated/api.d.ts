@@ -71,6 +71,7 @@ import type * as lib_financialSources from "../lib/financialSources.js";
 import type * as lib_financialWithdrawal from "../lib/financialWithdrawal.js";
 import type * as lib_fundraisingMath from "../lib/fundraisingMath.js";
 import type * as lib_invitationIdentity from "../lib/invitationIdentity.js";
+import type * as lib_maintenanceAccess from "../lib/maintenanceAccess.js";
 import type * as lib_money from "../lib/money.js";
 import type * as lib_permissionCoverage from "../lib/permissionCoverage.js";
 import type * as lib_permissionSigningMode from "../lib/permissionSigningMode.js";
@@ -98,6 +99,7 @@ import type * as permissionsV2Pdf from "../permissionsV2Pdf.js";
 import type * as profileSetup from "../profileSetup.js";
 import type * as retentionReview from "../retentionReview.js";
 import type * as retentionSchema from "../retentionSchema.js";
+import type * as reviewerRehearsal from "../reviewerRehearsal.js";
 import type * as rooms from "../rooms.js";
 import type * as seasonAdmin from "../seasonAdmin.js";
 import type * as seasonConfirmation from "../seasonConfirmation.js";
@@ -106,6 +108,7 @@ import type * as seasonHistory from "../seasonHistory.js";
 import type * as seasonTransition from "../seasonTransition.js";
 import type * as seasonTransitionReview from "../seasonTransitionReview.js";
 import type * as setupWizard from "../setupWizard.js";
+import type * as subteamMigration from "../subteamMigration.js";
 import type * as syntheticRehearsalCleanup from "../syntheticRehearsalCleanup.js";
 import type * as teamReports from "../teamReports.js";
 import type * as timeclock from "../timeclock.js";
@@ -113,6 +116,7 @@ import type * as timeclockPinControl from "../timeclockPinControl.js";
 import type * as timeclockRoster from "../timeclockRoster.js";
 import type * as travel from "../travel.js";
 import type * as withdrawals from "../withdrawals.js";
+import type * as workflowSummaries from "../workflowSummaries.js";
 
 import type {
   ApiFromModules,
@@ -184,6 +188,7 @@ declare const fullApi: ApiFromModules<{
   "lib/financialWithdrawal": typeof lib_financialWithdrawal;
   "lib/fundraisingMath": typeof lib_fundraisingMath;
   "lib/invitationIdentity": typeof lib_invitationIdentity;
+  "lib/maintenanceAccess": typeof lib_maintenanceAccess;
   "lib/money": typeof lib_money;
   "lib/permissionCoverage": typeof lib_permissionCoverage;
   "lib/permissionSigningMode": typeof lib_permissionSigningMode;
@@ -211,6 +216,7 @@ declare const fullApi: ApiFromModules<{
   profileSetup: typeof profileSetup;
   retentionReview: typeof retentionReview;
   retentionSchema: typeof retentionSchema;
+  reviewerRehearsal: typeof reviewerRehearsal;
   rooms: typeof rooms;
   seasonAdmin: typeof seasonAdmin;
   seasonConfirmation: typeof seasonConfirmation;
@@ -219,6 +225,7 @@ declare const fullApi: ApiFromModules<{
   seasonTransition: typeof seasonTransition;
   seasonTransitionReview: typeof seasonTransitionReview;
   setupWizard: typeof setupWizard;
+  subteamMigration: typeof subteamMigration;
   syntheticRehearsalCleanup: typeof syntheticRehearsalCleanup;
   teamReports: typeof teamReports;
   timeclock: typeof timeclock;
@@ -226,6 +233,7 @@ declare const fullApi: ApiFromModules<{
   timeclockRoster: typeof timeclockRoster;
   travel: typeof travel;
   withdrawals: typeof withdrawals;
+  workflowSummaries: typeof workflowSummaries;
 }>;
 
 /**

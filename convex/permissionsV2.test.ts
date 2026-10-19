@@ -140,10 +140,10 @@ it("fails closed until real signing is explicitly bound to this non-development 
   await f.t.run(ctx => ctx.db.patch(f.ids.student, {profileCompletedAt: 1}));
   await f.parent.mutation(api.permissionsV2.saveProfile, {studentId: f.ids.student, expectedRevision: 0, value: profile});
   vi.stubEnv("CONVEX_CLOUD_URL", prod);
-  await expect(f.parent.action(api.permissionsV2Pdf.prepare, {studentId: f.ids.student, eventIds: [f.ids.event]})).rejects.toThrow("signing is closed");
+  await expect(f.parent.action(api.permissionsV2Pdf.prepare, {studentId: f.ids.student, eventIds: [f.ids.event]})).rejects.toThrow("You cannot sign for this student right now.");
   vi.stubEnv("PERMISSION_REAL_SIGNING_ENABLED", "true");
   vi.stubEnv("PERMISSION_REAL_SIGNING_CLOUD_URL", "https://other.convex.cloud");
-  await expect(f.parent.action(api.permissionsV2Pdf.prepare, {studentId: f.ids.student, eventIds: [f.ids.event]})).rejects.toThrow("signing is closed");
+  await expect(f.parent.action(api.permissionsV2Pdf.prepare, {studentId: f.ids.student, eventIds: [f.ids.event]})).rejects.toThrow("You cannot sign for this student right now.");
   vi.stubEnv("PERMISSION_REAL_SIGNING_CLOUD_URL", prod);
   const workspace = await f.parent.query(api.permissions.workspace, {studentId: f.ids.student});
   expect(workspace).toMatchObject({signingMode: "real", canSign: true});
@@ -152,7 +152,7 @@ it("fails closed until real signing is explicitly bound to this non-development 
   const prepared = await f.parent.action(api.permissionsV2Pdf.prepare, {studentId: f.ids.student, eventIds: [f.ids.event]});
   expect(prepared.snapshot.synthetic).toBe(false);
   vi.stubEnv("PERMISSION_REAL_SIGNING_ENABLED", "false");
-  await expect(f.parent.action(api.permissionsV2Pdf.submit, {draftId: prepared.draftId, typedName: "Fictional Parent", acknowledged: true})).rejects.toThrow("signing is closed");
+  await expect(f.parent.action(api.permissionsV2Pdf.submit, {draftId: prepared.draftId, typedName: "Fictional Parent", acknowledged: true})).rejects.toThrow("You cannot sign for this student right now.");
   vi.stubEnv("PERMISSION_REAL_SIGNING_ENABLED", "true");
   const submissionId = await f.parent.action(api.permissionsV2Pdf.submit, {draftId: prepared.draftId, typedName: "Fictional Parent", acknowledged: true});
   const receipt = await f.parent.query(api.permissionsV2.receipt, {submissionId});

@@ -1,5 +1,29 @@
 # Visual review closed — October 16, 2026
 
+## October 18 Batch 4 current checks
+
+| Check | Evidence / remaining work |
+|---|---|
+| Coach waiting counts, Money tools, Revoke access | Dark phone: observed; confirmation opened and Cancel preserved access |
+| Travel Lead New event, Costs, Money tools | Dark desktop: draft reached fee input and Cancel; no financial editing grant, no bulk payment or matching tools |
+| Five-subteam filter | Travel Lead roster shows exact final list; legacy Mechanical displays as Build; no stored conversion |
+| Parent family workflows | Dark desktop Money definitions, positive Available funds on Home and signup guidance observed; no eligible travel checkbox exercised |
+| Student family workflows | Dark desktop Home available funds, read-only independent travel, Whole Team leave confirmation and Cancel observed; participation remained confirmed |
+| Light theme and other state combinations | Not freshly observed; source review and tests remain distinct from live evidence |
+
+See [Batch 4 report](audit-2026-10-18/batch-4-report.md). Earlier tables below are historical.
+
+## October 18 Batch 3 current checks
+
+| Check | Evidence / remaining work |
+|---|---|
+| Travel Lead grouped navigation and Join requests | Observed at 390px and 1440px in dark theme; no Coach-only tools shown |
+| Coach New event draft preservation | Observed at 1440px dark: group opens Events; backdrop click preserves draft after fix; Cancel closes without saving |
+| Parent/Student Edit profile and awaiting FIRST | Source-reviewed; fresh role browser checks remain unobserved |
+| Light-theme comparison | Unobserved; saved user theme unchanged |
+
+See [Batch 3 report](audit-2026-10-18/batch-3-report.md). Historical accepted visual checks below remain historical.
+
 ## October 18 footer follow-up
 
 Footer-only navigation implementation and representative local evidence are recorded in [FRONTEND_CONFORMANCE_LOG.md](FRONTEND_CONFORMANCE_LOG.md). Public/signed-out phone and desktop checks passed; authenticated Timeclock footer remains to observe during the authorized Mentor production rehearsal. Do not reopen completed October 16 visual acceptance or repeat unrelated captures.
@@ -172,7 +196,7 @@ Reconciled the updated 30 KB wizard report once. Row numbers below follow each c
 | Coach 6 | Removed health explanation; retained correction-request link | CoachStudentRecord.tsx |
 | Coach 7 | Open permission forms link only | CoachStudentRecord.tsx |
 | Coach 8 | Covers every Competition this season | FirstRegistration.tsx |
-| Coach 9 | Check both in FIRST, then verify | FirstRegistration.tsx |
+| Coach 9 | Look up both in FIRST. Then check both boxes and press Verify. | FirstRegistration.tsx |
 | Coach 10 | One Attendance heading | CoachStudentRecord.tsx; DashboardReports.tsx |
 | Coach 11 | Attendance totals start at kickoff | report-copy.ts |
 | Coach 12 | Removed roster explanation | CoachRosterManagement.tsx |

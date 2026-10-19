@@ -83,7 +83,7 @@ describe("synthetic versioned permission workflow", () => {
     const view = await f.coach.query(api.permissions.workspace, {studentId: f.ids.student}); const row = view.coverage.find(row => row.eventId === f.ids.events[0])!;
     await f.coach.mutation(api.permissions.requestNewSignature, {studentId: f.ids.student, eventIds: [f.ids.events[0]], expectedCoverage: [{eventId: row.eventId, revision: row.revision}], reason: "New wording needed"});
     expect(await accepted(f)).toBe(false);
-    await expect(review(f, a.submissionId)).rejects.toThrow("no longer controls");
+    await expect(review(f, a.submissionId)).rejects.toThrow("no longer covers an event that can be reviewed");
     const b = await sign(f, [f.ids.events[0]]); await review(f, b.submissionId); expect(await accepted(f)).toBe(true);
     const c = await sign(f); const receipt = await f.coach.query(api.permissions.receipt, {submissionId: c.submissionId});
     await expect(f.coach.mutation(api.permissions.review, {submissionId: c.submissionId, status: "accepted", expectedLatestReviewId: null, expectedCoverage: receipt.summary.controlledCoverage.slice(0, 1), idempotencyKey: "hidden-scope"})).rejects.toThrow("full current permission scope");

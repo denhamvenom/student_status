@@ -61,7 +61,7 @@ function Changes() {
   }
   return <section className={styles.root}>
     <FinanceRecentChanges rows={page.results} loading={page.status === 'LoadingFirstPage'} loadingMore={page.status === 'LoadingMore'} hasMore={page.status === 'CanLoadMore'} coverage={status?.coverage ?? null} onMore={() => page.loadMore(20)}/>
-    {status?.canPrepareHistory && <Button type="button" variant="outline" disabled={busy} onClick={() => void start()}>{busy ? copy.preparingHistory : copy.prepareHistory}</Button>}
+    {status?.canPrepareHistory && <details><summary>More options</summary><Button type="button" variant="outline" disabled={busy} onClick={() => void start()}>{busy ? copy.preparingHistory : copy.prepareHistory}</Button></details>}
     {error && <p role="alert">{error}</p>}{saved && <p role="status">{copy.preparationStarted}</p>}
   </section>
 }

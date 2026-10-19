@@ -30,7 +30,7 @@ function FeeWorkspace({ isCoach }: { isCoach: boolean }) {
   const maintenance = useQuery(api.feePriorities.maintenance, {})
   const fees = usePaginatedQuery(api.feePriorities.list, {}, { initialNumItems: 20 })
   const move = useMutation(api.feePriorities.move)
-  const [review, setReview] = useState<{ definition: Doc<'feeDefinitions'>; direction: 'up' | 'down'; orderRevision: number } | null>(null)
+  const [review, setReview] = useState<{ definition: Doc<'feeDefinitions'>; eventName: string | null; direction: 'up' | 'down'; orderRevision: number } | null>(null)
   const [reason, setReason] = useState('')
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -44,9 +44,9 @@ function FeeWorkspace({ isCoach }: { isCoach: boolean }) {
   const visibleBulkJobId = bulkJobId ?? maintenance?.control?.bulkJobId
   const liveDefinition = review ? fees.results.find(row => row.definition._id === review.definition._id) : null
   const fresh = !!review && maintenance?.canMove === true && maintenance.control?.revision === review.orderRevision && liveDefinition?.definition.revision === review.definition.revision && (review.direction === 'up' ? liveDefinition.canMoveUp : liveDefinition.canMoveDown)
-  function open(definition: Doc<'feeDefinitions'>, direction: 'up' | 'down') {
+  function open(definition: Doc<'feeDefinitions'>, eventName: string | null, direction: 'up' | 'down') {
     if (!maintenance?.control || !maintenance.canMove) return
-    setReview({ definition, direction, orderRevision: maintenance.control.revision }); setReason(''); setError(null)
+    setReview({ definition, eventName, direction, orderRevision: maintenance.control.revision }); setReason(''); setError(null)
   }
   async function submit() {
     if (!review || !fresh || pending || reason.trim().length < 8) return
@@ -65,17 +65,17 @@ function FeeWorkspace({ isCoach }: { isCoach: boolean }) {
       {!maintenance || fees.status === 'LoadingFirstPage' ? <p role="status">{copy.loading}</p> : <>
         {maintenance.mappingState !== 'ready' && <p className={styles.notice}>{maintenance.mappingState === 'uninitialized' ? copy.mappingUnknown : copy.partialOrder}</p>}
         {fees.results.length === 0 && fees.status === 'Exhausted' && <p>{copy.noFees}</p>}
-        <FeePriorityRows disabled={pending || maintenance.control?.state !== 'ready'} rows={fees.results.map(row => ({ key: row.definition._id, label: row.definition.label, priority: row.definition.priority, amountCents: row.definition.defaultAmountCents, cancelled: row.definition.state === 'cancelled', actions: {
+        <FeePriorityRows disabled={pending || maintenance.control?.state !== 'ready'} rows={fees.results.map(row => ({ key: row.definition._id, label: row.definition.label, summary: row.eventName ? `${copy.connectedTo}: ${row.eventName}` : undefined, priority: row.definition.priority, amountCents: row.definition.defaultAmountCents, cancelled: row.definition.state === 'cancelled', actions: {
           view: row.definition.latestJobId ? ()=>{if(row.definition.latestJobId)setBulkJobId(row.definition.latestJobId)} : undefined,
-          up: row.canMoveUp ? () => open(row.definition, 'up') : undefined,
-          down: row.canMoveDown ? () => open(row.definition, 'down') : undefined,
+          up: row.canMoveUp ? () => open(row.definition, row.eventName, 'up') : undefined,
+          down: row.canMoveDown ? () => open(row.definition, row.eventName, 'down') : undefined,
           edit: isCoach && row.canEdit ? () => setBulkDraft({kind:'edit',definition:row.definition}) : undefined,
           cancel: isCoach && row.canCancel ? () => setBulkDraft({kind:'cancel',definition:row.definition}) : undefined,
         } }))} />
         {isCoach && maintenance.canManageFees && maintenance.mappingState === 'ready' && <Button type="button" onClick={()=>setBulkDraft({kind:'create'})}>{copy.add}</Button>}
         {fees.status !== 'Exhausted' && <Button type="button" variant="outline" disabled={fees.status !== 'CanLoadMore'} onClick={() => fees.loadMore(20)}>{copy.moreFees}</Button>}
       </>}
-      {review && <form className={styles.form} onSubmit={event => { event.preventDefault(); void submit() }}><strong>{review.definition.label} · {review.direction === 'up' ? copy.up : copy.down}</strong><p>{copy.futureOnly}</p>
+      {review && <form className={styles.form} onSubmit={event => { event.preventDefault(); void submit() }}><strong>{review.definition.label}{review.eventName ? ` · ${review.eventName}` : ''} · {review.direction === 'up' ? copy.up : copy.down}</strong><p>{copy.futureOnly}</p>
         {!fresh && <p role="alert">{copy.staleReview}</p>}
         <label className={styles.field}>{copy.moveReason}<Input value={reason} required maxLength={1000} disabled={pending} onChange={event => setReason(event.target.value)} /></label>
         <Button type="submit" disabled={pending || !fresh || reason.trim().length < 8}>{pending ? copy.submitting : copy.moveConfirm}</Button>

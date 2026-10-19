@@ -22,6 +22,9 @@ async function fixture() {
   const t = convexTest(schema, modules);
   const ids = await t.run(async ctx => {
     const coachAuth = await ctx.db.insert("users", { email: "coach@example.invalid", emailVerificationTime: 1 });
+    const coachAccount = await ctx.db.insert("authAccounts", { userId: coachAuth, provider: "google", providerAccountId: "real-coach-google-sub", emailVerified: "coach@example.invalid" });
+    const coachSession = await ctx.db.insert("authSessions", { userId: coachAuth, expirationTime: 10_000 });
+    const coachToken = await ctx.db.insert("authRefreshTokens", { sessionId: coachSession, expirationTime: 10_000 });
     const coach = await ctx.db.insert("appUsers", { authUserId: coachAuth, email: "coach@example.invalid", name: "Coach", role: "coach", travelLead: false, financialEdit: true, active: true });
     const season = await ctx.db.insert("seasons", { name: "Synthetic Season", year: 2026, status: "active", startsAt: 1, permissionVersion: "DRAFT-1", createdBy: coach });
     const unrelatedAuth = await ctx.db.insert("users", { email: "unrelated@example.invalid", emailVerificationTime: 1 });
@@ -33,7 +36,7 @@ async function fixture() {
     const token = await ctx.db.insert("authRefreshTokens", { sessionId: session, expirationTime: 10_000 });
     const audit = await ctx.db.insert("audit", { actorId: coach, entity: "appUsers", entityId: appUser, action: "inviteAccepted", at: 1 });
     const realAudit = await ctx.db.insert("audit", { actorId: coach, entity: "seasons", entityId: season, action: "bootstrapProduction", at: 1 });
-    return { coachAuth, coach, season, unrelatedAuth, unrelated, auth, authAccount, appUser, session, token, audit, realAudit };
+    return { coachAuth, coachAccount, coachSession, coachToken, coach, season, unrelatedAuth, unrelated, auth, authAccount, appUser, session, token, audit, realAudit };
   });
   const manifest = {
     seasonId: ids.season, coachId: ids.coach,
@@ -42,7 +45,7 @@ async function fixture() {
     ids: {
       adultInvitations: [] as Id<"adultInvitations">[], parentInvitations: [] as Id<"parentInvitations">[], familyLinks: [] as Id<"familyLinks">[], joinRequests: [] as Id<"joinRequests">[], joinAttempts: [] as Id<"joinAttempts">[], joinCodes: [] as Id<"joinCodes">[], setupDrafts: [] as Id<"setupDrafts">[],
       studentFinanceSummaries: [] as Id<"studentFinanceSummaries">[], financialAccounts: [] as Id<"financialAccounts">[], authAccounts: [ids.authAccount], authSessions: [ids.session],
-      authRefreshTokens: [ids.token], authVerificationCodes: [], authVerifiers: [], audit: [ids.audit],
+      authRefreshTokens: [ids.token], authVerificationCodes: [], authVerifiers: [] as Id<"authVerifiers">[], audit: [ids.audit],
     },
   };
   return { t, ids, manifest };
@@ -67,17 +70,80 @@ describe("exact synthetic account cleanup", () => {
     await expect(f.t.mutation(internal.syntheticRehearsalCleanup.commit, { targetUrl, manifest: f.manifest, reviewedFingerprint: "wrong", reviewedCounts: reviewed.counts })).rejects.toThrow("inventory changed");
     const committed = await f.t.mutation(internal.syntheticRehearsalCleanup.commit, { targetUrl, manifest: f.manifest, reviewedFingerprint: reviewed.fingerprint, reviewedCounts: reviewed.counts });
     const remaining = await f.t.run(async ctx => ({
-      coach: await ctx.db.get(f.ids.coach), season: await ctx.db.get(f.ids.season), unrelated: await ctx.db.get(f.ids.unrelated),
+      coach: await ctx.db.get(f.ids.coach), coachAuth: await ctx.db.get(f.ids.coachAuth), coachAccount: await ctx.db.get(f.ids.coachAccount), coachSession: await ctx.db.get(f.ids.coachSession), coachToken: await ctx.db.get(f.ids.coachToken), season: await ctx.db.get(f.ids.season), unrelated: await ctx.db.get(f.ids.unrelated),
       realAudit: await ctx.db.get(f.ids.realAudit), testUser: await ctx.db.get(f.ids.appUser), auth: await ctx.db.get(f.ids.auth),
       session: await ctx.db.get(f.ids.session), token: await ctx.db.get(f.ids.token), testAudit: await ctx.db.get(f.ids.audit),
       receipt: await ctx.db.get(committed.receiptId),
     }));
     expect(remaining.coach?.role).toBe("coach");
+    expect(remaining.coachAuth?.email).toBe("coach@example.invalid");
+    expect(remaining.coachAccount?.provider).toBe("google");
+    expect(remaining.coachSession?.userId).toBe(f.ids.coachAuth);
+    expect(remaining.coachToken?.sessionId).toBe(f.ids.coachSession);
     expect(remaining.season?.status).toBe("active");
     expect(remaining.unrelated?.active).toBe(true);
     expect(remaining.realAudit?.action).toBe("bootstrapProduction");
     expect([remaining.testUser, remaining.auth, remaining.session, remaining.token, remaining.testAudit]).toEqual([null, null, null, null, null]);
     expect(remaining.receipt?.afterJson).not.toContain("example.invalid");
+  });
+
+  it("refuses to include any part of the Coach auth chain in the manifest", async () => {
+    enabled();
+    const f = await fixture();
+    f.manifest.ids.authAccounts.push(f.ids.coachAccount);
+    await expect(f.t.query(internal.syntheticRehearsalCleanup.preview, { targetUrl, manifest: f.manifest })).rejects.toThrow();
+    f.manifest.ids.authAccounts.pop();
+    f.manifest.ids.authSessions.push(f.ids.coachSession);
+    await expect(f.t.query(internal.syntheticRehearsalCleanup.preview, { targetUrl, manifest: f.manifest })).rejects.toThrow();
+    f.manifest.ids.authSessions.pop();
+    f.manifest.ids.authRefreshTokens.push(f.ids.coachToken);
+    await expect(f.t.query(internal.syntheticRehearsalCleanup.preview, { targetUrl, manifest: f.manifest })).rejects.toThrow();
+    f.manifest.ids.authRefreshTokens.pop();
+    f.manifest.authUsersToDelete.push({ id: f.ids.coachAuth, email: "coach@example.invalid" });
+    await expect(f.t.query(internal.syntheticRehearsalCleanup.preview, { targetUrl, manifest: f.manifest })).rejects.toThrow();
+    expect(await f.t.run(ctx => ctx.db.get(f.ids.coachToken))).not.toBeNull();
+  });
+
+  it("removes only exact reviewed signature-only orphan verifiers", async () => {
+    enabled();
+    const f = await fixture();
+    const verifiers = await f.t.run(async ctx => ({
+      target: await ctx.db.insert("authVerifiers", { signature: "orphan-for-rehearsal" }),
+      unrelated: await ctx.db.insert("authVerifiers", { signature: "unrelated-orphan" }),
+      unsigned: await ctx.db.insert("authVerifiers", {}),
+    }));
+    f.manifest.ids.authVerifiers.push(verifiers.unsigned);
+    await expect(f.t.query(internal.syntheticRehearsalCleanup.preview, { targetUrl, manifest: f.manifest })).rejects.toThrow("outside the account-only rehearsal scope");
+    f.manifest.ids.authVerifiers.pop();
+    f.manifest.ids.authVerifiers.push(verifiers.target);
+    const reviewed = await f.t.query(internal.syntheticRehearsalCleanup.preview, { targetUrl, manifest: f.manifest });
+    expect(reviewed.counts.authVerifiers).toBe(1);
+    await f.t.run(ctx => ctx.db.patch(verifiers.target, { signature: "changed-after-review" }));
+    await expect(f.t.mutation(internal.syntheticRehearsalCleanup.commit, { targetUrl, manifest: f.manifest, reviewedFingerprint: reviewed.fingerprint, reviewedCounts: reviewed.counts })).rejects.toThrow("inventory changed");
+    const fresh = await f.t.query(internal.syntheticRehearsalCleanup.preview, { targetUrl, manifest: f.manifest });
+    await f.t.mutation(internal.syntheticRehearsalCleanup.commit, { targetUrl, manifest: f.manifest, reviewedFingerprint: fresh.fingerprint, reviewedCounts: fresh.counts });
+    expect(await f.t.run(ctx => ctx.db.get(verifiers.target))).toBeNull();
+    expect(await f.t.run(ctx => ctx.db.get(verifiers.unrelated))).not.toBeNull();
+    expect(await f.t.run(ctx => ctx.db.get(verifiers.unsigned))).not.toBeNull();
+  });
+
+  it("preserves more than 40 unrelated calendar occurrence cache rows", async () => {
+    enabled();
+    const f = await fixture();
+    const cacheIds = await f.t.run(async ctx => {
+      const ids: Id<"timeclockOccurrences">[] = [];
+      for (let index = 0; index < 63; index++) ids.push(await ctx.db.insert("timeclockOccurrences", {
+        seasonId: f.ids.season, source: "calendar", sourceKey: `unrelated-${index}`, title: "Unrelated calendar cache", allDay: false,
+        scheduledStart: index + 1, scheduledEnd: index + 2, cancelled: false, observedAt: 1, revision: 1,
+        needsReview: false, lastSeenGeneration: 1,
+      }));
+      return ids;
+    });
+    const reviewed = await f.t.query(internal.syntheticRehearsalCleanup.preview, { targetUrl, manifest: f.manifest });
+    await f.t.mutation(internal.syntheticRehearsalCleanup.commit, { targetUrl, manifest: f.manifest, reviewedFingerprint: reviewed.fingerprint, reviewedCounts: reviewed.counts });
+    const retained = await f.t.run(async ctx => Promise.all(cacheIds.map(id => ctx.db.get(id))));
+    expect(retained).toHaveLength(63);
+    expect(retained.every(Boolean)).toBe(true);
   });
 
   it("cleans a real join and parent invitation flow with zero finance leaves", async () => {

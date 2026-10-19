@@ -17,7 +17,7 @@ export const adultProfileCopy = {
 
 export const driverReconciliationCopy = {
   title: 'Driver ownership review',
-  description: 'Review unowned driver records with one verified Mentor Google email match. Other conflicts need separate Coach review.',
+  description: "Link a driver to a Mentor when the driver's email matches one Mentor's Google email. Check other cases by hand.",
   empty: 'No matching unowned drivers are ready to link.',
   loading: 'Loading driver reconciliation...',
   failed: 'The driver could not be linked.',

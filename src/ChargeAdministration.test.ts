@@ -45,9 +45,9 @@ describe('rendered charge administration controls', () => {
     view.canCorrect = false; view.financialState = 'failed'; view.failedJob = true
     const html = renderToStaticMarkup(createElement(ChargeAdministration, { chargeId, allowEditing: true }))
     expect(html).toMatch(/<button[^>]*type="submit"[^>]*>Retry remaining work<\/button>/)
-    expect(html).toContain('Committed source-release progress')
+    expect(html).toContain('Money already returned to available funds')
     expect(html).toContain('$5.00')
-    expect(html).toContain('Planned target')
+    expect(html).toContain('Planned amount')
     expect(html).not.toContain('Review exact correction')
   })
   it('shows family details without editing or retry forms', () => {

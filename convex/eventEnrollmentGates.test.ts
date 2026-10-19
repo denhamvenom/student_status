@@ -30,7 +30,8 @@ describe.each(["running", "failed"] as const)("%s Whole Team provisioning gates"
     await expect(f.coach.mutation(api.admin.assignDriver, { eventId, driverId: f.ids.driver, seats: 3 })).rejects.toThrow("must finish");
     await expect(f.coach.mutation(api.travel.assignVehicle, { eventId, driverId: f.ids.driver, seats: 3 })).rejects.toThrow("must finish");
     await expect(f.coach.mutation(api.travel.setEventTransport, { eventId, transportEnabled: true, busSeats: 5, additionalAdults: 0, trailerRequired: false })).rejects.toThrow("must finish");
-    await expect(f.student.mutation(api.travel.setIndependentTravel, { eventId, studentId: f.ids.student, independentTravel: true })).rejects.toThrow("must finish");
+    await expect(f.coach.mutation(api.travel.setIndependentTravel, { eventId, studentId: f.ids.student, independentTravel: true })).rejects.toThrow("must finish");
+    await expect(f.student.mutation(api.travel.setIndependentTravel, { eventId, studentId: f.ids.student, independentTravel: true })).rejects.toThrow("Only a parent or Coach");
     await expect(f.coach.mutation(api.rooms.adultCreateGroup, { eventId, category: "Boys", name: "Room" })).rejects.toThrow("must finish");
     await expect(f.student.mutation(api.rooms.createGroup, { eventId, name: "Room" })).rejects.toThrow("must finish");
     await expect(f.student.mutation(api.withdrawals.requestWithdrawal, { eventId, idempotencyKey: "pending-withdrawal" })).rejects.toThrow("must finish");

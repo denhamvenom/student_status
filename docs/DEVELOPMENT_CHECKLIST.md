@@ -1,5 +1,30 @@
 # Student Status Development Checklist
 
+## October 18 production changeover authorized
+
+Owner explicitly authorized fixing stale tests, publishing development changes, removing all production synthetic data and all non-Coach application accounts/sign-ins, preserving the verified permanent Coach and real settings/credentials, then releasing the upgrades. Full live student onboarding is deferred to tomorrow by owner. Credentials must remain in place and must not be copied locally.
+
+Private production data/storage recovery export saved; original Coach identity matched the private initialization ledger. Inventory: four other accounts, one test student, related invitations/links/auth/zero-money summaries; no event/payment/signature records. Real calendar occurrences and Coach/season/FIRST/family-readiness records remain preserved. Exact manifest, snapshots and account identities are ignored private evidence only.
+
+The four stale assertions are fixed. Full application check passed with 423 tests before the final invitation-acceptance regression test; that final focused maintenance suite passes 5/5 and typecheck passes. Timeclock checks pass. Lint now excludes ignored private operator files; shipping source remains checked. Cleanup tests 7/7 cover exact fingerprints, protected Coach auth/session chain, signed orphan verifier cleanup and 63 unrelated real calendar rows. Temporary maintenance gate protects Google login, ordinary access, join requests and invitation acceptance. Development sync passed before the final invitation guard; final sync/release verification remains pending.
+
+Production cleanup/deployment has not yet executed. Existing credentials, FIRST/Calendar settings, real season and Coach must remain. Planned sequence: publish reviewed feature checkpoint; deploy necessary maintenance/cleanup backend under Coach-only maintenance; revoke old join code; refresh backup/manifest; preview and atomically remove reviewed test rows; disable cleanup switches; merge matching frontend release and verify both hosts and remaining production records. Remove temporary maintenance closure after verification so normal onboarding can proceed; no new team code is created until requested.
+
+See [production changeover report](PRODUCTION_CHANGEOVER_2026-10-18.md) for execution evidence. Earlier development-only stop instructions and retained-test-account notes below are historical and superseded by this authorization.
+
+## Plain-language audit October 18
+
+- [x] Batch 0: confirm six prerequisite facts and inventory development wording gates; see [findings and baseline validation](audit-2026-10-18/batch-0-findings.md).
+- [x] Owner review of Batch 0 and approved publication of its documentation checkpoint.
+- [x] Batch 1 safe text replacements and corresponding pinned tests implemented; typecheck/build/changed-file lint pass, source review complete. See [batch report](audit-2026-10-18/batch-1-report.md).
+- [x] Coach, Parent, Student and Travel Lead live spot-checks completed without shared-data saves.
+- [x] Batch 2 money/consent/FIRST/health/safety wording implemented and independently reviewed; development-only message sync passed. See [report](audit-2026-10-18/batch-2-report.md).
+- [x] Batch 3 navigation/layout implemented and source/test reviewed; development sync passed. Travel Lead navigation and Coach draft preservation checked live. See [report](audit-2026-10-18/batch-3-report.md).
+- [x] Batch 4 workflow implementation: review, build, typecheck, source lint and final subteam tests passed; Coach, Travel Lead, Parent and Student spot-checks complete without shared-data writes; see [report](audit-2026-10-18/batch-4-report.md).
+- [ ] Stored subteam conversion explicitly deferred by owner; no production comparison or backfill.
+- [ ] Separately listed bug/data fixes remain outside this checkpoint.
+- [ ] Green integrated checks: current full-suite result is 412 passed/four pre-existing stale assertions; nine private-helper lint errors remain. The large financial test passed in the Batch 2 full run. No production release is authorized by the audit.
+
 ## Controlled onboarding — October 18
 
 - [x] Save live Google information URLs; publish OAuth after explicit action-time approval.
@@ -749,3 +774,29 @@ Production release `8c22d50` is deployed; immutable tag `v0.1.0-onboarding.1` ve
 - [x] Production Parent Google login and synthetic invitation acceptance, explicitly approved simulated relationship/attestation logged privately.
 - [x] Production Timeclock Mentor Google login and authenticated footer verified.
 - [ ] Complete existing production family-link readiness setup through Coach maintenance and verify Parent dashboard. Add sign-out recovery to setup-error screen; no season guard bypass.
+
+
+### October 18 controlled onboarding verified
+
+- [x] All requested actual Google identities/roles established; Parent own synthetic child setup/dashboard verified after Coach family maintenance complete with zero unresolved.
+- [x] PR14 recovery control released and used successfully; both website builds verified. Mentor Timeclock signed-in footer verified.
+- [x] Private current synthetic inventory refreshed (38 selected rows, <=40/table); permanent Coach/season/family readiness protected. Test accounts retained; no cleanup executed.
+- [ ] Broader rollout: actual FIRST link, calendar freshness, physical multi-device concurrency/reconnection and owner enrollment opening. Backups/recovery deferred; real signing disabled/separately gated. Earlier pending account-recovery checks are superseded by this checkpoint.
+
+
+## October 18 final configuration and owner deferral
+
+- FIRST invitation saved through actual Coach Settings from previously supplied private owner inputs; exact production match verified. Permanent setting retained in private preservation ledger.
+- Calendar sync verified fresh (44 seconds old), no error; read-only verification.
+- Owner explicitly defers physical clock-in concurrency/reconnection testing until later; it does not block rollout. No synthetic event or attendance was created.
+- Account/footer development goal complete with these accepted boundaries. Real signing remains disabled; backups/recovery deferred; test records intentionally retained with exact cleanup ledger. Enrollment timing remains the owner’s operational decision.
+
+## Local rehearsal alignment — October 18
+
+Owner requested updating local development only. Freshly fetched origin/main is 68179f77212aef7c4f177b333271156389868a2d; local application/backend/dependency source matches that release exactly. Newer local differences are handoff documentation only. Existing dev:third-bandicoot-18 synchronized successfully with Convex typechecking; no reseed, reset, production sync, credential copying, or production configuration changes. Student Status local settings already target development; added ignored apps/timeclock/.env.local with the same public development endpoint. Existing development records remain separate from production. Google login and role preparation for the final rehearsal still require a fresh browser check; this synchronization does not claim that check passed.
+
+Validation: both application TypeScript checks and local Vite builds passed. Student Status retains its existing large-bundle warning; no build failure. No source change or repeated full test suite was needed because application source matches the already-reviewed release.
+
+## October 18 development reviewer data
+
+Owner-authorized development-only enrichment and private reviewer guide/index completed. Reviewed fixture, three focused tests, lint, typecheck/dev sync and exact saved-data checks passed. See DEVELOPMENT_REVIEW_DATA.md. Existing identities/history preserved; production unchanged. Google browser acceptance, physical device checks and cleanup are not implied by data availability.

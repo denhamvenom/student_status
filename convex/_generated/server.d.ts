@@ -34,6 +34,7 @@ type Env = {
   readonly PERMISSION_REAL_SIGNING_ENABLED: string | undefined;
   readonly PRODUCTION_BOOTSTRAP_CLOUD_URL: string | undefined;
   readonly PRODUCTION_BOOTSTRAP_ENABLED: string | undefined;
+  readonly SIGN_IN_MAINTENANCE_COACH_EMAIL: string | undefined;
   readonly SITE_URL: string | undefined;
   readonly SYNTHETIC_REHEARSAL_CLEANUP_CLOUD_URL: string | undefined;
   readonly SYNTHETIC_REHEARSAL_CLEANUP_ENABLED: string | undefined;

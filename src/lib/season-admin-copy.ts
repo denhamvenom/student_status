@@ -1,6 +1,6 @@
 export const seasonAdminCopy = {
   title: 'Season',
-  description: 'Prepare the next season and review each student before any transition.',
+  description: "Set up next season. Check each student before you switch seasons.",
   draftOnly: 'Draft preparation only. No student, account, balance or active season has changed.',
   newSeason: 'New season',
   returningStudents: 'Returning students',
@@ -18,7 +18,7 @@ export const seasonAdminCopy = {
   discardReason: 'Reason for discarding this draft',
   activeSeason: 'Current season',
   verifiedKickoff: (date: string) => `FIRST kickoff: ${date} (America/Chicago)`,
-  unverifiedKickoff: 'Attendance totals start at kickoff.',
+  unverifiedKickoff: 'Attendance totals start at kickoff, when the FIRST build season begins.',
   rosterDescription: 'Choose Returning or Departing for each student. An undecided student stays undecided; saving a draft never archives anyone.',
   staleDecision: 'Student changed since this choice. Review and save the choice again.',
   undecided: 'Undecided',

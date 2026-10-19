@@ -113,7 +113,7 @@ export function SeasonAdministration() {
   return <div className={styles.page}>
     {completed && <p role="status">Season transition complete. {view.source.name} is now active; historical records remain preserved.</p>}
     <header className={styles.heading}><h1>{copy.title}</h1><p>{copy.description}</p></header>
-    <p className={styles.notice}>Review and save each decision before confirming. Historical records remain attached to their original season.</p>
+    <p className={styles.notice}>Save each choice before you confirm. Old records stay with the season they came from.</p>
     <nav className={styles.steps} aria-label="Season transition steps">{steps.map((label, index) => <Button key={label} type="button" variant={step === index ? 'default' : 'outline'} disabled={!plan && index > 0 || !!plan && plan.state !== 'draft'} onClick={() => setStep(index)}>{index + 1}. {label}</Button>)}</nav>
     <p className={styles.muted}>{copy.activeSeason}: {view.source.name}</p>
     {step === 0 && (!plan || plan.state === 'draft') && <DraftForm key={plan?.id ?? 'new'} plan={plan} sourceYear={view.source.year} />}

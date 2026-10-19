@@ -35,6 +35,6 @@ export async function v2SigningAllowed(ctx: Ctx, studentId: Id<"students">, pare
 
 export async function requireV2Signing(ctx: Ctx, studentId: Id<"students">, parentId?: Id<"appUsers">) {
   const mode = permissionSigningMode();
-  if (!await v2SigningAllowed(ctx, studentId, parentId)) throw new Error(mode === "synthetic" ? "Only registered fictional development subjects may use consent." : "Permission signing is closed for this deployment.");
+  if (!await v2SigningAllowed(ctx, studentId, parentId)) throw new Error(mode === "synthetic" ? "Only registered fictional development subjects may use consent." : "You cannot sign for this student right now.");
   return mode;
 }

@@ -47,3 +47,18 @@ Travel invitation accepted using the approved Google identity; dashboard and rea
 ## Pending Parent recovery packet
 
 Parent accepted the authorized synthetic invitation, but production has never completed familyLinkSeasonBackfill. Existing Parent summary intentionally withholds access. One synthetic family link confirmed by bounded private preflight. Add only a normal Sign out action to the error fallback so the operator can switch to actual Coach; Reload and backend access guards stay intact. Scoped lint and TypeScript/build passed. After approved frontend release, use existing Coach Settings maintenance on production amicable-eel-413, verify backfill plus verification pass complete, then verify Parent's own setup/dashboard. No new backend deployment, no real personal-data entry, no cleanup or signing.
+
+
+## PR14 and family readiness completed October 18
+
+Owner approved PR14 candidate4a51b28 and existing Coach family setup on amicable-eel-413. Merge68179f77212aef7c4f177b333271156389868a2d exactly matches approved candidate tree. Student build e76e3ca2-1df0-438d-8c5a-d97a77987b30 succeeded15:25:13Z; Timeclock2a1473df-e475-4c72-ad85-960918b7f662 succeeded15:24:54Z. Release tag v0.1.0-onboarding.3. No backend deploy.
+
+Live error Sign out worked. Actual Coach Google login ran existing maintenance: complete, unresolved0, scanned2 (one link in each pass), correct season unchanged. Parent fresh Google login reached own synthetic child setup then dashboard via Finish later. Personal fields untouched. Mentor Timeclock authenticated footer verified. Private inventory refreshed:38 selected rows, global scan counts<=40/table, permanent migration readiness/audit explicitly preserved. Cleanup remains disabled/unexecuted. Remaining broader rollout items are listed in CURRENT_STATE; do not equate this batch with full team-launch certification.
+
+
+## October 18 final configuration and owner deferral
+
+- FIRST invitation saved through actual Coach Settings from previously supplied private owner inputs; exact production match verified. Permanent setting retained in private preservation ledger.
+- Calendar sync verified fresh (44 seconds old), no error; read-only verification.
+- Owner explicitly defers physical clock-in concurrency/reconnection testing until later; it does not block rollout. No synthetic event or attendance was created.
+- Account/footer development goal complete with these accepted boundaries. Real signing remains disabled; backups/recovery deferred; test records intentionally retained with exact cleanup ledger. Enrollment timing remains the owner’s operational decision.

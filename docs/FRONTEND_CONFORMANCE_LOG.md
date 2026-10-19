@@ -1,5 +1,13 @@
 # Frontend conformance work log
 
+## October 18 Batch 4 workflow changes
+
+Batch 4 implementation, independent review and role spot-checks are complete on `feature/development-review-fixtures-2026-10-18`. See [Batch 4 report](audit-2026-10-18/batch-4-report.md) and [copy inventory](audit-2026-10-18/batch-4-copy-inventory.md). Owner clarified the only selectable subteams: Build, Electrical, Machining, Programming, Business/Media. Owner explicitly deferred stored-record conversion; no production access or backfill. Final development backend sync, build/typecheck, source lint and 18 focused tests passed. Full suite before that last update: 412 passed, four existing stale assertions; full lint nine existing private-helper errors. Coach confirmation Cancel and staff Money tools/New event checks passed without shared-data writes. Parent Money/Home and event signup guidance checked. Student Home money, read-only independent travel, Whole Team leave confirmation and Cancel checked; participation stayed confirmed. This report accompanies the reviewed development checkpoint. Stop after Batch 4. No main merge or production rollout.
+
+## October 18 Batch 3 navigation/layout
+
+Grouped navigation, phone More headings, profile entry, rooming context and collapsed rare tools follow the approved master audit. Travel Lead dark-theme phone390/desktop1440 navigation and Join requests checked without shared-data writes. Build/types/scoped lint pass; independent source review correction applied. Coach desktop group navigation and draft preservation checked live; backdrop dismissal fixed and retested, Cancel verified. Fresh family-role checks and light-theme comparison remain unobserved; current scope/evidence in [Batch 3 report](audit-2026-10-18/batch-3-report.md) and [visual checks](VISUAL_CHECKS.md). Development backend display changes synchronized; no production release.
+
 ## October 18 footer-only public navigation
 
 Owner requested About/Privacy/Terms only in a consistent footer. Sol implemented shared Student Status footer across app/public routes and removed sign-in/header duplicates; Timeclock footer now owns the three existing links and remains visible in the active shell. Public content, routes, consent workflows and mobile navigation clearance preserved. Sol reported focused root typecheck/build/scoped lint and Timeclock lint/typecheck/build passed. Local Chrome 390 dark/1280 light checks on public pages, signed-out entry, synthetic Coach review and Timeclock entry found one footer, all three links and no horizontal overflow; keyboard About-to-Privacy and Student privacy navigation verified. Authenticated Timeclock not visually observed. Astra source review found no blocking findings; no redundant builds rerun. Representative screenshot saved outside Git. Not yet deployed.
@@ -290,3 +298,8 @@ Refreshed ignored rehearsal preview from current source and built CSS. Inspected
 
 ## October16 FIRST reopened message
 Private preview refreshed from current source: Parent and adult reopened show exact message above Needs completion; initial adult example omits it. Fixture render checks pass. Parent phone390 screenshot inspected, private-data/visual-checks/final-targeted/first-reopened-phone.png. No live FIRST transition performed; isolated lifecycle tests provide behavior evidence.
+
+
+## October 18 — Batch 2 wording checkpoint
+
+Approved sensitive-area text updated without layout or workflow changes. Live Travel Lead Drivers and Permission forms checked in the existing narrow dark-theme session; disabled Health export access preserved. Other roles and rare recovery/signing states were source/test verified, not a new all-role or all-theme visual pass. See [Batch 2 report](audit-2026-10-18/batch-2-report.md). Stop before Batch 3.

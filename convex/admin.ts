@@ -8,6 +8,7 @@ import { refreshStudentFinance } from "./lib/financeSummaries";
 import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
 import { markRoomCategoryReview } from "./lib/profileCorrections";
 import { syncWholeTeamMembership } from "./lib/wholeTeam";
+import { subteamOptions } from "../src/lib/subteams";
 
 export const listJoinRequests = query({
   args: {}, returns: v.any(),
@@ -29,6 +30,19 @@ export const createJoinCode = mutation({
     await ctx.db.insert("joinCodes", { seasonId: season._id, code, expiresAt, revoked: false, createdBy: user._id });
     await audit(ctx, user, "joinCodes", code, "create", null, { expiresAt });
     return { code, expiresAt };
+  },
+});
+
+export const activeJoinCodes = query({
+  args: { asOf: v.number() },
+  returns: v.object({ items: v.array(v.object({ codeId: v.id("joinCodes"), code: v.string(), expiresAt: v.number() })), truncated: v.boolean() }),
+  handler: async (ctx, args) => {
+    const user = await viewer(ctx);
+    if (user.role !== "coach") throw new Error("Join code management is coach only.");
+    if (!Number.isSafeInteger(args.asOf)) throw new Error("A valid review time is required.");
+    const season = await activeSeason(ctx);
+    const page = await ctx.db.query("joinCodes").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).order("desc").take(101);
+    return { items: page.slice(0, 100).filter(code => !code.revoked && code.expiresAt > args.asOf).map(code => ({ codeId: code._id, code: code.code, expiresAt: code.expiresAt })), truncated: page.length > 100 };
   },
 });
 
@@ -133,8 +147,10 @@ export const updateRoster = mutation({
     if (expectedRevision !== undefined && expectedRevision !== (student.profileRevision ?? 0)) throw new Error("Profile changed. Reload before saving.");
     if (args.legalName !== undefined && (!args.legalName.trim() || args.legalName.trim().length > 160)) throw new Error("Legal name under 160 characters is required.");
     if (args.preferredName !== undefined && (!args.preferredName.trim() || args.preferredName.trim().length > 80)) throw new Error("Preferred name under 80 characters is required.");
+    const proposedSubteam = args.subteam?.trim();
+    if (proposedSubteam !== undefined && proposedSubteam !== student.subteam && !subteamOptions.some(value => value === proposedSubteam)) throw new Error("Choose a listed subteam.");
     if (args.roomCategory !== undefined && args.roomCategory !== student.roomCategory) await markRoomCategoryReview(ctx, student._id, student.seasonId);
-    const changes = { ...fields, ...(args.legalName !== undefined ? { legalName: args.legalName.trim() } : {}), ...(args.preferredName !== undefined ? { preferredName: args.preferredName.trim() } : {}), ...(args.roomCategory !== undefined ? { roomCategoryLocked: true } : {}), ...(args.active === false && student.active ? { archivedAt: Date.now() } : {}), profileRevision: (student.profileRevision ?? 0) + 1 };
+    const changes = { ...fields, ...(proposedSubteam !== undefined ? { subteam: proposedSubteam } : {}), ...(args.legalName !== undefined ? { legalName: args.legalName.trim() } : {}), ...(args.preferredName !== undefined ? { preferredName: args.preferredName.trim() } : {}), ...(args.roomCategory !== undefined ? { roomCategoryLocked: true } : {}), ...(args.active === false && student.active ? { archivedAt: Date.now() } : {}), profileRevision: (student.profileRevision ?? 0) + 1 };
     await ctx.db.patch(student._id, changes);
     if (args.active === true && !student.active) await syncWholeTeamMembership(ctx, user, { ...student, ...changes });
     await audit(ctx, user, "students", student._id, "updateRoster", { profileRevision: student.profileRevision ?? 0, active: student.active, roomCategory: student.roomCategory, legalName: student.legalName, archivedAt: student.archivedAt ?? null }, { ...changes, archivedAt: changes.archivedAt ?? student.archivedAt ?? null }, reason?.trim());
