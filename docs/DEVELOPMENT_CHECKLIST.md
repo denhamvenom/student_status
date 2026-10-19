@@ -2,7 +2,7 @@
 
 ## October 19 fee-specific Bulk Payment CSV
 
-Implemented fee selection, All/Paid/Unpaid assessed-student export, blank-row skipping, authoritative review, and new receipts applied only to the selected fee. Durable row replay prevents duplicate posting; stale/overpayment and authorization checks remain server-side. Focused backend/CSV/regression checks and independent source review pass. See [workflow and evidence](FEE_PAYMENT_CSV.md). Integrated checks and shared development sync pending; no production deployment. Coordinating reviewed parent-email branch integration before the sole shared development sync.
+Implemented fee selection, All/Paid/Unpaid assessed-student export, blank-row skipping, authoritative review, and new receipts applied only to the selected fee. Durable row replay prevents duplicate posting; stale/overpayment and authorization checks remain server-side. Focused backend/CSV/regression checks and independent source review pass. See [workflow and evidence](FEE_PAYMENT_CSV.md). Combined lint/typecheck/build passed. Full suite passed 493 of 495 cases; two existing large-fixture tests timed out under parallel load, then both unchanged suites passed 35/35 with one worker. All 495 cases passed across those runs. Development sync to third-bandicoot-18 succeeded with backend typecheck; email sending remained disabled. No production deployment. Reviewed parent-email branch through 01ec5fe is integrated.
 
 ## October 19 simplified charge workflow (PR19)
 
