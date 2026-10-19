@@ -1,3 +1,5 @@
+import { internal } from "./_generated/api";
+import { parentInviteEmailConfiguration } from "./lib/parentInviteEmail";
 import { v } from "convex/values";
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
 import { mutation, query } from "./_generated/server";
@@ -5,6 +7,9 @@ import type { Doc } from "./_generated/dataModel";
 import { audit, requireRole, viewer } from "./lib/access";
 import { emailKey, newToken, tokenHash, verifiedAdult } from "./lib/invitationIdentity";
 
+const RESEND_COOLDOWN_MS = 60 * 60_000;
+const resendAvailableAt = (row: Doc<"adultInvitations">) => Math.max(row.emailQueuedAt ?? row.createdAt, row.emailSentAt ?? row.createdAt) + RESEND_COOLDOWN_MS;
+const emailStatus = v.union(v.literal("queued"), v.literal("sent"), v.literal("failed"), v.literal("not_sent"));
 const adultRole = v.union(v.literal("coach"), v.literal("mentor"));
 const grantFields = { role: adultRole, travelLead: v.boolean(), financialEdit: v.boolean(), healthExport: v.boolean() };
 const adultSummary = v.object({ userId: v.id("appUsers"), name: v.string(), email: v.string(), ...grantFields, active: v.boolean(), revision: v.number() });
@@ -27,29 +32,54 @@ export const workspace = query({
 });
 
 export const invitations = query({
-  args: { paginationOpts: paginationOptsValidator }, returns: paginationResultValidator(v.object({ invitationId: v.id("adultInvitations"), email: v.string(), ...grantFields, status: v.union(v.literal("pending"), v.literal("accepted"), v.literal("revoked"), v.literal("replaced")), createdAt: v.number(), expiresAt: v.number() })),
+  args: { paginationOpts: paginationOptsValidator }, returns: paginationResultValidator(v.object({ invitationId: v.id("adultInvitations"), email: v.string(), ...grantFields, status: v.union(v.literal("pending"), v.literal("accepted"), v.literal("revoked"), v.literal("replaced")), createdAt: v.number(), expiresAt: v.number(), emailStatus, emailError: v.union(v.string(), v.null()), resendAvailableAt: v.number() })),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach");
     const result = await ctx.db.query("adultInvitations").withIndex("by_email_and_status").paginate(args.paginationOpts);
-    return { ...result, page: result.page.map(row => ({ invitationId: row._id, email: row.email, role: row.role, travelLead: row.travelLead, financialEdit: row.financialEdit, healthExport: row.healthExport, status: row.status, createdAt: row.createdAt, expiresAt: row.expiresAt })) };
+    return { ...result, page: result.page.map(row => ({ invitationId: row._id, email: row.email, role: row.role, travelLead: row.travelLead, financialEdit: row.financialEdit, healthExport: row.healthExport, status: row.status, createdAt: row.createdAt, expiresAt: row.expiresAt, emailStatus: row.emailStatus ?? "not_sent" as const, emailError: row.emailError ?? null, resendAvailableAt: resendAvailableAt(row) })) };
   },
 });
 
 export const inviteAdult = mutation({
-  args: { email: v.string(), ...grantFields }, returns: v.object({ token: v.string(), invitationId: v.id("adultInvitations"), expiresAt: v.number() }),
+  args: { email: v.string(), ...grantFields }, returns: v.object({ invitationId: v.id("adultInvitations"), expiresAt: v.number() }),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach"); grants(args);
+    if (!parentInviteEmailConfiguration()) throw new Error("Automatic invitation email is not configured. Ask a Coach for help.");
     const email = emailKey(args.email);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) throw new Error("Enter a valid account email.");
     const existing = await ctx.db.query("appUsers").withIndex("by_email", q => q.eq("email", email)).take(2);
     if (existing.length) throw new Error("This email already has an account. Use account controls instead.");
     const prior = await ctx.db.query("adultInvitations").withIndex("by_email_and_status", q => q.eq("email", email).eq("status", "pending")).take(101);
     if (prior.length > 100) throw new Error("Invitation limit reached; Coach review is required.");
+    const latest = await ctx.db.query("adultInvitations").withIndex("by_email_and_createdAt", q => q.eq("email", email)).order("desc").first();
+    if (latest && resendAvailableAt(latest) > Date.now()) throw new Error("Wait one hour before resending this invitation.");
     for (const row of prior) await ctx.db.patch(row._id, { status: "replaced" });
     const token = newToken(); const now = Date.now(); const expiresAt = now + 7 * 86400000;
-    const invitationId = await ctx.db.insert("adultInvitations", { email, role: args.role, travelLead: args.travelLead, financialEdit: args.financialEdit, healthExport: args.healthExport, tokenHash: await tokenHash(token), status: "pending", createdBy: actor._id, createdAt: now, expiresAt });
+    const invitationId = await ctx.db.insert("adultInvitations", { email, role: args.role, travelLead: args.travelLead, financialEdit: args.financialEdit, healthExport: args.healthExport, tokenHash: await tokenHash(token), status: "pending", createdBy: actor._id, createdAt: now, expiresAt, emailStatus: "queued", emailQueuedAt: now, emailAttempt: 0 });
     await audit(ctx, actor, "adultInvitations", invitationId, "create", null, { email, role: args.role, travelLead: args.travelLead, financialEdit: args.financialEdit, healthExport: args.healthExport, expiresAt });
-    return { token, invitationId, expiresAt };
+    await ctx.scheduler.runAfter(0, internal.adultInviteEmail.send, { inviteId: invitationId, token, attempt: 1 });
+    await ctx.scheduler.runAfter(20 * 60_000, internal.adultInviteEmail.markStalled, { inviteId: invitationId, hash: await tokenHash(token) });
+    return { invitationId, expiresAt };
+  },
+});
+
+export const resendInvitation = mutation({
+  args: { invitationId: v.id("adultInvitations") }, returns: v.object({ invitationId: v.id("adultInvitations"), expiresAt: v.number() }),
+  handler: async (ctx, args) => {
+    const actor = await viewer(ctx); requireRole(actor, "coach");
+    if (!parentInviteEmailConfiguration()) throw new Error("Automatic invitation email is not configured. Ask a Coach for help.");
+    const row = await ctx.db.get(args.invitationId); const now = Date.now();
+    if (!row || row.status !== "pending" || row.expiresAt <= now) throw new Error("Pending active invitation not found.");
+    const issuer = await ctx.db.get(row.createdBy);
+    if (!issuer?.active || issuer.role !== "coach") throw new Error("Inviting Coach access was removed. Create a new invitation.");
+    if (resendAvailableAt(row) > now) throw new Error("Wait one hour before resending this invitation.");
+    if ((await ctx.db.query("appUsers").withIndex("by_email", q => q.eq("email", row.email)).take(1)).length) throw new Error("This email already has an account. Use account controls instead.");
+    const token = newToken(); const hash = await tokenHash(token); const expiresAt = now + 7 * 86400000;
+    await ctx.db.patch(row._id, { tokenHash: hash, createdBy: actor._id, expiresAt, emailStatus: "queued", emailQueuedAt: now, emailAttempt: 0, emailError: undefined, emailSentAt: undefined });
+    await ctx.scheduler.runAfter(0, internal.adultInviteEmail.send, { inviteId: row._id, token, attempt: 1 });
+    await ctx.scheduler.runAfter(20 * 60_000, internal.adultInviteEmail.markStalled, { inviteId: row._id, hash });
+    await audit(ctx, actor, "adultInvitations", row._id, "resend", null, { email: row.email, expiresAt });
+    return { invitationId: row._id, expiresAt };
   },
 });
 

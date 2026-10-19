@@ -1,5 +1,12 @@
 # Current integration handoff
 
+## October 19 - Mentor/Staff invitation email (development)
+
+Implemented Send invitation with private emailed links, accurate delivery status and guarded resend; removed public copy-link return/UI. Existing invitation acceptance remains explicit. Development third-bandicoot-18 synced with optional fields/additive index; sending remains disabled, no real messages or production writes. Independent review clear; 535 tests in101 files passed and focused31 account/mail tests passed. See [workflow and verification](ADULT_INVITATION_EMAIL.md). Real-inbox delivery and production promotion remain unverified/unreleased.
+
+The entries below describe earlier releases and remain historical for this development feature.
+
+
 ## Sign-in production release - October 19
 
 Checkout: student-status-readiness-design; branch feature/development-review-fixtures-2026-10-18. Production baseline is main 5fa254c (PR22). Owner authorized production promotion with no record changes. Source 1c8dae9 deployed to production amicable-eel-413 with schema validation and the additive adult identity index; no indexes removed, migrations, record edits, imports or environment changes performed. The parent-invitation chat confirmed shared backend ownership and held synchronization.

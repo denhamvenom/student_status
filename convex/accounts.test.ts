@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { convexTest } from "convex-test";
 import { api } from "./_generated/api";
 import schema from "./schema";
+import { tokenHash } from "./lib/invitationIdentity";
+vi.mock("./lib/parentInviteEmail", () => ({ parentInviteEmailConfiguration: () => ({ apiKey: "synthetic", from: "Synthetic <test@example.invalid>", replyTo: "test@example.invalid", origin: "https://example.invalid" }) }));
 const modules = import.meta.glob("./**/*.ts");
 async function fixture() {
   const t = convexTest(schema, modules);
@@ -19,6 +21,14 @@ async function fixture() {
   return { t, ids, coach: as(ids.coachAuth), invited: as(ids.inviteAuth), wrong: as(ids.wrongAuth), unverified: as(ids.unverifiedAuth) };
 }
 const access = { role: "mentor" as const, travelLead: true, financialEdit: false, healthExport: true };
+async function createInvite(f: Awaited<ReturnType<typeof fixture>>) {
+  const result = await f.coach.mutation(api.accounts.inviteAdult, invite);
+  expect(result).not.toHaveProperty("token");
+  const token = crypto.randomUUID().replaceAll("-", "").repeat(2);
+  const hash = await tokenHash(token);
+  await f.t.run(ctx => ctx.db.patch(result.invitationId, { tokenHash: hash }));
+  return { ...result, token };
+}
 const invite = { email: " Adult@Example.Invalid ", ...access };
 describe("adult accounts", () => {
   it("records the latest adult archive transition and audit clocks without changing inactive edits", async () => {
@@ -48,7 +58,7 @@ describe("adult accounts", () => {
   });
   it("accepts only the invited verified Google account, saves grants separately and excludes tokens from lists", async () => {
     const f = await fixture();
-    const link = await f.coach.mutation(api.accounts.inviteAdult, invite);
+    const link = await createInvite(f);
     const stored = await f.t.run(ctx => ctx.db.get(link.invitationId));
     expect(stored?.tokenHash).not.toBe(link.token);
     if (!stored) throw new Error("Invitation fixture missing.");
@@ -71,15 +81,17 @@ describe("adult accounts", () => {
 
   it("rejects replaced, revoked, expired invitations and invitations from removed Coaches", async () => {
     const f = await fixture();
-    const first = await f.coach.mutation(api.accounts.inviteAdult, invite);
-    const second = await f.coach.mutation(api.accounts.inviteAdult, invite);
+    const first = await createInvite(f);
+    await f.t.run(ctx => ctx.db.patch(first.invitationId, { emailQueuedAt: 0, createdAt: 0 }));
+    const second = await createInvite(f);
     await expect(f.invited.mutation(api.accounts.accept, { token: first.token })).rejects.toThrow("unavailable");
     await f.coach.mutation(api.accounts.revokeInvitation, { invitationId: second.invitationId });
     await expect(f.invited.mutation(api.accounts.accept, { token: second.token })).rejects.toThrow("unavailable");
-    const expired = await f.coach.mutation(api.accounts.inviteAdult, invite);
-    await f.t.run(ctx => ctx.db.patch(expired.invitationId, { expiresAt: 0 }));
+    await f.t.run(ctx => ctx.db.patch(second.invitationId, { emailQueuedAt: 0, createdAt: 0 }));
+    const expired = await createInvite(f);
+    await f.t.run(ctx => ctx.db.patch(expired.invitationId, { expiresAt: 0, emailQueuedAt: 0, createdAt: 0 }));
     await expect(f.invited.mutation(api.accounts.accept, { token: expired.token })).rejects.toThrow("expired");
-    const removed = await f.coach.mutation(api.accounts.inviteAdult, invite);
+    const removed = await createInvite(f);
     await f.t.run(ctx => ctx.db.patch(f.ids.coach, { active: false }));
     await expect(f.invited.mutation(api.accounts.accept, { token: removed.token })).rejects.toThrow("Inviting Coach");
     expect(await f.invited.mutation(api.accounts.preview, { token: removed.token })).toMatchObject({ status: "unavailable", email: null });
@@ -88,7 +100,7 @@ describe("adult accounts", () => {
   it("protects the last Coach and stale grants, and revokes access immediately", async () => {
     const f = await fixture();
     await expect(f.coach.mutation(api.accounts.updateAdult, { userId: f.ids.coach, expectedRevision: 0, ...access, active: true, reason: "Change" })).rejects.toThrow("last active Coach");
-    const link = await f.coach.mutation(api.accounts.inviteAdult, invite);
+    const link = await createInvite(f);
     const adult = await f.invited.mutation(api.accounts.accept, { token: link.token });
     await f.coach.mutation(api.accounts.updateAdult, { userId: adult.userId, expectedRevision: 0, ...access, healthExport: false, financialEdit: true, active: true, reason: "Finance only" });
     await expect(f.coach.mutation(api.accounts.updateAdult, { userId: adult.userId, expectedRevision: 0, ...access, active: true, reason: "Stale" })).rejects.toThrow("Account changed");
@@ -101,7 +113,7 @@ describe("adult accounts", () => {
 
   it("refuses to convert or overwrite a parent account through invitation acceptance", async () => {
     const f = await fixture();
-    const link = await f.coach.mutation(api.accounts.inviteAdult, invite);
+    const link = await createInvite(f);
     const parent = await f.t.run(ctx => ctx.db.insert("appUsers", { authUserId: f.ids.inviteAuth, email: "adult@example.invalid", name: "Parent", role: "parent", active: true, travelLead: false, financialEdit: false }));
     await expect(f.invited.mutation(api.accounts.accept, { token: link.token })).rejects.toThrow("another role");
     await expect(f.coach.mutation(api.accounts.updateAdult, { userId: parent, expectedRevision: 0, ...access, active: true, reason: "Convert" })).rejects.toThrow("cannot be converted");

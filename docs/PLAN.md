@@ -398,3 +398,7 @@ Student Google-only path and Parent/team staff Google-or-email path implemented 
 ## October 19 - Mentor/Staff invitation wording
 
 Owner authorized development and production publication of frontend-only invitation copy. Heading is Invite Mentor/Staff; Email address and instructions describe Google or email-code sign-in using the invited address. Landing and account-mismatch copy agree; link creation is distinguished from sending an email. No auth logic, backend, records, credentials or settings changed. Focused lint, application typecheck/build and live local heading/instructions checks passed. Exact production merge/build and live verification are recorded on the release PR.
+
+## October 19 - Mentor/Staff invitation email (development)
+
+Implemented Send invitation with private emailed links, accurate delivery status and guarded resend; removed public copy-link return/UI. Existing invitation acceptance remains explicit. Development third-bandicoot-18 synced with optional fields/additive index; sending remains disabled, no real messages or production writes. Independent review clear; 535 tests in101 files passed and focused31 account/mail tests passed. See [workflow and verification](ADULT_INVITATION_EMAIL.md). Real-inbox delivery and production promotion remain unverified/unreleased.
