@@ -1,5 +1,10 @@
 # Current integration handoff
 
+## Bulk Invite local candidate - October 18
+
+Branch `feature/bulk-invite` in `student-status-bulk-invite`, based on main `46d526a`. Coach Bulk Invite, CSV preview/export, individual Google-account linking, and whole-roster connection filtering implemented locally. See [feature and verification notes](BULK_INVITE.md). No deployment or main merge; live development Google-sign-in rehearsal remains separate. Earlier production evidence below is preserved.
+
+
 ## October 18 production changeover completed
 
 Owner-authorized production cleanup and release completed. Application source `09289d4` was pushed to the development branch, deployed to Convex production `amicable-eel-413`, and merged through PR15 as `d3d2e9e368dbbb52d6031ebae0dc5007c11f356b`. Both production websites built and deployed that merge successfully; its tree exactly matches the reviewed source.

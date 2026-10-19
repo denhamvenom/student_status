@@ -22,6 +22,31 @@ async function fixture() {
 }
 const page={paginationOpts:{numItems:20,cursor:null},asOf:100};
 describe("Coach student roster and record",()=>{
+  it("filters connection across pages without restricting Coach access to unconnected students",async()=>{
+    const f=await fixture();
+    await f.t.run(async ctx=>{
+      const original=await ctx.db.get(f.ids.student);
+      if(!original) throw new Error("Missing synthetic fixture");
+      const {_id,_creationTime,...fields}=original;
+      void _id; void _creationTime;
+      for(let i=0;i<22;i++) {
+        const auth=await ctx.db.insert("users",{email:`synthetic-${i}@example.invalid`});
+        const userId=await ctx.db.insert("appUsers",{authUserId:auth,email:`synthetic-${i}@example.invalid`,name:`Synthetic ${i}`,role:"student",active:true,travelLead:false,financialEdit:false});
+        await ctx.db.insert("students",{...fields,legalName:`Synthetic connected ${i}`,userId});
+      }
+    });
+    const unconnected=await f.coach.query(list,{...page,connection:"unconnected"});
+    expect(unconnected.page.map((row:{studentId:string})=>row.studentId)).toEqual([f.ids.student]);
+    expect(unconnected.isDone).toBe(true);
+    const connected=await f.coach.query(list,{...page,connection:"connected"});
+    expect(connected.page).toHaveLength(20);
+    expect(connected.isDone).toBe(false);
+    const next=await f.coach.query(list,{...page,connection:"connected",paginationOpts:{numItems:20,cursor:connected.continueCursor}});
+    expect(next.page).toHaveLength(2);
+    expect(next.isDone).toBe(true);
+    expect(await f.coach.query(detail,{studentId:f.ids.student,asOf:100})).toMatchObject({studentId:f.ids.student,active:true,account:{linkage:"unlinked"}});
+  });
+
   it("authorizes Coach only, minimizes list rows, and keeps inactive current-season details readable",async()=>{
     const f=await fixture();
     await expect(f.t.query(list,page)).rejects.toThrow();

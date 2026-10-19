@@ -800,3 +800,12 @@ Validation: both application TypeScript checks and local Vite builds passed. Stu
 ## October 18 development reviewer data
 
 Owner-authorized development-only enrichment and private reviewer guide/index completed. Reviewed fixture, three focused tests, lint, typecheck/dev sync and exact saved-data checks passed. See DEVELOPMENT_REVIEW_DATA.md. Existing identities/history preserved; production unchanged. Google browser acceptance, physical device checks and cleanup are not implied by data availability.
+
+## Bulk Invite local candidate - October 18
+
+- [x] Coach-only template, upload preview, duplicate decisions, idempotent creation and code downloads.
+- [x] Individual-code linking, replacement/revocation, expiry and normal member records.
+- [x] Server-side Membership connection filter; preserve general signup.
+- [x] All 436 synthetic tests, lint/types, Timeclock checks, and isolated component phone/desktop check; see BULK_INVITE.md for evidence limits.
+- [ ] Live development Google-sign-in rehearsal.
+- [ ] Separate approved production release (not authorized in this task).

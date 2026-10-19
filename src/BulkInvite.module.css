@@ -1,0 +1,20 @@
+.workspace{display:grid;gap:20px}
+.upload{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 16px;border:1px solid var(--purple-700);border-radius:4px;color:var(--accent-text);font-size:14px;font-weight:700;cursor:pointer}
+.upload:focus-within{outline:3px solid var(--gold-500);outline-offset:2px}
+.upload input{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}
+.reviewList,.batchList{display:grid;gap:12px}
+.reviewRow,.batch{border:1px solid var(--border-default);border-radius:6px;padding:16px;min-width:0}
+.reviewRow{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,360px);gap:16px}
+.reviewRow p,.batch p{margin:6px 0 0}
+.choice{display:grid;gap:10px}
+.choice label{display:grid;gap:5px;font-weight:600}
+.choice select{width:100%}
+.choice .confirmDuplicate{display:flex;align-items:center;gap:8px;font-weight:400}
+.confirmDuplicate input{width:20px;height:20px}
+.batch{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start}
+.details{grid-column:1/-1;min-width:0}
+.batchSummary,.rowActions{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.batchSummary{margin:12px 0}
+.code{overflow-wrap:anywhere;word-break:break-word}
+.success{padding:12px;background:var(--go-bg);color:var(--go-dot);border-radius:4px}
+@media(max-width:767px){.reviewRow{grid-template-columns:1fr}.batch{grid-template-columns:1fr}.batch>.button{justify-self:start}}

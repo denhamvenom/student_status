@@ -97,15 +97,14 @@ describe('synthetic review states', () => {
     mock.fundraiserRow = null
   })
 
-  it('offers sign-out on both Join and Waiting without submitting a request', () => {
+  it('keeps sign-out and individual invitation entry available on Join and Waiting', () => {
     for (const submitted of [false,true]) {
       const view = html(createElement(PendingJoinView,{submitted,busy:false,signOutError:'',onSignOut:vi.fn(),children:createElement('p',null,'Synthetic join form')}))
       expect(view).toContain(submitted?'Waiting':'Join the team')
       expect(view).toContain('Sign out')
       expect(view).toContain('Google account')
       expect(view).toContain('type="button"')
-      if (submitted) expect(view).not.toContain('Synthetic join form')
-      else expect(view).toContain('Synthetic join form')
+      expect(view).toContain('Synthetic join form')
     }
   })
 })
