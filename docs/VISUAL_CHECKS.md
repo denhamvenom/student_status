@@ -502,3 +502,11 @@ Approved template selected. Existing complete fictional profile prepared the ori
 October16 polish evidence supplement: refreshed preview render checks pass; Mentor phone390 and verified Competition desktop1440 inspected. FIRST links are block with6px top margin for all three states. Parent summary/orientation and verified check confirmed in DOM. See FRONTEND_CONFORMANCE_LOG and private-data/visual-checks/final-targeted/polish-*.png.
 
 FIRST followup visual evidence: refreshed preview includes Parent and adult reopened examples, initial state absence assertions pass. Parent phone390 capture inspected; see FRONTEND_CONFORMANCE_LOG. Item5 no longer deferred.
+
+## Bulk Invite local candidate
+
+| Check | Evidence / remaining work |
+|---|---|
+| BULK-1 Coach component | 1440 light/390 dark actual component with mocked hooks inspected; template/upload/confirmation/download passed. Live development Join Requests navigation and real Google redemption remain unobserved. See BULK_INVITE.md. |
+
+October 19 approval revision: isolated actual-component Coach queue reviewed at 1440px light and 390px dark; identity/email/actions legible, no phone overflow. Live integrated backend/Google check remains deferred; no backend sync authorized.

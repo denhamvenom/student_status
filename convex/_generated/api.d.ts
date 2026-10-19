@@ -16,6 +16,7 @@ import type * as attendanceOperations from "../attendanceOperations.js";
 import type * as attendanceReportMaintenance from "../attendanceReportMaintenance.js";
 import type * as auth from "../auth.js";
 import type * as bootstrap from "../bootstrap.js";
+import type * as bulkInvites from "../bulkInvites.js";
 import type * as calendar from "../calendar.js";
 import type * as calendarState from "../calendarState.js";
 import type * as chargeAdmin from "../chargeAdmin.js";
@@ -133,6 +134,7 @@ declare const fullApi: ApiFromModules<{
   attendanceReportMaintenance: typeof attendanceReportMaintenance;
   auth: typeof auth;
   bootstrap: typeof bootstrap;
+  bulkInvites: typeof bulkInvites;
   calendar: typeof calendar;
   calendarState: typeof calendarState;
   chargeAdmin: typeof chargeAdmin;
