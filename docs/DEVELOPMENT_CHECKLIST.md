@@ -6,7 +6,9 @@
 - [x] Cancellation and permission safeguards, source review, automated checks and representative synthetic UI checks.
 - [x] Development sync and read-only Calendar lookup; editor sharing verified.
 - [x] Development Calendar writes explicitly prohibited and blocked in code.
-- [ ] Authorized production deployment/enablement and real-event end-to-end verification.
+- [x] Authorized production backend deployment/enablement; read-only production authentication and writer access verified.
+- [x] Release documentation included in PR21; exact website build outcomes tracked in the PR.
+- [ ] Real-event end-to-end verification (no test Calendar entries created).
 
 See [workflow evidence](EVENT_CALENDAR_SYNC.md).
 
