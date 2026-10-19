@@ -502,3 +502,8 @@ Approved template selected. Existing complete fictional profile prepared the ori
 October16 polish evidence supplement: refreshed preview render checks pass; Mentor phone390 and verified Competition desktop1440 inspected. FIRST links are block with6px top margin for all three states. Parent summary/orientation and verified check confirmed in DOM. See FRONTEND_CONFORMANCE_LOG and private-data/visual-checks/final-targeted/polish-*.png.
 
 FIRST followup visual evidence: refreshed preview includes Parent and adult reopened examples, initial state absence assertions pass. Parent phone390 capture inspected; see FRONTEND_CONFORMANCE_LOG. Item5 no longer deferred.
+
+
+### FEE-REVIEW-2026-10-19 — Coach charge details
+
+Frontend wording and rendered-markup regression checks complete. Pending: authenticated new-charge, held and partial-release layouts at representative phone/desktop sizes and light/dark themes; Coach acceptance. No production records may be changed to manufacture evidence. See FRONTEND_CONFORMANCE_LOG.md October 19 entry.

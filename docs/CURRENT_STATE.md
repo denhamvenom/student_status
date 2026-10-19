@@ -1,5 +1,12 @@
 # Current integration handoff
 
+## October 19 charge review wording
+
+Implemented frontend-only simplification: View charge details; Review students and charges; explicit eight-character Reason input guidance; student names, planned/current amounts and readable saved/pending/review status replace internal revisions and processing counters. New unposted charges no longer produce false load errors. Missing existing charges still need review; held rows retain their explanation. Partial money release amounts and all confirmation/retry safeguards remain. No backend or production data changes.
+
+Validation: integrated lint/typecheck, 425 tests and build passed (existing bundle-size warning); final held-row wording refinement passed 14 focused tests and source lint. Independent review found the held-row case and it was corrected. Rendered-markup evidence only; fresh authenticated browser/phone/theme comparison remains pending. Development checkpoint only; production publication is not included in this change.
+
+
 ## October 18 production changeover completed
 
 Owner-authorized production cleanup and release completed. Application source `09289d4` was pushed to the development branch, deployed to Convex production `amicable-eel-413`, and merged through PR15 as `d3d2e9e368dbbb52d6031ebae0dc5007c11f356b`. Both production websites built and deployed that merge successfully; its tree exactly matches the reviewed source.
