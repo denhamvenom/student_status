@@ -14,7 +14,13 @@ Implementation is in student-status-bulk-invite, branch feature/parent-email-inv
 
 ## Verification
 
-Implementation and test evidence pending. Tests must exercise secret-free student responses, explicit-use single-use authentication, cross-browser link use, short-code failure/rate limits, safe account linking, Google student regressions, parent permissions, and desktop/phone UI.
+Implemented inbox-only parent sign-in links, removed student Share/Copy, preserved one-hour invitation resend and student Google login. Parent login still requires separate relationship/authority confirmation. Returning parents and expired private links support six-digit email codes. Integrated Calendar main b1f730a and reviewed legal-name/Money checkpoint 2bd052a without source conflicts.
+
+Combined verification: 99 test files / 509 tests passed with one worker; lint, frontend/backend types and application build passed. Independent authentication review found no unresolved blockers. Actual React components with mocked Convex/Auth passed explicit Continue, failed-link OTP fallback, separate attestation and student resend checks; 1440px light and 390px dark screenshots have no overflow. These checks did not send real emails or prove a real-inbox end-to-end round trip.
+
+Development third-bandicoot-18 synchronized successfully with backend typecheck/schema validation. Development email remains disabled; Calendar write guard remains production-only. No production deploy, main merge, real invitation, or financial write. Other chat confirmed signed-in local Coach Money layout; combined backend now provides legal-first labels. Real-inbox/browser rehearsal remains pending before production release.
+
+
 
 ## Implementation decisions
 

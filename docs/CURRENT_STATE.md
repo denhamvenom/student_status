@@ -1,12 +1,21 @@
 # Current integration handoff
 
+## October 19 private parent sign-in: development verified
+
+Implemented inbox-only parent sign-in links, removed student Share/Copy, preserved one-hour invitation resend and student Google login. Parent login still requires separate relationship/authority confirmation. Returning parents and expired private links support six-digit email codes. Integrated Calendar main b1f730a and reviewed legal-name/Money checkpoint 2bd052a without source conflicts.
+
+Combined verification: 99 test files / 509 tests passed with one worker; lint, frontend/backend types and application build passed. Independent authentication review found no unresolved blockers. Actual React components with mocked Convex/Auth passed explicit Continue, failed-link OTP fallback, separate attestation and student resend checks; 1440px light and 390px dark screenshots have no overflow. These checks did not send real emails or prove a real-inbox end-to-end round trip.
+
+Development third-bandicoot-18 synchronized successfully with backend typecheck/schema validation. Development email remains disabled; Calendar write guard remains production-only. No production deploy, main merge, real invitation, or financial write. Other chat confirmed signed-in local Coach Money layout; combined backend now provides legal-first labels. Real-inbox/browser rehearsal remains pending before production release.
+
+
 ## Local candidate: private parent email sign-in
 
 Workspace student-status-bulk-invite; branch feature/parent-email-invitations. Owner requested local implementation replacing student Share/Copy with inbox-only parent sign-in links, preserving one-hour resend and student Google login. Includes parent returning/expired-link email codes. No production deploy/main merge or real email sending authorized for this candidate. See [scope, design and evidence](PRIVATE_PARENT_SIGN_IN.md).
 
-Parent backend and frontend are implemented and undergoing final synthetic checks/review. Existing verified parent identities remain connected; legacy shared links cannot sign in. Student create/resend responses contain no secret. Google student/staff entry remains separate. Development mail remains disabled; a real inbox/browser rehearsal is still pending.
+Parent backend and frontend passed final synthetic checks and independent review. Existing verified parent identities remain connected; legacy shared links cannot sign in. Student create/resend responses contain no secret. Google student/staff entry remains separate. Development mail remains disabled; a real inbox/browser rehearsal is still pending.
 
-The other chat released Calendar as main b1f730a and is separately fixing full-name displays/Money scrolling. Root will integrate current main and its ready fix before one shared development sync, preserving development Calendar write prohibition. This checkout must not independently deploy production. Root owns Git/integration; Sol implementation/Astra review. Private credentials, test captures and account data remain ignored.
+The other chat released Calendar as main b1f730a and is separately fixing full-name displays/Money scrolling. Root integrated current main and the reviewed fix and completed the shared development sync, preserving development Calendar write prohibition. This checkout must not independently deploy production. Root owns Git/integration; Sol implementation/Astra review. Private credentials, test captures and account data remain ignored.
 
 ## Earlier released checkpoints
 
@@ -14,7 +23,7 @@ The other chat released Calendar as main b1f730a and is separately fixing full-n
 
 Student lists and financial/report projections now prefer the stored full legal name, with preferred name only as a fallback. Preferred-name editing and immutable signed records are preserved. Money uses the full content width; its focusable table scrolls vertically and horizontally with sticky column headings. Phone account cards remain available.
 
-Verification: focused backend tests and source review passed. Actual Money component with fictional rows checked at desktop/light, narrower desktop with keyboard scrolling, and phone/dark; no page-width overflow. No payment writes or production deployment. Parent-login chat owns the coordinated development sync and overlapping SetupWizard/Mentor/permission-export labels. Authenticated local review is pending Coach sign-in.
+Verification: focused backend tests and source review passed. Actual Money component with fictional rows checked at desktop/light, narrower desktop with keyboard scrolling, and phone/dark; no page-width overflow. No payment writes or production deployment. Parent-login chat owns the coordinated development sync and overlapping SetupWizard/Mentor/permission-export labels. The other chat confirmed the signed-in local Coach Money layout; legal-name backend changes are included in the combined development sync.
 
 
 ## Current release - linked event Calendar (PR21)
