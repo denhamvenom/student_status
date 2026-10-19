@@ -918,4 +918,4 @@ Owner-authorized development-only enrichment and private reviewer guide/index co
 - [x] Adult invitation email authentication preserves explicit acceptance; server denies student bypass and pending-approval race.
 - [x] Automated checks, independent review and development backend sync.
 - [ ] Coach acceptance and real-inbox email sign-in (development mail remains disabled).
-- [ ] Separate production release approval.
+- [x] Owner authorized production release; backend deployed without record mutations. Website checks tracked on release PR.
