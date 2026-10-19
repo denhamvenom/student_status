@@ -341,6 +341,9 @@ export const decideConnection = mutation({
       await audit(ctx, actor, "bulkInviteConnectionRequests", request._id, "decline", "pending", "declined");
       return null;
     }
+    const adultEmailIdentity = await ctx.db.query("adultEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", request.authUserId)).unique();
+    const parentEmailIdentity = await ctx.db.query("parentEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", request.authUserId)).unique();
+    if (adultEmailIdentity || parentEmailIdentity) throw new Error("Email sign-in identities cannot be approved as student accounts. Ask a Coach to review the adult invitation instead.");
     const row = await ctx.db.get(request.inviteId);
     const student = await ctx.db.get(request.studentId);
     const season = await activeSeason(ctx);

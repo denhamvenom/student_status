@@ -22,6 +22,49 @@ async function parentAccount(ctx: MutationCtx, email: string) {
   return matches[0] ?? null;
 }
 
+async function adultAccount(ctx: MutationCtx, email: string) {
+  const matches = await ctx.db.query("appUsers").withIndex("by_email", q => q.eq("email", email)).take(2);
+  if (matches.length !== 1 || !matches[0].active || !["coach", "mentor"].includes(matches[0].role)) return null;
+  const user = await ctx.db.get(matches[0].authUserId);
+  const aliases = await ctx.db.query("users").withIndex("email", q => q.eq("email", email)).take(2);
+  if (!user?.emailVerificationTime || user.isAnonymous || emailKey(user.email ?? "") !== email || aliases.length !== 1 || aliases[0]._id !== user._id) return null;
+  return user._id;
+}
+
+async function validAdultInvite(ctx: MutationCtx, id: Id<"adultInvitations">, email: string) {
+  const invite = await ctx.db.get(id);
+  if (!invite || invite.email !== email || invite.status !== "pending" || invite.expiresAt <= Date.now()) return false;
+  const issuer = await ctx.db.get(invite.createdBy);
+  return issuer?.active === true && issuer.role === "coach";
+}
+
+async function invitedAdultUser(ctx: MutationCtx, email: string): Promise<Id<"users"> | null> {
+  if ((await ctx.db.query("appUsers").withIndex("by_email", q => q.eq("email", email)).take(1)).length) return null;
+  const users = await ctx.db.query("users").withIndex("email", q => q.eq("email", email)).take(2);
+  if (users.length > 1) return null;
+  const user = users[0];
+  if (user) {
+    if (!user.emailVerificationTime || user.isAnonymous) return null;
+    if (await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", user._id)).unique()) return null;
+    if (await ctx.db.query("parentEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", user._id)).unique()) return null;
+    // Pending enrollment is a request, not an assigned student identity. The
+    // Coach-issued adult invitation supersedes it only on explicit acceptance.
+    const joins = await ctx.db.query("joinRequests").withIndex("by_authUserId", q => q.eq("authUserId", user._id)).take(21);
+    const bulk = await ctx.db.query("bulkInviteConnectionRequests").withIndex("by_authUserId", q => q.eq("authUserId", user._id)).take(21);
+    if (joins.length > 20 || bulk.length > 20 || joins.some(row => row.status === "approved") || bulk.some(row => row.status === "approved")) return null;
+    return user._id;
+  }
+  return await ctx.db.insert("users", { email, name: email, emailVerificationTime: Date.now() });
+}
+
+async function markAdultIdentity(ctx: MutationCtx, userId: Id<"users">, email: string) {
+  const marker = await ctx.db.query("adultEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", userId)).unique();
+  if (marker && marker.email !== email) return false;
+  if (await ctx.db.query("parentEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", userId)).unique()) return false;
+  if (!marker) await ctx.db.insert("adultEmailIdentities", { authUserId: userId, email, createdAt: Date.now() });
+  return true;
+}
+
 async function markParentIdentity(ctx: MutationCtx, userId: Id<"users">, email: string) {
   const marker = await ctx.db.query("parentEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", userId)).unique();
   if (marker && marker.email !== email) return false;
@@ -39,6 +82,7 @@ async function eligibleUser(ctx: MutationCtx, email: string): Promise<Id<"users"
   if (matches.length > 20) return null;
   for (const user of matches) {
     if (!user.emailVerificationTime || user.isAnonymous) return null;
+    if (await ctx.db.query("adultEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", user._id)).unique()) return null;
     const existing = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", user._id)).unique();
     if (existing) return null;
     const joins = await ctx.db.query("joinRequests").withIndex("by_authUserId", q => q.eq("authUserId", user._id)).take(1);
@@ -69,16 +113,27 @@ export const consumeInvite = internalMutation({
 });
 
 export const prepareCode = internalMutation({
-  args: { email: v.string(), code: v.string(), nonce: v.string(), inviteToken: v.optional(v.string()) },
+  args: { email: v.string(), code: v.string(), nonce: v.string(), inviteToken: v.optional(v.string()), adultInviteToken: v.optional(v.string()) },
   returns: v.boolean(),
   handler: async (ctx, args) => {
     const email = emailKey(args.email);
     if (!validEmail(email) || !/^[0-9]{6}$/.test(args.code) || !/^[0-9a-f]{64}$/.test(args.nonce)) return false;
     const app = await parentAccount(ctx, email);
+    const adultId = await adultAccount(ctx, email);
+    let adultInviteId: Id<"adultInvitations"> | undefined;
     let inviteId: Id<"parentInvitations"> | undefined;
     if (app) {
       const user = await ctx.db.get(app.authUserId);
       if (!user?.emailVerificationTime || emailKey(user.email ?? "") !== email) return false;
+    } else if (adultId) {
+      // Approved adult account; no role or capability comes from client input.
+    } else if (args.adultInviteToken) {
+      if (!/^[0-9a-f]{64}$/.test(args.adultInviteToken)) return false;
+      const hash = await tokenHash(args.adultInviteToken);
+      const invite = await ctx.db.query("adultInvitations").withIndex("by_tokenHash", q => q.eq("tokenHash", hash)).unique();
+      if (!invite || !await validAdultInvite(ctx, invite._id, email)) return false;
+      if ((await ctx.db.query("appUsers").withIndex("by_email", q => q.eq("email", email)).take(1)).length) return false;
+      adultInviteId = invite._id;
     } else {
       if (!args.inviteToken || !/^[0-9a-f]{64}$/.test(args.inviteToken)) return false;
       const hash = await tokenHash(args.inviteToken);
@@ -89,7 +144,7 @@ export const prepareCode = internalMutation({
     requireMaintenanceAccess(email);
     const now = Date.now();
     if (!(await codeLimiter.limit(ctx, "parentCodeMinute", { key: email })).ok || !(await codeLimiter.limit(ctx, "parentCodeHour", { key: email })).ok) return false;
-    await ctx.db.insert("parentEmailCodes", { email, codeHash: await tokenHash(`${args.nonce}:${args.code}`), nonce: args.nonce, inviteId, expiresAt: now + codeValidityMs, attempts: 0, createdAt: now });
+    await ctx.db.insert("parentEmailCodes", { email, codeHash: await tokenHash(`${args.nonce}:${args.code}`), nonce: args.nonce, inviteId, adultInviteId, expiresAt: now + codeValidityMs, attempts: 0, createdAt: now });
     return true;
   },
 });
@@ -105,7 +160,13 @@ export const consumeCode = internalMutation({
     if (row.codeHash !== await tokenHash(`${row.nonce}:${args.code}`)) return null;
     let userId: Id<"users"> | null = null;
     const app = await parentAccount(ctx, email);
-    if (app) {
+    const adultId = await adultAccount(ctx, email);
+    let adult = false;
+    if (adultId) { userId = adultId; adult = true; }
+    else if (row.adultInviteId) {
+      if (await validAdultInvite(ctx, row.adultInviteId, email)) userId = await invitedAdultUser(ctx, email);
+      adult = true;
+    } else if (app) {
       const user = await ctx.db.get(app.authUserId);
       userId = user?.emailVerificationTime && emailKey(user.email ?? "") === email ? user._id : null;
     } else if (row.inviteId) {
@@ -114,27 +175,27 @@ export const consumeCode = internalMutation({
     }
     if (!userId) return null;
     requireMaintenanceAccess(email);
-    if (!await markParentIdentity(ctx, userId, email)) return null;
+    if (!(adult ? await markAdultIdentity(ctx, userId, email) : await markParentIdentity(ctx, userId, email))) return null;
     await ctx.db.patch(row._id, { usedAt: Date.now() });
     return userId;
   },
 });
 
 export const requestCode = action({
-  args: { email: v.string(), inviteToken: v.optional(v.string()) }, returns: v.object({ sent: v.boolean() }),
+  args: { email: v.string(), inviteToken: v.optional(v.string()), adultInviteToken: v.optional(v.string()) }, returns: v.object({ sent: v.boolean() }),
   handler: async (ctx, args) => {
     const email = emailKey(args.email);
     const config = parentInviteEmailConfiguration();
     if (!config || !validEmail(email)) return { sent: true };
     const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, "0");
     const nonce = newToken();
-    const prepared: boolean = await ctx.runMutation(internal.parentEmailAuth.prepareCode, { email, code, nonce, inviteToken: args.inviteToken });
+    const prepared: boolean = await ctx.runMutation(internal.parentEmailAuth.prepareCode, { email, code, nonce, inviteToken: args.inviteToken, adultInviteToken: args.adultInviteToken });
     if (!prepared) return { sent: true };
     try {
       await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from: config.from, reply_to: config.replyTo, to: [email], subject: "Your Denham Venom parent sign-in code", text: `Your parent sign-in code is ${code}. It expires in 10 minutes. If you did not request this, ignore this email.`, html: `<p>Your parent sign-in code is <strong>${code}</strong>.</p><p>It expires in 10 minutes. If you did not request this, ignore this email.</p>` }),
+        body: JSON.stringify({ from: config.from, reply_to: config.replyTo, to: [email], subject: "Your Denham Venom sign-in code", text: `Your sign-in code is ${code}. It expires in 10 minutes. If you did not request this, ignore this email.`, html: `<p>Your sign-in code is <strong>${code}</strong>.</p><p>It expires in 10 minutes. If you did not request this, ignore this email.</p>` }),
         signal: AbortSignal.timeout(15_000),
       });
     } catch { /* Generic response avoids disclosing parent membership. */ }

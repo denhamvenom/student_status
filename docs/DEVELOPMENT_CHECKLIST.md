@@ -911,3 +911,11 @@ Owner-authorized development-only enrichment and private reviewer guide/index co
 
 - [x] October 19 local revision: Coach approval required before Bulk Invite account connection; no preapproval data access; competing approvals, 100-student import, daily limits and stale-request retry tested. Student/Coach component workflows tested in isolated browser.
 - [ ] Owner-authorized backend sync and live integration rehearsal of approval revision (explicitly not deployed).
+
+## October 19 — local sign-in chooser
+- [x] Student and Parent or team staff entry choices with Back navigation and existing visual language.
+- [x] Google-only student path; approved adults may use Google or email.
+- [x] Adult invitation email authentication preserves explicit acceptance; server denies student bypass and pending-approval race.
+- [x] Automated checks, independent review and development backend sync.
+- [ ] Coach acceptance and real-inbox email sign-in (development mail remains disabled).
+- [ ] Separate production release approval.

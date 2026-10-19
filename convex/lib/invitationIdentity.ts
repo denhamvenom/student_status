@@ -19,6 +19,7 @@ export async function verifiedGoogle(ctx: Ctx) {
   const user = await ctx.db.get(id as Id<"users">);
   if (!user?.email || user.isAnonymous || !user.emailVerificationTime) return null;
   if (await ctx.db.query("parentEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", user._id)).unique()) return null;
+  if (await ctx.db.query("adultEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", user._id)).unique()) return null;
   requireMaintenanceAccess(user.email);
   const accounts = await ctx.db.query("authAccounts").withIndex("userIdAndProvider", q => q.eq("userId", user._id).eq("provider", "google")).take(2);
   const verifiedEmail = emailKey(user.email);
@@ -40,4 +41,15 @@ export async function verifiedParentEmail(ctx: Ctx) {
 
 export async function verifiedParent(ctx: Ctx) {
   return await verifiedParentEmail(ctx) ?? await verifiedGoogle(ctx);
+}
+
+export async function verifiedAdult(ctx: Ctx) {
+  const id = await getAuthUserId(ctx);
+  const user = id && await ctx.db.get(id as Id<"users">);
+  if (!user?.email || user.isAnonymous || !user.emailVerificationTime) return null;
+  const marker = await ctx.db.query("adultEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", user._id)).unique();
+  if (!marker) return await verifiedGoogle(ctx);
+  if (marker.email !== emailKey(user.email)) return null;
+  requireMaintenanceAccess(user.email);
+  return { authUserId: user._id, email: marker.email, name: user.name?.trim() || user.email };
 }

@@ -22,6 +22,8 @@ export async function viewer(ctx: Ctx): Promise<AppUser> {
   if (!user || !user.active) throw new Error("Your account is waiting for approval or is inactive.");
   const parentEmailIdentity = await ctx.db.query("parentEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique();
   if (parentEmailIdentity && (user.role !== "parent" || parentEmailIdentity.email !== user.email.trim().toLowerCase())) throw new Error("Parent email sign-in is limited to its parent account.");
+  const adultMarker = await ctx.db.query("adultEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique();
+  if (adultMarker && (!["coach", "mentor"].includes(user.role) || adultMarker.email !== user.email.trim().toLowerCase())) throw new Error("Adult email sign-in is limited to its approved adult account.");
   return user;
 }
 
@@ -32,6 +34,8 @@ export async function maybeViewer(ctx: Ctx): Promise<AppUser | null> {
   if (user) requireMaintenanceAccess(user.email);
   const marker = user && await ctx.db.query("parentEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", authUserId as Id<"users">)).unique();
   if (marker && (user.role !== "parent" || marker.email !== user.email.trim().toLowerCase())) return null;
+  const adultMarker = user && await ctx.db.query("adultEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", authUserId as Id<"users">)).unique();
+  if (adultMarker && (!["coach", "mentor"].includes(user.role) || adultMarker.email !== user.email.trim().toLowerCase())) return null;
   return user?.active ? user : null;
 }
 

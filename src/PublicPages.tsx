@@ -28,7 +28,7 @@ export function AboutPage() {
     <p>DS Robotics Foundation operates Denham Venom Team 8044 and these team apps.</p>
     <section className={styles.card} aria-labelledby="access-heading">
       <h2 id="access-heading">Team access</h2>
-      <p>Students and staff use the Google account connected to their team profile. Invited parents can also sign in through a private emailed link or email code. Signing in does not automatically grant access to team records; the Coach approves enrollment and assigns team roles, and parents confirm their invited family relationship.</p>
+      <p>Students use their school Google account. Parents and approved team staff can use Google or an email code; invited parents can also use their private emailed link. Signing in does not automatically grant access to team records; the Coach approves enrollment and assigns team roles, and parents confirm their invited family relationship.</p>
       <Link className="button button-primary" to="/">Go to sign in</Link>
     </section>
     <section className={styles.section} aria-labelledby="timeclock-heading">
@@ -50,7 +50,7 @@ export function PrivacyPage() {
     </section>
     <section className={styles.section} aria-labelledby="information-heading">
       <h2 id="information-heading">Information in the apps</h2>
-      <p>Google sign-in provides account information such as your name, email address and profile image. Parent email sign-in verifies the email address receiving the private link or code. Depending on your role and what you submit, the apps also hold student and parent profiles, contact and emergency information, health information, attendance, participation and financial records, and permission-form evidence. These records support team administration and event preparation.</p>
+      <p>Google sign-in provides account information such as your name, email address and profile image. Adult email sign-in verifies the email address receiving the private link or code. Depending on your role and what you submit, the apps also hold student and parent profiles, contact and emergency information, health information, attendance, participation and financial records, and permission-form evidence. These records support team administration and event preparation.</p>
     </section>
     <section className={styles.section} aria-labelledby="access-privacy-heading">
       <h2 id="access-privacy-heading">Access</h2>

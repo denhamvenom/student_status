@@ -3,7 +3,7 @@ import { paginationOptsValidator, paginationResultValidator } from "convex/serve
 import { mutation, query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { audit, requireRole, viewer } from "./lib/access";
-import { emailKey, newToken, tokenHash, verifiedGoogle } from "./lib/invitationIdentity";
+import { emailKey, newToken, tokenHash, verifiedAdult } from "./lib/invitationIdentity";
 
 const adultRole = v.union(v.literal("coach"), v.literal("mentor"));
 const grantFields = { role: adultRole, travelLead: v.boolean(), financialEdit: v.boolean(), healthExport: v.boolean() };
@@ -40,7 +40,7 @@ export const inviteAdult = mutation({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach"); grants(args);
     const email = emailKey(args.email);
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) throw new Error("Enter a valid Google account email.");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) throw new Error("Enter a valid account email.");
     const existing = await ctx.db.query("appUsers").withIndex("by_email", q => q.eq("email", email)).take(2);
     if (existing.length) throw new Error("This email already has an account. Use account controls instead.");
     const prior = await ctx.db.query("adultInvitations").withIndex("by_email_and_status", q => q.eq("email", email).eq("status", "pending")).take(101);
@@ -75,7 +75,7 @@ export const preview = mutation({
     if (!actual || actual.status !== "pending" || actual.expiresAt <= Date.now()) return hidden;
     const issuer = await ctx.db.get(actual.createdBy);
     if (!issuer?.active || issuer.role !== "coach") return hidden;
-    const who = await verifiedGoogle(ctx);
+    const who = await verifiedAdult(ctx);
     if (!who || who.email !== actual.email) return { ...hidden, status: "verifiedAccountRequired" as const };
     const account = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique();
     const emailAccounts = await ctx.db.query("appUsers").withIndex("by_email", q => q.eq("email", who.email)).take(2);
@@ -93,20 +93,25 @@ export const accept = mutation({
     if (!row || row.status !== "pending" || row.expiresAt <= Date.now()) throw new Error("Invitation unavailable or expired.");
     const issuer = await ctx.db.get(row.createdBy);
     if (!issuer?.active || issuer.role !== "coach") throw new Error("Inviting Coach access was removed. Ask a Coach for a new invitation.");
-    const who = await verifiedGoogle(ctx);
-    if (!who || who.email !== row.email) throw new Error("Sign in with the invited verified Google email.");
+    const who = await verifiedAdult(ctx);
+    if (!who || who.email !== row.email) throw new Error("Sign in with the invited verified Google or email-code account.");
     if (await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique() || (await ctx.db.query("appUsers").withIndex("by_email", q => q.eq("email", who.email)).take(2)).length) throw new Error("This account already has access or another role. Ask a Coach for help.");
+    const priorJoins = await ctx.db.query("joinRequests").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).take(21);
+    const priorBulk = await ctx.db.query("bulkInviteConnectionRequests").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).take(21);
+    if (priorJoins.length > 20 || priorBulk.length > 20 || priorJoins.some(request => request.status === "approved") || priorBulk.some(request => request.status === "approved")) throw new Error("This account has linked student access or enrollment history requiring Coach review.");
     grants(row);
     const userId = await ctx.db.insert("appUsers", { authUserId: who.authUserId, email: who.email, name: who.name, role: row.role, travelLead: row.travelLead, financialEdit: row.financialEdit, healthExport: row.healthExport, active: true, accessRevision: 0 });
     await ctx.db.patch(row._id, { status: "accepted", acceptedBy: userId, acceptedAt: Date.now() });
     const user = await ctx.db.get(userId);
     if (!user) throw new Error("New account is unavailable.");
     await audit(ctx, user, "adultInvitations", row._id, "accept", "pending", summary(user));
-    const joinRequests = await ctx.db.query("joinRequests").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).take(21);
-    if (joinRequests.length > 20) throw new Error("Join request history limit reached; Coach review is required.");
-    for (const request of joinRequests) if (request.status === "pending") {
+    for (const request of priorJoins) if (request.status === "pending") {
       await ctx.db.patch(request._id, { status: "declined", decidedAt: Date.now(), decidedBy: user._id });
       await audit(ctx, user, "joinRequests", request._id, "supersededByAdultInvite", "pending", "declined");
+    }
+    for (const request of priorBulk) if (request.status === "pending") {
+      await ctx.db.patch(request._id, { status: "declined", decidedAt: Date.now(), decidedBy: user._id });
+      await audit(ctx, user, "bulkInviteConnectionRequests", request._id, "supersededByAdultInvite", "pending", "declined");
     }
     return { userId };
   },
