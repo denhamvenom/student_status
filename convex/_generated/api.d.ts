@@ -34,6 +34,7 @@ import type * as feeBulk from "../feeBulk.js";
 import type * as feeBulkWorker from "../feeBulkWorker.js";
 import type * as feeDefinitions from "../feeDefinitions.js";
 import type * as feeMappingWorker from "../feeMappingWorker.js";
+import type * as feePayments from "../feePayments.js";
 import type * as feePriorities from "../feePriorities.js";
 import type * as feePriorityWorker from "../feePriorityWorker.js";
 import type * as finance from "../finance.js";
@@ -152,6 +153,7 @@ declare const fullApi: ApiFromModules<{
   feeBulkWorker: typeof feeBulkWorker;
   feeDefinitions: typeof feeDefinitions;
   feeMappingWorker: typeof feeMappingWorker;
+  feePayments: typeof feePayments;
   feePriorities: typeof feePriorities;
   feePriorityWorker: typeof feePriorityWorker;
   finance: typeof finance;

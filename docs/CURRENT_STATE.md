@@ -1,5 +1,13 @@
 # Current integration handoff
 
+## October 19 fee-specific Bulk Payment CSV
+
+Implemented fee selection, All/Paid/Unpaid assessed-student export, blank-row skipping, authoritative review, and new receipts applied only to the selected fee. Durable row replay prevents duplicate posting; stale/overpayment and authorization checks remain server-side. Focused backend/CSV/regression checks and independent source review pass. See [workflow and evidence](FEE_PAYMENT_CSV.md). Integrated checks and shared development sync pending; no production deployment. Coordinating reviewed parent-email branch integration before the sole shared development sync.
+
+## October 19 fee-specific Bulk Payment CSV
+
+Implemented fee selection, All/Paid/Unpaid assessed-student export, blank-row skipping, authoritative review, and new receipts applied only to the selected fee. Durable row replay prevents duplicate posting; stale/overpayment and authorization checks remain server-side. Focused backend/CSV/regression checks and independent source review pass. See [workflow and evidence](FEE_PAYMENT_CSV.md). Integrated checks and shared development sync pending; no production deployment. Coordinating reviewed parent-email branch integration before the sole shared development sync.
+
 ## October 19 simplified charge workflow (PR19)
 
 Implemented development work follows the owner-approved Add charge → Review → Confirm charges flow: enter the reason once, load all student pages automatically, preserve exact reviewed-scope checks, and include Close details without changing charges. Validation: full lint, typecheck, 462 tests and build passed (existing bundle-size warning); independent source review found no blockers. Live browser/visual checks remain pending. Backend contracts remain unchanged. PR19 is the development candidate; main merge and production UI deployment remain separate.
