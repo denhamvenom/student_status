@@ -91,7 +91,7 @@ describe("withdrawal decisions", () => {
     expect((await t.run(ctx=>ctx.db.get(ids.participant)))?.status).toBe("withdrawn");
     const notices=await coach.query(api.withdrawals.wholeTeamLeaveNotices,{});
     expect(notices).toHaveLength(1);
-    expect(notices[0]).toMatchObject({eventId:ids.event,eventName:"Synthetic Whole Team",studentName:"Synthetic"});
+    expect(notices[0]).toMatchObject({eventId:ids.event,eventName:"Synthetic Whole Team",studentName:"Synthetic Student"});
     await expect(student.mutation(api.withdrawals.dismissWholeTeamLeaveNotice,{noticeId:notices[0].noticeId})).rejects.toThrow("Only a Coach");
     await coach.mutation(api.withdrawals.dismissWholeTeamLeaveNotice,{noticeId:notices[0].noticeId});
     expect(await coach.query(api.withdrawals.wholeTeamLeaveNotices,{})).toEqual([]);

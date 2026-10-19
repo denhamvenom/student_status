@@ -4,7 +4,7 @@ import { env, mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { activeSeason, audit, privateStudent, studentAccess, viewer } from "./lib/access";
-import { verifiedGoogle, tokenHash } from "./lib/invitationIdentity";
+import { verifiedParent, tokenHash } from "./lib/invitationIdentity";
 import { enrollmentPending } from "./lib/eventEnrollmentState";
 import { consentEventValidator, consentSnapshotValidator, correctionFieldValidator, expectedCoverageValidator, medicationChoicesValidator, publicVersion, parseSnapshot, validateSnapshot, selectedEvents, snapshotHash, boundedText, versionValidator, type ConsentSnapshot, type ExpectedCoverage } from "./lib/consentSnapshot";
 import { compareCoverage, controlledCoverage, coverageFor, expectedCoverage, sealedSnapshot, setPendingCoverage } from "./lib/permissionCoverage";
@@ -40,8 +40,8 @@ async function syntheticAllowed(ctx: Ctx, studentId: Id<"students">, parentId?: 
 async function syntheticGate(ctx: Ctx, studentId: Id<"students">, parentId?: Id<"appUsers">) {if (!await syntheticAllowed(ctx, studentId, parentId)) throw new Error("Real permission signing is unavailable. Only internally registered fictional development subjects may use this workflow.")}
 async function signer(ctx: Ctx, actor: Doc<"appUsers">) {
   if (actor.role !== "parent") throw new Error("Only a linked parent may sign.");
-  const who = await verifiedGoogle(ctx);
-  if (!who || who.authUserId !== actor.authUserId) throw new Error("A freshly verified Google parent account is required.");
+  const who = await verifiedParent(ctx);
+  if (!who || who.authUserId !== actor.authUserId) throw new Error("A verified parent account is required.");
   return who;
 }
 async function currentVersion(ctx: Ctx, student: Doc<"students">) {
@@ -94,7 +94,7 @@ export const workspace = query({
     }
     submissions.sort((a,b) => b.signedAt - a.signedAt || b._creationTime - a._creationTime);
     const canReview = actor.role === "coach" || actor.role === "mentor" && actor.travelLead;
-    const who = actor.role === "parent" ? await verifiedGoogle(ctx) : null;
+    const who = actor.role === "parent" ? await verifiedParent(ctx) : null;
     const v2 = version?.formFormat === 2;
     const signingMode = v2 ? permissionSigningMode() : "synthetic";
     const canSign = !!who && who.authUserId === actor.authUserId && (v2 ? await v2SigningAllowed(ctx, student._id, actor._id) : await syntheticAllowed(ctx, student._id, actor._id));
@@ -261,7 +261,7 @@ export const exportPacket = mutation({
       if (!student?.active || student.seasonId !== season._id) continue;
       const row = await coverageFor(ctx, student._id, event._id); const submission = row?.latestSubmissionId ? await ctx.db.get(row.latestSubmissionId) : null;
       const snapshot = args.includeHealth && submission?.snapshotFormat === 1 ? await sealedSnapshot(ctx, submission) : args.includeHealth && submission?.snapshotFormat === 2 ? await sealedSnapshotV2(ctx, submission) : undefined;
-      records.push({studentId: student._id, studentName: student.preferredName || student.legalName, state: row?.state ?? "required", revision: row?.revision ?? 0, submissionId: submission?._id ?? null, signerName: submission?.signerName ?? null, signedAt: submission?.signedAt ?? null, source: submission?.source ?? null, synthetic: submission?.synthetic ?? null, ...(snapshot ? {snapshot} : {}), collectedAt: generatedAt});
+      records.push({studentId: student._id, studentName: student.legalName || student.preferredName, state: row?.state ?? "required", revision: row?.revision ?? 0, submissionId: submission?._id ?? null, signerName: submission?.signerName ?? null, signedAt: submission?.signedAt ?? null, source: submission?.source ?? null, synthetic: submission?.synthetic ?? null, ...(snapshot ? {snapshot} : {}), collectedAt: generatedAt});
     }
     await audit(ctx, actor, "permissionExports", event._id, "export", null, {includeHealth: args.includeHealth, count: records.length, generatedAt});
     return {event: {eventId: event._id, name: event.name}, synthetic: records.length > 0 && records.every(record => record.synthetic === true), generatedAt, schemaVersion: 1 as const, isDone: page.isDone, continueCursor: page.continueCursor, records};

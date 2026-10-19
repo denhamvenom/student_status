@@ -88,8 +88,8 @@ function RosterReview({ plan }: { plan: Plan }) {
     <h2 id="season-returning-title">{copy.returningStudents}</h2><p className={styles.muted}>{copy.rosterDescription}</p>
     {rows.status === 'LoadingFirstPage' && <p role="status">{copy.loadingRoster}</p>}
     {rows.results.length > 0 && <div className={styles.roster}>{rows.results.map(row => <article className={styles.student} key={row.studentId}>
-      <div><strong>{row.preferredName || row.legalName}</strong><small>{row.subteam}</small>{row.decisionStale && <small className={styles.error}>{copy.staleDecision}</small>}</div>
-      <div className={styles.choices} role="group" aria-label={`${row.preferredName || row.legalName} season decision`}>
+      <div><strong>{row.legalName || row.preferredName}</strong><small>{row.subteam}</small>{row.decisionStale && <small className={styles.error}>{copy.staleDecision}</small>}</div>
+      <div className={styles.choices} role="group" aria-label={`${row.legalName || row.preferredName} season decision`}>
         <Button type="button" variant={row.choice === 'return' ? 'default' : 'outline'} aria-pressed={row.choice === 'return'} disabled={busyId !== null} onClick={() => void pick(row, 'return')}>{copy.returning}</Button>
         <Button type="button" variant={row.choice === 'depart' ? 'default' : 'outline'} aria-pressed={row.choice === 'depart'} disabled={busyId !== null} onClick={() => void pick(row, 'depart')}>{copy.departing}</Button>
         <Button type="button" variant={row.choice === null ? 'default' : 'outline'} aria-pressed={row.choice === null} disabled={busyId !== null} onClick={() => void pick(row, null)}>{copy.undecided}</Button>

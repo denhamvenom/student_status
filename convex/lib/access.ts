@@ -20,6 +20,8 @@ export async function viewer(ctx: Ctx): Promise<AppUser> {
   const who = await identity(ctx);
   const user = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique();
   if (!user || !user.active) throw new Error("Your account is waiting for approval or is inactive.");
+  const parentEmailIdentity = await ctx.db.query("parentEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique();
+  if (parentEmailIdentity && (user.role !== "parent" || parentEmailIdentity.email !== user.email.trim().toLowerCase())) throw new Error("Parent email sign-in is limited to its parent account.");
   return user;
 }
 
@@ -28,6 +30,8 @@ export async function maybeViewer(ctx: Ctx): Promise<AppUser | null> {
   if (!authUserId) return null;
   const user = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", authUserId as Id<"users">)).unique();
   if (user) requireMaintenanceAccess(user.email);
+  const marker = user && await ctx.db.query("parentEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", authUserId as Id<"users">)).unique();
+  if (marker && (user.role !== "parent" || marker.email !== user.email.trim().toLowerCase())) return null;
   return user?.active ? user : null;
 }
 
@@ -80,7 +84,7 @@ export function publicStudent(student: Doc<"students">) {
 }
 
 export function mentorStudent(student: Doc<"students">) {
-  return { _id: student._id, preferredName: student.preferredName, subteam: student.subteam, active: student.active };
+  return { _id: student._id, legalName: student.legalName, preferredName: student.preferredName, subteam: student.subteam, active: student.active };
 }
 
 export function mentorEvent(event: Doc<"events">) {

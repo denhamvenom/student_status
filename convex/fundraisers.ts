@@ -91,7 +91,7 @@ export const students = query({
       if (!student.active) continue;
       const row = await ctx.db.query("fundraiserStudentTotals").withIndex("by_fundraiserId_and_studentId", q => q.eq("fundraiserId", fundraiser._id).eq("studentId", student._id)).unique();
       const account = await financialAccount(ctx, student._id);
-      rows.push({ studentId: student._id, name: student.preferredName || student.legalName, grossCents: row?.grossCents ?? 0, teamCents: row?.teamCents ?? 0, travelCreditCents: row?.travelCreditCents ?? 0, rowRevision: row?.revision ?? 0, financialRevision: account?.state === "ready" && account.allocationSourceVersion === 1 ? account.revision : null, financialState: account?.state === "ready" && account.allocationSourceVersion === 1 ? "ready" as const : "updating" as const });
+      rows.push({ studentId: student._id, name: student.legalName || student.preferredName, grossCents: row?.grossCents ?? 0, teamCents: row?.teamCents ?? 0, travelCreditCents: row?.travelCreditCents ?? 0, rowRevision: row?.revision ?? 0, financialRevision: account?.state === "ready" && account.allocationSourceVersion === 1 ? account.revision : null, financialState: account?.state === "ready" && account.allocationSourceVersion === 1 ? "ready" as const : "updating" as const });
     }
     return { page: rows, isDone: page.isDone, continueCursor: page.continueCursor };
   },

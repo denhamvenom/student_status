@@ -1,9 +1,26 @@
 /// <reference types="vite/client" />
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import rateLimiter from "@convex-dev/rate-limiter/test";
 import { createTest as convexTest } from "../testUtils";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
+import type { Id } from "./_generated/dataModel";
+import { exportPKCS8, generateKeyPair } from "jose";
+
+const privateTokens = vi.hoisted(() => ({ counter: 0, last: "" }));
+vi.mock("./lib/invitationIdentity", async importOriginal => {
+  const original = await importOriginal<typeof import("./lib/invitationIdentity")>();
+  return { ...original, newToken: () => {
+    const token = (++privateTokens.counter).toString(16).padStart(64, "0");
+    privateTokens.last = token;
+    return token;
+  } };
+});
+async function attachToken<T extends { inviteId: Id<"parentInvitations"> }>(pending: Promise<T>): Promise<T & { token: string }> {
+  const result = await pending;
+  expect(Object.keys(result).sort()).toEqual(["expiresAt", "inviteId"]);
+  return { ...result, token: privateTokens.last };
+}
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -31,6 +48,7 @@ async function fixture() {
 }
 
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.useRealTimers(); });
+beforeEach(() => { enableSyntheticEmail(); });
 
 function enableSyntheticEmail() {
   vi.stubEnv("PARENT_INVITE_EMAIL_ENABLED", "true");
@@ -51,7 +69,7 @@ describe("parent invitations", () => {
 
   it("keeps invite opaque until verified matching Google sign-in, then atomically links once", async () => {
     const f = await fixture();
-    const invite = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: " Parent@Example.Invalid " });
+    const invite = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: " Parent@Example.Invalid " }));
     expect(invite.expiresAt).toBeGreaterThan(Date.now());
     const stored = await f.t.run(ctx => ctx.db.query("parentInvitations").withIndex("by_studentId", q => q.eq("studentId", f.ids.student)).unique());
     expect(stored?.tokenHash).not.toBe(invite.token);
@@ -60,7 +78,7 @@ describe("parent invitations", () => {
     expect(unsigned).toEqual({ status: "signInRequired", studentName: null, parentEmail: null, expiresAt: null, attestationText: null, attestationVersion: null });
     const mismatched = await f.wrong.mutation(api.parentInvites.previewParentInvite, { token: invite.token });
     expect(mismatched.studentName).toBeNull();
-    await expect(f.wrong.mutation(api.parentInvites.acceptParentInvite, { token: invite.token, relationship: "Mother", authorityAttested: true, attestationVersion: "parent-relationship-1" })).rejects.toThrow("invited verified");
+    await expect(f.wrong.mutation(api.parentInvites.acceptParentInvite, { token: invite.token, relationship: "Mother", authorityAttested: true, attestationVersion: "parent-relationship-1" })).rejects.toThrow("invited parent");
     await expect(f.parent.mutation(api.parentInvites.acceptParentInvite, { token: invite.token, relationship: "", authorityAttested: true, attestationVersion: "parent-relationship-1" })).rejects.toThrow("relationship");
     await expect(f.parent.mutation(api.parentInvites.acceptParentInvite, { token: invite.token, relationship: "Mother", authorityAttested: false, attestationVersion: "parent-relationship-1" })).rejects.toThrow("attestation");
     expect((await f.parent.mutation(api.parentInvites.previewParentInvite, { token: invite.token })).studentName).toBe("Student");
@@ -84,7 +102,7 @@ describe("parent invitations", () => {
 
   it("honors outstanding invites when Coach disables new creation and replacement", async () => {
     const f = await fixture();
-    const invite = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" });
+    const invite = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" }));
     await expect(f.student.mutation(api.parentInvites.setInvitationEnabled, { enabled: false })).rejects.toThrow("permission");
     await f.coach.mutation(api.parentInvites.setInvitationEnabled, { enabled: false });
     expect((await f.student.query(api.parentInvites.invitationSettings, {})).enabled).toBe(false);
@@ -95,31 +113,31 @@ describe("parent invitations", () => {
 
   it("rejects expired, replaced, revoked, and unverified invitations", async () => {
     const f = await fixture();
-    const first = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" });
+    const first = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" }));
     await f.t.run(ctx => ctx.db.patch(first.inviteId, { createdAt: Date.now() - 60 * 60_000 }));
-    const next = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" });
+    const next = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" }));
     await expect(f.parent.mutation(api.parentInvites.acceptParentInvite, { token: first.token, relationship: "Guardian", authorityAttested: true, attestationVersion: "parent-relationship-1" })).rejects.toThrow("unavailable");
     await f.t.run(async ctx => {
       const row = await ctx.db.query("parentInvitations").withIndex("by_studentId_and_parentEmail", q => q.eq("studentId", f.ids.student).eq("parentEmail", "parent@example.invalid")).order("desc").first();
       if (row) await ctx.db.patch(row._id, { expiresAt: Date.now() - 1 });
     });
     await expect(f.parent.mutation(api.parentInvites.acceptParentInvite, { token: next.token, relationship: "Guardian", authorityAttested: true, attestationVersion: "parent-relationship-1" })).rejects.toThrow("expired");
-    const fresh = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" });
+    const fresh = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" }));
     const invite = (await f.student.query(api.parentInvites.listStudentInvites, { studentId: f.ids.student }))[0];
     await f.coach.mutation(api.parentInvites.revokeParentInvite, { inviteId: invite._id });
     await expect(f.parent.mutation(api.parentInvites.acceptParentInvite, { token: fresh.token, relationship: "Guardian", authorityAttested: true, attestationVersion: "parent-relationship-1" })).rejects.toThrow("unavailable");
     await expect(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" })).rejects.toThrow("Coach");
     await f.coach.mutation(api.parentInvites.allowParentReinvite, { inviteId: invite._id, reason: "Verified request" });
     const unverified = await f.t.run(async ctx => { const id = await ctx.db.insert("users", { email: "unverified@example.invalid", name: "Unverified", emailVerificationTime: Date.now() }); await ctx.db.insert("authAccounts", { userId: id, provider: "google", providerAccountId: "google-unverified" }); return id; });
-    const newInvite = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "unverified@example.invalid" });
-    await expect(f.t.withIdentity({ subject: `${unverified}|session` }).mutation(api.parentInvites.acceptParentInvite, { token: newInvite.token, relationship: "Guardian", authorityAttested: true, attestationVersion: "parent-relationship-1" })).rejects.toThrow("verified Google");
+    const newInvite = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "unverified@example.invalid" }));
+    await expect(f.t.withIdentity({ subject: `${unverified}|session` }).mutation(api.parentInvites.acceptParentInvite, { token: newInvite.token, relationship: "Guardian", authorityAttested: true, attestationVersion: "parent-relationship-1" })).rejects.toThrow("invited parent");
   });
 
   it("resends only the latest own pending invite at the exact one-hour boundary", async () => {
     const f = await fixture();
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-10-19T12:00:00Z"));
-    const first = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" });
+    const first = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" }));
     await expect(f.t.mutation(api.parentInvites.resendParentInvite, { inviteId: first.inviteId })).rejects.toThrow("Sign in");
     await expect(f.coach.mutation(api.parentInvites.resendParentInvite, { inviteId: first.inviteId })).rejects.toThrow("permission");
     await expect(f.otherStudent.mutation(api.parentInvites.resendParentInvite, { inviteId: first.inviteId })).rejects.toThrow("unavailable");
@@ -132,7 +150,7 @@ describe("parent invitations", () => {
     expect((await f.student.query(api.parentInvites.listStudentInvites, { studentId: f.ids.student }))[0].resendAvailableAt).toBe(now + 1);
     await expect(f.student.mutation(api.parentInvites.resendParentInvite, { inviteId: first.inviteId })).rejects.toThrow("one hour");
     await f.t.run(ctx => ctx.db.patch(first.inviteId, { emailSentAt: now - 60 * 60_000 }));
-    const second = await f.student.mutation(api.parentInvites.resendParentInvite, { inviteId: first.inviteId });
+    const second = await attachToken(f.student.mutation(api.parentInvites.resendParentInvite, { inviteId: first.inviteId }));
     expect(second.inviteId).not.toBe(first.inviteId);
     expect(second.token).not.toBe(first.token);
     expect(second.expiresAt).toBeGreaterThan(first.expiresAt - 1000);
@@ -148,16 +166,16 @@ describe("parent invitations", () => {
 
   it("rejects resend after acceptance, revocation, expiry, pause, or student deactivation", async () => {
     const f = await fixture();
-    const accepted = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" });
+    const accepted = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" }));
     await f.parent.mutation(api.parentInvites.acceptParentInvite, { token: accepted.token, relationship: "Guardian", authorityAttested: true, attestationVersion: "parent-relationship-1" });
     await expect(f.student.mutation(api.parentInvites.resendParentInvite, { inviteId: accepted.inviteId })).rejects.toThrow("unavailable");
-    const revoked = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "revoked@example.invalid" });
+    const revoked = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "revoked@example.invalid" }));
     await f.coach.mutation(api.parentInvites.revokeParentInvite, { inviteId: revoked.inviteId });
     await expect(f.student.mutation(api.parentInvites.resendParentInvite, { inviteId: revoked.inviteId })).rejects.toThrow("unavailable");
-    const expired = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "expired@example.invalid" });
+    const expired = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "expired@example.invalid" }));
     await f.t.run(ctx => ctx.db.patch(expired.inviteId, { expiresAt: Date.now() - 1 }));
     await expect(f.student.mutation(api.parentInvites.resendParentInvite, { inviteId: expired.inviteId })).rejects.toThrow("unavailable");
-    const paused = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "paused@example.invalid" });
+    const paused = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "paused@example.invalid" }));
     await f.coach.mutation(api.parentInvites.setInvitationEnabled, { enabled: false });
     await expect(f.student.mutation(api.parentInvites.resendParentInvite, { inviteId: paused.inviteId })).rejects.toThrow("disabled");
     await f.coach.mutation(api.parentInvites.setInvitationEnabled, { enabled: true });
@@ -167,7 +185,7 @@ describe("parent invitations", () => {
 
   it("allows only one replacement when resend requests race", async () => {
     const f = await fixture();
-    const first = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" });
+    const first = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" }));
     await f.t.run(ctx => ctx.db.patch(first.inviteId, { createdAt: Date.now() - 60 * 60_000 }));
     const results = await Promise.allSettled([
       f.student.mutation(api.parentInvites.resendParentInvite, { inviteId: first.inviteId }),
@@ -181,11 +199,11 @@ describe("parent invitations", () => {
 
   it("does not elevate existing roles; Coach revocation blocks new invitations until restoration", async () => {
     const f = await fixture();
-    const conflicting = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "wrong@example.invalid" });
+    const conflicting = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "wrong@example.invalid" }));
     await f.t.run(async ctx => { await ctx.db.insert("appUsers", { authUserId: f.ids.wrongAuth, email: "wrong@example.invalid", name: "Wrong", role: "mentor", active: true, travelLead: false, financialEdit: false }); });
     await expect(f.wrong.mutation(api.parentInvites.acceptParentInvite, { token: conflicting.token, relationship: "Guardian", authorityAttested: true, attestationVersion: "parent-relationship-1" })).rejects.toThrow("another role");
     expect((await f.wrong.query(api.app.viewer, {})).user?.role).toBe("mentor");
-    const invite = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" });
+    const invite = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" }));
     await f.parent.mutation(api.parentInvites.acceptParentInvite, { token: invite.token, relationship: "Guardian", authorityAttested: true, attestationVersion: "parent-relationship-1" });
     const link = (await f.student.query(api.parentInvites.listFamilyLinks, { studentId: f.ids.student }))[0];
     await expect(f.student.mutation(api.parentInvites.revokeFamilyLink, { linkId: link._id })).rejects.toThrow("permission");
@@ -206,9 +224,9 @@ describe("parent invitations", () => {
     const f = await fixture();
     const parent2Auth = await f.t.run(async ctx => { const id = await ctx.db.insert("users", { email: "parent2@example.invalid", name: "Parent Two", emailVerificationTime: Date.now() }); await ctx.db.insert("authAccounts", { userId: id, provider: "google", providerAccountId: "google-parent2", emailVerified: "parent2@example.invalid" }); return id; });
     const parent2 = f.t.withIdentity({ subject: `${parent2Auth}|session` });
-    const a = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" });
-    const b = await f.otherStudent.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.other, parentEmail: "parent@example.invalid" });
-    const c = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent2@example.invalid" });
+    const a = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" }));
+    const b = await attachToken(f.otherStudent.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.other, parentEmail: "parent@example.invalid" }));
+    const c = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent2@example.invalid" }));
     for (const token of [a.token, b.token]) await f.parent.mutation(api.parentInvites.acceptParentInvite, { token, relationship: "Guardian", authorityAttested: true, attestationVersion: "parent-relationship-1" });
     await parent2.mutation(api.parentInvites.acceptParentInvite, { token: c.token, relationship: "Guardian", authorityAttested: true, attestationVersion: "parent-relationship-1" });
     expect((await f.parent.query(api.seasonFamilyLinks.currentSeasonPage, { paginationOpts: { numItems: 50, cursor: null } })).page).toHaveLength(2);
@@ -217,8 +235,8 @@ describe("parent invitations", () => {
 
   it("shows only current-season children and removes each revoked child from all family access", async () => {
     const f = await fixture();
-    const first = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" });
-    const second = await f.otherStudent.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.other, parentEmail: "parent@example.invalid" });
+    const first = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" }));
+    const second = await attachToken(f.otherStudent.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.other, parentEmail: "parent@example.invalid" }));
     for (const token of [first.token, second.token]) await f.parent.mutation(api.parentInvites.acceptParentInvite, { token, relationship: "Guardian", authorityAttested: true, attestationVersion: "parent-relationship-1" });
     const archivedChild = await f.t.run(async ctx => {
       const parent = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", f.ids.parentAuth)).unique();
@@ -256,7 +274,7 @@ describe("parent invitations", () => {
     const actionable = await f.coach.query(api.parentInvites.listStudentInvites, { studentId: f.ids.student });
     expect(actionable.find(row => row._id === revokedId)?.status).toBe("revoked");
     await f.coach.mutation(api.parentInvites.allowParentReinvite, { inviteId: actionable.find(row => row._id === revokedId)!._id, reason: "Resolved" });
-    expect((await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" })).token).toMatch(/^[0-9a-f]{64}$/);
+    expect((await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" }))).token).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it("keeps inactive and archived student records outside the invitation flow", async () => {
@@ -264,34 +282,30 @@ describe("parent invitations", () => {
     await f.t.run(ctx => ctx.db.patch(f.ids.student, { active: false }));
     await expect(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" })).rejects.toThrow();
     await f.t.run(ctx => ctx.db.patch(f.ids.student, { active: true }));
-    const invite = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" });
+    const invite = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" }));
     await f.t.run(async ctx => { const season = await ctx.db.query("seasons").withIndex("by_status", q => q.eq("status", "active")).unique(); if (season) await ctx.db.patch(season._id, { status: "archived" }); });
     await expect(f.parent.mutation(api.parentInvites.acceptParentInvite, { token: invite.token, relationship: "Guardian", authorityAttested: true, attestationVersion: "parent-relationship-1" })).rejects.toThrow();
   });
 });
 
 describe("parent invitation email", () => {
-  it("defaults to visible unsent status without configuration and never calls a provider", async () => {
+  it("rejects creation without private email delivery and never calls a provider", async () => {
     vi.stubEnv("PARENT_INVITE_EMAIL_ENABLED", "false");
     const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
     const f = await fixture();
-    const invite = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" });
-    expect(invite.inviteId).toBeTruthy();
-    const row = (await f.student.query(api.parentInvites.listStudentInvites, { studentId: f.ids.student }))[0];
-    expect(row.emailStatus).toBe("not_sent");
-    expect(row.emailError).toContain("not configured");
+    await expect(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" })).rejects.toThrow("Private parent email is unavailable");
+    expect(await f.student.query(api.parentInvites.listStudentInvites, { studentId: f.ids.student })).toEqual([]);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("keeps email unsent when opt-in lacks a trusted sender or origin", async () => {
+  it("rejects creation when opt-in lacks a trusted origin", async () => {
     vi.stubEnv("PARENT_INVITE_EMAIL_ENABLED", "true");
     vi.stubEnv("RESEND_API_KEY", "synthetic-key");
     vi.stubEnv("PARENT_INVITE_EMAIL_FROM", "invites@example.test");
     vi.stubEnv("PARENT_INVITE_APP_ORIGIN", "http://untrusted.example.test");
     const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
     const f = await fixture();
-    const invite = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" });
-    expect((await f.t.run(ctx => ctx.db.get(invite.inviteId)))?.emailStatus).toBe("not_sent");
+    await expect(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" })).rejects.toThrow("Private parent email is unavailable");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -300,7 +314,7 @@ describe("parent invitation email", () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "synthetic-message" }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     const f = await fixture();
-    const invite = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" });
+    const invite = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" }));
     expect((await f.student.query(api.parentInvites.listStudentInvites, { studentId: f.ids.student }))[0].emailStatus).toBe("queued");
     await f.t.action(internal.parentInviteEmail.send, { inviteId: invite.inviteId, token: invite.token, attempt: 1 });
     const row = (await f.student.query(api.parentInvites.listStudentInvites, { studentId: f.ids.student }))[0];
@@ -314,9 +328,9 @@ describe("parent invitation email", () => {
     expect(body.to).toEqual(["parent@example.invalid"]);
     expect(body.reply_to).toBe("coach@team8044.org");
     expect(body.text).toContain(`/invite-parent#token=${invite.token}`);
-    expect(body.html).toContain("Open invitation");
+    expect(body.html).toContain("Open private invitation");
     expect(body.html).not.toContain("Synthetic Student");
-    expect(body.text).toContain("Google account");
+    expect(body.text).toContain("private link");
     expect(JSON.stringify(await f.t.run(ctx => ctx.db.get(invite.inviteId)))).not.toContain(invite.token);
   });
 
@@ -324,14 +338,14 @@ describe("parent invitation email", () => {
     vi.useFakeTimers(); enableSyntheticEmail();
     const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
     const f = await fixture();
-    const revoked = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "first@example.invalid" });
+    const revoked = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "first@example.invalid" }));
     await f.coach.mutation(api.parentInvites.revokeParentInvite, { inviteId: revoked.inviteId });
     await f.t.action(internal.parentInviteEmail.send, { inviteId: revoked.inviteId, token: revoked.token, attempt: 1 });
-    const replaced = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "second@example.invalid" });
+    const replaced = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "second@example.invalid" }));
     await f.t.run(ctx => ctx.db.patch(replaced.inviteId, { createdAt: Date.now() - 60 * 60_000 }));
-    await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "second@example.invalid" });
+    await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "second@example.invalid" }));
     await f.t.action(internal.parentInviteEmail.send, { inviteId: replaced.inviteId, token: replaced.token, attempt: 1 });
-    const expired = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "third@example.invalid" });
+    const expired = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "third@example.invalid" }));
     await f.t.run(ctx => ctx.db.patch(expired.inviteId, { expiresAt: Date.now() - 1 }));
     await f.t.action(internal.parentInviteEmail.send, { inviteId: expired.inviteId, token: expired.token, attempt: 1 });
     expect(fetchMock).not.toHaveBeenCalled();
@@ -344,12 +358,12 @@ describe("parent invitation email", () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(new Response("", { status: 429 })).mockResolvedValueOnce(new Response(JSON.stringify({ id: "synthetic-message" }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     const f = await fixture();
-    const invite = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" });
+    const invite = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" }));
     await f.t.action(internal.parentInviteEmail.send, { inviteId: invite.inviteId, token: invite.token, attempt: 1 });
     expect((await f.student.query(api.parentInvites.listStudentInvites, { studentId: f.ids.student }))[0].emailStatus).toBe("queued");
     await f.t.action(internal.parentInviteEmail.send, { inviteId: invite.inviteId, token: invite.token, attempt: 2 });
     expect((await f.student.query(api.parentInvites.listStudentInvites, { studentId: f.ids.student }))[0].emailStatus).toBe("sent");
-    const stalled = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "stalled@example.invalid" });
+    const stalled = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "stalled@example.invalid" }));
     await f.t.mutation(internal.parentInviteEmail.markStalled, { inviteId: stalled.inviteId });
     expect((await f.t.run(ctx => ctx.db.get(stalled.inviteId)))?.emailStatus).toBe("failed");
     await f.t.action(internal.parentInviteEmail.send, { inviteId: stalled.inviteId, token: stalled.token, attempt: 1 });
@@ -361,7 +375,7 @@ describe("parent invitation email", () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response("secret provider details", { status: 400 }));
     vi.stubGlobal("fetch", fetchMock);
     const f = await fixture();
-    const invite = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" });
+    const invite = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" }));
     await f.t.action(internal.parentInviteEmail.send, { inviteId: invite.inviteId, token: invite.token, attempt: 1 });
     const row = (await f.student.query(api.parentInvites.listStudentInvites, { studentId: f.ids.student }))[0];
     expect(row.emailStatus).toBe("failed");
@@ -373,7 +387,7 @@ describe("parent invitation email", () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response("temporary failure", { status: 503 }));
     vi.stubGlobal("fetch", fetchMock);
     const f = await fixture();
-    const invite = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" });
+    const invite = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" }));
     vi.advanceTimersByTime(1);
     await f.t.finishInProgressScheduledFunctions();
     vi.advanceTimersByTime(60_000);
@@ -389,17 +403,138 @@ describe("parent invitation email", () => {
   it("caps automatic mail creation across changing recipients", async () => {
     vi.useFakeTimers(); enableSyntheticEmail();
     const f = await fixture();
-    for (let i = 0; i < 10; i++) await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: `parent${i}@example.invalid` });
+    for (let i = 0; i < 10; i++) await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: `parent${i}@example.invalid` }));
     await expect(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "extra@example.invalid" })).rejects.toThrow("Too many email invitations");
   });
 
   it("does not schedule mail for a cooldown rejection", async () => {
     vi.useFakeTimers(); enableSyntheticEmail();
     const f = await fixture();
-    const first = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" });
+    const first = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" }));
     await expect(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" })).rejects.toThrow("one hour");
     await expect(f.student.mutation(api.parentInvites.resendParentInvite, { inviteId: first.inviteId })).rejects.toThrow("one hour");
     const pending = await f.t.run(ctx => ctx.db.query("parentInvitations").withIndex("by_studentId_and_parentEmail_and_status", q => q.eq("studentId", f.ids.student).eq("parentEmail", "parent@example.invalid").eq("status", "pending")).take(10));
     expect(pending).toHaveLength(1);
+  });
+});
+
+describe("private parent email authentication", () => {
+  it("issues an Auth session only for a sent, one-use private invitation", async () => {
+    const keys = await generateKeyPair("RS256", { extractable: true });
+    vi.stubEnv("JWT_PRIVATE_KEY", await exportPKCS8(keys.privateKey));
+    vi.stubEnv("CONVEX_SITE_URL", "https://synthetic.convex.site");
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "synthetic-message" }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const f = await fixture();
+    const invite = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" }));
+    const returned = await f.student.query(api.parentInvites.listStudentInvites, { studentId: f.ids.student });
+    expect(JSON.stringify(returned)).not.toContain(invite.token);
+    await f.t.run(ctx => ctx.db.patch(invite.inviteId, { emailStatus: "failed" }));
+    expect((await f.t.action(api.auth.signIn, { provider: "parentEmail", params: { kind: "invite", token: invite.token } })).tokens).toBeNull();
+    await f.t.run(ctx => ctx.db.patch(invite.inviteId, { emailStatus: "queued", emailAttempt: undefined }));
+    await f.t.action(internal.parentInviteEmail.send, { inviteId: invite.inviteId, token: invite.token, attempt: 1 });
+    const signedIn = await f.t.action(api.auth.signIn, { provider: "parentEmail", params: { kind: "invite", token: invite.token } });
+    expect(signedIn.tokens?.token).toBeTruthy();
+    expect(signedIn.tokens?.refreshToken).toBeTruthy();
+    const session = await f.t.run(ctx => ctx.db.query("authSessions").withIndex("userId", q => q.eq("userId", f.ids.parentAuth)).first());
+    expect(session?.userId).toBe(f.ids.parentAuth);
+    expect((await f.t.action(api.auth.signIn, { provider: "parentEmail", params: { kind: "invite", token: invite.token } })).tokens).toBeNull();
+    const marker = await f.t.run(ctx => ctx.db.query("parentEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", f.ids.parentAuth)).unique());
+    expect(marker?.email).toBe("parent@example.invalid");
+    const parentSession = f.t.withIdentity({ subject: `${f.ids.parentAuth}|${session!._id}` });
+    expect((await parentSession.mutation(api.parentInvites.previewParentInvite, { token: invite.token })).status).toBe("valid");
+    await expect(parentSession.mutation(api.app.requestJoin, { code: "FAKE", firstName: "P", lastName: "X" })).rejects.toThrow("Google");
+  });
+
+  it("uses an emailed code when the first-time private login window expired", async () => {
+    const keys = await generateKeyPair("RS256", { extractable: true });
+    vi.stubEnv("JWT_PRIVATE_KEY", await exportPKCS8(keys.privateKey));
+    vi.stubEnv("CONVEX_SITE_URL", "https://synthetic.convex.site");
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "synthetic-message" }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const f = await fixture();
+    const invite = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" }));
+    await f.t.action(internal.parentInviteEmail.send, { inviteId: invite.inviteId, token: invite.token, attempt: 1 });
+    await f.t.run(ctx => ctx.db.patch(invite.inviteId, { loginExpiresAt: Date.now() - 1 }));
+    expect((await f.t.action(api.auth.signIn, { provider: "parentEmail", params: { kind: "invite", token: invite.token } })).tokens).toBeNull();
+    expect(await f.t.action(api.parentEmailAuth.requestCode, { email: "parent@example.invalid", inviteToken: invite.token })).toEqual({ sent: true });
+    const body = JSON.parse(String((fetchMock.mock.calls.at(-1) as [string, RequestInit])[1].body)) as { text: string };
+    const code = body.text.match(/\b[0-9]{6}\b/)?.[0];
+    expect(code).toMatch(/^[0-9]{6}$/);
+    expect((await f.t.action(api.auth.signIn, { provider: "parentEmail", params: { kind: "otp", email: "parent@example.invalid", code: "000000" === code ? "999999" : "000000" } })).tokens).toBeNull();
+    const signedIn = await f.t.action(api.auth.signIn, { provider: "parentEmail", params: { kind: "otp", email: "parent@example.invalid", code } });
+    expect(signedIn.tokens?.token).toBeTruthy();
+    expect((await f.t.action(api.auth.signIn, { provider: "parentEmail", params: { kind: "otp", email: "parent@example.invalid", code } })).tokens).toBeNull();
+    await f.parent.mutation(api.parentInvites.acceptParentInvite, { token: invite.token, relationship: "Parent", authorityAttested: true, attestationVersion: "parent-relationship-1" });
+    expect((await f.parent.query(api.app.viewer, {})).user?.role).toBe("parent");
+  });
+
+  it("creates a parent-only identity for a first-time email recipient without Google", async () => {
+    const keys = await generateKeyPair("RS256", { extractable: true });
+    vi.stubEnv("JWT_PRIVATE_KEY", await exportPKCS8(keys.privateKey));
+    vi.stubEnv("CONVEX_SITE_URL", "https://synthetic.convex.site");
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "synthetic-message" }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const f = await fixture();
+    const email = "fresh.parent@example.invalid";
+    const invite = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: email }));
+    await f.t.action(internal.parentInviteEmail.send, { inviteId: invite.inviteId, token: invite.token, attempt: 1 });
+    await f.t.run(ctx => ctx.db.patch(invite.inviteId, { loginExpiresAt: Date.now() - 1 }));
+    await f.t.action(api.parentEmailAuth.requestCode, { email, inviteToken: invite.token });
+    const body = JSON.parse(String((fetchMock.mock.calls.at(-1) as [string, RequestInit])[1].body)) as { text: string };
+    const code = body.text.match(/\b[0-9]{6}\b/)?.[0];
+    const signedIn = await f.t.action(api.auth.signIn, { provider: "parentEmail", params: { kind: "otp", email, code } });
+    expect(signedIn.tokens?.token).toBeTruthy();
+    const marker = await f.t.run(ctx => ctx.db.query("parentEmailIdentities").withIndex("by_email", q => q.eq("email", email)).unique());
+    expect(marker).toBeTruthy();
+    expect(await f.t.run(ctx => ctx.db.query("authAccounts").withIndex("userIdAndProvider", q => q.eq("userId", marker!.authUserId).eq("provider", "google")).take(1))).toEqual([]);
+    const session = await f.t.run(ctx => ctx.db.query("authSessions").withIndex("userId", q => q.eq("userId", marker!.authUserId)).first());
+    const parent = f.t.withIdentity({ subject: `${marker!.authUserId}|${session!._id}` });
+    expect((await parent.mutation(api.parentInvites.previewParentInvite, { token: invite.token })).status).toBe("valid");
+    await parent.mutation(api.parentInvites.acceptParentInvite, { token: invite.token, relationship: "Guardian", authorityAttested: true, attestationVersion: "parent-relationship-1" });
+    expect((await parent.query(api.app.viewer, {})).user?.role).toBe("parent");
+  });
+
+  it("never upgrades a legacy shared invitation or a student address into a parent login", async () => {
+    const keys = await generateKeyPair("RS256", { extractable: true });
+    vi.stubEnv("JWT_PRIVATE_KEY", await exportPKCS8(keys.privateKey));
+    vi.stubEnv("CONVEX_SITE_URL", "https://synthetic.convex.site");
+    const f = await fixture();
+    const legacyToken = "b".repeat(64);
+    await f.t.run(async ctx => {
+      const actor = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", f.ids.studentAuth)).unique();
+      await ctx.db.insert("parentInvitations", { studentId: f.ids.student, parentEmail: "parent@example.invalid", tokenHash: await (await import("./lib/invitationIdentity")).tokenHash(legacyToken), status: "pending", emailStatus: "sent", createdBy: actor!._id, createdAt: Date.now(), expiresAt: Date.now() + 7 * 24 * 60 * 60_000 });
+    });
+    expect((await f.t.action(api.auth.signIn, { provider: "parentEmail", params: { kind: "invite", token: legacyToken } })).tokens).toBeNull();
+    const invite = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "student2@example.invalid" }));
+    await f.t.run(async ctx => {
+      const app = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", f.ids.otherStudentAuth)).unique();
+      await ctx.db.patch(app!._id, { email: "student2@example.invalid" });
+      await ctx.db.patch(f.ids.otherStudentAuth, { email: "student2@example.invalid", emailVerificationTime: Date.now() });
+      await ctx.db.patch(invite.inviteId, { emailStatus: "sent" });
+    });
+    expect((await f.t.action(api.auth.signIn, { provider: "parentEmail", params: { kind: "invite", token: invite.token } })).tokens).toBeNull();
+  });
+
+  it("persists the five-attempt OTP cap and rejects an expired code through Auth", async () => {
+    const keys = await generateKeyPair("RS256", { extractable: true });
+    vi.stubEnv("JWT_PRIVATE_KEY", await exportPKCS8(keys.privateKey));
+    vi.stubEnv("CONVEX_SITE_URL", "https://synthetic.convex.site");
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "synthetic-message" }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const f = await fixture();
+    const email = "fresh.parent@example.invalid";
+    const invite = await attachToken(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: email }));
+    await f.t.action(internal.parentInviteEmail.send, { inviteId: invite.inviteId, token: invite.token, attempt: 1 });
+    await f.t.action(api.parentEmailAuth.requestCode, { email, inviteToken: invite.token });
+    const body = JSON.parse(String((fetchMock.mock.calls.at(-1) as [string, RequestInit])[1].body)) as { text: string };
+    const code = body.text.match(/\b[0-9]{6}\b/)?.[0] ?? "";
+    const wrong = code === "000000" ? "999999" : "000000";
+    for (let i = 0; i < 5; i++) expect((await f.t.action(api.auth.signIn, { provider: "parentEmail", params: { kind: "otp", email, code: wrong } })).tokens).toBeNull();
+    const stored = await f.t.run(ctx => ctx.db.query("parentEmailCodes").withIndex("by_email_and_createdAt", q => q.eq("email", email)).order("desc").first());
+    expect(stored?.attempts).toBe(5);
+    expect((await f.t.action(api.auth.signIn, { provider: "parentEmail", params: { kind: "otp", email, code } })).tokens).toBeNull();
+    await f.t.run(ctx => ctx.db.patch(stored!._id, { attempts: 0, expiresAt: Date.now() - 1 }));
+    expect((await f.t.action(api.auth.signIn, { provider: "parentEmail", params: { kind: "otp", email, code } })).tokens).toBeNull();
   });
 });

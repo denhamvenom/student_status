@@ -5,6 +5,7 @@ import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { financeMetrics, financeNamespace, reportAggregate } from "./lib/reportAggregates";
 import schema from "./schema";
+import { tokenHash } from "./lib/invitationIdentity";
 
 const modules = import.meta.glob("./**/*.ts");
 const targetUrl = "https://synthetic-rehearsal.convex.cloud";
@@ -171,8 +172,9 @@ describe("exact synthetic account cleanup", () => {
       const account = await ctx.db.query("financialAccounts").withIndex("by_studentId", q => q.eq("studentId", studentRow!._id)).unique();
       return { codeRow: codeRow!, studentApp: studentApp!, studentRow: studentRow!, summary: summary!, account: account! };
     });
-    const invite = await studentLogin.mutation(api.parentInvites.createParentInvite, { studentId: joined.studentRow._id, parentEmail: "test.parent@example.invalid" });
-    await parentLogin.mutation(api.parentInvites.acceptParentInvite, { token: invite.token, relationship: "Parent", authorityAttested: true, attestationVersion: "parent-relationship-1" });
+    const parentToken = "a".repeat(64);
+    await f.t.run(async ctx => ctx.db.insert("parentInvitations", { studentId: joined.studentRow._id, parentEmail: "test.parent@example.invalid", tokenHash: await tokenHash(parentToken), status: "pending", createdBy: joined.studentApp._id, createdAt: Date.now(), expiresAt: Date.now() + 7 * 24 * 60 * 60_000 }));
+    await parentLogin.mutation(api.parentInvites.acceptParentInvite, { token: parentToken, relationship: "Parent", authorityAttested: true, attestationVersion: "parent-relationship-1" });
     await coach.mutation(api.admin.revokeJoinCode, { codeId: joined.codeRow._id });
     const related = await f.t.run(async ctx => {
       const parentApp = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", signedIn.parentAuth)).unique();

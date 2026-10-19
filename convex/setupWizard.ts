@@ -56,7 +56,7 @@ export const summary=mutation({args:{},returns:v.object({students:v.array(summar
     const item:typeof nextItem.type=actor.role==="parent"
       ? !parentDetails?"studentDetails":!data.contacts?"contacts":!data.medical?"medical":!parent?"finishSetup":first==="needsCompletion"?"first":first==="awaitingVerification"?"waitingCoach":"done"
       : !self?"studentDetails":adult&&first==="needsCompletion"?"first":first==="awaitingVerification"?"waitingCoach":"done";
-    rows.push({studentId:student._id,name:student.preferredName||student.legalName,studentComplete:self,parentComplete:parent,firstState:first,nextItem:item,needsSetup:item!=="waitingCoach"&&item!=="done"});
+    rows.push({studentId:student._id,name:student.legalName||student.preferredName,studentComplete:self,parentComplete:parent,firstState:first,nextItem:item,needsSetup:item!=="waitingCoach"&&item!=="done"});
   }
   return {students:rows,truncated};
 }});

@@ -255,7 +255,7 @@ export const requestJoin = mutation({
   args: { code: v.string(), firstName: v.string(), lastName: v.string() }, returns: v.union(v.id("joinRequests"), v.null()),
   handler: async (ctx, args) => {
     const who = await identity(ctx);
-    if (!who.email) throw new Error("A Google email is required.");
+    if (await ctx.db.query("parentEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique()) throw new Error("A Google account is required for student enrollment.");
     const season = await activeSeason(ctx);
     const latest = await ctx.db.query("joinRequests").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).order("desc").first();
     const existing = latest?.seasonId === season._id ? latest : null;

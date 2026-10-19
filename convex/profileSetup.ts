@@ -84,7 +84,7 @@ export const corrections = query({
     const result = [];
     for (const row of page.page) {
       const student = await ctx.db.get(row.studentId);
-      if (student?.active && student.seasonId === season._id) result.push({ requestId: row._id, studentId: student._id, studentName: student.preferredName || student.legalName, field: row.field, note: row.note, requestedAt: row.requestedAt, revision: student.profileRevision ?? 0 });
+      if (student?.active && student.seasonId === season._id) result.push({ requestId: row._id, studentId: student._id, studentName: student.legalName || student.preferredName, field: row.field, note: row.note, requestedAt: row.requestedAt, revision: student.profileRevision ?? 0 });
     }
     return { ...page, page: result };
   },

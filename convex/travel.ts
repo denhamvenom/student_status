@@ -105,7 +105,7 @@ export const eventTransport = query({
     const students = await Promise.all(confirmed.map(p => ctx.db.get(p.studentId)));
     const riders = confirmed.flatMap((p, i) => {
       const student = students[i];
-      return student?.active && student.seasonId === event.seasonId ? [{ studentId: student._id, name: student.preferredName || student.legalName, independentTravel: p.independentTravel ?? false }] : [];
+      return student?.active && student.seasonId === event.seasonId ? [{ studentId: student._id, name: student.legalName || student.preferredName, independentTravel: p.independentTravel ?? false }] : [];
     });
     return { event: { _id: event._id, name: event.name, transportEnabled: event.transportEnabled ?? event.travel !== "Families provide transportation", busSeats: event.busSeats ?? 0, additionalAdults: event.additionalAdults ?? 0, trailerRequired: event.trailerRequired ?? false }, drivers, assignments, riders, summary: await transportSummary(ctx, event) };
   },

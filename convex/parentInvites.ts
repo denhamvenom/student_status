@@ -6,7 +6,7 @@ import { RateLimiter } from "@convex-dev/rate-limiter";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { activeSeason, audit, ownStudent, requireRole, requireSeasonProfileWritable, viewer } from "./lib/access";
-import { emailKey, tokenHash, newToken, verifiedGoogle } from "./lib/invitationIdentity";
+import { emailKey, tokenHash, newToken, verifiedParent } from "./lib/invitationIdentity";
 import { parentInviteEmailConfiguration } from "./lib/parentInviteEmail";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -47,6 +47,7 @@ async function revokedLinkForEmail(ctx: Ctx, studentId: Id<"students">, email: s
 
 async function queueParentInvite(ctx: MutationCtx, actor: Doc<"appUsers">, student: Doc<"students">, parentEmail: string, previous: Doc<"parentInvitations">[]) {
   const emailConfiguration = parentInviteEmailConfiguration();
+  if (!emailConfiguration) throw new Error("Private parent email is unavailable. Ask a Coach for help.");
   if (emailConfiguration) {
     const key = `${student._id}:${parentEmail}`;
     if (!(await emailLimiter.limit(ctx, "parentInviteEmailHourly", { key })).ok ||
@@ -58,12 +59,12 @@ async function queueParentInvite(ctx: MutationCtx, actor: Doc<"appUsers">, stude
   const token = newToken();
   const now = Date.now();
   const expiresAt = now + WEEK_MS;
-  const inviteId = await ctx.db.insert("parentInvitations", { studentId: student._id, parentEmail, tokenHash: await tokenHash(token), status: "pending", emailStatus: emailConfiguration ? "queued" : "not_sent", emailError: emailConfiguration ? undefined : "Automatic email is not configured. Share the link directly.", createdBy: actor._id, createdAt: now, expiresAt });
+  const inviteId = await ctx.db.insert("parentInvitations", { studentId: student._id, parentEmail, tokenHash: await tokenHash(token), loginVersion: 1, loginExpiresAt: now + 24 * 60 * 60_000, status: "pending", emailStatus: "queued", createdBy: actor._id, createdAt: now, expiresAt });
   if (emailConfiguration) {
     await ctx.scheduler.runAfter(0, internal.parentInviteEmail.send, { inviteId, token, attempt: 1 });
     await ctx.scheduler.runAfter(20 * 60_000, internal.parentInviteEmail.markStalled, { inviteId });
   }
-  return { token, expiresAt, inviteId };
+  return { expiresAt, inviteId };
 }
 
 export const invitationSettings = query({
@@ -85,7 +86,7 @@ export const setInvitationEnabled = mutation({
 
 export const createParentInvite = mutation({
   args: { studentId: v.id("students"), parentEmail: v.string() },
-  returns: v.object({ token: v.string(), expiresAt: v.number(), inviteId: v.id("parentInvitations") }),
+  returns: v.object({ expiresAt: v.number(), inviteId: v.id("parentInvitations") }),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "student");
     const own = await ownStudent(ctx, actor);
@@ -112,7 +113,7 @@ export const createParentInvite = mutation({
 
 export const resendParentInvite = mutation({
   args: { inviteId: v.id("parentInvitations") },
-  returns: v.object({ token: v.string(), expiresAt: v.number(), inviteId: v.id("parentInvitations") }),
+  returns: v.object({ expiresAt: v.number(), inviteId: v.id("parentInvitations") }),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "student");
     const own = await ownStudent(ctx, actor);
@@ -144,7 +145,7 @@ export const previewParentInvite = mutation({
     if (!row || row.status !== "pending" || row.expiresAt <= Date.now()) return hidden;
     const authUserId = await getAuthUserId(ctx);
     if (!authUserId) return { ...hidden, status: "signInRequired" as const };
-    const who = await verifiedGoogle(ctx);
+    const who = await verifiedParent(ctx);
     if (!who || who.email !== row.parentEmail) return { ...hidden, status: "emailMismatch" as const };
     const student = await ctx.db.get(row.studentId);
     const season = await activeSeason(ctx);
@@ -167,8 +168,8 @@ export const acceptParentInvite = mutation({
     const hash = await tokenHash(args.token);
     const row = await ctx.db.query("parentInvitations").withIndex("by_tokenHash", q => q.eq("tokenHash", hash)).unique();
     if (!row || row.status !== "pending" || row.expiresAt <= Date.now()) throw new Error("Invitation unavailable or expired.");
-    const who = await verifiedGoogle(ctx);
-    if (!who || who.email !== row.parentEmail) throw new Error("Sign in with the invited verified Google email.");
+    const who = await verifiedParent(ctx);
+    if (!who || who.email !== row.parentEmail) throw new Error("Sign in with the invited parent email.");
     const relationship = args.relationship.trim();
     if (!relationship || relationship.length > 80 || !args.authorityAttested || args.attestationVersion !== ATTESTATION_VERSION) throw new Error("Current relationship and legal guardian authority attestation are required.");
     const student = await eligibleStudent(ctx, row.studentId);

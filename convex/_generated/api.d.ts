@@ -95,6 +95,7 @@ import type * as lib_timeclock from "../lib/timeclock.js";
 import type * as lib_timeclockPin from "../lib/timeclockPin.js";
 import type * as lib_timeclockTransition from "../lib/timeclockTransition.js";
 import type * as lib_wholeTeam from "../lib/wholeTeam.js";
+import type * as parentEmailAuth from "../parentEmailAuth.js";
 import type * as parentInviteEmail from "../parentInviteEmail.js";
 import type * as parentInvites from "../parentInvites.js";
 import type * as participation from "../participation.js";
@@ -219,6 +220,7 @@ declare const fullApi: ApiFromModules<{
   "lib/timeclockPin": typeof lib_timeclockPin;
   "lib/timeclockTransition": typeof lib_timeclockTransition;
   "lib/wholeTeam": typeof lib_wholeTeam;
+  parentEmailAuth: typeof parentEmailAuth;
   parentInviteEmail: typeof parentInviteEmail;
   parentInvites: typeof parentInvites;
   participation: typeof participation;

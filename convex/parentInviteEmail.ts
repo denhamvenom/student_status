@@ -12,7 +12,7 @@ export const markStalled = internalMutation({
   handler: async (ctx, args) => {
     const row = await ctx.db.get(args.inviteId);
     if (row?.emailStatus === "queued") await ctx.db.patch(row._id, {
-      emailStatus: "failed", emailError: "Email status could not be confirmed. Share the link directly.",
+      emailStatus: "failed", emailError: "Email status could not be confirmed. Ask a Coach for help.",
     });
     return null;
   },
@@ -54,7 +54,7 @@ export const finishSend = internalMutation({
       await ctx.db.patch(row._id, { emailError: "Email is delayed. Retrying automatically." });
       await ctx.scheduler.runAfter(RETRY_DELAYS_MS[args.attempt - 1], internal.parentInviteEmail.send, { inviteId: args.inviteId, token: args.token, attempt: args.attempt + 1 });
     } else {
-      await ctx.db.patch(row._id, { emailStatus: args.outcome === "not_sent" || row.status !== "pending" || row.expiresAt <= Date.now() ? "not_sent" : "failed", emailError: args.outcome === "not_sent" ? "Automatic email is not configured. Share the link directly." : "Email could not be sent. Share the link directly." });
+      await ctx.db.patch(row._id, { emailStatus: args.outcome === "not_sent" || row.status !== "pending" || row.expiresAt <= Date.now() ? "not_sent" : "failed", emailError: args.outcome === "not_sent" ? "Automatic email is not configured. Ask a Coach for help." : "Email could not be sent. Ask a Coach for help." });
     }
     return null;
   },
@@ -79,8 +79,8 @@ export const send = internalAction({
       reply_to: config.replyTo,
       to: [ready.parentEmail],
       subject: "Invitation to Denham Venom Student Status",
-      text: `You have been invited to connect your Google account to Denham Venom Student Status. Open this link to review the invitation: ${link}\n\nSign in with the Google account for ${ready.parentEmail}. The invitation expires in 7 days and can be used once. If you were not expecting this invitation, you can ignore this email.`,
-      html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#172431"><h1>Parent invitation</h1><p>You have been invited to connect your Google account to Denham Venom Student Status.</p><p><a href="${link}" style="display:inline-block;background:#165d75;color:#fff;padding:12px 18px;text-decoration:none;border-radius:6px">Open invitation</a></p><p>Sign in with the Google account that received this email. The invitation expires in 7 days and can be used once.</p><p>If you were not expecting this invitation, you can ignore this email.</p></div>`,
+      text: `You have been invited to Denham Venom Student Status as a parent. Open this private link and choose Continue to sign in: ${link}\n\nThe sign-in link is valid for 24 hours and can be used once. The invitation stays available for 7 days; after 24 hours, request a code sent to this email address. If you were not expecting this invitation, you can ignore this email.`,
+      html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#172431"><h1>Parent invitation</h1><p>You have been invited to Denham Venom Student Status as a parent.</p><p><a href="${link}" style="display:inline-block;background:#165d75;color:#fff;padding:12px 18px;text-decoration:none;border-radius:6px">Open private invitation</a></p><p>Choose Continue to sign in. This private link works once within 24 hours. The invitation remains available for 7 days; after 24 hours, request a code sent to this email address.</p><p>If you were not expecting this invitation, you can ignore this email.</p></div>`,
     });
     let outcome: "sent" | "retry" | "failed";
     try {

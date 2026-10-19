@@ -90,8 +90,12 @@ describe("event operations", () => {
     const inviteId = await f.student[0].mutation(api.rooms.invite, { groupId: groupA, studentId: f.ids.students[1] }).catch(() => null);
     expect(inviteId).toBeNull();
     const invite = await f.student[0].mutation(api.rooms.invite, { groupId: groupA, studentId: f.ids.students[2] });
+    await f.t.run(ctx => ctx.db.patch(f.ids.students[0], { legalName: "Synthetic Full Student", preferredName: "Synthetic" }));
     const peerView = await f.student[2].query(api.rooms.eligiblePeers, { eventId: f.ids.event });
     expect(JSON.stringify(peerView)).not.toContain("groupId");
+    expect(peerView.find(row => row.studentId === f.ids.students[0])).toMatchObject({ legalName: "Synthetic Full Student", preferredName: "Synthetic" });
+    const groupView = await f.student[0].query(api.rooms.mine, { eventId: f.ids.event });
+    expect(groupView.group?.members[0]).toMatchObject({ legalName: "Synthetic Full Student", preferredName: "Synthetic" });
     const mine = await f.student[2].query(api.rooms.mine, { eventId: f.ids.event });
     expect(mine.invites[0].groupName).toBe("Alpha");
     await f.student[2].mutation(api.rooms.respond, { inviteId: invite, accept: true });

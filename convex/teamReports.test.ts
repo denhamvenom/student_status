@@ -29,7 +29,7 @@ describe("bounded role-scoped team reports",()=>{
     const result=await f.lead.query(rows,args);
     expect(result.page).toHaveLength(1);
     expect(result.attendance).toMatchObject({state:"updating",kickoff:null});
-    expect(result.page[0]).toMatchObject({name:"Synthetic",finance:{state:"uninitialized",paidCents:null,raisedCents:null},attendance:null,eventsCount:0,selectedEvent:null});
+    expect(result.page[0]).toMatchObject({name:"Synthetic Student",finance:{state:"uninitialized",paidCents:null,raisedCents:null},attendance:null,eventsCount:0,selectedEvent:null});
     expect(JSON.stringify(result)).not.toContain("PRIVATE HEALTH");
     expect(JSON.stringify(result)).not.toContain("private-student@example.invalid");
     await expect(f.coach.query(rows,{paginationOpts:{numItems:11,cursor:null},asOf:100})).rejects.toThrow("between 1 and 10");
