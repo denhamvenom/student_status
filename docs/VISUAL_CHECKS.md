@@ -503,6 +503,11 @@ October16 polish evidence supplement: refreshed preview render checks pass; Ment
 
 FIRST followup visual evidence: refreshed preview includes Parent and adult reopened examples, initial state absence assertions pass. Parent phone390 capture inspected; see FRONTEND_CONFORMANCE_LOG. Item5 no longer deferred.
 
+
+### FEE-REVIEW-2026-10-19 — Coach charge details
+
+Frontend wording and rendered-markup regression checks complete. Pending: authenticated new-charge, held and partial-release layouts at representative phone/desktop sizes and light/dark themes; Coach acceptance. No production records may be changed to manufacture evidence. See FRONTEND_CONFORMANCE_LOG.md October 19 entry.
+
 ## Bulk Invite local candidate
 
 | Check | Evidence / remaining work |

@@ -1,5 +1,12 @@
 # Frontend conformance work log
 
+## October 19 charge review wording
+
+Implemented frontend-only simplification: View charge details; Review students and charges; explicit eight-character Reason input guidance; student names, planned/current amounts and readable saved/pending/review status replace internal revisions and processing counters. New unposted charges no longer produce false load errors. Missing existing charges still need review; held rows retain their explanation. Partial money release amounts and all confirmation/retry safeguards remain. No backend or production data changes.
+
+Validation: integrated lint/typecheck, 425 tests and build passed (existing bundle-size warning); final held-row wording refinement passed 14 focused tests and source lint. Independent review found the held-row case and it was corrected. Rendered-markup evidence only; fresh authenticated browser/phone/theme comparison remains pending. Development checkpoint only; production publication is not included in this change.
+
+
 ## October 18 Batch 4 workflow changes
 
 Batch 4 implementation, independent review and role spot-checks are complete on `feature/development-review-fixtures-2026-10-18`. See [Batch 4 report](audit-2026-10-18/batch-4-report.md) and [copy inventory](audit-2026-10-18/batch-4-copy-inventory.md). Owner clarified the only selectable subteams: Build, Electrical, Machining, Programming, Business/Media. Owner explicitly deferred stored-record conversion; no production access or backfill. Final development backend sync, build/typecheck, source lint and 18 focused tests passed. Full suite before that last update: 412 passed, four existing stale assertions; full lint nine existing private-helper errors. Coach confirmation Cancel and staff Money tools/New event checks passed without shared-data writes. Parent Money/Home and event signup guidance checked. Student Home money, read-only independent travel, Whole Team leave confirmation and Cancel checked; participation stayed confirmed. This report accompanies the reviewed development checkpoint. Stop after Batch 4. No main merge or production rollout.

@@ -1,6 +1,12 @@
 # Current integration handoff
 
-## Current local candidate — Coach approval required
+## October 19 charge review wording
+
+Implemented frontend-only simplification: View charge details; Review students and charges; explicit eight-character Reason input guidance; student names, planned/current amounts and readable saved/pending/review status replace internal revisions and processing counters. New unposted charges no longer produce false load errors. Missing existing charges still need review; held rows retain their explanation. Partial money release amounts and all confirmation/retry safeguards remain. No backend or production data changes.
+
+Validation: integrated lint/typecheck, 425 tests and build passed (existing bundle-size warning); final held-row wording refinement passed 14 focused tests and source lint. Independent review found the held-row case and it was corrected. Rendered-markup evidence only; fresh authenticated browser/phone/theme comparison remains pending. Owner authorized PR18 merge and production frontend deployment on October 19; deployment verification is in progress.
+
+## Bulk Invite notes carried from PR17 (historical pre-merge status)
 
 October 19 owner change supersedes direct linking: five-digit Bulk Invite codes submit connection requests; only a Coach can connect the verified Google account to the existing student. Six-digit ordinary team requests remain separate. Local backend, student waiting/retry UI and Coach approval queue implemented; 26 backend cases and isolated actual-component browser tests pass, including concurrency, 100 students, daily limits and stale requests. See BULK_INVITE.md. No backend sync (including development) is authorized for this revision. Local frontend server stopped to avoid mixing new UI with the old deployed API. Real Google redemption remains deferred by owner; no production deployment or main merge.
 
