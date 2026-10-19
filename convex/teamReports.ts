@@ -48,7 +48,7 @@ async function reportRow(ctx: QueryCtx, student: Doc<"students">, attendance: Aw
     const awaitingConfirmation = selectedEvent.participation === "pending" || selectedEvent.participation === "waitlist";
     selected = {participation:selectedEvent.participation,state:uncertain?"unknown" as const:awaitingConfirmation?"open" as const:selectedEvent.state,outstanding:awaitingConfirmation && !uncertain?["Participation is not confirmed"]:selectedEvent.open};
   }
-  return {studentId:student._id,name:student.preferredName||student.legalName,subteam:student.subteam,travelTeam:student.travelTeam,finance,attendance:counts,eventsCount,selectedEvent:selected};
+  return {studentId:student._id,name:student.legalName||student.preferredName,subteam:student.subteam,travelTeam:student.travelTeam,finance,attendance:counts,eventsCount,selectedEvent:selected};
 }
 
 const eventChoice = v.object({eventId:v.id("events"),name:v.string(),startsAt:v.number(),type:v.union(v.literal("Competition"),v.literal("Outreach"),v.literal("Team"))});

@@ -1,5 +1,12 @@
 # Current integration handoff
 
+## October 19 legal student names and Money scrolling
+
+Student lists and financial/report projections now prefer the stored full legal name, with preferred name only as a fallback. Preferred-name editing and immutable signed records are preserved. Money uses the full content width; its focusable table scrolls vertically and horizontally with sticky column headings. Phone account cards remain available.
+
+Verification: focused backend tests and source review passed. Actual Money component with fictional rows checked at desktop/light, narrower desktop with keyboard scrolling, and phone/dark; no page-width overflow. No payment writes or production deployment. Parent-login chat owns the coordinated development sync and overlapping SetupWizard/Mentor/permission-export labels. Authenticated local review is pending Coach sign-in.
+
+
 ## Current release - linked event Calendar (PR21)
 
 Workspace student-status-readiness-design; branch feature/development-review-fixtures-2026-10-18. Implemented creation/linking to the shared Timeclock Calendar, Media Support Requested, linked schedule sync and recovery. Development sync passed; lint/types, 506 tests, both app builds and representative synthetic UI checks passed. See [behavior and evidence](EVENT_CALENDAR_SYNC.md). Root owns Git and shared backend synchronization.

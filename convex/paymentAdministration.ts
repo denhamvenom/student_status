@@ -129,7 +129,7 @@ export const previewPayments = query({
       const account = student ? await financialAccount(ctx, student._id) : null;
       if (account && (account.state !== "ready" || account.allocationSourceVersion !== 1)) error = "Finish financial preparation before recording this row.";
       if (student && !account) { const history = await ctx.db.query("ledgerEntries").withIndex("by_studentId_and_recordedAt", q => q.eq("studentId", student._id)).first(); const charge = await ctx.db.query("charges").withIndex("by_studentId_and_priority", q => q.eq("studentId", student._id)).first(); if (history || charge) error = "Historical finances require rebuilding."; }
-      result.push({ studentId: student?._id ?? null, studentName: student?.preferredName ?? email, expectedGeneration: student ? account?.generation ?? 1 : null, error });
+      result.push({ studentId: student?._id ?? null, studentName: student?.legalName || student?.preferredName || email, expectedGeneration: student ? account?.generation ?? 1 : null, error });
     }
     return result;
   },

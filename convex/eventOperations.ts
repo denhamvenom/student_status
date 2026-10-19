@@ -32,7 +32,7 @@ export const workspace = query({
     const participants = await roster(ctx, event._id);
     const students = await Promise.all(participants.map(async p => {
       const student = await ctx.db.get(p.studentId);
-      return { participantId: p._id, studentId: p.studentId, name: student?.preferredName || student?.legalName || "Student", status: p.status, signedUpAt: p.createdAt, active: !!student?.active };
+      return { participantId: p._id, studentId: p.studentId, name: student?.legalName || student?.preferredName || "Student", status: p.status, signedUpAt: p.createdAt, active: !!student?.active };
     }));
     const requirements = await ctx.db.query("requirements").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(101);
     if (requirements.length > 100) throw new Error("Requirement limit reached.");

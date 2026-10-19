@@ -131,7 +131,7 @@ export const unmapped = query({
       const student = await ctx.db.get(charge.studentId);
       if (!student || student.seasonId !== season._id) throw new Error("Fee review belongs to another season.");
       const event = charge.eventId ? await ctx.db.get(charge.eventId) : null;
-      return { review, charge, studentName: student.preferredName || student.legalName, eventName: event?.name ?? null, effectiveCents: effectiveChargeCents(charge) };
+      return { review, charge, studentName: student.legalName || student.preferredName, eventName: event?.name ?? null, effectiveCents: effectiveChargeCents(charge) };
     }));
     return { ...result, page };
   },
@@ -144,7 +144,7 @@ export const students = query({
     const actor = await viewer(ctx); requireRole(actor, "coach"); const season = await activeSeason(ctx);
     const result = await ctx.db.query("students").withIndex("by_seasonId_and_active", q => q.eq("seasonId", season._id).eq("active", true)).paginate(boundedOptions(args.paginationOpts));
     if (result.page.length > 20) throw new Error("Student page exceeded its supported size.");
-    return { ...result, page: result.page.map(student => ({ studentId: student._id, name: student.preferredName || student.legalName })) };
+    return { ...result, page: result.page.map(student => ({ studentId: student._id, name: student.legalName || student.preferredName })) };
   },
 });
 

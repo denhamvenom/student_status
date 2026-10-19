@@ -1,5 +1,12 @@
 # Student Status implementation plan
 
+## October 19 legal student names and Money scrolling
+
+Student lists and financial/report projections now prefer the stored full legal name, with preferred name only as a fallback. Preferred-name editing and immutable signed records are preserved. Money uses the full content width; its focusable table scrolls vertically and horizontally with sticky column headings. Phone account cards remain available.
+
+Verification: focused backend tests and source review passed. Actual Money component with fictional rows checked at desktop/light, narrower desktop with keyboard scrolling, and phone/dark; no page-width overflow. No payment writes or production deployment. Parent-login chat owns the coordinated development sync and overlapping SetupWizard/Mentor/permission-export labels. Authenticated local review is pending Coach sign-in.
+
+
 ## Linked Calendar production release (PR21)
 
 Implemented event create/link, Media Support Requested, linked title/schedule/location/cancellation sync, conflict recovery and permission/cancellation safeguards. Development and source/synthetic verification passed. Calendar editor sharing verified; development Calendar writes explicitly prohibited and blocked in code. Production backend deployed and Calendar connection enabled under explicit owner authorization. Production authentication and writer access verified without Calendar changes. Exact website build outcomes are recorded in PR21; real-event end-to-end saving remains unperformed. See [scope and evidence](EVENT_CALENDAR_SYNC.md).

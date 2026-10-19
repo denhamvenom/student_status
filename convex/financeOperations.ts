@@ -53,7 +53,7 @@ export const operationOptions = query({
       state: maintenance && maintenance.state !== "ready" ? maintenance.state === "failed" ? "failed" as const : "updating" as const : account.state === "ready" ? "ready" as const : account.state === "failed" ? "failed" as const : "updating" as const, sourceCount: account.sourceCount, chargeCount: account.chargeCount,
       personalAvailableCents: account.personalAvailableCents,
       fundraisingAvailableCents: account.fundraisingAvailableCents,
-      recipients: recipients.filter(x => x.active && x._id !== student._id).map(x => ({ _id: x._id, name: x.preferredName || x.legalName })),
+      recipients: recipients.filter(x => x.active && x._id !== student._id).map(x => ({ _id: x._id, name: x.legalName || x.preferredName })),
     };
   },
 });

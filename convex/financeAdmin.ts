@@ -19,7 +19,7 @@ export const students = query({
     const page = await Promise.all(result.page.map(async student => {
       const { account, ...projection } = await financeRow(ctx, student._id);
       const writable = !maintenance || maintenance.state === "ready";
-      return { studentId: student._id, name: student.preferredName || student.legalName, active: student.active, ...projection, canRecord: projection.state === "ready" && writable && student.active && (actor.role === "coach" || actor.financialEdit), canView: student.active, canRebuild: actor.role === "coach" && (!maintenance || ["ready", "failed"].includes(maintenance.state)) && (!account || ["ready", "failed", "uninitialized"].includes(account.state) && !account.operationJobId && !account.allocationJobId && !account.fundraiserJobId) };
+      return { studentId: student._id, name: student.legalName || student.preferredName, active: student.active, ...projection, canRecord: projection.state === "ready" && writable && student.active && (actor.role === "coach" || actor.financialEdit), canView: student.active, canRebuild: actor.role === "coach" && (!maintenance || ["ready", "failed"].includes(maintenance.state)) && (!account || ["ready", "failed", "uninitialized"].includes(account.state) && !account.operationJobId && !account.allocationJobId && !account.fundraiserJobId) };
     }));
     return { ...result, page, seasonId: season._id, maintenance };
   },
@@ -35,7 +35,7 @@ export const recentChanges = query({
     const coverage = await ctx.db.query("financeChangeBackfills").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).unique();
     const page = await Promise.all(result.page.map(async item => {
       const [student, actor, fee] = await Promise.all([item.studentId ? ctx.db.get(item.studentId) : null, ctx.db.get(item.actorId), item.feeDefinitionId ? ctx.db.get(item.feeDefinitionId) : null]);
-      return { feeDefinitionId: item.feeDefinitionId ?? null, feeLabel: item.feeDefinitionId ? fee?.label ?? "Fee definition unavailable" : null, changeId: item._id, studentId: item.studentId ?? null, studentName: student?.preferredName || student?.legalName || (item.studentId ? "Archived student" : null), actorName: actor?.name ?? "Archived account", occurredAt: item.occurredAt, kind: item.kind, state: item.state, meaning: item.meaning, beforeCents: item.beforeCents, afterCents: item.afterCents, deltaCents: item.deltaCents, reason: item.reason, sourceKind: item.sourceKind ?? null, sourceType: item.sourceType, sourceId: item.sourceId, historical: item.historical };
+      return { feeDefinitionId: item.feeDefinitionId ?? null, feeLabel: item.feeDefinitionId ? fee?.label ?? "Fee definition unavailable" : null, changeId: item._id, studentId: item.studentId ?? null, studentName: student?.legalName || student?.preferredName || (item.studentId ? "Archived student" : null), actorName: actor?.name ?? "Archived account", occurredAt: item.occurredAt, kind: item.kind, state: item.state, meaning: item.meaning, beforeCents: item.beforeCents, afterCents: item.afterCents, deltaCents: item.deltaCents, reason: item.reason, sourceKind: item.sourceKind ?? null, sourceType: item.sourceType, sourceId: item.sourceId, historical: item.historical };
     }));
     return { ...result, page, seasonId: season._id, coverage: { state: coverage?.state === "complete" ? "ready" as const : coverage?.state === "failed" ? "failed" as const : "updating" as const, startedAt: coverage?.startedAt ?? null, completedAt: coverage?.completedAt ?? null } };
   },
