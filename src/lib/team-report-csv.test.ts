@@ -13,6 +13,8 @@ describe('loaded team report CSV',()=>{
     expect(csv).toContain('"\'=HYPERLINK(""bad"")"')
     expect(csv).toContain('"0","Unavailable","Unavailable","Unknown","0"')
     expect(csv).toContain('"Readiness unavailable","\'+private requirement"')
+    expect(csv).toContain('"Build"')
+    expect(csv).not.toContain('"Mechanical"')
     expect(csv).not.toContain('PRIVATE HEALTH')
   })
   it('marks an open selected-event requirement Draft even when the loaded scope is complete',()=>{
@@ -21,5 +23,15 @@ describe('loaded team report CSV',()=>{
     expect(teamReportStatus([row],scope)).toBe('Draft')
     expect(teamReportStatus([{...row,selectedEvent:{state:'ready',outstanding:[]}}],scope)).toBe('Complete')
     expect(teamReportStatus([{...row,selectedEvent:null}],{...scope,selectedEvent:null,selectedEventAt:null})).toBe('Draft')
+  })
+  it('keeps not-counted attendance distinct from a counted zero in exports', () => {
+    const row = { name: 'Synthetic', subteam: 'Outreach', travelTeam: false, finance: { chargedCents: 0, paidCents: 0, dueCents: 0, raisedCents: 0, travelAccountCents: 0 }, attendance: null, eventsCount: 0, selectedEvent: null }
+    const scope = { seasonId: 'synthetic', asOf: 0, selectedEvent: null, selectedEventAt: null, subteam: '', outstandingOnly: false, loadedCount: 1, filteredCount: 1, hasMore: false, attendanceState: 'unknownKickoff', eventsCoverage: 'complete' }
+    const before = teamReportCsv([row], scope)
+    expect(before).toContain('"Business/Media"')
+    expect(before).toContain('"Not counted yet"')
+    const after = teamReportCsv([{ ...row, attendance: { offTuesday: 0, offThursday: 0, offOutreach: 0, buildWeekday: 0, buildSaturday: 0, buildSunday: 0, buildOutreach: 0 } }], { ...scope, attendanceState: 'ready' })
+    expect(after).not.toContain('"Not counted yet"')
+    expect(after).toContain('"0","0","0"')
   })
 })

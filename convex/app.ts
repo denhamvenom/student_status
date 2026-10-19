@@ -239,14 +239,28 @@ export const setTheme = mutation({
   handler: async (ctx, args) => { const user = await requireViewer(ctx); await ctx.db.patch(user._id, { theme: args.theme }); return null; },
 });
 
+/** The signed-in applicant sees only their current-season request. */
+export const joinStatus = query({
+  args: {},
+  returns: v.object({ status: v.union(v.literal("none"), v.literal("pending"), v.literal("declined"), v.literal("approved")) }),
+  handler: async ctx => {
+    const who = await identity(ctx);
+    const season = await activeSeason(ctx);
+    const latest = await ctx.db.query("joinRequests").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).order("desc").first();
+    return { status: latest?.seasonId === season._id ? latest.status : "none" as const };
+  },
+});
+
 export const requestJoin = mutation({
   args: { code: v.string(), firstName: v.string(), lastName: v.string() }, returns: v.union(v.id("joinRequests"), v.null()),
   handler: async (ctx, args) => {
     const who = await identity(ctx);
     if (!who.email) throw new Error("A Google email is required.");
-    const existing = await ctx.db.query("joinRequests").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).first();
-    if (existing) return existing._id;
     const season = await activeSeason(ctx);
+    const latest = await ctx.db.query("joinRequests").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).order("desc").first();
+    const existing = latest?.seasonId === season._id ? latest : null;
+    if (existing?.status === "pending") return existing._id;
+    if (existing?.status === "approved") return null;
     const now = Date.now();
     const attempts = await ctx.db.query("joinAttempts").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique();
     if (attempts && attempts.lockedUntil > now) return null;
@@ -260,6 +274,10 @@ export const requestJoin = mutation({
     if (attempts) await ctx.db.patch(attempts._id, { failed: 0, lockedUntil: 0 });
     const firstName = args.firstName.trim(); const lastName = args.lastName.trim();
     if (!firstName || !lastName || firstName.length > 80 || lastName.length > 80) throw new Error("Enter your first and last name.");
+    if (existing) {
+      await ctx.db.patch(existing._id, { email: who.email.toLowerCase(), firstName, lastName, status: "pending", createdAt: now, decidedAt: undefined, decidedBy: undefined });
+      return existing._id;
+    }
     return await ctx.db.insert("joinRequests", { authUserId: who.authUserId, email: who.email.toLowerCase(), firstName, lastName, seasonId: season._id, status: "pending", createdAt: now });
   },
 });

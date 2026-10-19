@@ -72,3 +72,15 @@ export const familyCopy = {
     sampleAttestation: "I confirm that I am this student's parent or legal guardian and have authority to act for this student.",
   },
 } as const
+
+export const moneyMeanings = {
+  due: 'The amount still needed to cover charges.',
+  charged: 'The total cost of charges on this account.',
+  applied: 'Personal payments and fundraising credit already used for charges.',
+  available: 'Unused personal payments and fundraising credit available for charges.',
+  personal: 'Personal payments that have not yet been used for charges.',
+  fundraising: 'Fundraising credit that has not yet been used for charges.',
+  raised: 'The full amount raised before the team and student shares are split.',
+  earned: 'The student share earned from fundraisers.',
+  transfers: 'Credit received from another account or season.',
+} as const

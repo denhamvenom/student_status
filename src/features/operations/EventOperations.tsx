@@ -7,6 +7,7 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import styles from "./Operations.module.css";
+import { WholeTeamLeaveNotices } from "../../Withdrawals";
 
 type Row = { participantId: string; studentId: Id<"students">; name: string; status: string; signedUpAt: number; active: boolean };
 type Requirement = { key: string; label: string; instructions?: string; url?: string; dueAt?: number };
@@ -14,7 +15,7 @@ type Requirement = { key: string; label: string; instructions?: string; url?: st
 function when(value?: number | null) { return value ? new Date(value).toLocaleString("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }) : operationsCopy.event.notSet; }
 function localDate(value?: number | null) { if (!value) return ""; const d = new Date(value); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); }
 
-export function EventOperations({ eventId }: { eventId: Id<"events"> }) {
+export function EventOperations({ eventId, coach=false }: { eventId: Id<"events">; coach?:boolean }) {
   const data = useQuery(api.eventOperations.workspace, { eventId });
   const review = useMutation(api.eventOperations.reviewSignup);
   const settings = useMutation(api.eventOperations.updateSettings);
@@ -70,6 +71,7 @@ export function EventOperations({ eventId }: { eventId: Id<"events"> }) {
       {waitlist.length > 0 && <div><h3 className="font-semibold">{operationsCopy.event.waitlist}</h3><ol className={styles.sectionRows}>{waitlist.map((p, i) => <li className={styles.sectionRow} key={p.participantId}><span className="min-w-40">{i + 1}. {p.name} · {when(p.signedUpAt)}</span><Button disabled={busy || i !== 0 || data.available === 0} onClick={() => void act(() => review({ eventId, studentId: p.studentId, decision: "promote" }), operationsText.event.promoted(p.name))}>{operationsCopy.event.promote}</Button><Button variant="outline" disabled={busy || !reason.trim()} onClick={() => void act(() => review({ eventId, studentId: p.studentId, decision: "decline", reason: reason.trim() }), operationsText.event.removedFromWaitlist(p.name))}>{operationsCopy.event.decline}</Button></li>)}</ol></div>}
       {(pending.length > 0 || waitlist.length > 0) && <label className="block">{operationsCopy.event.reasonForDeclining} <Input value={reason} onChange={e => setReason(e.target.value)} maxLength={500} /></label>}
       {confirmed.length > 0 && <p>{operationsCopy.event.confirmed} {confirmed.map(p => p.name).join(", ")}</p>}
+      {event.assignmentScope==="wholeTeam"&&<WholeTeamLeaveNotices eventId={eventId} coach={coach}/>}
     </CardContent></Card></div></details>
     {canEdit && <details className={styles.disclosure}><summary><strong>{operationsCopy.event.eventSettings}</strong><span>{operationsText.event.signupCloses(when(event.signupClosesAt))}</span></summary><div className={styles.disclosureBody}><Card><CardHeader><CardTitle>{operationsCopy.event.eventSettings}</CardTitle></CardHeader><CardContent><form className="form-grid" onSubmit={submitSettings}>
       {event.signupMode !== "assigned" && <><label>{operationsCopy.event.capacityNoLimit} <Input type="number" min="1" max="500" value={capacityValue} onChange={e => setCapacity(e.target.value)} /></label><label>{operationsCopy.event.signupClosesLocal} <Input type="datetime-local" value={signupValue} onChange={e => setSignupDeadline(e.target.value)} /></label></>}

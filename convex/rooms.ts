@@ -202,7 +202,7 @@ export const respond = mutation({
 });
 
 export const finalize = mutation({
-  args: { groupId: v.id("roomGroups"), allowFifth: v.boolean(), reason: v.optional(v.string()) }, returns: v.null(),
+  args: { groupId: v.id("roomGroups"), allowFifth: v.boolean(), reason: v.optional(v.string()), expectedMembers: v.optional(v.array(v.id("students"))) }, returns: v.null(),
   handler: async (ctx, args) => {
     const user = await viewer(ctx);
     if (user.role !== "coach" && !user.travelLead) throw new Error("Room finalization denied.");
@@ -211,6 +211,7 @@ export const finalize = mutation({
     if (!event || event.archived || event.seasonId !== season._id || !event.overnight || !event.roomingEnabled) throw new Error("Room group is unavailable.");
     requireEnrollmentComplete(event);
     const members = await ctx.db.query("roomMemberships").withIndex("by_groupId", q => q.eq("groupId", group._id)).take(6);
+    if (args.expectedMembers && (args.expectedMembers.length !== members.length || new Set(args.expectedMembers).size !== members.length || members.some(member => !args.expectedMembers!.includes(member.studentId)))) throw new Error("Room members changed. Close this confirmation and review the room again.");
     if (!members.length) throw new Error("An empty room cannot be finalized.");
     if (members.length > 5 || members.length === 5 && (!args.allowFifth || !args.reason?.trim())) throw new Error("A fifth occupant requires an adult reason; six are never allowed.");
     if (event.roomDeadline !== undefined && Date.now() > event.roomDeadline && !args.reason?.trim()) throw new Error("A reason is required after the room deadline.");

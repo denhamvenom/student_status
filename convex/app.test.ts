@@ -107,6 +107,34 @@ describe("server boundaries", () => {
     expect(await f.t.withIdentity({ subject: `${authJoiner}|sessionB` }).mutation(api.app.requestJoin, { code: code.code, firstName: "Jo", lastName: "Iner" })).toBe(requestId);
   });
 
+  it("keeps join status across sessions and validates a new code after a decline", async () => {
+    const f = await fixture();
+    const authJoiner = await f.t.run(ctx => ctx.db.insert("users", { email: "new.joiner@example.invalid", name: "New Joiner" }));
+    const joiner = f.t.withIdentity({ subject: `${authJoiner}|first` });
+    const secondSession = f.t.withIdentity({ subject: `${authJoiner}|second` });
+    expect(await joiner.query(api.app.joinStatus, {})).toEqual({ status: "none" });
+    const code = await f.coach.mutation(api.admin.createJoinCode, { duration: "1w" });
+    const requestId = await joiner.mutation(api.app.requestJoin, { code: code.code, firstName: "New", lastName: "Joiner" });
+    expect(await secondSession.query(api.app.joinStatus, {})).toEqual({ status: "pending" });
+    await f.t.run(ctx => ctx.db.patch(requestId!, { status: "declined", decidedAt: 10 }));
+    expect(await secondSession.query(api.app.joinStatus, {})).toEqual({ status: "declined" });
+    expect(await secondSession.mutation(api.app.requestJoin, { code: "wrong", firstName: "New", lastName: "Joiner" })).toBeNull();
+    expect(await joiner.query(api.app.joinStatus, {})).toEqual({ status: "declined" });
+    expect(await secondSession.mutation(api.app.requestJoin, { code: code.code, firstName: "New", lastName: "Joiner" })).toBe(requestId);
+    expect(await joiner.query(api.app.joinStatus, {})).toEqual({ status: "pending" });
+  });
+
+  it("lists active team codes only to a Coach and removes revoked codes", async () => {
+    const f = await fixture();
+    const code = await f.coach.mutation(api.admin.createJoinCode, { duration: "1w" });
+    const asOf = Date.now();
+    const list = await f.coach.query(api.admin.activeJoinCodes, { asOf });
+    expect(list.items).toEqual([expect.objectContaining({ code: code.code })]);
+    await expect(f.mentor.query(api.admin.activeJoinCodes, { asOf })).rejects.toThrow("coach only");
+    await f.coach.mutation(api.admin.revokeJoinCode, { codeId: list.items[0].codeId });
+    expect((await f.coach.query(api.admin.activeJoinCodes, { asOf })).items).toEqual([]);
+  });
+
   it("commits invalid join attempts and locks the account after five failures", async () => {
     const f = await fixture();
     const authJoiner = await f.t.run(ctx => ctx.db.insert("users", { email: "locked@example.org", name: "Locked" }));
@@ -205,3 +233,39 @@ describe("server boundaries", () => {
     await f.t.run(async ctx => { const parent = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", f.ids.authParent)).unique(); if (!parent) throw new Error("Parent missing"); const link = await ctx.db.query("familyLinks").withIndex("by_parentUserId_and_studentId", q => q.eq("parentUserId", parent._id).eq("studentId", f.ids.other)).unique(); if (!link) throw new Error("Link missing"); await ctx.db.patch(link._id, { active: false }); });
     await expect(f.parent.query(api.app.studentProfile, { studentId: f.ids.other })).rejects.toThrow("permission");
   });});
+
+
+describe('Batch 4 workflow summaries and confirmation checks', () => {
+  it('counts only pending signups and rejects family access to staff counts', async () => {
+    const f = await fixture();
+    await f.t.run(async ctx => {
+      await ctx.db.insert('participants', {eventId:f.ids.event,studentId:f.ids.student,status:'pending',createdAt:1,updatedAt:1});
+      await ctx.db.insert('participants', {eventId:f.ids.event,studentId:f.ids.other,status:'waitlist',createdAt:2,updatedAt:2});
+    });
+    expect(await f.coach.query(api.workflowSummaries.waitingSignups,{eventId:f.ids.event})).toEqual({count:1,more:false});
+    await expect(f.student.query(api.workflowSummaries.waitingSignups,{eventId:f.ids.event})).rejects.toThrow('Staff access');
+    await f.t.run(ctx=>ctx.db.patch(f.ids.event,{archived:true}));
+    await expect(f.coach.query(api.workflowSummaries.waitingSignups,{eventId:f.ids.event})).rejects.toThrow('unavailable');
+  });
+  it('distinguishes unconfirmed health entries without exposing them to a student', async () => {
+    const f = await fixture();
+    expect(await f.coach.query(api.workflowSummaries.healthStatus,{studentId:f.ids.student})).toBe('entered');
+    await f.t.run(ctx=>ctx.db.patch(f.ids.student,{allergies:{state:'unknown'},medications:{state:'unknown'}}));
+    expect(await f.coach.query(api.workflowSummaries.healthStatus,{studentId:f.ids.student})).toBe('missing');
+    await expect(f.student.query(api.workflowSummaries.healthStatus,{studentId:f.ids.student})).rejects.toThrow();
+  });
+  it('rejects a room confirmation whose reviewed membership has changed', async () => {
+    const f = await fixture();
+    const groupId = await f.t.run(async ctx => {
+      await ctx.db.patch(f.ids.event,{overnight:true,roomingEnabled:true});
+      const groupId=await ctx.db.insert('roomGroups',{eventId:f.ids.event,name:'Reviewed room',category:'Boys',finalized:false,needsReview:false,adultFifthException:false,createdBy:(await ctx.db.get(f.ids.student))!.userId!});
+      await ctx.db.insert('roomMemberships',{eventId:f.ids.event,groupId,studentId:f.ids.student,joinedAt:1});
+      await ctx.db.insert('participants',{eventId:f.ids.event,studentId:f.ids.student,status:'confirmed',createdAt:1,updatedAt:1});
+      return groupId;
+    });
+    await expect(f.coach.mutation(api.rooms.finalize,{groupId,allowFifth:false,expectedMembers:[f.ids.other]})).rejects.toThrow('Room members changed');
+    expect((await f.t.run(ctx=>ctx.db.get(groupId)))?.finalized).toBe(false);
+    await f.coach.mutation(api.rooms.finalize,{groupId,allowFifth:false,expectedMembers:[f.ids.student]});
+    expect((await f.t.run(ctx=>ctx.db.get(groupId)))?.finalized).toBe(true);
+  });
+});

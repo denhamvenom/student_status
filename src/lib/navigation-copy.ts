@@ -23,8 +23,8 @@ const n = navigationCopy.labels
 export const menu: Record<string, [string, string][]> = {
   student: [[n.status,'/'],[n.events,'/events'],[n.finances,'/finances'],[n.attendance,'/attendance'],[n.profileHealth,'/profile'],[n.parents,'/parents'],[n.settings,'/settings']],
   parent: [[n.status,'/'],[n.events,'/events'],[n.finances,'/finances'],[n.attendance,'/attendance'],[n.studentProfile,'/profile'],[n.permissionForm,'/forms'],[n.settings,'/settings']],
-  coach: [[n.team,'/'],[n.events,'/events'],[n.readiness,'/readiness'],[n.withdrawals,'/withdrawals'],[n.drivers,'/drivers'],[n.finances,'/finances'],[n.fundraising,'/fundraising'],[n.permissionForms,'/permissions'],[n.reports,'/reports'],[n.joinRequests,'/enroll'],[n.usersRoles,'/adults'],[readinessCopy.navigation.attendance,'/attendance'],[n.season,'/season'],[readinessCopy.navigation.archived,'/retention'],[n.settings,'/settings']],
-  travelLead: [[n.team,'/'],[n.joinRequests,'/enroll'],[n.events,'/events'],[n.readiness,'/readiness'],[n.withdrawals,'/withdrawals'],[n.drivers,'/drivers'],[n.finances,'/finances'],[n.fundraising,'/fundraising'],[n.permissionForms,'/permissions'],[n.reports,'/reports'],[n.myProfile,'/myprofile'],[n.settings,'/settings']],
+  coach: [[n.team,'/'],[n.events,'/events'],[n.readiness,'/readiness'],[n.withdrawals,'/withdrawals'],[n.drivers,'/drivers'],[n.finances,'/finances'],[n.fundraising,'/fundraising'],[n.permissionForms,'/permissions'],[n.reports,'/reports'],[n.joinRequests,'/enroll'],[n.usersRoles,'/adults'],[readinessCopy.navigation.attendance,'/attendance'],[n.season,'/season'],['Money tools','/money-tools'],[readinessCopy.navigation.archived,'/retention'],[n.settings,'/settings']],
+  travelLead: [[n.team,'/'],[n.joinRequests,'/enroll'],[n.events,'/events'],[n.readiness,'/readiness'],[n.withdrawals,'/withdrawals'],[n.drivers,'/drivers'],[n.finances,'/finances'],[n.fundraising,'/fundraising'],[n.permissionForms,'/permissions'],[n.reports,'/reports'],['Money tools','/money-tools'],[n.myProfile,'/myprofile'],[n.settings,'/settings']],
   mentor: [[n.teamReport,'/'],[n.myProfile,'/myprofile'],[n.settings,'/settings']],
 }
 

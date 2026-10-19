@@ -107,6 +107,7 @@ import type * as seasonHistory from "../seasonHistory.js";
 import type * as seasonTransition from "../seasonTransition.js";
 import type * as seasonTransitionReview from "../seasonTransitionReview.js";
 import type * as setupWizard from "../setupWizard.js";
+import type * as subteamMigration from "../subteamMigration.js";
 import type * as syntheticRehearsalCleanup from "../syntheticRehearsalCleanup.js";
 import type * as teamReports from "../teamReports.js";
 import type * as timeclock from "../timeclock.js";
@@ -114,6 +115,7 @@ import type * as timeclockPinControl from "../timeclockPinControl.js";
 import type * as timeclockRoster from "../timeclockRoster.js";
 import type * as travel from "../travel.js";
 import type * as withdrawals from "../withdrawals.js";
+import type * as workflowSummaries from "../workflowSummaries.js";
 
 import type {
   ApiFromModules,
@@ -221,6 +223,7 @@ declare const fullApi: ApiFromModules<{
   seasonTransition: typeof seasonTransition;
   seasonTransitionReview: typeof seasonTransitionReview;
   setupWizard: typeof setupWizard;
+  subteamMigration: typeof subteamMigration;
   syntheticRehearsalCleanup: typeof syntheticRehearsalCleanup;
   teamReports: typeof teamReports;
   timeclock: typeof timeclock;
@@ -228,6 +231,7 @@ declare const fullApi: ApiFromModules<{
   timeclockRoster: typeof timeclockRoster;
   travel: typeof travel;
   withdrawals: typeof withdrawals;
+  workflowSummaries: typeof workflowSummaries;
 }>;
 
 /**

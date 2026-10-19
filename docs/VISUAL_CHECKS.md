@@ -1,5 +1,18 @@
 # Visual review closed — October 16, 2026
 
+## October 18 Batch 4 current checks
+
+| Check | Evidence / remaining work |
+|---|---|
+| Coach waiting counts, Money tools, Revoke access | Dark phone: observed; confirmation opened and Cancel preserved access |
+| Travel Lead New event, Costs, Money tools | Dark desktop: draft reached fee input and Cancel; no financial editing grant, no bulk payment or matching tools |
+| Five-subteam filter | Travel Lead roster shows exact final list; legacy Mechanical displays as Build; no stored conversion |
+| Parent family workflows | Dark desktop Money definitions, positive Available funds on Home and signup guidance observed; no eligible travel checkbox exercised |
+| Student family workflows | Dark desktop Home available funds, read-only independent travel, Whole Team leave confirmation and Cancel observed; participation remained confirmed |
+| Light theme and other state combinations | Not freshly observed; source review and tests remain distinct from live evidence |
+
+See [Batch 4 report](audit-2026-10-18/batch-4-report.md). Earlier tables below are historical.
+
 ## October 18 Batch 3 current checks
 
 | Check | Evidence / remaining work |

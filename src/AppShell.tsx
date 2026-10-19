@@ -40,9 +40,9 @@ export function AppShell({ children, viewer, familyContext, role = "coach" }: { 
     [nav.team]: [[nav.team, '/'], [nav.joinRequests, '/enroll'], [nav.attendance, '/attendance'], [nav.reports, '/reports']],
     [nav.events]: [[nav.events, '/events'], [nav.readiness, '/readiness'], [nav.permissionForms, '/permissions'], [nav.drivers, '/drivers'], [nav.withdrawals, '/withdrawals']],
     [nav.money]: [[nav.money, '/finances'], [nav.fundraising, '/fundraising']],
-    [nav.admin]: [[nav.users, '/adults'], [nav.season, '/season'], [nav.archived, '/retention'], [nav.settings, '/settings']],
+    [nav.admin]: [[nav.users, '/adults'], [nav.season, '/season'], [nav.archived, '/retention'], ['Money tools', '/money-tools'], [nav.settings, '/settings']],
   }
-  if (role === 'travelLead') { delete groups[nav.admin]; groups[uiCopy.navigation.account] = [[navigationCopy.labels.myProfile, '/myprofile'], [nav.settings, '/settings']] }
+  if (role === 'travelLead') { groups[nav.money].push(['Money tools', '/money-tools']); delete groups[nav.admin]; groups[uiCopy.navigation.account] = [[navigationCopy.labels.myProfile, '/myprofile'], [nav.settings, '/settings']] }
   const allowed = menu[role] ?? menu.mentor
   const staff = role === 'coach' || role === 'travelLead'
   const allowedPaths = new Set(allowed.map(([, path]) => path))

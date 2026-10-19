@@ -177,9 +177,9 @@ export const setIndependentTravel = mutation({
   args: { eventId: v.id("events"), studentId: v.id("students"), independentTravel: v.boolean() }, returns: v.null(),
   handler: async (ctx, args) => {
     const user = await viewer(ctx);
+    if (user.role !== "parent" && user.role !== "coach") throw new Error("Only a parent or Coach can set independent travel.");
     const event = await currentEvent(ctx, args.eventId);
     const student = await studentAccess(ctx, user, args.studentId);
-    if (user.role === "mentor" && !user.travelLead) throw new Error("Travel setting access denied.");
     if (student.seasonId !== event.seasonId) throw new Error("Student and event seasons do not match.");
     const participant = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
     if (!participant || participant.status !== "confirmed") throw new Error("Only confirmed participants can set independent travel.");

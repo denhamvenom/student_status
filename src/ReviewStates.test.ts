@@ -62,6 +62,7 @@ describe('synthetic review states', () => {
   it('offers a guarded retry to a Coach when withdrawal processing fails', () => {
     mock.queryQueue = [
       [{requestId:'synthetic-request',eventId,studentId}],
+      [],
       {studentName:'Synthetic student',eventName:'Synthetic event',requestStatus:'processing',canRetry:true,progress:{jobId:'synthetic-job',state:'failed',committedCents:100,totalCents:200,lastError:'Synthetic return failed'}},
     ]
     const view = html(createElement(WithdrawalQueue))

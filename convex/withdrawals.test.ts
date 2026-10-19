@@ -71,6 +71,47 @@ async function finish(f: Awaited<ReturnType<typeof fixture>>) {
 }
 
 describe("withdrawal decisions", () => {
+  it("lets a student leave a free Whole Team event immediately and records a dismissible Coach notice", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await t.run(async ctx => {
+      const coachAuth = await ctx.db.insert("users", { email: "coach@example.invalid", name: "Synthetic Coach" });
+      const coach = await ctx.db.insert("appUsers", { authUserId: coachAuth, email: "coach@example.invalid", name: "Synthetic Coach", role: "coach", travelLead: false, financialEdit: false, active: true });
+      const studentAuth = await ctx.db.insert("users", { email: "student@example.invalid", name: "Synthetic Student" });
+      const studentUser = await ctx.db.insert("appUsers", { authUserId: studentAuth, email: "student@example.invalid", name: "Synthetic Student", role: "student", travelLead: false, financialEdit: false, active: true });
+      const season = await ctx.db.insert("seasons", { name: "Synthetic", year: 2026, status: "active", startsAt: 0, permissionVersion: "DRAFT", createdBy: coach });
+      const student = await ctx.db.insert("students", { seasonId: season, userId: studentUser, legalName: "Synthetic Student", preferredName: "Synthetic", email: "student@example.invalid", subteam: "A", active: true, travelTeam: true, roomCategoryLocked: false, allergies: { state: "unknown" }, medications: { state: "unknown" } });
+      const event = await ctx.db.insert("events", { seasonId: season, name: "Synthetic Whole Team", type: "Team", startsAt: 100, endsAt: 200, destination: "Example", travel: "Families provide transportation", overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "assigned", assignmentScope: "wholeTeam", allowWithdrawal: false, permissionRequired: false, firstRequired: false, archived: false });
+      const participant = await ctx.db.insert("participants", { eventId: event, studentId: student, status: "confirmed", createdAt: 0, updatedAt: 0 });
+      return { coachAuth, studentAuth, event, participant };
+    });
+    const student=t.withIdentity({subject:`${ids.studentAuth}|session`});
+    const coach=t.withIdentity({subject:`${ids.coachAuth}|session`});
+    expect(await student.mutation(api.withdrawals.leaveWholeTeam,{eventId:ids.event})).toEqual({moneyReviewPending:false});
+    expect(await student.mutation(api.withdrawals.leaveWholeTeam,{eventId:ids.event})).toEqual({moneyReviewPending:false});
+    expect((await t.run(ctx=>ctx.db.get(ids.participant)))?.status).toBe("withdrawn");
+    const notices=await coach.query(api.withdrawals.wholeTeamLeaveNotices,{});
+    expect(notices).toHaveLength(1);
+    expect(notices[0]).toMatchObject({eventId:ids.event,eventName:"Synthetic Whole Team",studentName:"Synthetic"});
+    await expect(student.mutation(api.withdrawals.dismissWholeTeamLeaveNotice,{noticeId:notices[0].noticeId})).rejects.toThrow("Only a Coach");
+    await coach.mutation(api.withdrawals.dismissWholeTeamLeaveNotice,{noticeId:notices[0].noticeId});
+    expect(await coach.query(api.withdrawals.wholeTeamLeaveNotices,{})).toEqual([]);
+    expect(await coach.query(api.withdrawals.wholeTeamLeaveNotices,{eventId:ids.event})).toEqual([]);
+  });
+
+  it("releases a paid Whole Team place before the separate fee decision", async () => {
+    const f=await fixture();
+    await f.t.run(ctx=>ctx.db.patch(f.ids.event,{signupMode:"assigned",assignmentScope:"wholeTeam",allowWithdrawal:false}));
+    expect(await f.student.mutation(api.withdrawals.leaveWholeTeam,{eventId:f.ids.event})).toEqual({moneyReviewPending:true});
+    expect((await f.t.run(ctx=>ctx.db.get(f.ids.participant)))?.status).toBe("withdrawn");
+    const queue=await f.coach.query(api.withdrawals.pendingWithdrawals,{});
+    expect(queue).toHaveLength(1);
+    const preview=await f.coach.query(api.withdrawals.withdrawalPreview,{eventId:f.ids.event,studentId:f.ids.student});
+    expect(preview).toMatchObject({wholeTeamLeft:true,status:"withdrawn",requestStatus:"pending"});
+    await f.coach.mutation(api.withdrawals.reviewWithdrawal,{requestId:queue[0].requestId,decision:"retain",cancelUnpaidMain:true,reason:"Retain paid fee",expectedRevision:preview.revision});
+    await finish(f);
+    expect((await f.t.run(ctx=>ctx.db.get(f.ids.participant)))?.status).toBe("withdrawn");
+    expect((await f.t.run(ctx=>ctx.db.get(queue[0].requestId)))?.status).toBe("approved");
+  });
   it("preserves reservation while pending or denied, then releases room and capacity with source-preserving full return", async () => {
     const f = await fixture();
     const requestId = await f.student.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.event, idempotencyKey: "request-one" });
