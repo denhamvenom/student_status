@@ -2,6 +2,14 @@
 
 ## October 19 Resend connection and real delivery test
 
+## October 19 charge review wording
+
+Implemented frontend-only simplification: View charge details; Review students and charges; explicit eight-character Reason input guidance; student names, planned/current amounts and readable saved/pending/review status replace internal revisions and processing counters. New unposted charges no longer produce false load errors. Missing existing charges still need review; held rows retain their explanation. Partial money release amounts and all confirmation/retry safeguards remain. No backend or production data changes.
+
+Validation: integrated lint/typecheck, 425 tests and build passed (existing bundle-size warning); final held-row wording refinement passed 14 focused tests and source lint. Independent review found the held-row case and it was corrected. Rendered-markup evidence only; fresh authenticated browser/phone/theme comparison remains pending. Owner authorized PR18 merge and production frontend deployment on October 19; deployment verification is in progress.
+
+## Bulk Invite notes carried from PR17 (historical pre-merge status)
+
 Owner authorized connecting the key to development and one real test email. Resend domain team8044.org verified; sending-only domain-restricted key stored in ignored .env.resend.local. Four server settings installed only on development third-bandicoot-18: key, sender notifications@team8044.org, reply address coach@team8044.org, and automatic sending=false. One direct provider connectivity test to the owner's designated recipient was reported delivered by Resend. This was not a student/parent invitation and does not prove Google redemption. No code sync, main merge, production environment change or deployment occurred. Automatic invitation sending and the application-origin setting still require development integration before a full invitation rehearsal. Earlier local-only restrictions below are superseded only for these explicitly authorized settings and test-email actions. Private receipt/screenshot remain ignored under .test-temp/resend-setup/.
 
 ## Parent email invitations — October 19 local candidate

@@ -139,7 +139,7 @@ function BulkPreparationForm({ kind, definition, disabled, onDismiss, onJob }: {
         {definition&&<div className={styles.scope}><Button type="button" variant={existingScope?'default':'outline'} disabled={disabled||pending} onClick={()=>setExistingScope(true)}>{copy.existingCharges}</Button><Button type="button" variant={!existingScope?'default':'outline'} disabled={disabled||pending} onClick={()=>setExistingScope(false)}>{copy.changeScope}</Button></div>}
         {existingScope?<p>{copy.existingScopeNote}</p>:<FeeScopeFields eventSelectionDisabled={!!definition} eventId={eventId} events={events.results.filter(event=>!event.archived).map(event=>({id:event.eventId,name:event.name}))} onEventChange={setEventId} scope={scope} onScopeChange={setScope} students={students.results.map(student=>({id:student.studentId,name:student.name,checked:studentIds.includes(student.studentId),disabled:studentIds.length>=500&&!studentIds.includes(student.studentId)}))} onStudentChange={(id,checked)=>setStudentIds(previous=>checked?previous.includes(id)?previous:previous.length<500?[...previous,id]:previous:previous.filter(value=>value!==id))} disabled={disabled||pending} loadingStudents={students.status==='LoadingFirstPage'||students.status==='LoadingMore'} moreStudents={students.status!=='Exhausted'} loadStudents={()=>students.loadMore(20)} loadingEvents={events.status==='LoadingFirstPage'||events.status==='LoadingMore'} moreEvents={events.status!=='Exhausted'} loadEvents={()=>events.loadMore(20)}/>}
       </>}
-      {effectiveScope==='selected'&&<p>{copy.studentsSelected}: {studentIds.length} / 500</p>}<label className={styles.field}>{copy.reason}<Input value={reason} required maxLength={1000} disabled={disabled||pending} onChange={event=>setReason(event.target.value)}/></label>
+      {effectiveScope==='selected'&&<p>{copy.studentsSelected}: {studentIds.length} / 500</p>}<label className={styles.field}>{copy.reasonInput}<Input value={reason} required maxLength={1000} disabled={disabled||pending} onChange={event=>setReason(event.target.value)}/></label>
       <Button type="submit" disabled={disabled||pending||!label.trim()||cents===null||!scopeValid||!priorReady||reason.trim().length<8}>{pending?copy.submitting:copy.prepareBulk}</Button>
       <Button type="button" variant="outline" disabled={pending} onClick={onDismiss}>{copy.dismiss}</Button>
       {error&&<p role="alert">{error}</p>}
@@ -171,15 +171,15 @@ function BulkJobHistory({definitionId,onSelect}:{definitionId:Id<'feeDefinitions
   return <div className={styles.form}><strong>{copy.history}</strong>{history.status==='LoadingFirstPage'?<p role="status">{copy.loading}</p>:<>{history.results.length===0&&<p>{copy.noHistory}</p>}{history.results.map(job=><div className={styles.historyRow} key={job._id}><strong>{copy.bulkStates[job.state]}</strong><span>{copy.bulkKinds[job.kind]} · {copy.bulkScopes[job.scope]} · {copy.targetAmount}: {chargeCurrency(job.targetAmountCents)}</span><span>{new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',dateStyle:'medium',timeStyle:'short'}).format(job.createdAt)}</span><p>{copy.reason}: {job.reason}</p><Button type="button" variant="outline" onClick={()=>onSelect(job._id)}>{copy.details}</Button></div>)}{history.status!=='Exhausted'&&<Button type="button" variant="outline" disabled={history.status!=='CanLoadMore'} onClick={()=>history.loadMore(20)}>{copy.moreHistory}</Button>}</>}</div>
 }
 
-export function BulkJobSummary({job,originalActorName,processingActorName,children}:{job:Doc<'feeBulkJobs'>;originalActorName:string;processingActorName:string;children?:ReactNode}){
+export function BulkJobSummary({job,originalActorName,children}:{job:Doc<'feeBulkJobs'>;originalActorName:string;processingActorName:string;children?:ReactNode}){
   return <Card className={styles.card}><CardTitle>{copy.bulkReceipt}</CardTitle>
     <p role={job.state==='failed'?'alert':'status'}>{copy.bulkStates[job.state]}</p>
     <p>{copy.originalScope}: {copy.bulkScopes[job.scope]} · {copy.scopeMembers}: {job.snapshotComplete?job.snapshotCount:copy.unknownScopeCount}</p>
     <p>{copy.targetAmount}: {chargeCurrency(job.targetAmountCents)}</p>
-    <p>{copy.recordsProcessed}: {job.processed} · {copy.committedRows}: {job.committed} · {copy.heldRows}: {job.held}</p>
+    <p>{copy.committedRows}: {job.committed} · {copy.heldRows}: {job.held}</p>
     {job.priorHeldJobId&&<><p>{copy.plannedSuperseded}: {job.priorHeldRows??copy.unavailable}</p><p>{copy.committedSuperseded}: {job.supersededRows}</p><p className={styles.muted}>{copy.supersedeFinalOnly}</p></>}
-    <p>{copy.requestedBy}: {originalActorName} · {copy.processedBy}: {processingActorName}</p><p>{copy.reason}: {job.reason}</p>
-    {job.lastError&&<p role="alert">{job.lastError}</p>}
+    <p>{copy.requestedBy}: {originalActorName}</p><p>{copy.reason}: {job.reason}</p>
+    {job.lastError&&<p role="alert">{copy.processingFailed}</p>}
     {children}
   </Card>
 }
@@ -221,14 +221,14 @@ function BulkJobReview({jobId,canCancel,canRetry}:{jobId:Id<'feeBulkJobs'>;canCa
     {preview?.job.state==='prepared'&&preview.job.priorHeldJobId&&preview.job.priorHeldRows!==undefined&&<PriorHeldScopeReview jobId={preview.job.priorHeldJobId} held={preview.job.priorHeldRows} disabled={pending} onReviewed={()=>setPriorReviewed(true)}/>}
     {rows.status==='LoadingFirstPage'?<p role="status">{copy.loading}</p>:<>{rows.results.map(row=><BulkRowEvidence key={row._id} row={row}>{row.canRetryChild&&<BulkChildRetry row={row} disabled={pending}/>}</BulkRowEvidence>)}{rows.status!=='Exhausted'&&<Button type="button" variant="outline" disabled={rows.status!=='CanLoadMore'||pending} onClick={()=>rows.loadMore(20)}>{copy.moreRows}</Button>}</>}
     {preview?.canCommit&&!review&&<Button type="button" disabled={pending||!priorReviewReady||rows.status!=='Exhausted'} onClick={()=>{setReview(preview);setReason('')}}>{copy.preview}</Button>}
-    {(review||canCancel)&&<form className={styles.form} onSubmit={event=>{event.preventDefault();void act(review?'commit':'cancel')}}>{review&&<><p>{copy.reviewedScope}: {review.scopeMemberCount} · {copy.targetAmount}: {chargeCurrency(review.job.targetAmountCents)}</p>{!fresh&&<p role="alert">{copy.staleReview}</p>}<p>{copy.noCash}</p></>}<label className={styles.field}>{copy.reason}<Input value={reason} required maxLength={1000} disabled={pending} onChange={event=>setReason(event.target.value)}/></label>{review&&<Button type="submit" disabled={pending||!fresh||reason.trim().length<8}>{pending?copy.submitting:copy.post}</Button>}{canCancel&&<Button type={review?'button':'submit'} variant="outline" disabled={pending||reason.trim().length<8} onClick={()=>{if(review)void act('cancel')}}>{copy.cancelPrepared}</Button>}</form>}
+    {(review||canCancel)&&<form className={styles.form} onSubmit={event=>{event.preventDefault();void act(review?'commit':'cancel')}}>{review&&<><p>{copy.reviewedScope}: {review.scopeMemberCount} · {copy.targetAmount}: {chargeCurrency(review.job.targetAmountCents)}</p>{!fresh&&<p role="alert">{copy.staleReview}</p>}<p>{copy.noCash}</p></>}<label className={styles.field}>{copy.reasonInput}<Input value={reason} required maxLength={1000} disabled={pending} onChange={event=>setReason(event.target.value)}/></label>{review&&<Button type="submit" disabled={pending||!fresh||reason.trim().length<8}>{pending?copy.submitting:copy.post}</Button>}{canCancel&&<Button type={review?'button':'submit'} variant="outline" disabled={pending||reason.trim().length<8} onClick={()=>{if(review)void act('cancel')}}>{copy.cancelPrepared}</Button>}</form>}
     {error&&<p role="alert">{error}</p>}
     {canRetry&&<form className={styles.form} onSubmit={event=>{event.preventDefault();void resume()}}><p>{copy.retryScopeNote}</p>
       {rows.results.filter(row=>row.state==='held'&&!row.correctionJobId&&!row.allocationJobId).map(row=><label className={styles.checkbox} key={row._id}><Checkbox checked={retryRows.some(selected=>selected.rowId===row._id)} disabled={pending||row.financialState!=='ready'||row.currentFinancialRevision===null||row.currentGeneration===null} onCheckedChange={checked=>{
         if(!checked){setRetryRows(previous=>previous.filter(selected=>selected.rowId!==row._id));return}
         const financialRevision=row.currentFinancialRevision,generation=row.currentGeneration
         if(financialRevision!==null&&generation!==null&&retryRows.length<20)setRetryRows(previous=>previous.some(selected=>selected.rowId===row._id)?previous:[...previous,{rowId:row._id,expectedFinancialRevision:financialRevision,expectedGeneration:generation,expectedChargeRevision:row.currentChargeRevision}])
-      }}/>{row.name} · {copy.refreshedFinancialRevision}: {row.currentFinancialRevision??copy.unavailable} · {copy.chargeRevision}: {row.currentChargeRevision??copy.unavailable}</label>)}
+      }}/>{row.name}</label>)}
       {!freshRetry&&<p role="alert">{copy.staleRetry}</p>}
       {unfinishedChild&&<p>{copy.childBeforeParent}</p>}<label className={styles.field}>{copy.retryReason}<Input value={reason} maxLength={1000} required disabled={pending} onChange={event=>setReason(event.target.value)}/></label><Button type="submit" disabled={pending||unfinishedChild||!freshRetry||reason.trim().length<8||preview?.job.state==='held'&&retryRows.length===0}>{pending?copy.submitting:copy.retry}</Button>
     </form>}
@@ -237,15 +237,16 @@ function BulkJobReview({jobId,canCancel,canRetry}:{jobId:Id<'feeBulkJobs'>;canCa
 
 type BulkRow=FunctionReturnType<typeof api.feeDefinitions.bulkRows>['page'][number]
 export function BulkRowEvidence({row,children}:{row:BulkRow;children?:ReactNode}){
+  const newCharge = !row.chargeId && row.originalExpectedChargeRevision == null
+  const currentChargeAvailable = row.currentEffectiveCents !== null && row.currentAppliedCents !== null
   return <div className={styles.historyRow}><strong>{row.name}</strong><span>{copy.rowStates[row.state]}</span>
-    <span>{copy.originalEffective}: {row.beforeEffectiveCents===undefined?copy.unavailable:chargeCurrency(row.beforeEffectiveCents)} · {copy.originalApplied}: {row.beforeAppliedCents===undefined?copy.unavailable:chargeCurrency(row.beforeAppliedCents)}</span>
-    <span>{copy.originalFinancialRevision}: {row.originalExpectedFinancialRevision??copy.unavailable} · {copy.originalChargeRevision}: {row.originalExpectedChargeRevision??copy.unavailable}</span>
-    <span>{copy.targetAmount}: {chargeCurrency(row.targetAmountCents)}</span>
-    <span>{copy.currentEffective}: {row.currentEffectiveCents===null?copy.unavailable:chargeCurrency(row.currentEffectiveCents)} · {copy.currentApplied}: {row.currentAppliedCents===null?copy.unavailable:chargeCurrency(row.currentAppliedCents)}</span>
-    <span>{copy.releaseRequired}: {row.releaseRequiredCents===null?copy.unavailable:chargeCurrency(row.releaseRequiredCents)}</span>
-    {row.childState&&<span>{copy.childStates[row.childState]}</span>}
-    {row.correctionJobId&&<span>{copy.committedRelease}: {chargeCurrency(row.committedReleaseCents)} / {chargeCurrency(row.totalReleaseCents)}</span>}
-    {row.financialState!=='ready'&&<p>{copy.rowFinancialPending}</p>}{row.message&&<p>{row.message}</p>}{row.childError&&<p role="alert">{row.childError}</p>}{children}
+    {row.state !== 'committed' && <span>{copy.targetAmount}: {chargeCurrency(row.targetAmountCents)}</span>}
+    {currentChargeAvailable ? <>
+      <span>{copy.currentEffective}: {chargeCurrency(row.currentEffectiveCents!)} · {copy.currentApplied}: {chargeCurrency(row.currentAppliedCents!)}</span>
+    </> : <p>{newCharge ? row.state === 'pending' ? copy.notChargedYet : copy.noLinkedCharge : copy.chargeUnavailable}</p>}
+    {row.releaseRequiredCents !== null && row.releaseRequiredCents > 0 && <span>{copy.releaseRequired}: {chargeCurrency(row.releaseRequiredCents)}</span>}
+    {row.correctionJobId && row.totalReleaseCents > 0 && <span>{copy.committedRelease}: {chargeCurrency(row.committedReleaseCents)} / {chargeCurrency(row.totalReleaseCents)}</span>}
+    {row.financialState!=='ready'&&<p>{copy.rowFinancialPending}</p>}{row.message&&<p>{row.message}</p>}{row.childError&&<p role="alert">{copy.studentProcessingFailed}</p>}{children}
   </div>
 }
 
@@ -317,7 +318,7 @@ function MapHistoricalFees({ control, definitions, moreDefinitions, loadDefiniti
         {selected.length > 0 && control && selected.every(row => row.charge.eventId === selected[0].charge.eventId) && <CreateMappingDestination key={selected[0].charge.eventId ?? 'standalone'} eventId={selected[0].charge.eventId} orderRevision={control.revision} disabled={pending} onCreated={setDefinitionId} />}
         <Button type="button" disabled={!target || !control || pending} onClick={() => { if (target && control) { setReviewed({ rows: selected, definition: target, orderRevision: control.revision }); setError(null) } }}>{copy.map}</Button>
       </>}
-      {reviewed && <form className={styles.form} onSubmit={event => { event.preventDefault(); void submit() }}><strong>{copy.mappingTarget}: {reviewed.definition.label}</strong><UnmappedFeeEvidence rows={reviewed.rows.map(row => ({ ...row, selected: true }))} disabled onSelect={() => undefined} /><p>{copy.mappingNoMoney}</p>{!fresh && <p role="alert">{copy.staleReview}</p>}<label className={styles.field}>{copy.reason}<Input value={reason} maxLength={1000} required disabled={pending} onChange={event => setReason(event.target.value)} /></label><Button type="submit" disabled={pending || !fresh || reason.trim().length < 8}>{pending ? copy.submitting : copy.mapConfirm}</Button><Button type="button" variant="outline" disabled={pending} onClick={() => setReviewed(null)}>{copy.dismiss}</Button></form>}
+      {reviewed && <form className={styles.form} onSubmit={event => { event.preventDefault(); void submit() }}><strong>{copy.mappingTarget}: {reviewed.definition.label}</strong><UnmappedFeeEvidence rows={reviewed.rows.map(row => ({ ...row, selected: true }))} disabled onSelect={() => undefined} /><p>{copy.mappingNoMoney}</p>{!fresh && <p role="alert">{copy.staleReview}</p>}<label className={styles.field}>{copy.reasonInput}<Input value={reason} maxLength={1000} required disabled={pending} onChange={event => setReason(event.target.value)} /></label><Button type="submit" disabled={pending || !fresh || reason.trim().length < 8}>{pending ? copy.submitting : copy.mapConfirm}</Button><Button type="button" variant="outline" disabled={pending} onClick={() => setReviewed(null)}>{copy.dismiss}</Button></form>}
     </>}{error && <p role="alert">{error}</p>}
   </Card>
 }
@@ -348,7 +349,7 @@ function CreateMappingDestination({ eventId, orderRevision, disabled, onCreated 
     finally { setPending(false) }
   }
   return <div className={styles.form}><Button type="button" variant="outline" disabled={disabled || pending || created} onClick={() => setOpen(value => !value)}>{copy.createMappingDefinition}</Button>
-    {open && <form className={styles.form} onSubmit={event => { event.preventDefault(); void submit() }}><p>{copy.mappingDefinitionNote}</p><label className={styles.field}>{copy.name}<Input value={label} required maxLength={150} disabled={disabled || pending} onChange={event => setLabel(event.target.value)} /></label><label className={styles.field}>{copy.defaultAmount}<Input value={amount} required inputMode="decimal" disabled={disabled || pending} onChange={event => setAmount(event.target.value)} /></label><label className={styles.field}>{copy.reason}<Input value={reason} required maxLength={1000} disabled={disabled || pending} onChange={event => setReason(event.target.value)} /></label><Button type="submit" disabled={disabled || pending || !label.trim() || cents === null || reason.trim().length < 8}>{pending ? copy.submitting : copy.createMappingDefinition}</Button></form>}
+    {open && <form className={styles.form} onSubmit={event => { event.preventDefault(); void submit() }}><p>{copy.mappingDefinitionNote}</p><label className={styles.field}>{copy.name}<Input value={label} required maxLength={150} disabled={disabled || pending} onChange={event => setLabel(event.target.value)} /></label><label className={styles.field}>{copy.defaultAmount}<Input value={amount} required inputMode="decimal" disabled={disabled || pending} onChange={event => setAmount(event.target.value)} /></label><label className={styles.field}>{copy.reasonInput}<Input value={reason} required maxLength={1000} disabled={disabled || pending} onChange={event => setReason(event.target.value)} /></label><Button type="submit" disabled={disabled || pending || !label.trim() || cents === null || reason.trim().length < 8}>{pending ? copy.submitting : copy.createMappingDefinition}</Button></form>}
     {created && <p role="status">{copy.mappingDefinitionCreated}</p>}{error && <p role="alert">{error}</p>}
   </div>
 }
@@ -370,7 +371,7 @@ function PrepareFeeMapping({ onJob }: { onJob: (jobId: Id<'feeMappingJobs'>) => 
   }
   return <Card className={styles.card}><CardTitle>{copy.prepareMapping}</CardTitle><p>{copy.proofNote}</p>
     <form className={styles.form} onSubmit={event => { event.preventDefault(); void submit() }}>
-      <label className={styles.field}>{copy.reason}<Input value={reason} maxLength={1000} required disabled={pending || !!jobId} onChange={event => setReason(event.target.value)} /></label>
+      <label className={styles.field}>{copy.reasonInput}<Input value={reason} maxLength={1000} required disabled={pending || !!jobId} onChange={event => setReason(event.target.value)} /></label>
       <Button type="submit" variant="outline" disabled={pending || !!jobId || reason.trim().length < 8}>{pending ? copy.submitting : copy.prepareMapping}</Button>
     </form>{error && <p role="alert">{error}</p>}
   </Card>
@@ -458,7 +459,7 @@ export function FeeDefinitionDraftForm({ scopeFields, scopeValid, disabled, onPr
     <label className={styles.field}>{copy.name}<Input value={label} required disabled={disabled || pending} onChange={event => setLabel(event.target.value)} /></label>
     <label className={styles.field}>{copy.amount}<Input value={amount} required inputMode="decimal" disabled={disabled || pending} onChange={event => setAmount(event.target.value)} /></label>
     <fieldset className={styles.form} disabled={disabled || pending}>{scopeFields}</fieldset>
-    <label className={styles.field}>{copy.reason}<Input value={reason} maxLength={1000} required disabled={disabled || pending} onChange={event => setReason(event.target.value)} /></label>
+    <label className={styles.field}>{copy.reasonInput}<Input value={reason} maxLength={1000} required disabled={disabled || pending} onChange={event => setReason(event.target.value)} /></label>
     <p className={styles.muted}>{copy.prepareBulkNote} {copy.append}</p>
     <Button type="submit" disabled={disabled || pending || !scopeValid || !label.trim() || cents === null || reason.trim().length < 8}>{pending ? copy.submitting : copy.prepareBulk}</Button>
     {error && <p role="alert">{error}</p>}
