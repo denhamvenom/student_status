@@ -10,6 +10,16 @@ const permissionField = v.union(v.literal("general"), v.literal("emergencyName")
 const report = v.object({ state: v.union(v.literal("unknown"), v.literal("none"), v.literal("reported")), text: v.optional(v.string()) });
 
 export default defineSchema({
+  bulkInviteCodeReservations: defineTable({ codeHash: v.string() }).index("by_codeHash", ["codeHash"]),
+  bulkInviteConnectionRequests: defineTable({
+    authUserId: v.id("users"), inviteId: v.id("bulkStudentInvites"), codeHash: v.string(),
+    studentId: v.id("students"), seasonId: v.id("seasons"), googleName: v.string(), googleEmail: v.string(),
+    status: v.union(v.literal("pending"), v.literal("approved"), v.literal("declined")),
+    createdAt: v.number(), decidedAt: v.optional(v.number()), decidedBy: v.optional(v.id("appUsers")),
+  }).index("by_authUserId", ["authUserId"])
+    .index("by_authUserId_and_status", ["authUserId", "status"])
+    .index("by_authUserId_and_inviteId_and_codeHash", ["authUserId", "inviteId", "codeHash"])
+    .index("by_seasonId_and_status", ["seasonId", "status"]),
   ...authTables,
   ...retentionTables,
   historicalCorrectionSessions: defineTable({ seasonId: v.id("seasons"), actorId: v.id("appUsers"), reason: v.string(), openedAt: v.number(), expiresAt: v.number(), closedAt: v.optional(v.number()) }).index("by_actorId_and_seasonId", ["actorId", "seasonId"]),
@@ -162,7 +172,11 @@ export default defineSchema({
   }).index("by_planId_and_sourceEntryId", ["planId", "sourceEntryId"])
     .index("by_planId_and_sourceStudentId", ["planId", "sourceStudentId"]),
   students: defineTable({ seasonId: v.id("seasons"), userId: v.optional(v.id("appUsers")), profileCompletedAt: v.optional(v.number()), profileRevision: v.optional(v.number()), consentProfileV2: v.optional(consentProfileV2Validator), consentProfileV2CompletedAt: v.optional(v.number()), consentProfileV2ConfirmedBy: v.optional(v.id("appUsers")), guardianName: v.optional(v.string()), guardianRelationship: v.optional(v.string()), guardianPhone: v.optional(v.string()), guardianEmail: v.optional(v.string()), archivedAt: v.optional(v.number()), legalName: v.string(), preferredName: v.string(), firstName: v.optional(v.string()), lastName: v.optional(v.string()), structuredNameReviewed: v.optional(v.boolean()), email: v.string(), subteam: v.string(), active: v.boolean(), travelTeam: v.boolean(), shirtSize: v.optional(v.string()), roomCategory: v.optional(category), roomCategoryLocked: v.boolean(), emergencyName: v.optional(v.string()), emergencyRelationship: v.optional(v.string()), emergencyPhone: v.optional(v.string()), allergies: report, medications: report, otcAuthorization: v.optional(v.union(v.literal("yes"), v.literal("contact"), v.literal("no"))) })
-    .index("by_seasonId_and_active", ["seasonId", "active"]).index("by_seasonId", ["seasonId"]).index("by_userId", ["userId"]).index("by_seasonId_and_userId", ["seasonId", "userId"]).index("by_seasonId_and_email", ["seasonId", "email"]).index("by_active_and_archivedAt", ["active", "archivedAt"]),
+    .index("by_seasonId_and_active", ["seasonId", "active"]).index("by_seasonId_and_active_and_userId", ["seasonId", "active", "userId"]).index("by_seasonId", ["seasonId"]).index("by_userId", ["userId"]).index("by_seasonId_and_userId", ["seasonId", "userId"]).index("by_seasonId_and_email", ["seasonId", "email"]).index("by_active_and_archivedAt", ["active", "archivedAt"]),
+  bulkInviteBatches: defineTable({ seasonId: v.id("seasons"), createdBy: v.id("appUsers"), createdAt: v.number(), expiresAt: v.optional(v.number()), idempotencyKey: v.string(), requestHash: v.string(), inviteCount: v.number(), pendingCount: v.number(), connectedCount: v.number(), createdCount: v.number(), linkedCount: v.number(), skippedCount: v.number() })
+    .index("by_createdBy_and_idempotencyKey", ["createdBy", "idempotencyKey"]).index("by_seasonId_and_createdAt", ["seasonId", "createdAt"]),
+  bulkStudentInvites: defineTable({ batchId: v.id("bulkInviteBatches"), seasonId: v.id("seasons"), studentId: v.id("students"), code: v.string(), codeHash: v.string(), status: v.union(v.literal("pending"), v.literal("redeemed"), v.literal("revoked"), v.literal("replaced")), createdBy: v.id("appUsers"), createdAt: v.number(), expiresAt: v.optional(v.number()), redeemedBy: v.optional(v.id("appUsers")), redeemedAt: v.optional(v.number()) })
+    .index("by_batchId", ["batchId"]).index("by_codeHash", ["codeHash"]).index("by_studentId_and_status", ["studentId", "status"]),
   familyLinks: defineTable({ parentUserId: v.id("appUsers"), studentId: v.id("students"), seasonId: v.optional(v.id("seasons")), active: v.boolean(), createdBy: v.id("appUsers"), revokedAt: v.optional(v.number()), revokedBy: v.optional(v.id("appUsers")) })
     .index("by_parentUserId", ["parentUserId"]).index("by_studentId", ["studentId"]).index("by_parentUserId_and_studentId", ["parentUserId", "studentId"])
     .index("by_parentUserId_and_seasonId_and_active", ["parentUserId", "seasonId", "active"]),

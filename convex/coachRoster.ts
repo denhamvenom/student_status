@@ -63,13 +63,18 @@ async function rosterRow(ctx: QueryCtx, student: Doc<"students">, upcoming: Upco
 }
 
 export const list = query({
-  args: { paginationOpts: paginationOptsValidator, active: v.optional(v.boolean()), asOf: v.number() },
+  args: { paginationOpts: paginationOptsValidator, active: v.optional(v.boolean()), connection: v.optional(v.union(v.literal("all"), v.literal("connected"), v.literal("unconnected"))), asOf: v.number() },
   returns: paginationResultValidator(rowValidator).extend({ seasonId: v.id("seasons") }),
   handler: async (ctx, args) => {
     requireRole(await viewer(ctx), "coach");
     if (!Number.isFinite(args.asOf)) throw new Error("A valid current time is required.");
     const season = await activeSeason(ctx);
-    const page = await ctx.db.query("students").withIndex("by_seasonId_and_active", q => q.eq("seasonId", season._id).eq("active", args.active ?? true)).paginate(boundedFinancePage(args.paginationOpts));
+    const students = args.connection === "unconnected"
+      ? ctx.db.query("students").withIndex("by_seasonId_and_active_and_userId", q => q.eq("seasonId", season._id).eq("active", args.active ?? true).eq("userId", undefined))
+      : args.connection === "connected"
+        ? ctx.db.query("students").withIndex("by_seasonId_and_active_and_userId", q => q.eq("seasonId", season._id).eq("active", args.active ?? true).gt("userId", undefined))
+        : ctx.db.query("students").withIndex("by_seasonId_and_active", q => q.eq("seasonId", season._id).eq("active", args.active ?? true));
+    const page = await students.paginate(boundedFinancePage(args.paginationOpts));
     const upcoming = await upcomingEvents(ctx, season._id, args.asOf);
     return { ...page, page: await Promise.all(page.page.map(student => rosterRow(ctx, student, upcoming))), seasonId: season._id };
   },

@@ -310,3 +310,10 @@ Private preview refreshed from current source: Parent and adult reopened show ex
 ## October 18 — Batch 2 wording checkpoint
 
 Approved sensitive-area text updated without layout or workflow changes. Live Travel Lead Drivers and Permission forms checked in the existing narrow dark-theme session; disabled Health export access preserved. Other roles and rare recovery/signing states were source/test verified, not a new all-role or all-theme visual pass. See [Batch 2 report](audit-2026-10-18/batch-2-report.md). Stop before Batch 3.
+
+## Bulk Invite local component check - October 18
+
+Actual new component rendered with synthetic mocked Convex hooks, no backend connection. Inspected desktop1440 light initial state and phone390 dark created batch, including full-length codes. Upload, confirmation, template/code downloads passed; document width remained 390px on phone, no runtime page errors. Shared cards/buttons/type/styles reused. This checks the new surface only, not live Coach navigation, authorization or OAuth. Independent source review clear; ignored evidence in .test-temp/bulk-ui.
+
+## October 19 — Bulk Invite account approval
+Added Coach connection queue using existing cards, responsive table, buttons and ConfirmAction dialog. Extracted PendingJoin with waiting/declined states and stale-preview protection. Actual-component isolated browser checks passed at desktop1440 light and phone390 dark (no horizontal overflow). Evidence: ignored .test-temp/approval-ui; mocked backend only, no deployment or live Google claim.

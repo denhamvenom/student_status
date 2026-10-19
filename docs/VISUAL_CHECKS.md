@@ -507,3 +507,11 @@ FIRST followup visual evidence: refreshed preview includes Parent and adult reop
 ### FEE-REVIEW-2026-10-19 — Coach charge details
 
 Frontend wording and rendered-markup regression checks complete. Pending: authenticated new-charge, held and partial-release layouts at representative phone/desktop sizes and light/dark themes; Coach acceptance. No production records may be changed to manufacture evidence. See FRONTEND_CONFORMANCE_LOG.md October 19 entry.
+
+## Bulk Invite local candidate
+
+| Check | Evidence / remaining work |
+|---|---|
+| BULK-1 Coach component | 1440 light/390 dark actual component with mocked hooks inspected; template/upload/confirmation/download passed. Live development Join Requests navigation and real Google redemption remain unobserved. See BULK_INVITE.md. |
+
+October 19 approval revision: isolated actual-component Coach queue reviewed at 1440px light and 390px dark; identity/email/actions legible, no phone overflow. Live integrated backend/Google check remains deferred; no backend sync authorized.
