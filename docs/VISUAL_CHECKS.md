@@ -1,5 +1,9 @@
 # Visual review closed — October 16, 2026
 
+## October 19 parent invitation resend
+
+Actual StudentParents component with mocked Convex passed countdown, resend rejection/success, refreshed Share/Copy link and busy controls at 1440px light and 390px dark. Screenshots inspected: no overflow. Uses existing card/button styles. Local synthetic evidence only; real Google redemption and physical device share remain unverified. Screenshots remain ignored under .test-temp/parent-email-ui. Other audit-screen visual checks below remain separate.
+
 ## October 19 parent email/share candidate
 
 | Check | Evidence / remaining work |

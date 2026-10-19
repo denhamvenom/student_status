@@ -1,5 +1,9 @@
 # Frontend conformance work log
 
+## October 19 parent invitation resend
+
+Actual StudentParents component with mocked Convex passed countdown, resend rejection/success, refreshed Share/Copy link and busy controls at 1440px light and 390px dark. Screenshots inspected: no overflow. Uses existing card/button styles. Local synthetic evidence only; real Google redemption and physical device share remain unverified. Screenshots remain ignored under .test-temp/parent-email-ui. Other audit-screen visual checks below remain separate.
+
 ## October 19 parent email/share
 
 Actual StudentParents component inspected with mocked Convex at 1440px light and 390px dark. Reused existing FamilyOperations surface, type, spacing, gold action and wrapping share controls; no new CSS required. Share/Copy and live email status remain readable without horizontal overflow. Synthetic browser behavior covers queued/sent/failed/not_sent, explicit unconfigured message, share cancellation/failure and copy fallback. Screenshots remain ignored in `.test-temp/parent-email-ui/`. This is component-level evidence, not integrated Google login or a physical phone share sheet. No fresh pixel comparison against the hosted prototype was performed; existing component/design tokens were preserved. See PARENT_INVITATION_EMAIL.md.

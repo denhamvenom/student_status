@@ -1,5 +1,5 @@
 import { ConfirmAction } from './ConfirmAction'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useAuthActions } from '@convex-dev/auth/react'
 import { useMutation, useQuery } from 'convex/react'
 import { Link, useNavigate } from 'react-router'
@@ -22,6 +22,10 @@ const inviteLink = (token:string) => `${window.location.origin}/invite-parent#to
 const oauthTokenKey = 'student-status-parent-invite-oauth'
 const focusAcceptedHeading = (element:HTMLHeadingElement|null) => element?.focus()
 const deliveryText = (status:string|null|undefined) => familyCopy.parent[invitationEmailStatus(status)]
+const resendWait = (milliseconds:number) => {
+  const seconds = Math.ceil(milliseconds / 1000)
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2,'0')}`
+}
 
 /** A token is intentionally held only in the current page and in the URL fragment. */
 function readFragmentToken() {
@@ -80,6 +84,7 @@ export function CoachParentAccess({roster}:{roster:RosterStudent[]}) {
 export function StudentParents({student}:{student:RosterStudent|null}) {
   const settings = useQuery(api.parentInvites.invitationSettings,{})
   const create = useMutation(api.parentInvites.createParentInvite)
+  const resend = useMutation(api.parentInvites.resendParentInvite)
   const invites = useQuery(api.parentInvites.listStudentInvites,student?{studentId:studentId(student._id)}:'skip')
   const links = useQuery(api.parentInvites.listFamilyLinks,student?{studentId:studentId(student._id)}:'skip')
   const [email,setEmail] = useState('')
@@ -87,11 +92,34 @@ export function StudentParents({student}:{student:RosterStudent|null}) {
   const [expiry,setExpiry] = useState<number|null>(null)
   const [createdInviteId,setCreatedInviteId] = useState<string|null>(null)
   const [busy,setBusy] = useState(false)
+  const [resendingInviteId,setResendingInviteId] = useState<string|null>(null)
+  const resendInFlight = useRef(false)
+  const [now,setNow] = useState(Date.now)
   const [error,setError] = useState('')
   const [copied,setCopied] = useState(false)
   const [shareNotice,setShareNotice] = useState('')
   useEffect(()=>{setLink('');setExpiry(null);setCreatedInviteId(null);setCopied(false);setShareNotice('');setError('')},[student?._id])
-  const submit = async (event:FormEvent) => {event.preventDefault();if(!student)return;setBusy(true);setError('');setLink('');setCreatedInviteId(null);setCopied(false);setShareNotice('');try{const result=await create({studentId:studentId(student._id),parentEmail:email.trim().toLowerCase()});setLink(inviteLink(result.token));setExpiry(result.expiresAt);setCreatedInviteId(result.inviteId);setEmail('')}catch(e){setError(message(e))}finally{setBusy(false)}}
+  useEffect(()=>{const timer=window.setInterval(()=>setNow(Date.now()),1000);return()=>window.clearInterval(timer)},[])
+  const submit = async (event:FormEvent) => {event.preventDefault();if(!student || busy || resendInFlight.current)return;setBusy(true);setError('');setLink('');setCreatedInviteId(null);setCopied(false);setShareNotice('');try{const result=await create({studentId:studentId(student._id),parentEmail:email.trim().toLowerCase()});setLink(inviteLink(result.token));setExpiry(result.expiresAt);setCreatedInviteId(result.inviteId);setEmail('')}catch(e){setError(message(e))}finally{setBusy(false)}}
+  const resendInvitation = async (inviteId:Id<'parentInvitations'>) => {
+    if (busy || resendInFlight.current) return
+    resendInFlight.current = true
+    setResendingInviteId(inviteId)
+    setError('')
+    setShareNotice('')
+    try {
+      const result = await resend({inviteId})
+      setLink(inviteLink(result.token))
+      setExpiry(result.expiresAt)
+      setCreatedInviteId(result.inviteId)
+      setCopied(false)
+    } catch (error) {
+      setError(message(error))
+    } finally {
+      resendInFlight.current = false
+      setResendingInviteId(null)
+    }
+  }
   const copy = async () => {setError('');try{await navigator.clipboard.writeText(link);setCopied(true)}catch{setError(familyCopy.parent.copyFailed)}}
   const share = async () => {setError('');setShareNotice('');const result=await shareParentInvitation(navigator,link,{title:familyCopy.parent.landing,text:familyCopy.parent.signInInvitedEmail});if(result==='copied'){setCopied(true);setShareNotice(familyCopy.parent.shareCopied)}else if(result==='shareFailed'){setError(familyCopy.parent.shareFailed)}else if(result==='copyFailed'){setError(familyCopy.parent.copyFailed)}}
   const createdInvite = createdInviteId ? invites?.find(invite=>invite._id===createdInviteId) : undefined
@@ -100,13 +128,17 @@ export function StudentParents({student}:{student:RosterStudent|null}) {
     {!student ? <section className="card"><p>{familyCopy.parent.noProfile}</p></section> : <>
       <section className={`card parent-section ${styles.surface}`}><h2>{familyCopy.parent.inviteHeading}</h2><p>{familyCopy.parent.inviteDescription}</p>
         {settings?.enabled === false && <p role="status">{familyCopy.parent.pausedNotice}</p>}
-        <form className="parent-invite-form" onSubmit={e=>void submit(e)}><label htmlFor="parent-email">{familyCopy.parent.googleEmail}</label><Input id="parent-email" type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} required disabled={busy || settings?.enabled !== true}/><Button className="button button-primary" type="submit" disabled={busy || settings?.enabled !== true}>{busy?familyCopy.parent.creating:familyCopy.parent.createLink}</Button></form>
+        <form className="parent-invite-form" onSubmit={e=>void submit(e)}><label htmlFor="parent-email">{familyCopy.parent.googleEmail}</label><Input id="parent-email" type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} required disabled={busy || resendingInviteId!==null || settings?.enabled !== true}/><Button className="button button-primary" type="submit" disabled={busy || resendingInviteId!==null || settings?.enabled !== true}>{busy?familyCopy.parent.creating:familyCopy.parent.createLink}</Button></form>
         <p className="muted tiny">{familyCopy.parent.noEmail}</p>
-        {link && <section className={`parent-share ${styles.inviteShare}`} aria-labelledby="parent-share-title"><h3 id="parent-share-title">{familyCopy.parent.invitationLink}</h3><p>{familyCopy.parent.invitationCreated} {expiry ? when(expiry) : familyCopy.parent.expiryFallback}.</p><p role="status">{deliveryText(emailStatus)} {emailStatus==='sent' && familyCopy.parent.emailSentNext} {(emailStatus==='not_sent'||emailStatus==='failed') && createdInvite?.emailError}</p><p className="muted tiny">{familyCopy.parent.shareGuidance}</p><label className="sr-only" htmlFor="parent-share-link">{familyCopy.parent.invitationLink}</label><div className={styles.shareControls}><Input id="parent-share-link" value={link} readOnly onFocus={e=>e.currentTarget.select()}/><Button className="button button-outline" onClick={()=>void share()}>{familyCopy.parent.shareLink}</Button><Button className="button button-primary" onClick={()=>void copy()}>{copied?familyCopy.parent.copied:familyCopy.parent.copyLink}</Button></div>{shareNotice && <p role="status">{shareNotice}</p>}<p className="muted tiny">{familyCopy.parent.once} {familyCopy.parent.signInInvitedEmail}</p></section>}
+        {link && <section className={`parent-share ${styles.inviteShare}`} aria-labelledby="parent-share-title"><h3 id="parent-share-title">{familyCopy.parent.invitationLink}</h3><p>{familyCopy.parent.invitationCreated} {expiry ? when(expiry) : familyCopy.parent.expiryFallback}.</p><p role="status">{deliveryText(emailStatus)} {emailStatus==='sent' && familyCopy.parent.emailSentNext} {(emailStatus==='not_sent'||emailStatus==='failed') && createdInvite?.emailError}</p><p className="muted tiny">{familyCopy.parent.shareGuidance}</p><label className="sr-only" htmlFor="parent-share-link">{familyCopy.parent.invitationLink}</label><div className={styles.shareControls}><Input id="parent-share-link" value={link} readOnly onFocus={e=>e.currentTarget.select()}/><Button className="button button-outline" disabled={busy || resendingInviteId!==null} onClick={()=>void share()}>{familyCopy.parent.shareLink}</Button><Button className="button button-primary" disabled={busy || resendingInviteId!==null} onClick={()=>void copy()}>{copied?familyCopy.parent.copied:familyCopy.parent.copyLink}</Button></div>{shareNotice && <p role="status">{shareNotice}</p>}<p className="muted tiny">{familyCopy.parent.once} {familyCopy.parent.signInInvitedEmail}</p></section>}
         {error && <p role="alert" className="open-text">{error}</p>}
       </section>
       <section className={`card parent-section ${styles.surface}`}><h2>{familyCopy.parent.accessHeading}</h2>
-        {!invites || !links ? <p>{familyCopy.parent.loading}</p> : <><h3>{familyCopy.parent.invitations}</h3>{invites.length===0 ? <p className="muted">{familyCopy.parent.noneInvitations}</p> : <div className="simple-list">{invites.map(invite=><div className="parent-record" key={invite._id}><div><strong>{invite.parentEmail}</strong><p className="muted tiny">{deliveryText(invite.emailStatus)}</p></div><span>{invite.status==='pending' && invite.expiresAt<=Date.now()?familyCopy.parent.expired:invite.status} · {when(invite.expiresAt)}</span></div>)}</div>}
+        {!invites || !links ? <p>{familyCopy.parent.loading}</p> : <><h3>{familyCopy.parent.invitations}</h3>{invites.length===0 ? <p className="muted">{familyCopy.parent.noneInvitations}</p> : <div className="simple-list">{invites.map(invite=>{
+          const canResend = invite.status==='pending' && invite.expiresAt>now && invites.find(row=>row.parentEmail===invite.parentEmail)?._id===invite._id
+          const wait = Math.max(0,invite.resendAvailableAt-now)
+          return <div className="parent-record" key={invite._id}><div><strong>{invite.parentEmail}</strong><p className="muted tiny">{deliveryText(invite.emailStatus)}</p></div><span>{invite.status==='pending' && invite.expiresAt<=now?familyCopy.parent.expired:invite.status} · {when(invite.expiresAt)}</span>{canResend && <Button className="button button-outline" disabled={busy || resendingInviteId!==null || settings?.enabled!==true || wait>0} onClick={()=>void resendInvitation(invite._id)}>{resendingInviteId===invite._id?familyCopy.parent.resending:wait>0?`${familyCopy.parent.resendIn} ${resendWait(wait)}`:familyCopy.parent.resendInvitation}</Button>}</div>
+        })}</div>}
           <h3>{familyCopy.parent.linkedParents}</h3>{links.filter(link=>link.active).length===0 ? <p className="muted">{familyCopy.parent.noLinked}</p> : <div className="simple-list">{links.filter(link=>link.active).map(link=><div className="parent-record" key={link._id}><strong>{link.parentName}</strong><span>{link.parentEmail}</span></div>)}</div>}</>}
       </section>
     </>}

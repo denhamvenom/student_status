@@ -1,5 +1,11 @@
 # Student Status implementation plan
 
+## October 19 parent email resend checkpoint
+
+Implemented and locally verified: automatic parent email, Share/Copy, and Resend invitation after one server-enforced hour. Exact invited Google login remains required; resend invalidates the prior link. Lint/types/build and scoped review pass; all 482 regression cases passed across the full run and isolated timeout rerun. Synthetic phone/desktop checks passed. See [detailed evidence and rollout](PARENT_INVITATION_EMAIL.md).
+
+Current main audit fixes are preserved. Audit chat owns the next shared development sync after merging this candidate with its fee-payment CSV work. Production deployment/main merge and real invitation-to-Google rehearsal remain pending. Development mail stays disabled; the prior direct connectivity email was confirmed received.
+
 ## October 19 parent email invitation candidate
 
 Owner approved local implementation of automatic parent invitation email and native Share invitation, retaining exact invited Google-account sign-in. See [scope, configuration and evidence](PARENT_INVITATION_EMAIL.md). This work does not authorize backend synchronization, production email, or a main merge. Bulk Invite's earlier release remains unchanged.

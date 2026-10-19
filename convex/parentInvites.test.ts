@@ -96,6 +96,7 @@ describe("parent invitations", () => {
   it("rejects expired, replaced, revoked, and unverified invitations", async () => {
     const f = await fixture();
     const first = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" });
+    await f.t.run(ctx => ctx.db.patch(first.inviteId, { createdAt: Date.now() - 60 * 60_000 }));
     const next = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" });
     await expect(f.parent.mutation(api.parentInvites.acceptParentInvite, { token: first.token, relationship: "Guardian", authorityAttested: true, attestationVersion: "parent-relationship-1" })).rejects.toThrow("unavailable");
     await f.t.run(async ctx => {
@@ -112,6 +113,70 @@ describe("parent invitations", () => {
     const unverified = await f.t.run(async ctx => { const id = await ctx.db.insert("users", { email: "unverified@example.invalid", name: "Unverified", emailVerificationTime: Date.now() }); await ctx.db.insert("authAccounts", { userId: id, provider: "google", providerAccountId: "google-unverified" }); return id; });
     const newInvite = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "unverified@example.invalid" });
     await expect(f.t.withIdentity({ subject: `${unverified}|session` }).mutation(api.parentInvites.acceptParentInvite, { token: newInvite.token, relationship: "Guardian", authorityAttested: true, attestationVersion: "parent-relationship-1" })).rejects.toThrow("verified Google");
+  });
+
+  it("resends only the latest own pending invite at the exact one-hour boundary", async () => {
+    const f = await fixture();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-19T12:00:00Z"));
+    const first = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" });
+    await expect(f.t.mutation(api.parentInvites.resendParentInvite, { inviteId: first.inviteId })).rejects.toThrow("Sign in");
+    await expect(f.coach.mutation(api.parentInvites.resendParentInvite, { inviteId: first.inviteId })).rejects.toThrow("permission");
+    await expect(f.otherStudent.mutation(api.parentInvites.resendParentInvite, { inviteId: first.inviteId })).rejects.toThrow("unavailable");
+    await expect(f.student.mutation(api.parentInvites.resendParentInvite, { inviteId: first.inviteId })).rejects.toThrow("one hour");
+    await expect(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: " PARENT@example.invalid " })).rejects.toThrow("one hour");
+    const now = Date.now();
+    await f.t.run(ctx => ctx.db.patch(first.inviteId, { createdAt: now - 60 * 60_000 + 1 }));
+    await expect(f.student.mutation(api.parentInvites.resendParentInvite, { inviteId: first.inviteId })).rejects.toThrow("one hour");
+    await f.t.run(ctx => ctx.db.patch(first.inviteId, { createdAt: now - 2 * 60 * 60_000, emailSentAt: now - 60 * 60_000 + 1 }));
+    expect((await f.student.query(api.parentInvites.listStudentInvites, { studentId: f.ids.student }))[0].resendAvailableAt).toBe(now + 1);
+    await expect(f.student.mutation(api.parentInvites.resendParentInvite, { inviteId: first.inviteId })).rejects.toThrow("one hour");
+    await f.t.run(ctx => ctx.db.patch(first.inviteId, { emailSentAt: now - 60 * 60_000 }));
+    const second = await f.student.mutation(api.parentInvites.resendParentInvite, { inviteId: first.inviteId });
+    expect(second.inviteId).not.toBe(first.inviteId);
+    expect(second.token).not.toBe(first.token);
+    expect(second.expiresAt).toBeGreaterThan(first.expiresAt - 1000);
+    const rows = await f.student.query(api.parentInvites.listStudentInvites, { studentId: f.ids.student });
+    expect(rows.find(row => row._id === first.inviteId)?.status).toBe("replaced");
+    expect(rows.find(row => row._id === second.inviteId)?.resendAvailableAt).toBe(rows.find(row => row._id === second.inviteId)!.createdAt + 60 * 60_000);
+    await expect(f.parent.mutation(api.parentInvites.acceptParentInvite, { token: first.token, relationship: "Guardian", authorityAttested: true, attestationVersion: "parent-relationship-1" })).rejects.toThrow("unavailable");
+    await expect(f.student.mutation(api.parentInvites.resendParentInvite, { inviteId: first.inviteId })).rejects.toThrow("unavailable");
+    await expect(f.student.mutation(api.parentInvites.resendParentInvite, { inviteId: second.inviteId })).rejects.toThrow("one hour");
+    await expect(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" })).rejects.toThrow("one hour");
+    expect((await f.t.run(ctx => ctx.db.get(second.inviteId)))?.status).toBe("pending");
+  });
+
+  it("rejects resend after acceptance, revocation, expiry, pause, or student deactivation", async () => {
+    const f = await fixture();
+    const accepted = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" });
+    await f.parent.mutation(api.parentInvites.acceptParentInvite, { token: accepted.token, relationship: "Guardian", authorityAttested: true, attestationVersion: "parent-relationship-1" });
+    await expect(f.student.mutation(api.parentInvites.resendParentInvite, { inviteId: accepted.inviteId })).rejects.toThrow("unavailable");
+    const revoked = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "revoked@example.invalid" });
+    await f.coach.mutation(api.parentInvites.revokeParentInvite, { inviteId: revoked.inviteId });
+    await expect(f.student.mutation(api.parentInvites.resendParentInvite, { inviteId: revoked.inviteId })).rejects.toThrow("unavailable");
+    const expired = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "expired@example.invalid" });
+    await f.t.run(ctx => ctx.db.patch(expired.inviteId, { expiresAt: Date.now() - 1 }));
+    await expect(f.student.mutation(api.parentInvites.resendParentInvite, { inviteId: expired.inviteId })).rejects.toThrow("unavailable");
+    const paused = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "paused@example.invalid" });
+    await f.coach.mutation(api.parentInvites.setInvitationEnabled, { enabled: false });
+    await expect(f.student.mutation(api.parentInvites.resendParentInvite, { inviteId: paused.inviteId })).rejects.toThrow("disabled");
+    await f.coach.mutation(api.parentInvites.setInvitationEnabled, { enabled: true });
+    await f.t.run(ctx => ctx.db.patch(f.ids.student, { active: false }));
+    await expect(f.student.mutation(api.parentInvites.resendParentInvite, { inviteId: paused.inviteId })).rejects.toThrow();
+  });
+
+  it("allows only one replacement when resend requests race", async () => {
+    const f = await fixture();
+    const first = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" });
+    await f.t.run(ctx => ctx.db.patch(first.inviteId, { createdAt: Date.now() - 60 * 60_000 }));
+    const results = await Promise.allSettled([
+      f.student.mutation(api.parentInvites.resendParentInvite, { inviteId: first.inviteId }),
+      f.student.mutation(api.parentInvites.resendParentInvite, { inviteId: first.inviteId }),
+    ]);
+    expect(results.filter(result => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter(result => result.status === "rejected")).toHaveLength(1);
+    const rows = await f.t.run(ctx => ctx.db.query("parentInvitations").withIndex("by_studentId_and_parentEmail_and_status", q => q.eq("studentId", f.ids.student).eq("parentEmail", "parent@example.invalid").eq("status", "pending")).take(10));
+    expect(rows).toHaveLength(1);
   });
 
   it("does not elevate existing roles; Coach revocation blocks new invitations until restoration", async () => {
@@ -263,6 +328,7 @@ describe("parent invitation email", () => {
     await f.coach.mutation(api.parentInvites.revokeParentInvite, { inviteId: revoked.inviteId });
     await f.t.action(internal.parentInviteEmail.send, { inviteId: revoked.inviteId, token: revoked.token, attempt: 1 });
     const replaced = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "second@example.invalid" });
+    await f.t.run(ctx => ctx.db.patch(replaced.inviteId, { createdAt: Date.now() - 60 * 60_000 }));
     await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "second@example.invalid" });
     await f.t.action(internal.parentInviteEmail.send, { inviteId: replaced.inviteId, token: replaced.token, attempt: 1 });
     const expired = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "third@example.invalid" });
@@ -327,10 +393,13 @@ describe("parent invitation email", () => {
     await expect(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "extra@example.invalid" })).rejects.toThrow("Too many email invitations");
   });
 
-  it("limits repeated mail to one recipient", async () => {
+  it("does not schedule mail for a cooldown rejection", async () => {
     vi.useFakeTimers(); enableSyntheticEmail();
     const f = await fixture();
-    for (let i = 0; i < 3; i++) await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" });
-    await expect(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" })).rejects.toThrow("Too many email invitations");
+    const first = await f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" });
+    await expect(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: "parent@example.invalid" })).rejects.toThrow("one hour");
+    await expect(f.student.mutation(api.parentInvites.resendParentInvite, { inviteId: first.inviteId })).rejects.toThrow("one hour");
+    const pending = await f.t.run(ctx => ctx.db.query("parentInvitations").withIndex("by_studentId_and_parentEmail_and_status", q => q.eq("studentId", f.ids.student).eq("parentEmail", "parent@example.invalid").eq("status", "pending")).take(10));
+    expect(pending).toHaveLength(1);
   });
 });
