@@ -1,5 +1,11 @@
 # Fee-specific payment CSV
 
+## Bulk Payment full-name correction - October 19
+
+Owner explicitly authorized the production correction. Export and payment review now use the full student legal name, preserving last names when a preferred name is only a first name. CSV columns, identifiers, financial behavior and settings are unchanged. Existing downloaded files need to be downloaded again to show the corrected names.
+
+Source ad61740 passed lint, typecheck, all 495 tests in one single-worker run, and production build; independent review found no blockers. Development third-bandicoot-18 and production amicable-eel-413 synchronization succeeded with backend typecheck/schema validation. Read-only production export verification confirmed full multi-part names on every exported row; no financial writes were performed. This code release also carries the previously published PR19 deployment documentation onto main. Automatic website build results are recorded in the release PR after merge.
+
 ## Approved behavior
 
 The owner requested a Bulk Payment workflow that selects a shared fee, exports assessed students, and imports new payments applied directly to that fee. The export filters are All assessed students, Fully paid students, and Students who still owe money (including partial balances). Students not assessed the fee are excluded.
