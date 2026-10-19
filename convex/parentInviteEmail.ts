@@ -76,6 +76,7 @@ export const send = internalAction({
     // Keep payload identical across retries; Resend deduplicates this invite ID for 24 hours.
     const payload = JSON.stringify({
       from: config.from,
+      reply_to: config.replyTo,
       to: [ready.parentEmail],
       subject: "Invitation to Denham Venom Student Status",
       text: `You have been invited to connect your Google account to Denham Venom Student Status. Open this link to review the invitation: ${link}\n\nSign in with the Google account for ${ready.parentEmail}. The invitation expires in 7 days and can be used once. If you were not expecting this invitation, you can ignore this email.`,

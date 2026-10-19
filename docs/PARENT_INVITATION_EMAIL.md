@@ -17,6 +17,7 @@ The implementation uses Resend's email API. These settings belong only in the ch
 - `PARENT_INVITE_EMAIL_ENABLED`: explicit sending switch; keep off until sender and target are verified.
 - `RESEND_API_KEY`: sending credential.
 - `PARENT_INVITE_EMAIL_FROM`: sender using a verified domain.
+- `PARENT_INVITE_EMAIL_REPLY_TO`: monitored reply address.
 - `PARENT_INVITE_APP_ORIGIN`: trusted Student Status origin used to construct invitation links.
 
 Do not point production mail at localhost or the development site. Configure the intended domain/sender in the provider and keep click tracking disabled so invitation links are not rewritten. The message contains the invitation link and instructions, not the student's health, finances or profile information. Missing configuration must show that email was not sent while preserving manual sharing.
@@ -24,6 +25,8 @@ Do not point production mail at localhost or the development site. Configure the
 Provider references: [send email](https://resend.com/docs/api-reference/emails/send-email), [verified domains](https://resend.com/docs/dashboard/domains/introduction), [idempotency](https://resend.com/docs/dashboard/emails/idempotency-keys).
 
 ## Reliability and privacy
+
+Owner-selected defaults: **Denham Venom Robotics <notifications@team8044.org>** as sender and **coach@team8044.org** as Reply-To. Both can be overridden with server settings. This routes replies to the Coach; it does not create a mailbox or forward messages addressed directly to notifications@team8044.org. Sending remains disabled until explicitly enabled with a verified sender, key and trusted origin.
 
 Email creation is limited to three per hour per student/recipient pair and ten per day per student across recipients. Temporary provider/network failures retry up to three attempts using the same provider idempotency key; permanent failures stop. A 20-minute watchdog changes a stuck queued status to failed/unconfirmed. Revoked, replaced, expired, inactive-student and inactive-season invitations are suppressed before sending. Replacement creation is the resend path and invalidates the prior link.
 

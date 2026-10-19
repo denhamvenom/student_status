@@ -247,6 +247,7 @@ describe("parent invitation email", () => {
     expect(url).toBe("https://api.resend.com/emails");
     expect((request.headers as Record<string, string>)["Idempotency-Key"]).toBe(`parent-invite/${invite.inviteId}`);
     expect(body.to).toEqual(["parent@example.invalid"]);
+    expect(body.reply_to).toBe("coach@team8044.org");
     expect(body.text).toContain(`/invite-parent#token=${invite.token}`);
     expect(body.html).toContain("Open invitation");
     expect(body.html).not.toContain("Synthetic Student");
