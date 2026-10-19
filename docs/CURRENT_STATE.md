@@ -1,5 +1,9 @@
 # Current integration handoff
 
+## October 19 Resend connection and real delivery test
+
+Owner authorized connecting the key to development and one real test email. Resend domain team8044.org verified; sending-only domain-restricted key stored in ignored .env.resend.local. Four server settings installed only on development third-bandicoot-18: key, sender notifications@team8044.org, reply address coach@team8044.org, and automatic sending=false. One direct provider connectivity test to the owner's designated recipient was reported delivered by Resend. This was not a student/parent invitation and does not prove Google redemption. No code sync, main merge, production environment change or deployment occurred. Automatic invitation sending and the application-origin setting still require development integration before a full invitation rehearsal. Earlier local-only restrictions below are superseded only for these explicitly authorized settings and test-email actions. Private receipt/screenshot remain ignored under .test-temp/resend-setup/.
+
 ## Parent email invitations — October 19 local candidate
 
 Workspace: Development Version/student-status-bulk-invite. Branch: feature/parent-email-invitations. Owner requested automatic email plus Share invitation while keeping Google login; local implementation/testing only. Do not sync either backend, merge main, deploy, send real mail or create production requests without further authorization.
