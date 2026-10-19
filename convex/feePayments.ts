@@ -41,7 +41,7 @@ async function rowState(ctx: Ctx, fee: Doc<"feeDefinitions">, item: ImportRow) {
   if (!student?.active || student.seasonId !== fee.seasonId || !charge || charge.studentId !== student._id || charge.feeDefinitionId !== fee._id || !account || account.seasonId !== fee.seasonId || account.state !== "ready" || account.allocationSourceVersion !== 1) return { state: "invalid" as const, message: "Student, fee charge, or financial records are unavailable.", studentName: null, chargedCents: null, appliedCents: null, owedCents: null };
   const chargedCents = effectiveChargeCents(charge);
   const owedCents = chargedCents - charge.appliedCents;
-  const facts = { studentName: student.preferredName || student.legalName, chargedCents, appliedCents: charge.appliedCents, owedCents };
+  const facts = { studentName: student.legalName, chargedCents, appliedCents: charge.appliedCents, owedCents };
   if ((charge.revision ?? 0) !== item.expectedChargeRevision || account.generation !== item.expectedFinancialGeneration || account.revision !== item.expectedFinancialRevision) return { state: "stale" as const, message: "This fee balance changed. Export a fresh file before recording this row.", ...facts };
   if (item.amountCents > owedCents || owedCents <= 0) return { state: "invalid" as const, message: "The new payment exceeds the amount owed for this fee.", ...facts };
   return { state: "ready" as const, message: null, ...facts };
@@ -66,7 +66,7 @@ export const exportPage = query({
       if (args.filter === "paid" && owedCents !== 0 || args.filter === "unpaid" && owedCents === 0) continue;
       const account = await financialAccount(ctx, student._id);
       if (!account || account.seasonId !== fee.seasonId || account.state !== "ready" || account.allocationSourceVersion !== 1) throw new Error("Prepare financial records before exporting this fee.");
-      page.push({ studentId: student._id, chargeId: charge._id, studentName: student.preferredName || student.legalName, chargedCents, appliedCents: charge.appliedCents, owedCents, chargeRevision: charge.revision ?? 0, financialGeneration: account.generation, financialRevision: account.revision });
+      page.push({ studentId: student._id, chargeId: charge._id, studentName: student.legalName, chargedCents, appliedCents: charge.appliedCents, owedCents, chargeRevision: charge.revision ?? 0, financialGeneration: account.generation, financialRevision: account.revision });
     }
     return { feeLabel: fee.label, page, isDone: source.isDone, continueCursor: source.continueCursor };
   },

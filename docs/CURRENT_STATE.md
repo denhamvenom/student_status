@@ -1,6 +1,20 @@
 # Current integration handoff
 
-## Active development candidate - October 19
+## Bulk Payment full-name correction - October 19
+
+Owner explicitly authorized the production correction. Export and payment review now use the full student legal name, preserving last names when a preferred name is only a first name. CSV columns, identifiers, financial behavior and settings are unchanged. Existing downloaded files need to be downloaded again to show the corrected names.
+
+Source ad61740 passed lint, typecheck, all 495 tests in one single-worker run, and production build; independent review found no blockers. Development third-bandicoot-18 and production amicable-eel-413 synchronization succeeded with backend typecheck/schema validation. Read-only production export verification confirmed full multi-part names on every exported row; no financial writes were performed. This code release also carries the previously published PR19 deployment documentation onto main. Automatic website build results are recorded in the release PR after merge.
+
+## Production release - October 19
+
+Owner authorized the combined production release. Source 75683bb deployed successfully to Convex production amicable-eel-413 with typecheck/schema validation and no index deletion. PR19 merged as c861f1d78aef57796cb2787c1c46cb5fb2887202; both Student Status and Timeclock Cloudflare builds succeeded for that exact merge.
+
+Signed-in Coach production check confirmed the fee CSV UI and all three export options. View charge details opened and Close details dismissed it. Read-only production export queries verified consistent assessed/paid/unpaid balances. Timeclock operator sign-in page loaded. No payment import, charge change or test invitation was performed during release verification.
+
+The coordinated parent-email chat installed and verified production settings, then enabled sending after both builds succeeded: notifications@team8044.org sender, coach@team8044.org replies, production app origin matching SITE_URL, existing restricted key preserved privately. Development sending remains disabled. No real invitation/Google round trip was performed; that remains unverified. Existing accounts, charges and real settings were preserved.
+
+## Historical development candidate - October 19
 
 Workspace: Development Version/student-status-readiness-design. Branch: feature/development-review-fixtures-2026-10-18; existing PR19. Root owns Git and the sole shared development sync. Production merge/deployment remains separately authorized.
 
@@ -14,4 +28,4 @@ Parent-email branch through 01ec5fe is integrated additively: automatic parent i
 
 Main 4d21466 (PR18) has both production frontend builds verified. Bulk Invite was released through PR17; see [release evidence](BULK_INVITE_RELEASE_2026-10-19.md). The October 18 synthetic cleanup is historical: real student records have since been created. Never rerun that cleanup. Credentials and real settings remain intact.
 
-Development target: third-bandicoot-18. Production target: amicable-eel-413. Do not publish development synthetic records or private evidence. No production release of PR19 changes is authorized by the current implementation request. Next: publish the reviewed development checkpoint and update PR19; main/production release remains separate. Current visual gaps remain in [VISUAL_CHECKS.md](VISUAL_CHECKS.md).
+Development target: third-bandicoot-18. Production target: amicable-eel-413. Do not publish development synthetic records or private evidence. Production release of PR19 is complete under the later owner authorization recorded above. Current visual gaps remain in [VISUAL_CHECKS.md](VISUAL_CHECKS.md).
