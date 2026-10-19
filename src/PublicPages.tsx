@@ -28,7 +28,7 @@ export function AboutPage() {
     <p>DS Robotics Foundation operates Denham Venom Team 8044 and these team apps.</p>
     <section className={styles.card} aria-labelledby="access-heading">
       <h2 id="access-heading">Team access</h2>
-      <p>Use the Google account connected to your team profile. Signing in does not automatically grant access to team records; the Coach approves enrollment and assigns team roles.</p>
+      <p>Students and staff use the Google account connected to their team profile. Invited parents can also sign in through a private emailed link or email code. Signing in does not automatically grant access to team records; the Coach approves enrollment and assigns team roles, and parents confirm their invited family relationship.</p>
       <Link className="button button-primary" to="/">Go to sign in</Link>
     </section>
     <section className={styles.section} aria-labelledby="timeclock-heading">
@@ -50,15 +50,15 @@ export function PrivacyPage() {
     </section>
     <section className={styles.section} aria-labelledby="information-heading">
       <h2 id="information-heading">Information in the apps</h2>
-      <p>Google sign-in provides account information such as your name, email address and profile image. Depending on your role and what you submit, the apps also hold student and parent profiles, contact and emergency information, health information, attendance, participation and financial records, and permission-form evidence. These records support team administration and event preparation.</p>
+      <p>Google sign-in provides account information such as your name, email address and profile image. Parent email sign-in verifies the email address receiving the private link or code. Depending on your role and what you submit, the apps also hold student and parent profiles, contact and emergency information, health information, attendance, participation and financial records, and permission-form evidence. These records support team administration and event preparation.</p>
     </section>
     <section className={styles.section} aria-labelledby="access-privacy-heading">
       <h2 id="access-privacy-heading">Access</h2>
-      <p>Access depends on your approved team role and family relationships. Google sign-in alone does not grant access to team records. The Coach approves enrollment and manages application roles. Authorized team staff and linked family members can access information appropriate to their responsibilities.</p>
+      <p>Access depends on your approved team role and family relationships. Signing in alone does not grant access to team records. The Coach approves enrollment and manages application roles. Authorized team staff and linked family members can access information appropriate to their responsibilities.</p>
     </section>
     <section className={styles.section} aria-labelledby="services-heading">
       <h2 id="services-heading">Services used</h2>
-      <p>Google provides sign-in and the team calendar. Your Google account information is used to identify your account and connect it to your approved team access. Convex processes and stores application records, and Cloudflare hosts the websites. Timeclock reads the team calendar separately; signing in does not give the apps access to your personal Google calendar.</p>
+      <p>Google provides Google sign-in and the team calendar. Account information identifies your account and connects it to your approved team access. Resend delivers parent invitations and sign-in emails, receiving the destination address and the private link or code needed for that email. Convex processes and stores application records, and Cloudflare hosts the websites. Timeclock reads the team calendar separately; signing in does not give the apps access to your personal Google calendar.</p>
     </section>
     <section className={styles.section} aria-labelledby="retention-heading">
       <h2 id="retention-heading">Retention and review</h2>
@@ -86,7 +86,7 @@ export function TermsPage() {
     </section>
     <section className={styles.section} aria-labelledby="accounts-heading">
       <h2 id="accounts-heading">Your account and submissions</h2>
-      <p>Sign in with your own approved Google account. Keep your account secure, sign out when you finish using a shared device, and tell the Coach if you think someone else has used your access. Submit information you believe is accurate and ask for a correction when you find an error.</p>
+      <p>Sign in with your own approved account. Keep private invitation links and sign-in codes to yourself. Keep your account secure, sign out when you finish using a shared device, and tell the Coach if you think someone else has used your access. Submit information you believe is accurate and ask for a correction when you find an error.</p>
     </section>
     <section className={styles.section} aria-labelledby="misuse-heading">
       <h2 id="misuse-heading">Misuse and access</h2>

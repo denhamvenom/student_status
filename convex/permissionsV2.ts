@@ -3,7 +3,7 @@ import { internalMutation, internalQuery, mutation, query } from "./_generated/s
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { activeSeason, audit, studentAccess, viewer } from "./lib/access";
-import { verifiedGoogle, tokenHash } from "./lib/invitationIdentity";
+import { verifiedParent, tokenHash } from "./lib/invitationIdentity";
 import { compareCoverage, coverageFor, expectedCoverage, setPendingCoverage } from "./lib/permissionCoverage";
 import { boundedText, expectedCoverageValidator } from "./lib/consentSnapshot";
 import { consentProfileV2Validator, consentSnapshotV2Validator, selectedEventsV2, snapshotHashV2, validateConsentProfileV2, validateSnapshotV2, type ConsentSnapshotV2 } from "./lib/consentSnapshotV2";
@@ -18,8 +18,8 @@ const draftResultValidator = v.object({draftId: v.id("permissionDrafts"), expire
 
 async function parentSigner(ctx: Ctx, actor: Doc<"appUsers">) {
   if (actor.role !== "parent") throw new Error("Only a linked parent may complete or sign this form.");
-  const who = await verifiedGoogle(ctx);
-  if (!who || who.authUserId !== actor.authUserId) throw new Error("A verified Google parent account is required.");
+  const who = await verifiedParent(ctx);
+  if (!who || who.authUserId !== actor.authUserId) throw new Error("A verified parent account is required.");
   return who;
 }
 function formReader(actor: Doc<"appUsers">) {

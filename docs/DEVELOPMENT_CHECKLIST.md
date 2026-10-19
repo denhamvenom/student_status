@@ -1,5 +1,9 @@
 # Student Status Development Checklist
 
+## Private parent email sign-in — local work
+
+Owner-approved local replacement for student Share/Copy: private inbox-only first sign-in, one-hour resend, parent email-code recovery/returning login, and unchanged student Google sign-in. Implementation and synthetic verification are in progress. Production still runs the previous shared-link feature. See [design, boundaries and checks](PRIVATE_PARENT_SIGN_IN.md). Coordinate Calendar/main and the parallel name/Money fix before shared development sync.
+
 ## Bulk Payment full-name correction - October 19
 
 Owner explicitly authorized the production correction. Export and payment review now use the full student legal name, preserving last names when a preferred name is only a first name. CSV columns, identifiers, financial behavior and settings are unchanged. Existing downloaded files need to be downloaded again to show the corrected names.

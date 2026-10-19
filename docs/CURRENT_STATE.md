@@ -1,5 +1,15 @@
 # Current integration handoff
 
+## Local candidate: private parent email sign-in
+
+Workspace student-status-bulk-invite; branch feature/parent-email-invitations. Owner requested local implementation replacing student Share/Copy with inbox-only parent sign-in links, preserving one-hour resend and student Google login. Includes parent returning/expired-link email codes. No production deploy/main merge or real email sending authorized for this candidate. See [scope, design and evidence](PRIVATE_PARENT_SIGN_IN.md).
+
+Parent backend and frontend are implemented and undergoing final synthetic checks/review. Existing verified parent identities remain connected; legacy shared links cannot sign in. Student create/resend responses contain no secret. Google student/staff entry remains separate. Development mail remains disabled; a real inbox/browser rehearsal is still pending.
+
+The other chat released Calendar as main b1f730a and is separately fixing full-name displays/Money scrolling. Root will integrate current main and its ready fix before one shared development sync, preserving development Calendar write prohibition. This checkout must not independently deploy production. Root owns Git/integration; Sol implementation/Astra review. Private credentials, test captures and account data remain ignored.
+
+## Earlier released checkpoints
+
 ## Bulk Payment full-name correction - October 19
 
 Owner explicitly authorized the production correction. Export and payment review now use the full student legal name, preserving last names when a preferred name is only a first name. CSV columns, identifiers, financial behavior and settings are unchanged. Existing downloaded files need to be downloaded again to show the corrected names.
