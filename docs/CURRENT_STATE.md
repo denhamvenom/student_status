@@ -25,3 +25,7 @@ Rollback: use a coordinated code fix or rollback of both frontend/backend. Do no
 ## Current workspace and coordination
 
 Branch feature/parent-email-invitations, checkout student-status-bulk-invite. Root owns production release; audit chat has clean matching local preview and holds synchronization. Main baseline b1f730a; combined names/Money checkpoint 2bd052a included. Current implementation/test evidence: [private parent sign-in](PRIVATE_PARENT_SIGN_IN.md), [visual checks](VISUAL_CHECKS.md), [release history](RELEASE_2026-10-19.md). Student records, credentials and private captures remain outside Git.
+
+## October 19 - Mentor/Staff invitation wording
+
+Owner authorized development and production publication of frontend-only invitation copy. Heading is Invite Mentor/Staff; Email address and instructions describe Google or email-code sign-in using the invited address. Landing and account-mismatch copy agree; link creation is distinguished from sending an email. No auth logic, backend, records, credentials or settings changed. Focused lint, application typecheck/build and live local heading/instructions checks passed. Exact production merge/build and live verification are recorded on the release PR.

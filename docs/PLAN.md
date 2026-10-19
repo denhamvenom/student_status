@@ -394,3 +394,7 @@ Owner-authorized development-only enrichment and private reviewer guide/index co
 
 ## October 19 — local sign-in chooser implemented
 Student Google-only path and Parent/team staff Google-or-email path implemented using existing components. Approved adult identity reuse and invitation email authentication retain server role boundaries and explicit acceptance. Development synced; 522 tests, final 44 focused regressions, lint/typecheck/build and independent review pass. Production promotion and real-inbox checks remain separate.
+
+## October 19 - Mentor/Staff invitation wording
+
+Owner authorized development and production publication of frontend-only invitation copy. Heading is Invite Mentor/Staff; Email address and instructions describe Google or email-code sign-in using the invited address. Landing and account-mismatch copy agree; link creation is distinguished from sending an email. No auth logic, backend, records, credentials or settings changed. Focused lint, application typecheck/build and live local heading/instructions checks passed. Exact production merge/build and live verification are recorded on the release PR.
