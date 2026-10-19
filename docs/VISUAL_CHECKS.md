@@ -1,5 +1,30 @@
 # Visual review closed — October 16, 2026
 
+## October 19 fee payment CSV
+
+Actual component with isolated synthetic backend: CSV upload reached Review, showing server-provided name/balances, selected fee and total. Desktop 1440px light and phone 390px dark layouts inspected with no horizontal overflow. Existing shared cards, controls, typography and colors reused. Backend saves, authenticated browser operation and remaining viewport/theme combinations are not claimed. See [workflow evidence](FEE_PAYMENT_CSV.md).
+
+## October 19 charge workflow current checks
+
+| Check | Evidence / remaining work |
+|---|---|
+| Automatic full-list review, original reason, explicit confirmation | Source reviewed and focused tests passed; live browser interaction unobserved |
+| Close details and collapsed cancellation on phone/desktop/light/dark | Source reviewed; fresh authenticated visual comparison remains pending |
+
+## October 19 parent invitation resend
+
+Actual StudentParents component with mocked Convex passed countdown, resend rejection/success, refreshed Share/Copy link and busy controls at 1440px light and 390px dark. Screenshots inspected: no overflow. Uses existing card/button styles. Local synthetic evidence only; real Google redemption and physical device share remain unverified. Screenshots remain ignored under .test-temp/parent-email-ui. Other audit-screen visual checks below remain separate.
+
+## October 19 parent email/share candidate
+
+| Check | Evidence / remaining work |
+|---|---|
+| Student Parents email/share controls | Actual component with mocked backend, 1440px light and 390px dark inspected; wrapping and controls readable, no overflow |
+| Status and fallback behavior | Synthetic browser check passed queued/sent/failed/not_sent, configuration message, native-share mock, cancellation/failure and copy fallback |
+| Integrated delivery and device sharing | Real email/OAuth link and physical phone share sheet remain unverified; requires sender configuration and authorized test recipient |
+
+See [current evidence](PARENT_INVITATION_EMAIL.md) and [conformance detail](FRONTEND_CONFORMANCE_LOG.md). No production changes.
+
 ## October 18 Batch 4 current checks
 
 | Check | Evidence / remaining work |

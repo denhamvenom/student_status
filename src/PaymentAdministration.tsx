@@ -10,6 +10,7 @@ import { NativeSelect, NativeSelectOption } from './components/ui/native-select'
 import { parseFundraisingDecimal, formatFundraisingCents } from './Fundraising'
 import styles from './ChargeAdministration.module.css'
 import { paymentAdministrationCopy as copy } from './lib/payment-admin-copy'
+import { FeePaymentImport } from './FeePaymentImport'
 type PaymentRow = { studentEmail: string; amountCents: number; method: 'cash' | 'check' | 'other'; reference: string; occurredAt: number; rowReference: string }
 type ReviewedRow = PaymentRow & FunctionReturnType<typeof api.paymentAdministration.previewPayments>[number]
 const message = (error: unknown) => error instanceof Error ? error.message : String(error)
@@ -53,7 +54,8 @@ class PaymentBoundary extends Component<{ children: ReactNode; retry: () => void
 }
 export function PaymentAdministration({ studentId, mode = 'bulk' }: { studentId?: Id<'students'>; mode?: 'bulk' | 'import' | 'correction' }) {
   const [attempt, setAttempt] = useState(0)
-  return <section className={styles.root}><PaymentBoundary key={attempt} retry={() => setAttempt(value => value + 1)}>{mode === 'correction' && studentId ? <PaymentCorrections studentId={studentId}/> : <BulkPayments key={mode} initialMode={mode === 'import' ? 'import' : 'bulk'}/>}</PaymentBoundary></section>
+  const [path, setPath] = useState<'fee' | 'other'>(mode === 'import' ? 'other' : 'fee')
+  return <section className={styles.root}><PaymentBoundary key={attempt} retry={() => setAttempt(value => value + 1)}>{mode === 'correction' && studentId ? <PaymentCorrections studentId={studentId}/> : <><div className={styles.actions}><Button variant={path === 'fee' ? 'default' : 'outline'} onClick={() => setPath('fee')}>Pay a selected fee from CSV</Button><Button variant={path === 'other' ? 'default' : 'outline'} onClick={() => setPath('other')}>Other bulk payments</Button></div>{path === 'fee' ? <FeePaymentImport/> : <BulkPayments key={mode} initialMode={mode === 'import' ? 'import' : 'bulk'}/>}</>}</PaymentBoundary></section>
 }
 function BulkPayments({ initialMode }: { initialMode: 'bulk' | 'import' }) {
   const convex = useConvex(); const post = useMutation(api.paymentAdministration.recordPaymentRow)

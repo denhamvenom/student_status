@@ -1,15 +1,24 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
+import { components, internal } from "./_generated/api";
 import { mutation, query } from "./_generated/server";
+import { RateLimiter } from "@convex-dev/rate-limiter";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { activeSeason, audit, ownStudent, requireRole, requireSeasonProfileWritable, viewer } from "./lib/access";
 import { emailKey, tokenHash, newToken, verifiedGoogle } from "./lib/invitationIdentity";
+import { parentInviteEmailConfiguration } from "./lib/parentInviteEmail";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const RESEND_COOLDOWN_MS = 60 * 60 * 1000;
+const resendAvailableAt = (row: Doc<"parentInvitations">) => Math.max(row.createdAt, row.emailSentAt ?? row.createdAt) + RESEND_COOLDOWN_MS;
 const ATTESTATION_VERSION = "parent-relationship-1";
 const ATTESTATION_TEXT = "I attest that I am this student's parent or legal guardian, that I have legal authority to access this student's information, and that the relationship I entered is accurate. Linking my account does not sign travel or medication consent.";
 type Ctx = QueryCtx | MutationCtx;
+const emailLimiter = new RateLimiter(components.rateLimiter, {
+  parentInviteEmailHourly: { kind: "fixed window", rate: 3, period: 60 * 60 * 1000 },
+  parentInviteEmailDaily: { kind: "fixed window", rate: 10, period: 24 * 60 * 60 * 1000 },
+});
 
 async function setting(ctx: Ctx) {
   return ctx.db.query("parentInvitationSettings").withIndex("by_key", q => q.eq("key", "team")).unique();
@@ -36,6 +45,27 @@ async function revokedLinkForEmail(ctx: Ctx, studentId: Id<"students">, email: s
   return false;
 }
 
+async function queueParentInvite(ctx: MutationCtx, actor: Doc<"appUsers">, student: Doc<"students">, parentEmail: string, previous: Doc<"parentInvitations">[]) {
+  const emailConfiguration = parentInviteEmailConfiguration();
+  if (emailConfiguration) {
+    const key = `${student._id}:${parentEmail}`;
+    if (!(await emailLimiter.limit(ctx, "parentInviteEmailHourly", { key })).ok ||
+        !(await emailLimiter.limit(ctx, "parentInviteEmailDaily", { key: actor._id })).ok) {
+      throw new Error("Too many email invitations. Wait before creating another link.");
+    }
+  }
+  for (const row of previous) await ctx.db.patch(row._id, { status: "replaced" });
+  const token = newToken();
+  const now = Date.now();
+  const expiresAt = now + WEEK_MS;
+  const inviteId = await ctx.db.insert("parentInvitations", { studentId: student._id, parentEmail, tokenHash: await tokenHash(token), status: "pending", emailStatus: emailConfiguration ? "queued" : "not_sent", emailError: emailConfiguration ? undefined : "Automatic email is not configured. Share the link directly.", createdBy: actor._id, createdAt: now, expiresAt });
+  if (emailConfiguration) {
+    await ctx.scheduler.runAfter(0, internal.parentInviteEmail.send, { inviteId, token, attempt: 1 });
+    await ctx.scheduler.runAfter(20 * 60_000, internal.parentInviteEmail.markStalled, { inviteId });
+  }
+  return { token, expiresAt, inviteId };
+}
+
 export const invitationSettings = query({
   args: {}, returns: v.object({ enabled: v.boolean() }),
   handler: async ctx => { await viewer(ctx); return { enabled: (await setting(ctx))?.enabled ?? true }; },
@@ -55,7 +85,7 @@ export const setInvitationEnabled = mutation({
 
 export const createParentInvite = mutation({
   args: { studentId: v.id("students"), parentEmail: v.string() },
-  returns: v.object({ token: v.string(), expiresAt: v.number() }),
+  returns: v.object({ token: v.string(), expiresAt: v.number(), inviteId: v.id("parentInvitations") }),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "student");
     const own = await ownStudent(ctx, actor);
@@ -70,13 +100,36 @@ export const createParentInvite = mutation({
     if (revoked) throw new Error("A Coach must resolve this revoked invitation.");
     const previous = await ctx.db.query("parentInvitations").withIndex("by_studentId_and_parentEmail_and_status", q => q.eq("studentId", student._id).eq("parentEmail", parentEmail).eq("status", "pending")).take(101);
     if (previous.length > 100) throw new Error("Too many pending invitations. Ask a Coach for help.");
-    for (const row of previous) await ctx.db.patch(row._id, { status: "replaced" });
-    const token = newToken();
     const now = Date.now();
-    const expiresAt = now + WEEK_MS;
-    const id = await ctx.db.insert("parentInvitations", { studentId: student._id, parentEmail, tokenHash: await tokenHash(token), status: "pending", createdBy: actor._id, createdAt: now, expiresAt });
-    await audit(ctx, actor, "parentInvitations", id, "create", null, { studentId: student._id, parentEmail, expiresAt });
-    return { token, expiresAt };
+    if (previous.some(row => row.expiresAt > now && resendAvailableAt(row) > now)) {
+      throw new Error("Wait one hour before sending another invitation to this parent.");
+    }
+    const result = await queueParentInvite(ctx, actor, student, parentEmail, previous);
+    await audit(ctx, actor, "parentInvitations", result.inviteId, "create", null, { studentId: student._id, parentEmail, expiresAt: result.expiresAt });
+    return result;
+  },
+});
+
+export const resendParentInvite = mutation({
+  args: { inviteId: v.id("parentInvitations") },
+  returns: v.object({ token: v.string(), expiresAt: v.number(), inviteId: v.id("parentInvitations") }),
+  handler: async (ctx, args) => {
+    const actor = await viewer(ctx); requireRole(actor, "student");
+    const own = await ownStudent(ctx, actor);
+    if ((await setting(ctx))?.enabled === false) throw new Error("Parent invitations are disabled. Ask a Coach for help.");
+    const old = await ctx.db.get(args.inviteId);
+    if (!old || old.studentId !== own._id || old.status !== "pending" || old.expiresAt <= Date.now()) throw new Error("Pending invitation unavailable.");
+    const student = await eligibleStudent(ctx, own._id);
+    const latest = await ctx.db.query("parentInvitations").withIndex("by_studentId_and_parentEmail", q => q.eq("studentId", own._id).eq("parentEmail", old.parentEmail)).order("desc").first();
+    if (latest?._id !== old._id) throw new Error("Only the latest pending invitation can be resent.");
+    const now = Date.now();
+    if (resendAvailableAt(old) > now) throw new Error("Wait one hour before resending this invitation.");
+    if (await revokedLinkForEmail(ctx, student._id, old.parentEmail)) throw new Error("A Coach must resolve this revoked family link.");
+    const revoked = await ctx.db.query("parentInvitations").withIndex("by_studentId_and_parentEmail_and_status", q => q.eq("studentId", student._id).eq("parentEmail", old.parentEmail).eq("status", "revoked")).first();
+    if (revoked) throw new Error("A Coach must resolve this revoked invitation.");
+    const result = await queueParentInvite(ctx, actor, student, old.parentEmail, [old]);
+    await audit(ctx, actor, "parentInvitations", result.inviteId, "resend", { replacedInviteId: old._id }, { studentId: student._id, parentEmail: old.parentEmail, expiresAt: result.expiresAt });
+    return result;
   },
 });
 
@@ -157,7 +210,7 @@ async function studentManager(ctx: Ctx, studentId: Id<"students">) {
 
 export const listStudentInvites = query({
   args: { studentId: v.id("students") },
-  returns: v.array(v.object({ _id: v.id("parentInvitations"), parentEmail: v.string(), status: v.union(v.literal("pending"), v.literal("accepted"), v.literal("revoked"), v.literal("replaced")), createdAt: v.number(), expiresAt: v.number(), acceptedAt: v.union(v.number(), v.null()) })),
+  returns: v.array(v.object({ _id: v.id("parentInvitations"), parentEmail: v.string(), status: v.union(v.literal("pending"), v.literal("accepted"), v.literal("revoked"), v.literal("replaced")), emailStatus: v.union(v.literal("not_sent"), v.literal("queued"), v.literal("sent"), v.literal("failed")), emailError: v.union(v.string(), v.null()), createdAt: v.number(), resendAvailableAt: v.number(), expiresAt: v.number(), acceptedAt: v.union(v.number(), v.null()) })),
   handler: async (ctx, args) => {
     await studentManager(ctx, args.studentId);
     const recent = await ctx.db.query("parentInvitations").withIndex("by_studentId", q => q.eq("studentId", args.studentId)).order("desc").take(100);
@@ -166,7 +219,7 @@ export const listStudentInvites = query({
     if (pending.length > 100 || revoked.length > 100) throw new Error("Too many actionable invitations. Ask a Coach for help.");
     const byId = new Map([...recent, ...pending, ...revoked].map(row => [row._id, row]));
     const rows = [...byId.values()].sort((a, b) => b._creationTime - a._creationTime);
-    return rows.map(row => ({ _id: row._id, parentEmail: row.parentEmail, status: row.status, createdAt: row.createdAt, expiresAt: row.expiresAt, acceptedAt: row.acceptedAt ?? null }));
+    return rows.map(row => ({ _id: row._id, parentEmail: row.parentEmail, status: row.status, emailStatus: row.emailStatus ?? "not_sent" as const, emailError: row.emailError ?? null, createdAt: row.createdAt, resendAvailableAt: resendAvailableAt(row), expiresAt: row.expiresAt, acceptedAt: row.acceptedAt ?? null }));
   },
 });
 

@@ -1,7 +1,7 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import FeeAdministration, { BulkJobSummary, BulkRowEvidence, FeeDefinitionDraftForm, FeeMaintenanceNotice, LiveMappingReceipt, FeePriorityReceipt, FeePriorityRows, UnmappedFeeEvidence } from './FeeAdministration'
+import FeeAdministration, { BulkJobSummary, BulkRowEvidence, FeeDefinitionDraftForm, FeeMaintenanceNotice, LiveMappingReceipt, FeePriorityReceipt, FeePriorityRows, UnmappedFeeEvidence, bulkCommitArgs, bulkReviewComplete, bulkReviewUnchanged, shouldLoadPreparedRows, shouldLoadStudentChoices } from './FeeAdministration'
 import type { Doc, Id } from '../convex/_generated/dataModel'
 
 const queryState = vi.hoisted(() => ({ loaded: true, queryCount: 0, mapping: null as null | { job: { state: string; processed: number; mapped: number; unmapped: number; reason: string }; originalActorName: string; processingActorName: string; canRetry: boolean; canCancel: boolean } }))
@@ -12,6 +12,28 @@ vi.mock('convex/react', () => ({
 }))
 
 describe('shared fee presentation', () => {
+  it('automatically pages applicable student choices and prepared rows before enabling confirmation', () => {
+    const prepared = { canCommit: true, scopeMemberCount: 50, expectedScopeHash: 'frozen-scope', expectedOrderRevision: 2, expectedDefinitionRevision: 3, job: { _id: 'synthetic-bulk' as Id<'feeBulkJobs'>, state: 'prepared', reason: 'Original reviewed reason' } } as NonNullable<Parameters<typeof bulkReviewComplete>[0]>
+    expect(shouldLoadStudentChoices('create', 'selected', false, null, 'CanLoadMore')).toBe(true)
+    expect(shouldLoadStudentChoices('edit', 'selected', false, null, 'CanLoadMore')).toBe(true)
+    expect(shouldLoadStudentChoices('create', 'selected', false, null, 'LoadingMore')).toBe(false)
+    expect(shouldLoadStudentChoices('create', 'allActive', false, null, 'CanLoadMore')).toBe(false)
+    expect(shouldLoadStudentChoices('edit', 'selected', true, null, 'CanLoadMore')).toBe(false)
+    expect(shouldLoadPreparedRows(prepared, 'CanLoadMore')).toBe(true)
+    expect(shouldLoadPreparedRows(prepared, 'LoadingMore')).toBe(false)
+    expect(bulkReviewComplete(prepared, 20, 'CanLoadMore', true)).toBe(false)
+    expect(bulkReviewComplete(prepared, 50, 'LoadingMore', true)).toBe(false)
+    expect(bulkReviewComplete(prepared, 50, 'Exhausted', false)).toBe(false)
+    expect(bulkReviewComplete(prepared, 50, 'Exhausted', true)).toBe(true)
+  })
+  it('confirms only the unchanged reviewed scope and reuses its original reason', () => {
+    const reviewed = { canCommit: true, scopeMemberCount: 50, expectedScopeHash: 'frozen-scope', expectedOrderRevision: 2, expectedDefinitionRevision: 3, job: { _id: 'synthetic-bulk' as Id<'feeBulkJobs'>, state: 'prepared', reason: ' Original reviewed reason ' } } as NonNullable<Parameters<typeof bulkReviewComplete>[0]>
+    expect(bulkReviewUnchanged(reviewed, reviewed)).toBe(true)
+    expect(bulkReviewUnchanged(reviewed, { ...reviewed, expectedScopeHash: 'changed' })).toBe(false)
+    expect(bulkReviewUnchanged(reviewed, { ...reviewed, expectedOrderRevision: 4 })).toBe(false)
+    expect(bulkReviewUnchanged(reviewed, { ...reviewed, expectedDefinitionRevision: 5 })).toBe(false)
+    expect(bulkCommitArgs(reviewed)).toEqual({ jobId: reviewed.job._id, expectedScopeHash: 'frozen-scope', expectedOrderRevision: 2, expectedDefinitionRevision: 3, reason: 'Original reviewed reason' })
+  })
   it('exposes only authorized mapping recovery and labels cancelled receipts accurately', () => {
     const receipt = { job: { state: 'failed', processed: 4, mapped: 2, unmapped: 2, reason: 'Synthetic mapping review' }, originalActorName: 'Coach', processingActorName: 'Coach', canRetry: true, canCancel: true }
     try {
@@ -46,6 +68,7 @@ describe('shared fee presentation', () => {
   it('labels custom charge preparation as zero-money review and requires explicit submit', () => {
     const html = renderToStaticMarkup(createElement(FeeDefinitionDraftForm, { scopeFields: null, scopeValid: false, disabled: false, onPrepare: async () => undefined }))
     expect(html).toContain('Review which students and charges this change will affect. No amounts change until you confirm.')
+    expect(html).toContain('>Review</button>')
     expect(html).toContain('type="submit"')
     expect(html).toContain('disabled')
     expect(html).not.toContain('successfully')

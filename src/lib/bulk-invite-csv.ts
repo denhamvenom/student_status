@@ -4,7 +4,7 @@ const HEADER = ['First Name', 'Last Name']
 export const MAX_INVITE_CSV_BYTES = 128 * 1024
 export const MAX_INVITE_ROWS = 100
 
-function readCells(input: string): string[][] {
+export function readCsvCells(input: string): string[][] {
   const rows: string[][] = []
   let row: string[] = []
   let cell = ''
@@ -38,7 +38,7 @@ function readCells(input: string): string[][] {
 
 export function parseInviteCsv(input: string): InviteCsvRow[] {
   if (new TextEncoder().encode(input).length > MAX_INVITE_CSV_BYTES) throw new Error('The CSV is too large. Use a file under 128 KB.')
-  const rows = readCells(input.replace(/^\uFEFF/, ''))
+  const rows = readCsvCells(input.replace(/^\uFEFF/, ''))
   if (rows[0]?.length !== 2 || rows[0][0].trim().toLowerCase() !== HEADER[0].toLowerCase() || rows[0][1].trim().toLowerCase() !== HEADER[1].toLowerCase()) {
     throw new Error('The first row must be First Name,Last Name.')
   }

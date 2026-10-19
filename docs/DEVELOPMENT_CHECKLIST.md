@@ -1,5 +1,38 @@
 # Student Status Development Checklist
 
+## October 19 fee-specific Bulk Payment CSV
+
+Implemented fee selection, All/Paid/Unpaid assessed-student export, blank-row skipping, authoritative review, and new receipts applied only to the selected fee. Durable row replay prevents duplicate posting; stale/overpayment and authorization checks remain server-side. Focused backend/CSV/regression checks and independent source review pass. See [workflow and evidence](FEE_PAYMENT_CSV.md). Combined lint/typecheck/build passed. Full suite passed 493 of 495 cases; two existing large-fixture tests timed out under parallel load, then both unchanged suites passed 35/35 with one worker. All 495 cases passed across those runs. Development sync to third-bandicoot-18 succeeded with backend typecheck; email sending remained disabled. No production deployment. Reviewed parent-email branch through 01ec5fe is integrated.
+
+## October 19 simplified charge workflow (PR19)
+
+Implemented development work follows the owner-approved Add charge → Review → Confirm charges flow: enter the reason once, load all student pages automatically, preserve exact reviewed-scope checks, and include Close details without changing charges. Validation: full lint, typecheck, 462 tests and build passed (existing bundle-size warning); independent source review found no blockers. Live browser/visual checks remain pending. Backend contracts remain unchanged. PR19 is the development candidate; main merge and production UI deployment remain separate.
+
+The owner separately authorized confirmation of the existing production fee. That one prepared operation completed successfully for the entire reviewed active roster, with no held rows. Private verification remains outside Git; no student records or account-specific evidence are included here. This supersedes the earlier observation that the fee was only prepared. No duplicate fee was created.
+
+PR18 is already merged as `4d21466`, with both production frontend builds verified successful. The older pre-merge and empty-roster notes below describe historical checkpoints, not current production state.
+
+## October 19 charge-details close control
+
+Added Close details while charge details are loading or open. Closing only dismisses the panel locally; it does not cancel, confirm or change charges. View charge details reopens it. A dismissed automatically selected job stays hidden, while a different new automatic job can still appear. No backend changes. Focused fee tests (14), source lint, typecheck and build validation recorded for this frontend checkpoint; live UI verification remains pending. Production read-only inspection confirmed the reported missing fee was still prepared, not committed; no financial action was taken. No student-specific evidence is stored here.
+
+## October 19 parent email resend checkpoint
+
+Implemented and locally verified: automatic parent email, Share/Copy, and Resend invitation after one server-enforced hour. Exact invited Google login remains required; resend invalidates the prior link. Lint/types/build and scoped review pass; all 482 regression cases passed across the full run and isolated timeout rerun. Synthetic phone/desktop checks passed. See [detailed evidence and rollout](PARENT_INVITATION_EMAIL.md).
+
+Current main audit fixes are preserved. Audit chat owns the next shared development sync after merging this candidate with its fee-payment CSV work. Production deployment/main merge and real invitation-to-Google rehearsal remain pending. Development mail stays disabled; the prior direct connectivity email was confirmed received.
+
+## October 19 parent email invitations — local candidate
+
+- [x] Automatic invitation email, safe sending status, bounded retry/rate limits and interrupted-job recovery implemented.
+- [x] Share invitation and Copy fallback implemented; matching Google account and existing acceptance rules preserved.
+- [x] Full 478-test suite, lint, application/backend types and application build pass; actual-component synthetic browser checks at desktop/light and phone/dark pass.
+- [x] Scoped Astra review closed without blockers. No production requests or real emails sent.
+- [ ] Configure verified sender/domain/key and approved origin; authorized real-email and Google-link round-trip check before release.
+- [ ] Separate authorization for backend sync and production rollout; no deployment in this checkpoint.
+
+See [configuration and detailed evidence](PARENT_INVITATION_EMAIL.md). Earlier dated checkpoints below are historical.
+
 ## October 19 charge review wording
 
 Implemented frontend-only simplification: View charge details; Review students and charges; explicit eight-character Reason input guidance; student names, planned/current amounts and readable saved/pending/review status replace internal revisions and processing counters. New unposted charges no longer produce false load errors. Missing existing charges still need review; held rows retain their explanation. Partial money release amounts and all confirmation/retry safeguards remain. No backend or production data changes.
