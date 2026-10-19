@@ -4,7 +4,7 @@ import { Checkbox } from './components/ui/checkbox'
 import { NativeSelect, NativeSelectOption } from './components/ui/native-select'
 import type { Doc, Id } from '../convex/_generated/dataModel'
 import { Input } from './components/ui/input'
-import { Component, useRef, useState, type ReactNode } from 'react'
+import { Component, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useMutation, usePaginatedQuery, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
 import type { FunctionArgs, FunctionReturnType } from 'convex/server'
@@ -96,6 +96,9 @@ function FeeWorkspace({ isCoach }: { isCoach: boolean }) {
 }
 
 type UnmappedRow = FunctionReturnType<typeof api.feeDefinitions.unmapped>['page'][number]
+export function shouldLoadStudentChoices(kind:'create'|'edit'|'cancel',scope:'allActive'|'selected',existingScope:boolean,eventId:Id<'events'>|null,status:string){
+  return kind!=='cancel'&&!existingScope&&scope==='selected'&&!eventId&&status==='CanLoadMore'
+}
 
 function BulkPreparationForm({ kind, definition, disabled, onDismiss, onJob }: {
   kind:'create'|'edit'|'cancel'
@@ -123,6 +126,7 @@ function BulkPreparationForm({ kind, definition, disabled, onDismiss, onJob }: {
   const effectiveScope=existingScope?'existingCharges':eventId?'confirmedEvent':scope
   const scopeValid=effectiveScope!=='selected'||studentIds.length>0
   const priorReady=(!definition?.latestJobId||!!latest)&&(kind!=='cancel'||latest?.job.state!=='held'||reviewedPrior?.jobId===latest.job._id&&reviewedPrior.held===latest.job.held)
+  useEffect(()=>{if(shouldLoadStudentChoices(kind,scope,existingScope,eventId,students.status))students.loadMore(20)},[kind,scope,existingScope,eventId,students.status,students.loadMore])
   async function submit(){
     if(disabled||pending||!label.trim()||cents===null||!scopeValid||!priorReady||reason.trim().length<8)return
     setPending(true);setError(null)
@@ -140,7 +144,7 @@ function BulkPreparationForm({ kind, definition, disabled, onDismiss, onJob }: {
       {kind!=='cancel'&&<label className={styles.field}>{copy.amount}<Input value={amount} required inputMode="decimal" disabled={disabled||pending} onChange={event=>setAmount(event.target.value)}/></label>}
       {kind==='cancel'?<p>{copy.cancelNote} {copy.cancelTarget}</p>:<>
         {definition&&<div className={styles.scope}><Button type="button" variant={existingScope?'default':'outline'} disabled={disabled||pending} onClick={()=>setExistingScope(true)}>{copy.existingCharges}</Button><Button type="button" variant={!existingScope?'default':'outline'} disabled={disabled||pending} onClick={()=>setExistingScope(false)}>{copy.changeScope}</Button></div>}
-        {existingScope?<p>{copy.existingScopeNote}</p>:<FeeScopeFields eventSelectionDisabled={!!definition} eventId={eventId} events={events.results.filter(event=>!event.archived).map(event=>({id:event.eventId,name:event.name}))} onEventChange={setEventId} scope={scope} onScopeChange={setScope} students={students.results.map(student=>({id:student.studentId,name:student.name,checked:studentIds.includes(student.studentId),disabled:studentIds.length>=500&&!studentIds.includes(student.studentId)}))} onStudentChange={(id,checked)=>setStudentIds(previous=>checked?previous.includes(id)?previous:previous.length<500?[...previous,id]:previous:previous.filter(value=>value!==id))} disabled={disabled||pending} loadingStudents={students.status==='LoadingFirstPage'||students.status==='LoadingMore'} moreStudents={students.status!=='Exhausted'} loadStudents={()=>students.loadMore(20)} loadingEvents={events.status==='LoadingFirstPage'||events.status==='LoadingMore'} moreEvents={events.status!=='Exhausted'} loadEvents={()=>events.loadMore(20)}/>}
+        {existingScope?<p>{copy.existingScopeNote}</p>:<FeeScopeFields eventSelectionDisabled={!!definition} eventId={eventId} events={events.results.filter(event=>!event.archived).map(event=>({id:event.eventId,name:event.name}))} onEventChange={setEventId} scope={scope} onScopeChange={setScope} students={students.results.map(student=>({id:student.studentId,name:student.name,checked:studentIds.includes(student.studentId),disabled:studentIds.length>=500&&!studentIds.includes(student.studentId)}))} onStudentChange={(id,checked)=>setStudentIds(previous=>checked?previous.includes(id)?previous:previous.length<500?[...previous,id]:previous:previous.filter(value=>value!==id))} disabled={disabled||pending} loadingStudents={students.status==='LoadingFirstPage'||students.status==='LoadingMore'} moreStudents={students.status!=='Exhausted'} autoLoadStudents={scope==='selected'&&!existingScope&&!eventId} loadStudents={()=>students.loadMore(20)} loadingEvents={events.status==='LoadingFirstPage'||events.status==='LoadingMore'} moreEvents={events.status!=='Exhausted'} loadEvents={()=>events.loadMore(20)}/>}
       </>}
       {effectiveScope==='selected'&&<p>{copy.studentsSelected}: {studentIds.length} / 500</p>}<label className={styles.field}>{copy.reasonInput}<Input value={reason} required maxLength={1000} disabled={disabled||pending} onChange={event=>setReason(event.target.value)}/></label>
       <Button type="submit" disabled={disabled||pending||!label.trim()||cents===null||!scopeValid||!priorReady||reason.trim().length<8}>{pending?copy.submitting:copy.prepareBulk}</Button>
@@ -189,6 +193,18 @@ export function BulkJobSummary({job,originalActorName,children}:{job:Doc<'feeBul
 }
 
 type BulkPreview=FunctionReturnType<typeof api.feeDefinitions.previewBulk>
+export function bulkReviewComplete(preview:BulkPreview|undefined,rowCount:number,rowStatus:string,priorReviewReady:boolean){
+  return preview?.canCommit===true&&priorReviewReady&&rowStatus==='Exhausted'&&rowCount===preview.scopeMemberCount
+}
+export function shouldLoadPreparedRows(preview:BulkPreview|undefined,status:string){
+  return preview?.job.state==='prepared'&&status==='CanLoadMore'
+}
+export function bulkReviewUnchanged(review:BulkPreview|null,preview:BulkPreview|undefined){
+  return !!review&&preview?.canCommit===true&&preview.job._id===review.job._id&&preview.expectedScopeHash===review.expectedScopeHash&&preview.expectedOrderRevision===review.expectedOrderRevision&&preview.expectedDefinitionRevision===review.expectedDefinitionRevision&&preview.scopeMemberCount===review.scopeMemberCount
+}
+export function bulkCommitArgs(review:BulkPreview):FunctionArgs<typeof api.feeDefinitions.commitBulk>{
+  return {jobId:review.job._id,expectedScopeHash:review.expectedScopeHash,expectedOrderRevision:review.expectedOrderRevision,expectedDefinitionRevision:review.expectedDefinitionRevision,reason:review.job.reason.trim()}
+}
 function BulkJobReview({jobId,canCancel,canRetry}:{jobId:Id<'feeBulkJobs'>;canCancel:boolean;canRetry:boolean}){
   const preview=useQuery(api.feeDefinitions.previewBulk,{jobId})
   const rows=usePaginatedQuery(api.feeDefinitions.bulkRows,{jobId},{initialNumItems:20})
@@ -196,36 +212,41 @@ function BulkJobReview({jobId,canCancel,canRetry}:{jobId:Id<'feeBulkJobs'>;canCa
   const cancel=useMutation(api.feeDefinitions.cancelPrepared)
   const retry=useMutation(api.feeDefinitions.retryBulk)
   const [review,setReview]=useState<BulkPreview|null>(null)
-  const [reason,setReason]=useState('')
+  const [cancelReason,setCancelReason]=useState('')
+  const [retryReason,setRetryReason]=useState('')
   const [pending,setPending]=useState(false)
   const [error,setError]=useState<string|null>(null)
   const [retryRows,setRetryRows]=useState<FunctionArgs<typeof api.feeDefinitions.retryBulk>['rows']>([])
   const [priorReviewed,setPriorReviewed]=useState(false)
   const priorReviewReady=!preview?.job.priorHeldJobId||priorReviewed
-  const fresh=!!review&&preview?.canCommit===true&&preview.expectedScopeHash===review.expectedScopeHash&&preview.expectedOrderRevision===review.expectedOrderRevision&&preview.expectedDefinitionRevision===review.expectedDefinitionRevision
+  const allRowsLoaded=bulkReviewComplete(preview,rows.results.length,rows.status,priorReviewReady)
+  useEffect(()=>{if(!review&&allRowsLoaded&&preview)setReview(preview)},[review,allRowsLoaded,preview])
+  useEffect(()=>{if(shouldLoadPreparedRows(preview,rows.status))rows.loadMore(20)},[preview,rows.status,rows.loadMore])
+  const fresh=bulkReviewUnchanged(review,preview)
   const freshRetry=retryRows.every(selected=>rows.results.some(row=>row._id===selected.rowId&&row.state==='held'&&!row.correctionJobId&&!row.allocationJobId&&row.financialState==='ready'&&row.currentFinancialRevision===selected.expectedFinancialRevision&&row.currentGeneration===selected.expectedGeneration&&row.currentChargeRevision===selected.expectedChargeRevision))
   const unfinishedChild=rows.status!=='Exhausted'||rows.results.some(row=>row.state==='waiting'&&(row.childState!=='complete'||row.financialState!=='ready'))
   async function resume(){
-    if(pending||!canRetry||!freshRetry||unfinishedChild||reason.trim().length<8||preview?.job.state==='held'&&retryRows.length===0)return
+    if(pending||!canRetry||!freshRetry||unfinishedChild||retryReason.trim().length<8||preview?.job.state==='held'&&retryRows.length===0)return
     setPending(true);setError(null)
-    try{await retry({jobId,rows:retryRows,reason:reason.trim()});setRetryRows([]);setReason('')}
+    try{await retry({jobId,rows:retryRows,reason:retryReason.trim()});setRetryRows([]);setRetryReason('')}
     catch(failure){setError(failure instanceof Error?failure.message:copy.unavailable)}finally{setPending(false)}
   }
   async function act(action:'commit'|'cancel'){
-    if(pending||reason.trim().length<8||action==='commit'&&(!review||!fresh||!priorReviewReady)||action==='cancel'&&!canCancel)return
+    if(pending||action==='commit'&&(!review||!fresh||!allRowsLoaded||review.job.reason.trim().length<8)||action==='cancel'&&(!canCancel||cancelReason.trim().length<8))return
     setPending(true);setError(null)
     try{
-      if(action==='cancel')await cancel({jobId,reason:reason.trim()})
-      else if(review)await commit({jobId,expectedScopeHash:review.expectedScopeHash,expectedOrderRevision:review.expectedOrderRevision,expectedDefinitionRevision:review.expectedDefinitionRevision,reason:reason.trim()})
-      setReview(null);setReason('')
+      if(action==='cancel')await cancel({jobId,reason:cancelReason.trim()})
+      else if(review)await commit(bulkCommitArgs(review))
+      setReview(null);setCancelReason('')
     }catch(failure){setError(failure instanceof Error?failure.message:copy.unavailable)}finally{setPending(false)}
   }
   return <div className={styles.form}>
     {preview&&<><strong>{preview.definition.label}</strong>{preview.message&&['prepared','preparing','draining'].includes(preview.job.state)&&<p>{preview.message}</p>}</>}
     {preview?.job.state==='prepared'&&preview.job.priorHeldJobId&&preview.job.priorHeldRows!==undefined&&<PriorHeldScopeReview jobId={preview.job.priorHeldJobId} held={preview.job.priorHeldRows} disabled={pending} onReviewed={()=>setPriorReviewed(true)}/>}
-    {rows.status==='LoadingFirstPage'?<p role="status">{copy.loading}</p>:<>{rows.results.map(row=><BulkRowEvidence key={row._id} row={row}>{row.canRetryChild&&<BulkChildRetry row={row} disabled={pending}/>}</BulkRowEvidence>)}{rows.status!=='Exhausted'&&<Button type="button" variant="outline" disabled={rows.status!=='CanLoadMore'||pending} onClick={()=>rows.loadMore(20)}>{copy.moreRows}</Button>}</>}
-    {preview?.canCommit&&!review&&<Button type="button" disabled={pending||!priorReviewReady||rows.status!=='Exhausted'} onClick={()=>{setReview(preview);setReason('')}}>{copy.preview}</Button>}
-    {(review||canCancel)&&<form className={styles.form} onSubmit={event=>{event.preventDefault();void act(review?'commit':'cancel')}}>{review&&<><p>{copy.reviewedScope}: {review.scopeMemberCount} · {copy.targetAmount}: {chargeCurrency(review.job.targetAmountCents)}</p>{!fresh&&<p role="alert">{copy.staleReview}</p>}<p>{copy.noCash}</p></>}<label className={styles.field}>{copy.reasonInput}<Input value={reason} required maxLength={1000} disabled={pending} onChange={event=>setReason(event.target.value)}/></label>{review&&<Button type="submit" disabled={pending||!fresh||reason.trim().length<8}>{pending?copy.submitting:copy.post}</Button>}{canCancel&&<Button type={review?'button':'submit'} variant="outline" disabled={pending||reason.trim().length<8} onClick={()=>{if(review)void act('cancel')}}>{copy.cancelPrepared}</Button>}</form>}
+    {preview?.job.state==='prepared'&&<p>{copy.reviewAllRows}</p>}
+    {rows.status==='LoadingFirstPage'?<p role="status">{copy.loading}</p>:<>{rows.results.map(row=><BulkRowEvidence key={row._id} row={row}>{row.canRetryChild&&<BulkChildRetry row={row} disabled={pending}/>}</BulkRowEvidence>)}{preview?.job.state==='prepared'&&rows.status!=='Exhausted'&&<p role="status">{copy.loadingReviewRows}</p>}{preview?.job.state!=='prepared'&&rows.status!=='Exhausted'&&<Button type="button" variant="outline" disabled={rows.status!=='CanLoadMore'||pending} onClick={()=>rows.loadMore(20)}>{copy.moreRows}</Button>}</>}
+    {review&&<form className={styles.form} onSubmit={event=>{event.preventDefault();void act('commit')}}><p>{copy.reviewedScope}: {review.scopeMemberCount} · {copy.targetAmount}: {chargeCurrency(review.job.targetAmountCents)}</p><p>{copy.reason}: {review.job.reason}</p>{!fresh&&<p role="alert">{copy.staleReview}</p>}<p>{copy.noCash}</p><Button type="submit" disabled={pending||!fresh||!allRowsLoaded}>{pending?copy.submitting:copy.post}</Button></form>}
+    {canCancel&&<details><summary>{copy.cancelPreparation}</summary><form className={styles.form} onSubmit={event=>{event.preventDefault();void act('cancel')}}><label className={styles.field}>{copy.cancelReason}<Input value={cancelReason} required maxLength={1000} disabled={pending} onChange={event=>setCancelReason(event.target.value)}/></label><Button type="submit" variant="outline" disabled={pending||cancelReason.trim().length<8}>{copy.cancelPrepared}</Button></form></details>}
     {error&&<p role="alert">{error}</p>}
     {canRetry&&<form className={styles.form} onSubmit={event=>{event.preventDefault();void resume()}}><p>{copy.retryScopeNote}</p>
       {rows.results.filter(row=>row.state==='held'&&!row.correctionJobId&&!row.allocationJobId).map(row=><label className={styles.checkbox} key={row._id}><Checkbox checked={retryRows.some(selected=>selected.rowId===row._id)} disabled={pending||row.financialState!=='ready'||row.currentFinancialRevision===null||row.currentGeneration===null} onCheckedChange={checked=>{
@@ -234,7 +255,7 @@ function BulkJobReview({jobId,canCancel,canRetry}:{jobId:Id<'feeBulkJobs'>;canCa
         if(financialRevision!==null&&generation!==null&&retryRows.length<20)setRetryRows(previous=>previous.some(selected=>selected.rowId===row._id)?previous:[...previous,{rowId:row._id,expectedFinancialRevision:financialRevision,expectedGeneration:generation,expectedChargeRevision:row.currentChargeRevision}])
       }}/>{row.name}</label>)}
       {!freshRetry&&<p role="alert">{copy.staleRetry}</p>}
-      {unfinishedChild&&<p>{copy.childBeforeParent}</p>}<label className={styles.field}>{copy.retryReason}<Input value={reason} maxLength={1000} required disabled={pending} onChange={event=>setReason(event.target.value)}/></label><Button type="submit" disabled={pending||unfinishedChild||!freshRetry||reason.trim().length<8||preview?.job.state==='held'&&retryRows.length===0}>{pending?copy.submitting:copy.retry}</Button>
+      {unfinishedChild&&<p>{copy.childBeforeParent}</p>}<label className={styles.field}>{copy.retryReason}<Input value={retryReason} maxLength={1000} required disabled={pending} onChange={event=>setRetryReason(event.target.value)}/></label><Button type="submit" disabled={pending||unfinishedChild||!freshRetry||retryReason.trim().length<8||preview?.job.state==='held'&&retryRows.length===0}>{pending?copy.submitting:copy.retry}</Button>
     </form>}
   </div>
 }
@@ -532,7 +553,7 @@ export function UnmappedFeeEvidence({ rows, disabled, onSelect }: {
 }
 
 /** Controlled scope fields; no membership or monetary facts are generated here. */
-export function FeeScopeFields({ eventId, events, onEventChange, scope, onScopeChange, students, onStudentChange, disabled, loadingStudents, moreStudents, loadStudents, loadingEvents, moreEvents, loadEvents, eventSelectionDisabled }: {
+export function FeeScopeFields({ eventId, events, onEventChange, scope, onScopeChange, students, onStudentChange, disabled, loadingStudents, moreStudents, autoLoadStudents=false, loadStudents, loadingEvents, moreEvents, loadEvents, eventSelectionDisabled }: {
   eventId: Id<'events'> | null
   events: ReadonlyArray<{ id: Id<'events'>; name: string }>
   onEventChange: (eventId: Id<'events'> | null) => void
@@ -543,6 +564,7 @@ export function FeeScopeFields({ eventId, events, onEventChange, scope, onScopeC
   disabled: boolean
   loadingStudents: boolean
   moreStudents: boolean
+  autoLoadStudents?: boolean
   loadStudents: () => void
   loadingEvents?: boolean
   moreEvents?: boolean
@@ -562,9 +584,9 @@ export function FeeScopeFields({ eventId, events, onEventChange, scope, onScopeC
       <div className={styles.scope} role="group" aria-label={copy.whoOwes}><Button type="button" variant={scope === 'allActive' ? 'default' : 'outline'} aria-pressed={scope === 'allActive'} disabled={disabled} onClick={() => onScopeChange('allActive')}>{copy.allActive}</Button><Button type="button" variant={scope === 'selected' ? 'default' : 'outline'} aria-pressed={scope === 'selected'} disabled={disabled} onClick={() => onScopeChange('selected')}>{copy.selected}</Button></div>
       {scope === 'allActive' ? <p className={styles.muted}>{copy.allActiveSnapshot}</p> : <>
         <div className={styles.students}>{students.map(student => <label className={styles.checkbox} key={student.id}><Checkbox checked={student.checked} disabled={disabled || student.disabled} onCheckedChange={checked => onStudentChange(student.id, checked)} />{student.name}</label>)}</div>
-        {loadingStudents && <p role="status">{copy.loading}</p>}
+        {(loadingStudents||autoLoadStudents&&moreStudents) && <p role="status">{copy.loading}</p>}
         {!loadingStudents && !moreStudents && students.length === 0 && <p>{copy.noStudents}</p>}
-        {moreStudents && <Button type="button" variant="outline" disabled={disabled || loadingStudents} onClick={loadStudents}>{copy.moreStudents}</Button>}
+        {moreStudents&&!autoLoadStudents && <Button type="button" variant="outline" disabled={disabled || loadingStudents} onClick={loadStudents}>{copy.moreStudents}</Button>}
       </>}
     </>}
   </div>

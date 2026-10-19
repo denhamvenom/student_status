@@ -1,5 +1,13 @@
 # Student Status implementation plan
 
+## October 19 simplified charge workflow (PR19)
+
+Implemented development work follows the owner-approved Add charge → Review → Confirm charges flow: enter the reason once, load all student pages automatically, preserve exact reviewed-scope checks, and include Close details without changing charges. Validation: full lint, typecheck, 462 tests and build passed (existing bundle-size warning); independent source review found no blockers. Live browser/visual checks remain pending. Backend contracts remain unchanged. PR19 is the development candidate; main merge and production UI deployment remain separate.
+
+The owner separately authorized confirmation of the existing production fee. That one prepared operation completed successfully for the entire reviewed active roster, with no held rows. Private verification remains outside Git; no student records or account-specific evidence are included here. This supersedes the earlier observation that the fee was only prepared. No duplicate fee was created.
+
+PR18 is already merged as `4d21466`, with both production frontend builds verified successful. The older pre-merge and empty-roster notes below describe historical checkpoints, not current production state.
+
 ## October 19 charge-details close control
 
 Added Close details while charge details are loading or open. Closing only dismisses the panel locally; it does not cancel, confirm or change charges. View charge details reopens it. A dismissed automatically selected job stays hidden, while a different new automatic job can still appear. No backend changes. Focused fee tests (14), source lint, typecheck and build validation recorded for this frontend checkpoint; live UI verification remains pending. Production read-only inspection confirmed the reported missing fee was still prepared, not committed; no financial action was taken. No student-specific evidence is stored here.

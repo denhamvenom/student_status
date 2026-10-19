@@ -1,5 +1,12 @@
 # Visual review closed — October 16, 2026
 
+## October 19 charge workflow current checks
+
+| Check | Evidence / remaining work |
+|---|---|
+| Automatic full-list review, original reason, explicit confirmation | Source reviewed and focused tests passed; live browser interaction unobserved |
+| Close details and collapsed cancellation on phone/desktop/light/dark | Source reviewed; fresh authenticated visual comparison remains pending |
+
 ## October 18 Batch 4 current checks
 
 | Check | Evidence / remaining work |
