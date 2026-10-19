@@ -15,3 +15,7 @@ Implemented in development source: fee selector and three export filters, bounde
 ## Verification
 
 Five backend tests cover direct allocation, existing other-fee debt, access controls, replay/changed manifest, stale/overpayment checks, active-season scope, partial resume and paid/unpaid filters. Six CSV tests and five existing payment/invitation tests passed; typecheck and scoped lint passed. Independent source review found no blockers. Actual component tested with an isolated mocked backend: synthetic CSV upload reached Review with the correct fee, authoritative name/balances, total and explicit Confirm; 1440px light and 390px dark layouts showed no horizontal overflow. This is not an authenticated or real-payment rehearsal. Combined lint/typecheck/build passed. Full suite passed 493 of 495 cases; two existing large-fixture tests timed out under parallel load, then both unchanged suites passed 35/35 with one worker. All 495 cases passed across those runs. Development sync to third-bandicoot-18 succeeded with backend typecheck; email sending remained disabled. No production deployment.
+
+## Production publication
+
+Released through PR19 / main c861f1d with the matching backend deployed. Both website builds succeeded. Parent email is enabled in production; development sending stays disabled. Read-only Coach/fee-export checks and Close details passed. No live payment import or real invitation/Google round trip was performed. See [combined release evidence](RELEASE_2026-10-19.md). Earlier pending-production statements above are historical.

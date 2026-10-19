@@ -62,3 +62,7 @@ For a production release, first integrate current main and both developers' inte
 ## Combined development integration - October 19
 
 Parent-email candidate through 01ec5fe was merged with the payment CSV work as ff29bd4. Only documentation conflicted; source, optional schema additions and generated contracts were preserved. Combined lint/typecheck/build passed. Full suite passed 493 of 495 cases; two existing large-fixture tests timed out under parallel load, then both unchanged suites passed 35/35 with one worker. All 495 cases passed across those runs. Development sync to third-bandicoot-18 succeeded with backend typecheck; email sending remained disabled. No production deployment. The integration checkout remains the sole shared backend sync owner. Real email/Google redemption remains unverified.
+
+## Production publication
+
+Released through PR19 / main c861f1d with the matching backend deployed. Both website builds succeeded. Parent email is enabled in production; development sending stays disabled. Read-only Coach/fee-export checks and Close details passed. No live payment import or real invitation/Google round trip was performed. See [combined release evidence](RELEASE_2026-10-19.md). Earlier pending-production statements above are historical.

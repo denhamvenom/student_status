@@ -1,5 +1,13 @@
 # Student Status implementation plan
 
+## Production release - October 19
+
+Owner authorized the combined production release. Source 75683bb deployed successfully to Convex production amicable-eel-413 with typecheck/schema validation and no index deletion. PR19 merged as c861f1d78aef57796cb2787c1c46cb5fb2887202; both Student Status and Timeclock Cloudflare builds succeeded for that exact merge.
+
+Signed-in Coach production check confirmed the fee CSV UI and all three export options. View charge details opened and Close details dismissed it. Read-only production export queries verified consistent assessed/paid/unpaid balances. Timeclock operator sign-in page loaded. No payment import, charge change or test invitation was performed during release verification.
+
+The coordinated parent-email chat installed and verified production settings, then enabled sending after both builds succeeded: notifications@team8044.org sender, coach@team8044.org replies, production app origin matching SITE_URL, existing restricted key preserved privately. Development sending remains disabled. No real invitation/Google round trip was performed; that remains unverified. Existing accounts, charges and real settings were preserved.
+
 ## October 19 fee-specific Bulk Payment CSV
 
 Implemented fee selection, All/Paid/Unpaid assessed-student export, blank-row skipping, authoritative review, and new receipts applied only to the selected fee. Durable row replay prevents duplicate posting; stale/overpayment and authorization checks remain server-side. Focused backend/CSV/regression checks and independent source review pass. See [workflow and evidence](FEE_PAYMENT_CSV.md). Combined lint/typecheck/build passed. Full suite passed 493 of 495 cases; two existing large-fixture tests timed out under parallel load, then both unchanged suites passed 35/35 with one worker. All 495 cases passed across those runs. Development sync to third-bandicoot-18 succeeded with backend typecheck; email sending remained disabled. No production deployment. Reviewed parent-email branch through 01ec5fe is integrated.
