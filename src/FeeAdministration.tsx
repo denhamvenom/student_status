@@ -37,11 +37,14 @@ function FeeWorkspace({ isCoach }: { isCoach: boolean }) {
   const [jobId, setJobId] = useState<Id<'feePriorityJobs'> | null>(null)
   const [mappingJobId, setMappingJobId] = useState<Id<'feeMappingJobs'> | null>(null)
   const [bulkJobId, setBulkJobId] = useState<Id<'feeBulkJobs'> | null>(null)
+  const [dismissedBulkJobId, setDismissedBulkJobId] = useState<Id<'feeBulkJobs'> | null>(null)
+  function openBulkJob(id: Id<'feeBulkJobs'>) { setDismissedBulkJobId(null); setBulkJobId(id) }
   const [bulkDraft, setBulkDraft] = useState<{kind:'create'|'edit'|'cancel';definition?:Doc<'feeDefinitions'>}|null>(null)
   const submittedIntent = useRef<{ fingerprint: string; key: string } | null>(null)
   const visibleJobId = jobId ?? maintenance?.control?.priorityJobId
   const visibleMappingJobId = mappingJobId ?? maintenance?.control?.mappingJobId
-  const visibleBulkJobId = bulkJobId ?? maintenance?.control?.bulkJobId
+  const automaticBulkJobId = maintenance?.control?.bulkJobId
+  const visibleBulkJobId = bulkJobId ?? (automaticBulkJobId !== dismissedBulkJobId ? automaticBulkJobId : null)
   const liveDefinition = review ? fees.results.find(row => row.definition._id === review.definition._id) : null
   const fresh = !!review && maintenance?.canMove === true && maintenance.control?.revision === review.orderRevision && liveDefinition?.definition.revision === review.definition.revision && (review.direction === 'up' ? liveDefinition.canMoveUp : liveDefinition.canMoveDown)
   function open(definition: Doc<'feeDefinitions'>, eventName: string | null, direction: 'up' | 'down') {
@@ -66,7 +69,7 @@ function FeeWorkspace({ isCoach }: { isCoach: boolean }) {
         {maintenance.mappingState !== 'ready' && <p className={styles.notice}>{maintenance.mappingState === 'uninitialized' ? copy.mappingUnknown : copy.partialOrder}</p>}
         {fees.results.length === 0 && fees.status === 'Exhausted' && <p>{copy.noFees}</p>}
         <FeePriorityRows disabled={pending || maintenance.control?.state !== 'ready'} rows={fees.results.map(row => ({ key: row.definition._id, label: row.definition.label, summary: row.eventName ? `${copy.connectedTo}: ${row.eventName}` : undefined, priority: row.definition.priority, amountCents: row.definition.defaultAmountCents, cancelled: row.definition.state === 'cancelled', actions: {
-          view: row.definition.latestJobId ? ()=>{if(row.definition.latestJobId)setBulkJobId(row.definition.latestJobId)} : undefined,
+          view: row.definition.latestJobId ? ()=>{if(row.definition.latestJobId)openBulkJob(row.definition.latestJobId)} : undefined,
           up: row.canMoveUp ? () => open(row.definition, row.eventName, 'up') : undefined,
           down: row.canMoveDown ? () => open(row.definition, row.eventName, 'down') : undefined,
           edit: isCoach && row.canEdit ? () => setBulkDraft({kind:'edit',definition:row.definition}) : undefined,
@@ -87,8 +90,8 @@ function FeeWorkspace({ isCoach }: { isCoach: boolean }) {
     {isCoach && maintenance?.canMap && maintenance.mappingState === 'uninitialized' && <PrepareFeeMapping onJob={setMappingJobId} />}
     {isCoach && maintenance?.canMap && maintenance.mappingState === 'reviewRequired' && <MapHistoricalFees control={maintenance.control} definitions={fees.results.map(row => row.definition)} moreDefinitions={fees.status === 'CanLoadMore'} loadDefinitions={() => fees.loadMore(20)} onJob={setMappingJobId} />}
     {isCoach && visibleMappingJobId && <LiveMappingReceipt key={visibleMappingJobId} jobId={visibleMappingJobId} />}
-    {isCoach && bulkDraft && <BulkPreparationForm key={`${bulkDraft.kind}:${bulkDraft.definition?._id??'new'}`} {...bulkDraft} disabled={!maintenance?.canManageFees} onDismiss={()=>setBulkDraft(null)} onJob={id=>{setBulkJobId(id);setBulkDraft(null)}} />}
-    {visibleBulkJobId && <BulkJobWorkspace key={visibleBulkJobId} jobId={visibleBulkJobId} isCoach={isCoach} onSelect={setBulkJobId}/>} 
+    {isCoach && bulkDraft && <BulkPreparationForm key={`${bulkDraft.kind}:${bulkDraft.definition?._id??'new'}`} {...bulkDraft} disabled={!maintenance?.canManageFees} onDismiss={()=>setBulkDraft(null)} onJob={id=>{openBulkJob(id);setBulkDraft(null)}} />}
+    {visibleBulkJobId && <BulkJobWorkspace key={visibleBulkJobId} jobId={visibleBulkJobId} isCoach={isCoach} onSelect={openBulkJob} onClose={()=>{setDismissedBulkJobId(automaticBulkJobId ?? visibleBulkJobId);setBulkJobId(null)}}/>}
   </div>
 }
 
@@ -156,10 +159,11 @@ function PriorHeldScopeReview({jobId,held,disabled,onReviewed}:{jobId:Id<'feeBul
   </div>
 }
 
-function BulkJobWorkspace({jobId,isCoach,onSelect}:{jobId:Id<'feeBulkJobs'>;isCoach:boolean;onSelect:(id:Id<'feeBulkJobs'>)=>void}){
+function BulkJobWorkspace({jobId,isCoach,onSelect,onClose}:{onClose:()=>void;jobId:Id<'feeBulkJobs'>;isCoach:boolean;onSelect:(id:Id<'feeBulkJobs'>)=>void}){
   const status=useQuery(api.feeDefinitions.bulkStatus,{jobId})
-  if(!status)return <p role="status">{copy.loading}</p>
+  if(!status)return <div><Button type="button" variant="outline" onClick={onClose}>{copy.closeDetails}</Button><p role="status">{copy.loading}</p></div>
   return <BulkJobSummary {...status}>
+    <Button type="button" variant="outline" onClick={onClose}>{copy.closeDetails}</Button>
     {status.job.supersededByJobId&&<Button type="button" variant="outline" onClick={()=>{if(status.job.supersededByJobId)onSelect(status.job.supersededByJobId)}}>{copy.openSupersedingOperation}</Button>}
     {isCoach&&<BulkJobReview jobId={jobId} canCancel={status.canCancel} canRetry={status.canRetry}/>}
     <BulkJobHistory definitionId={status.job.feeDefinitionId} onSelect={onSelect}/>

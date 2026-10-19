@@ -9,6 +9,7 @@ export const feeAdministrationCopy = {
   moreFees: 'More fees',
   up: 'Up', down: 'Down', edit: 'Edit', cancel: 'Cancel fee',
   details: 'View charge details',
+  closeDetails: 'Close details',
   cancelled: 'Cancelled',
   moveReason: 'Reason for changing the fee order (at least 8 characters)',
   moveReview: 'Review priority change',
