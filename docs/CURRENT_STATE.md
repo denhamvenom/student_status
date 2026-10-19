@@ -1,5 +1,9 @@
 # Current integration handoff
 
+## Production release — October 19
+
+Owner-authorized Bulk Invite release completed: backend `amicable-eel-413` deployed, PR17 merged as `f7c205c`, both Cloudflare builds succeeded. Coach Google sign-in, roster, Bulk Invite/approval queue and Timeclock sign-in verified. One regular six-digit team code generated; no requests, student records or bulk batches created. Private pre-release backup verified. Student acceptance testing deferred by owner to actual alpha testers. See BULK_INVITE_RELEASE_2026-10-19.md. The local-only restrictions below are historical and superseded by this explicit release authorization.
+
 ## Current local candidate — Coach approval required
 
 October 19 owner change supersedes direct linking: five-digit Bulk Invite codes submit connection requests; only a Coach can connect the verified Google account to the existing student. Six-digit ordinary team requests remain separate. Local backend, student waiting/retry UI and Coach approval queue implemented; 26 backend cases and isolated actual-component browser tests pass, including concurrency, 100 students, daily limits and stale requests. See BULK_INVITE.md. No backend sync (including development) is authorized for this revision. Local frontend server stopped to avoid mixing new UI with the old deployed API. Real Google redemption remains deferred by owner; no production deployment or main merge.
