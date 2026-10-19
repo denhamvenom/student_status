@@ -1,5 +1,7 @@
 # Parent invitation email and sharing
 
+This document records the historical Share/Copy implementation. The October 19 private parent sign-in release supersedes that behavior; see [current workflow and release evidence](PRIVATE_PARENT_SIGN_IN.md).
+
 ## Scope and release boundary
 
 October 19: owner requested automatic parent invitation email and a Share invitation button, retaining Google login. Work is on `feature/parent-email-invitations` in the `student-status-bulk-invite` checkout. The owner subsequently authorized development credential setup and one connectivity test, confirmed received. Student resend is a local candidate; no production deployment or main merge has occurred. Shared development synchronization is coordinated with the audit chat, which owns that sync.

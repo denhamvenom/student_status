@@ -1,63 +1,15 @@
 # Current integration handoff
 
-## October 19 private parent sign-in: development verified
+## Private parent sign-in production release - October 19
 
-Implemented inbox-only parent sign-in links, removed student Share/Copy, preserved one-hour invitation resend and student Google login. Parent login still requires separate relationship/authority confirmation. Returning parents and expired private links support six-digit email codes. Integrated Calendar main b1f730a and reviewed legal-name/Money checkpoint 2bd052a without source conflicts.
+Owner authorized production publication of the combined parent sign-in and legal-name/Money work. Source 15f2dcc deployed successfully to Convex production amicable-eel-413 with backend typecheck, schema validation and additive indexes; no indexes deleted. Production sender/reply/origin and existing auth credentials were verified without exposing or changing secrets. Production email remains enabled; development sending stays disabled. Calendar write guard is preserved.
 
-Combined verification: 99 test files / 509 tests passed with one worker; lint, frontend/backend types and application build passed. Independent authentication review found no unresolved blockers. Actual React components with mocked Convex/Auth passed explicit Continue, failed-link OTP fallback, separate attestation and student resend checks; 1440px light and 390px dark screenshots have no overflow. These checks did not send real emails or prove a real-inbox end-to-end round trip.
+Validation: all 509 tests in 99 files passed, lint and application/backend types passed, Student Status and Timeclock builds passed. Independent auth review and synthetic actual-component desktop/light and phone/dark checks passed. Local Coach Money showed full legal names and scrolling. No real invitation, email, Calendar event or financial write was created during release checks. Real-inbox end-to-end private sign-in remains unverified.
 
-Development third-bandicoot-18 synchronized successfully with backend typecheck/schema validation. Development email remains disabled; Calendar write guard remains production-only. No production deploy, main merge, real invitation, or financial write. Other chat confirmed signed-in local Coach Money layout; combined backend now provides legal-first labels. Real-inbox/browser rehearsal remains pending before production release.
+The release PR publishes all source and documentation together; exact main revision and both automatic website build outcomes will be recorded in its release evidence. The previous Share/Copy workflow is superseded by inbox-only parent sign-in, explicit Continue and separate relationship attestation; student Google login and one-hour resend remain. Legacy invitations cannot become login credentials. See [current parent workflow](PRIVATE_PARENT_SIGN_IN.md).
 
+Rollback: use a coordinated code fix or rollback of both frontend/backend. Do not delete new parent auth records or indexes; these may hold live accounts after release. Disabling PARENT_INVITE_EMAIL_ENABLED stops new mail and new invitations but does not revoke existing sessions or already-sent links. Do not overwrite later shared releases.
 
-## Local candidate: private parent email sign-in
+## Current workspace and coordination
 
-Workspace student-status-bulk-invite; branch feature/parent-email-invitations. Owner requested local implementation replacing student Share/Copy with inbox-only parent sign-in links, preserving one-hour resend and student Google login. Includes parent returning/expired-link email codes. No production deploy/main merge or real email sending authorized for this candidate. See [scope, design and evidence](PRIVATE_PARENT_SIGN_IN.md).
-
-Parent backend and frontend passed final synthetic checks and independent review. Existing verified parent identities remain connected; legacy shared links cannot sign in. Student create/resend responses contain no secret. Google student/staff entry remains separate. Development mail remains disabled; a real inbox/browser rehearsal is still pending.
-
-The other chat released Calendar as main b1f730a and is separately fixing full-name displays/Money scrolling. Root integrated current main and the reviewed fix and completed the shared development sync, preserving development Calendar write prohibition. This checkout must not independently deploy production. Root owns Git/integration; Sol implementation/Astra review. Private credentials, test captures and account data remain ignored.
-
-## Earlier released checkpoints
-
-## October 19 legal student names and Money scrolling
-
-Student lists and financial/report projections now prefer the stored full legal name, with preferred name only as a fallback. Preferred-name editing and immutable signed records are preserved. Money uses the full content width; its focusable table scrolls vertically and horizontally with sticky column headings. Phone account cards remain available.
-
-Verification: focused backend tests and source review passed. Actual Money component with fictional rows checked at desktop/light, narrower desktop with keyboard scrolling, and phone/dark; no page-width overflow. No payment writes or production deployment. Parent-login chat owns the coordinated development sync and overlapping SetupWizard/Mentor/permission-export labels. The other chat confirmed the signed-in local Coach Money layout; legal-name backend changes are included in the combined development sync.
-
-
-## Current release - linked event Calendar (PR21)
-
-Workspace student-status-readiness-design; branch feature/development-review-fixtures-2026-10-18. Implemented creation/linking to the shared Timeclock Calendar, Media Support Requested, linked schedule sync and recovery. Development sync passed; lint/types, 506 tests, both app builds and representative synthetic UI checks passed. See [behavior and evidence](EVENT_CALENDAR_SYNC.md). Root owns Git and shared backend synchronization.
-
-Owner changed Calendar sharing; read-only verification reports writer access. Owner explicitly prohibits development Calendar writes. Code requires the exact production deployment plus an explicit enable flag; development remains read-only. No real Calendar events were created or changed. Source 2c5fae7 is deployed to production amicable-eel-413 with typecheck/schema validation. Production Calendar writes are enabled; the development flag remains unset. Production authentication and Calendar writer access passed read-only checks. PR21 carries this release and documentation onto main; exact website build outcomes are recorded in the PR. A real-event end-to-end save remains unperformed to avoid creating test entries on the team Calendar.
-
-## Bulk Payment full-name correction - October 19
-
-Owner explicitly authorized the production correction. Export and payment review now use the full student legal name, preserving last names when a preferred name is only a first name. CSV columns, identifiers, financial behavior and settings are unchanged. Existing downloaded files need to be downloaded again to show the corrected names.
-
-Source ad61740 passed lint, typecheck, all 495 tests in one single-worker run, and production build; independent review found no blockers. Development third-bandicoot-18 and production amicable-eel-413 synchronization succeeded with backend typecheck/schema validation. Read-only production export verification confirmed full multi-part names on every exported row; no financial writes were performed. This code release also carries the previously published PR19 deployment documentation onto main. Automatic website build results are recorded in the release PR after merge.
-
-## Production release - October 19
-
-Owner authorized the combined production release. Source 75683bb deployed successfully to Convex production amicable-eel-413 with typecheck/schema validation and no index deletion. PR19 merged as c861f1d78aef57796cb2787c1c46cb5fb2887202; both Student Status and Timeclock Cloudflare builds succeeded for that exact merge.
-
-Signed-in Coach production check confirmed the fee CSV UI and all three export options. View charge details opened and Close details dismissed it. Read-only production export queries verified consistent assessed/paid/unpaid balances. Timeclock operator sign-in page loaded. No payment import, charge change or test invitation was performed during release verification.
-
-The coordinated parent-email chat installed and verified production settings, then enabled sending after both builds succeeded: notifications@team8044.org sender, coach@team8044.org replies, production app origin matching SITE_URL, existing restricted key preserved privately. Development sending remains disabled. No real invitation/Google round trip was performed; that remains unverified. Existing accounts, charges and real settings were preserved.
-
-## Historical development candidate - October 19
-
-Workspace: Development Version/student-status-readiness-design. Branch: feature/development-review-fixtures-2026-10-18; existing PR19. Root owns Git and the sole shared development sync. Production merge/deployment remains separately authorized.
-
-Implemented charge flow: Add charge -> Review -> Confirm charges, original reason once, automatic student-list loading, and Close details. The owner separately authorized posting the existing production fee; that operation completed with no held rows. Private account evidence remains outside Git. Earlier prepared-only observations are superseded.
-
-Implemented fee-specific Bulk Payment CSV: fee selection; All/Paid/Unpaid assessed-student export; blank amount skipping; authoritative review; new receipts allocated directly to the selected fee; stale/overpayment checks; durable cross-actor replay and partial recovery. See [workflow and evidence](FEE_PAYMENT_CSV.md). Focused backend/CSV/regression checks, types and source review pass. Synthetic actual-component desktop/light and phone/dark review passed. Combined lint/typecheck/build passed. Full suite passed 493 of 495 cases; two existing large-fixture tests timed out under parallel load, then both unchanged suites passed 35/35 with one worker. All 495 cases passed across those runs. Development sync to third-bandicoot-18 succeeded with backend typecheck; email sending remained disabled. No production deployment.
-
-Parent-email branch through 01ec5fe is integrated additively: automatic parent invitations, Share/Copy, and one-hour student resend. Source/schema/API merged without source conflicts; documentation preserves both features. See [email feature and evidence](PARENT_INVITATION_EMAIL.md). Development email settings exist with sending disabled; keep disabled. Real invitation/Google redemption and physical sharing remain unverified. No parent-email production deployment.
-
-## Production baseline
-
-Main 4d21466 (PR18) has both production frontend builds verified. Bulk Invite was released through PR17; see [release evidence](BULK_INVITE_RELEASE_2026-10-19.md). The October 18 synthetic cleanup is historical: real student records have since been created. Never rerun that cleanup. Credentials and real settings remain intact.
-
-Development target: third-bandicoot-18. Production target: amicable-eel-413. Do not publish development synthetic records or private evidence. Production release of PR19 is complete under the later owner authorization recorded above. Current visual gaps remain in [VISUAL_CHECKS.md](VISUAL_CHECKS.md).
+Branch feature/parent-email-invitations, checkout student-status-bulk-invite. Root owns production release; audit chat has clean matching local preview and holds synchronization. Main baseline b1f730a; combined names/Money checkpoint 2bd052a included. Current implementation/test evidence: [private parent sign-in](PRIVATE_PARENT_SIGN_IN.md), [visual checks](VISUAL_CHECKS.md), [release history](RELEASE_2026-10-19.md). Student records, credentials and private captures remain outside Git.
