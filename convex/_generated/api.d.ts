@@ -71,6 +71,7 @@ import type * as lib_financialSources from "../lib/financialSources.js";
 import type * as lib_financialWithdrawal from "../lib/financialWithdrawal.js";
 import type * as lib_fundraisingMath from "../lib/fundraisingMath.js";
 import type * as lib_invitationIdentity from "../lib/invitationIdentity.js";
+import type * as lib_maintenanceAccess from "../lib/maintenanceAccess.js";
 import type * as lib_money from "../lib/money.js";
 import type * as lib_permissionCoverage from "../lib/permissionCoverage.js";
 import type * as lib_permissionSigningMode from "../lib/permissionSigningMode.js";
@@ -187,6 +188,7 @@ declare const fullApi: ApiFromModules<{
   "lib/financialWithdrawal": typeof lib_financialWithdrawal;
   "lib/fundraisingMath": typeof lib_fundraisingMath;
   "lib/invitationIdentity": typeof lib_invitationIdentity;
+  "lib/maintenanceAccess": typeof lib_maintenanceAccess;
   "lib/money": typeof lib_money;
   "lib/permissionCoverage": typeof lib_permissionCoverage;
   "lib/permissionSigningMode": typeof lib_permissionSigningMode;

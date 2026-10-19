@@ -2,11 +2,13 @@ import Google from "@auth/core/providers/google";
 import { convexAuth } from "@convex-dev/auth/server";
 import { env } from "./_generated/server";
 import { allowedAuthRedirect } from "./lib/authRedirect";
+import { requireMaintenanceAccess } from "./lib/maintenanceAccess";
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [Google({
     profile(profile) {
       if (profile.email_verified !== true || !profile.email) throw new Error("A verified Google email is required.");
+      requireMaintenanceAccess(profile.email);
       return {
         id: profile.sub,
         name: profile.name,

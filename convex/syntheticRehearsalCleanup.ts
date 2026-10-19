@@ -27,7 +27,7 @@ type Manifest = typeof manifestValidator.type;
 type Row = Record<string, unknown> & { _id: string; _creationTime: number };
 type AllowedTable = keyof Manifest["ids"] | "appUsers" | "students" | "users";
 const MAX_TARGETS = 4;
-const MAX_ROWS_PER_TABLE = 40;
+const MAX_ROWS_PER_TABLE = 100;
 const MAX_DELETE_ROWS = 100;
 const targetPattern = /^https:\/\/[a-z0-9-]+\.convex\.cloud$/;
 
@@ -83,6 +83,23 @@ async function inspect(ctx: QueryCtx | MutationCtx, manifest: Manifest) {
   const coach = await ctx.db.get(manifest.coachId);
   if (!season || !coach || season.createdBy !== coach._id || coach.role !== "coach" || !coach.active || season.status !== "active") {
     throw new Error("Expected active Coach and season were not found.");
+  }
+  const coachAuth = await ctx.db.get(coach.authUserId);
+  if (!coachAuth || coachAuth.email !== coach.email || !coachAuth.emailVerificationTime || coachAuth.isAnonymous) {
+    throw new Error("The active Coach's verified auth identity changed.");
+  }
+  const coachGoogleAccounts = await ctx.db.query("authAccounts")
+    .withIndex("userIdAndProvider", q => q.eq("userId", coach.authUserId).eq("provider", "google")).take(2);
+  if (coachGoogleAccounts.length !== 1 || coachGoogleAccounts[0].emailVerified !== coach.email || coachGoogleAccounts[0].secret) {
+    throw new Error("The active Coach's verified Google account changed.");
+  }
+  const coachSessions = await ctx.db.query("authSessions")
+    .withIndex("userId", q => q.eq("userId", coach.authUserId)).take(MAX_ROWS_PER_TABLE + 1);
+  if (coachSessions.length > MAX_ROWS_PER_TABLE) throw new Error("Coach session inventory limit exceeded.");
+  const coachSessionIds = new Set(coachSessions.map(row => row._id));
+  if (expected.has(coach.authUserId) || expected.has(coachGoogleAccounts[0]._id) ||
+      coachSessions.some(row => expected.has(row._id))) {
+    throw new Error("The Coach auth identity and sessions must be preserved.");
   }
 
   const documents: Array<{ table: string; row: Row }> = [];
@@ -181,9 +198,10 @@ async function inspect(ctx: QueryCtx | MutationCtx, manifest: Manifest) {
         !row.allocationJobId && !row.operationJobId && !row.fundraiserJobId && !row.fundraiserRowId && !row.rebuildActorId); break;
       case "authAccounts": check(authIds.has(row.userId as string) && row.provider === "google" && !row.secret); break;
       case "authSessions": check(authIds.has(row.userId as string)); break;
-      case "authRefreshTokens": check(sessionIds.has(row.sessionId as string)); break;
+      case "authRefreshTokens": check(sessionIds.has(row.sessionId as string) && !coachSessionIds.has(row.sessionId as Id<"authSessions">)); break;
       case "authVerificationCodes": check(authAccountIds.has(row.accountId as string)); break;
-      case "authVerifiers": check(sessionIds.has(row.sessionId as string)); break;
+      case "authVerifiers": check(sessionIds.has(row.sessionId as string) ||
+        (row.sessionId === undefined && typeof row.signature === "string" && row.signature.length > 0)); break;
       case "audit": check((protectedIds.has(row.entityId as string) || row.entity === "joinCodes" && targetJoinCodes.has(row.entityId as string)) && row.entity !== "seasons" && (row.actorId === manifest.coachId || accountIds.has(row.actorId as string))); break;
       default: throw new Error("Unexpected cleanup table.");
     }

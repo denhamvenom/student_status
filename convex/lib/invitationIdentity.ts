@@ -1,6 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
+import { requireMaintenanceAccess } from "./maintenanceAccess";
 type Ctx = QueryCtx | MutationCtx;
 
 export function emailKey(value: string) { return value.trim().toLowerCase(); }
@@ -17,6 +18,7 @@ export async function verifiedGoogle(ctx: Ctx) {
   if (!id) return null;
   const user = await ctx.db.get(id as Id<"users">);
   if (!user?.email || user.isAnonymous || !user.emailVerificationTime) return null;
+  requireMaintenanceAccess(user.email);
   const accounts = await ctx.db.query("authAccounts").withIndex("userIdAndProvider", q => q.eq("userId", user._id).eq("provider", "google")).take(2);
   const verifiedEmail = emailKey(user.email);
   if (!accounts.some(account => account.emailVerified && emailKey(account.emailVerified) === verifiedEmail)) return null;

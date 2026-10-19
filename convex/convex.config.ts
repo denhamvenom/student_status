@@ -5,6 +5,7 @@ import rateLimiter from "@convex-dev/rate-limiter/convex.config.js";
 
 const app = defineApp({ env: {
   SITE_URL: v.optional(v.string()),
+  SIGN_IN_MAINTENANCE_COACH_EMAIL: v.optional(v.string()),
   PERMISSION_REAL_SIGNING_ENABLED: v.optional(v.string()),
   PERMISSION_REAL_SIGNING_CLOUD_URL: v.optional(v.string()),
   PRODUCTION_BOOTSTRAP_ENABLED: v.optional(v.string()),

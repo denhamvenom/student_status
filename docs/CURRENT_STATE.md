@@ -1,5 +1,17 @@
 # Current integration handoff
 
+## October 18 production changeover authorized
+
+Owner explicitly authorized fixing stale tests, publishing development changes, removing all production synthetic data and all non-Coach application accounts/sign-ins, preserving the verified permanent Coach and real settings/credentials, then releasing the upgrades. Full live student onboarding is deferred to tomorrow by owner. Credentials must remain in place and must not be copied locally.
+
+Private production data/storage recovery export saved; original Coach identity matched the private initialization ledger. Inventory: four other accounts, one test student, related invitations/links/auth/zero-money summaries; no event/payment/signature records. Real calendar occurrences and Coach/season/FIRST/family-readiness records remain preserved. Exact manifest, snapshots and account identities are ignored private evidence only.
+
+The four stale assertions are fixed. Full application check passed with 423 tests before the final invitation-acceptance regression test; that final focused maintenance suite passes 5/5 and typecheck passes. Timeclock checks pass. Lint now excludes ignored private operator files; shipping source remains checked. Cleanup tests 7/7 cover exact fingerprints, protected Coach auth/session chain, signed orphan verifier cleanup and 63 unrelated real calendar rows. Temporary maintenance gate protects Google login, ordinary access, join requests and invitation acceptance. Development sync passed before the final invitation guard; final sync/release verification remains pending.
+
+Production cleanup/deployment has not yet executed. Existing credentials, FIRST/Calendar settings, real season and Coach must remain. Planned sequence: publish reviewed feature checkpoint; deploy necessary maintenance/cleanup backend under Coach-only maintenance; revoke old join code; refresh backup/manifest; preview and atomically remove reviewed test rows; disable cleanup switches; merge matching frontend release and verify both hosts and remaining production records. Remove temporary maintenance closure after verification so normal onboarding can proceed; no new team code is created until requested.
+
+See [production changeover report](PRODUCTION_CHANGEOVER_2026-10-18.md) for execution evidence. Earlier development-only stop instructions and retained-test-account notes below are historical and superseded by this authorization.
+
 ## October 18 Batch 4 workflow changes
 
 Batch 4 implementation, independent review and role spot-checks are complete on `feature/development-review-fixtures-2026-10-18`. See [Batch 4 report](audit-2026-10-18/batch-4-report.md) and [copy inventory](audit-2026-10-18/batch-4-copy-inventory.md). Owner clarified the only selectable subteams: Build, Electrical, Machining, Programming, Business/Media. Owner explicitly deferred stored-record conversion; no production access or backfill. Final development backend sync, build/typecheck, source lint and 18 focused tests passed. Full suite before that last update: 412 passed, four existing stale assertions; full lint nine existing private-helper errors. Coach confirmation Cancel and staff Money tools/New event checks passed without shared-data writes. Parent Money/Home and event signup guidance checked. Student Home money, read-only independent travel, Whole Team leave confirmation and Cancel checked; participation stayed confirmed. This report accompanies the reviewed development checkpoint. Stop after Batch 4. No main merge or production rollout.
