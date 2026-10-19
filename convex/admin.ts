@@ -97,7 +97,7 @@ export const approveJoin = mutation({
 });
 
 export const createEvent = mutation({
-  args: { name: v.string(), type: v.union(v.literal("Competition"), v.literal("Outreach"), v.literal("Team")), startsAt: v.number(), endsAt: v.number(), destination: v.string(), travel: v.string(), overnight: v.boolean(), roomingEnabled: v.boolean(), roomDeadline: v.optional(v.number()), feeCents: v.number(), signupMode: v.union(v.literal("assigned"), v.literal("open"), v.literal("approval")), assignmentScope: v.optional(v.union(v.literal("selected"), v.literal("travelTeam"), v.literal("wholeTeam"))), assignedStudentIds: v.optional(v.array(v.id("students"))), capacity: v.optional(v.number()), signupClosesAt: v.optional(v.number()), allowWithdrawal: v.boolean(), permissionRequired: v.boolean(), firstRequired: v.boolean(), requirements: v.array(v.object({ key: v.string(), label: v.string(), instructions: v.optional(v.string()), url: v.optional(v.string()), dueAt: v.optional(v.number()) })) }, returns: v.id("events"),
+  args: { name: v.string(), type: v.union(v.literal("Competition"), v.literal("Outreach"), v.literal("Team")), startsAt: v.number(), endsAt: v.number(), destination: v.string(), travel: v.string(), overnight: v.boolean(), roomingEnabled: v.boolean(), roomDeadline: v.optional(v.number()), feeCents: v.number(), signupMode: v.union(v.literal("assigned"), v.literal("open"), v.literal("approval")), assignmentScope: v.optional(v.union(v.literal("selected"), v.literal("travelTeam"), v.literal("wholeTeam"))), assignedStudentIds: v.optional(v.array(v.id("students"))), capacity: v.optional(v.number()), signupClosesAt: v.optional(v.number()), allowWithdrawal: v.boolean(), permissionRequired: v.boolean(), firstRequired: v.boolean(), mediaSupportRequested: v.optional(v.boolean()), calendarChoice: v.optional(v.union(v.object({ kind: v.literal("create") }), v.object({ kind: v.literal("link"), eventId: v.string() }))), requirements: v.array(v.object({ key: v.string(), label: v.string(), instructions: v.optional(v.string()), url: v.optional(v.string()), dueAt: v.optional(v.number()) })) }, returns: v.id("events"),
   handler: async (ctx, args) => {
     await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const user = await viewer(ctx);
@@ -107,7 +107,8 @@ export const createEvent = mutation({
     if (args.signupMode !== "assigned" && (args.assignmentScope || args.assignedStudentIds?.length)) throw new Error("Only assigned events may preselect students.");
     if ((args.assignmentScope === "travelTeam" || args.assignmentScope === "wholeTeam") && user.role !== "coach") throw new Error("Automatic team assignment is coach only.");
     if (args.assignmentScope === "wholeTeam" && (args.capacity !== undefined || args.assignedStudentIds?.length)) throw new Error("Whole Team events include all active members and cannot use capacity or selected students.");
-    const { requirements, assignedStudentIds, ...eventFields } = args;
+    if (args.calendarChoice?.kind === "link" && (!args.calendarChoice.eventId || args.calendarChoice.eventId.length > 512)) throw new Error("Invalid Calendar event selection.");
+    const { requirements, assignedStudentIds, calendarChoice, ...eventFields } = args;
     let assigned = [...new Set(assignedStudentIds ?? [])];
     if (args.assignmentScope === "travelTeam" || args.assignmentScope === "wholeTeam") {
       const students = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(501);
@@ -117,7 +118,12 @@ export const createEvent = mutation({
     if (assigned.length > (args.assignmentScope === "wholeTeam" ? 500 : 100)) throw new Error("Assign at most 100 students when creating an event.");
     if (args.capacity !== undefined && assigned.length > args.capacity) throw new Error("Assigned students exceed event capacity.");
     for (const studentId of assigned) { const student = await ctx.db.get(studentId); if (!student || !student.active || student.seasonId !== season._id) throw new Error("Assigned student is unavailable."); }
-    const id = await ctx.db.insert("events", { ...eventFields, name: args.name.trim(), seasonId: season._id, archived: false, ...(args.assignmentScope === "wholeTeam" ? { wholeTeamParticipantCount: 0, enrollmentState: "running" as const } : {}) });
+    const id = await ctx.db.insert("events", { ...eventFields, name: args.name.trim(), seasonId: season._id, archived: false, ...(calendarChoice ? { calendarChoice: calendarChoice.kind, calendarEventId: calendarChoice.kind === "link" ? calendarChoice.eventId : undefined, calendarSyncState: "pending" as const, calendarRevision: 1, calendarActorId: user._id } : {}), ...(args.assignmentScope === "wholeTeam" ? { wholeTeamParticipantCount: 0, enrollmentState: "running" as const } : {}) });
+    if (calendarChoice?.kind === "link") {
+      const claim = await ctx.db.query("eventCalendarClaims").withIndex("by_calendarEventId", q => q.eq("calendarEventId", calendarChoice.eventId)).unique();
+      if (claim) throw new Error("This Calendar event is already linked to another Student Status event.");
+      await ctx.db.insert("eventCalendarClaims", { calendarEventId: calendarChoice.eventId, eventId: id });
+    }
     const keys = new Set<string>();
     for (const requirement of requirements) {
       if (!requirement.key.trim() || keys.has(requirement.key) || ["pay", "perm", "first", "room"].includes(requirement.key)) throw new Error("Duplicate or reserved requirement key.");
@@ -136,6 +142,7 @@ export const createEvent = mutation({
       await ctx.db.patch(id, { enrollmentJobId: jobId });
       await ctx.scheduler.runAfter(0, internal.eventEnrollment.run, { jobId });
     }
+    if (calendarChoice) await ctx.scheduler.runAfter(0, internal.eventCalendar.push, { eventId: id, revision: 1 });
     await audit(ctx, user, "events", id, "create", null, eventFields);
     return id;
   },

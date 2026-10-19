@@ -1,5 +1,9 @@
 # Student Status implementation plan
 
+## Linked Calendar production release (PR21)
+
+Implemented event create/link, Media Support Requested, linked title/schedule/location/cancellation sync, conflict recovery and permission/cancellation safeguards. Development and source/synthetic verification passed. Calendar editor sharing verified; development Calendar writes explicitly prohibited and blocked in code. Production backend deployed and Calendar connection enabled under explicit owner authorization. Production authentication and writer access verified without Calendar changes. Exact website build outcomes are recorded in PR21; real-event end-to-end saving remains unperformed. See [scope and evidence](EVENT_CALENDAR_SYNC.md).
+
 ## Bulk Payment full-name correction - October 19
 
 Owner explicitly authorized the production correction. Export and payment review now use the full student legal name, preserving last names when a preferred name is only a first name. CSV columns, identifiers, financial behavior and settings are unchanged. Existing downloaded files need to be downloaded again to show the corrected names.

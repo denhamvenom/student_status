@@ -1,5 +1,17 @@
 # Student Status Development Checklist
 
+## Linked Calendar workflow
+
+- [x] Event creation/linking, Media Support Requested, linked editing and recovery.
+- [x] Cancellation and permission safeguards, source review, automated checks and representative synthetic UI checks.
+- [x] Development sync and read-only Calendar lookup; editor sharing verified.
+- [x] Development Calendar writes explicitly prohibited and blocked in code.
+- [x] Authorized production backend deployment/enablement; read-only production authentication and writer access verified.
+- [x] Release documentation included in PR21; exact website build outcomes tracked in the PR.
+- [ ] Real-event end-to-end verification (no test Calendar entries created).
+
+See [workflow evidence](EVENT_CALENDAR_SYNC.md).
+
 ## Bulk Payment full-name correction - October 19
 
 Owner explicitly authorized the production correction. Export and payment review now use the full student legal name, preserving last names when a preferred name is only a first name. CSV columns, identifiers, financial behavior and settings are unchanged. Existing downloaded files need to be downloaded again to show the corrected names.

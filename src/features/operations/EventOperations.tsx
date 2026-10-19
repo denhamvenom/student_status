@@ -8,6 +8,7 @@ import { Input } from "../../components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import styles from "./Operations.module.css";
 import { WholeTeamLeaveNotices } from "../../Withdrawals";
+import { EventCalendarOperations } from './EventCalendarOperations'
 
 type Row = { participantId: string; studentId: Id<"students">; name: string; status: string; signedUpAt: number; active: boolean };
 type Requirement = { key: string; label: string; instructions?: string; url?: string; dueAt?: number };
@@ -73,6 +74,7 @@ export function EventOperations({ eventId, coach=false }: { eventId: Id<"events"
       {confirmed.length > 0 && <p>{operationsCopy.event.confirmed} {confirmed.map(p => p.name).join(", ")}</p>}
       {event.assignmentScope==="wholeTeam"&&<WholeTeamLeaveNotices eventId={eventId} coach={coach}/>}
     </CardContent></Card></div></details>
+    <EventCalendarOperations eventId={eventId} coach={canEdit} event={event}/>
     {canEdit && <details className={styles.disclosure}><summary><strong>{operationsCopy.event.eventSettings}</strong><span>{operationsText.event.signupCloses(when(event.signupClosesAt))}</span></summary><div className={styles.disclosureBody}><Card><CardHeader><CardTitle>{operationsCopy.event.eventSettings}</CardTitle></CardHeader><CardContent><form className="form-grid" onSubmit={submitSettings}>
       {event.signupMode !== "assigned" && <><label>{operationsCopy.event.capacityNoLimit} <Input type="number" min="1" max="500" value={capacityValue} onChange={e => setCapacity(e.target.value)} /></label><label>{operationsCopy.event.signupClosesLocal} <Input type="datetime-local" value={signupValue} onChange={e => setSignupDeadline(e.target.value)} /></label></>}
       {event.overnight && event.roomingEnabled && <label>{operationsCopy.event.roomDeadlineLocal} <Input type="datetime-local" value={roomValue} onChange={e => setRoomDeadline(e.target.value)} /></label>}

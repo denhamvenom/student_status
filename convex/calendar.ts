@@ -1,28 +1,10 @@
-import { SignJWT, importPKCS8 } from "jose";
 import { env, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { normalizeCalendarEvent } from "./lib/calendarNormalize";
+import { chicagoMidnight } from "./lib/calendarDates";
+import { hashId, serviceToken } from "./lib/calendarAuth";
+import { reconcileLinkedNow, reconcileOneNow } from "./eventCalendar";
 import { v } from "convex/values";
-
-const scope = "https://www.googleapis.com/auth/calendar.readonly";
-const tokenEndpoint = "https://oauth2.googleapis.com/token";
-
-async function serviceToken(email: string, privateKey: string): Promise<string> {
-  const now = Math.floor(Date.now() / 1000);
-  const key = await importPKCS8(privateKey.replace(/\\n/g, "\n"), "RS256");
-  const assertion = await new SignJWT({ scope }).setProtectedHeader({ alg: "RS256", typ: "JWT" })
-    .setIssuer(email).setAudience(tokenEndpoint).setIssuedAt(now).setExpirationTime(now + 3600).sign(key);
-  const response = await fetch(tokenEndpoint, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion }) });
-  if (!response.ok) throw new Error(`Calendar token request failed (${response.status})`);
-  const body: unknown = await response.json();
-  if (!body || typeof body !== "object" || !("access_token" in body) || typeof body.access_token !== "string") throw new Error("Calendar token response was invalid");
-  return body.access_token;
-}
-
-async function hashId(id: string) {
-  const bytes = new TextEncoder().encode(id);
-  return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))).map(x => x.toString(16).padStart(2, "0")).join("");
-}
 
 export const refresh = internalAction({
   args: {}, returns: v.null(),
@@ -64,6 +46,8 @@ export const refresh = internalAction({
           const event = normalizeCalendarEvent(item as Record<string, unknown>, now, state.generation);
           if (!event) throw new Error("Calendar event was invalid");
           await ctx.runMutation(internal.timeclock.applyCalendarOccurrence, event);
+          if (event.cancelled && event.providerUpdatedAt === undefined) await reconcileOneNow(ctx, event.sourceKey);
+          else await ctx.runMutation(internal.eventCalendar.applyObserved, { eventId: event.sourceKey, title: event.title, location: typeof (item as Record<string, unknown>).location === "string" ? (item as Record<string, unknown>).location as string : "", start: event.scheduledStart ?? (event.allDayStartDate ? chicagoMidnight(event.allDayStartDate) : undefined), end: event.scheduledEnd ?? (event.allDayEndDate ? chicagoMidnight(event.allDayEndDate) : undefined), allDay: event.allDay, allDayStartDate: event.allDayStartDate, allDayEndDate: event.allDayEndDate, recurring: !!event.recurringEventId, cancelled: event.cancelled, etag: event.providerVersion, providerUpdatedAt: event.providerUpdatedAt, description: typeof (item as Record<string, unknown>).description === "string" ? (item as Record<string, unknown>).description as string : "" });
         }
         pageToken = typeof payload.nextPageToken === "string" ? payload.nextPageToken : undefined;
         syncToken = typeof payload.nextSyncToken === "string" ? payload.nextSyncToken : undefined;
@@ -79,6 +63,7 @@ export const refresh = internalAction({
           if (!progress.continueCursor || batch === 99) throw new Error("Calendar reconciliation exceeded its batch limit");
           cursor = progress.continueCursor;
         }
+        await reconcileLinkedNow(ctx);
       }
       await ctx.runMutation(internal.calendarState.finish, { generation: state.generation, now: Date.now(), syncToken });
     } catch (error) {

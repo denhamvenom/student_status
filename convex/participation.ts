@@ -19,7 +19,7 @@ export const signUp = mutation({
     await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const user = await viewer(ctx); const student = await ownStudent(ctx, user);
     const event = await ctx.db.get(args.eventId); const season = await activeSeason(ctx);
-    if (!event || event.seasonId !== season._id || student.seasonId !== season._id || event.archived || event.signupMode === "assigned") throw new Error("Signup is unavailable.");
+    if (!event || event.seasonId !== season._id || student.seasonId !== season._id || event.archived || event.cancelled || event.signupMode === "assigned") throw new Error("Signup is unavailable.");
     if (event.signupClosesAt !== undefined && Date.now() > event.signupClosesAt) throw new Error("Signup has closed.");
     const prior = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
     if (prior && prior.status !== "withdrawn") return prior.status;
@@ -52,7 +52,7 @@ export const setParticipation = mutation({
     const user = await viewer(ctx);
     if (user.role !== "coach" && !user.travelLead) throw new Error("Participation edit denied.");
     const event = await ctx.db.get(args.eventId); const student = await ctx.db.get(args.studentId); const season = await activeSeason(ctx);
-    if (!event || event.archived || !student || !student.active || event.seasonId !== season._id || student.seasonId !== season._id) throw new Error("Student or event not found.");
+    if (!event || event.archived || event.cancelled || !student || !student.active || event.seasonId !== season._id || student.seasonId !== season._id) throw new Error("Student or event not found.");
     requireEnrollmentComplete(event);
     if (event.signupMode === "assigned" && user.role !== "coach") throw new Error("Required-event roster is coach only.");
     if (event.signupMode === "assigned" && (args.status === "pending" || args.status === "waitlist")) throw new Error("Required events cannot have pending or waitlisted participants.");
