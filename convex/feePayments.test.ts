@@ -20,7 +20,7 @@ async function fixture() {
     const otherFee = await ctx.db.insert("feeDefinitions", { seasonId: season, kind: "custom", label: "Earlier fee", defaultAmountCents: 500, priority: 10, revision: 0, state: "active", createdBy: actor, createdAt: 1, updatedAt: 1 });
     const students = [];
     for (let index = 0; index < 2; index++) {
-      const student = await ctx.db.insert("students", { seasonId: season, legalName: `Synthetic ${index}`, preferredName: `Synthetic ${index}`, email: `student${index}@example.invalid`, subteam: "Build", active: true, travelTeam: false, roomCategoryLocked: false, allergies: { state: "unknown" }, medications: { state: "unknown" } });
+      const student = await ctx.db.insert("students", { seasonId: season, legalName: index === 0 ? "Alex Rivera" : `Synthetic ${index}`, preferredName: index === 0 ? "Alex" : `Synthetic ${index}`, email: `student${index}@example.invalid`, subteam: "Build", active: true, travelTeam: false, roomCategoryLocked: false, allergies: { state: "unknown" }, medications: { state: "unknown" } });
       const account = await ensureFinancialAccount(ctx, student);
       const otherCharge = await ctx.db.insert("charges", { studentId: student, feeDefinitionId: otherFee, label: "Earlier fee", amountCents: 500, appliedCents: 0, priority: 10, createdBy: actor, createdAt: 1 });
       const charge = await ctx.db.insert("charges", { studentId: student, feeDefinitionId: fee, label: "Trip fee", amountCents: 1000, appliedCents: 0, priority: 20, createdBy: actor, createdAt: 1 });
@@ -44,11 +44,12 @@ describe("fee-specific CSV payment batches", () => {
     const f = await fixture();
     const exported = await f.exportPage();
     expect(exported.page).toHaveLength(2);
-    expect(exported.page[0]).toMatchObject({ chargedCents: 1000, appliedCents: 0, owedCents: 1000 });
+    expect(exported.page[0]).toMatchObject({ studentName: "Alex Rivera", chargedCents: 1000, appliedCents: 0, owedCents: 1000 });
     await expect(f.parent.query(api.feePayments.exportPage, { feeDefinitionId: f.ids.fee, filter: "all", paginationOpts: { cursor: null, numItems: 20 } })).rejects.toThrow("Financial editing");
     const rows = await f.rows();
     const preview = await f.coach.query(api.feePayments.previewRows, { feeDefinitionId: f.ids.fee, exportId: "synthetic-export-1", rows });
     expect(preview.map(item => item.state)).toEqual(["ready", "ready"]);
+    expect(preview[0].studentName).toBe("Alex Rivera");
     const batch = await f.coach.mutation(api.feePayments.beginBatch, { feeDefinitionId: f.ids.fee, exportId: "synthetic-export-1", rows, ...details });
     await expect(f.parent.mutation(api.feePayments.recordRow, { batchId: batch.batchId, rowKey: rows[0].rowKey })).rejects.toThrow("Financial editing");
     const saved = await f.coach.mutation(api.feePayments.recordRow, { batchId: batch.batchId, rowKey: rows[0].rowKey });
