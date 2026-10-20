@@ -1,3 +1,4 @@
+import { normalizeChangedPhone } from "../shared/contact-format";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
@@ -184,10 +185,10 @@ export const saveBasics = mutation({
     if (!Number.isSafeInteger(args.expectedProfileRevision) || args.expectedProfileRevision < 0 || args.expectedProfileRevision !== (actor.profileRevision ?? 0)) throw new Error("Profile changed. Reload before saving.");
     const profileRevision = (actor.profileRevision ?? 0) + 1;
     const patch = {
-      name: clean(args.name, "Name", 100) || actor.name, phone: clean(args.phone, "Phone", 50) || actor.phone, shirtSize: args.shirtSize ?? actor.shirtSize,
+      name: clean(args.name, "Name", 100) || actor.name, phone: normalizeChangedPhone(args.phone, actor.phone, "Phone") || actor.phone, shirtSize: args.shirtSize ?? actor.shirtSize,
       emergencyName: clean(args.emergencyName, "Emergency contact name", 100) || actor.emergencyName,
       emergencyRelationship: clean(args.emergencyRelationship, "Emergency contact relationship", 100) || actor.emergencyRelationship,
-      emergencyPhone: clean(args.emergencyPhone, "Emergency contact phone", 50) || actor.emergencyPhone, profileRevision, staffSetupCompletedAt: Date.now(),
+      emergencyPhone: normalizeChangedPhone(args.emergencyPhone, actor.emergencyPhone, "Emergency contact phone") || actor.emergencyPhone, profileRevision, staffSetupCompletedAt: Date.now(),
     };
     let state: DriverState | null = null;
     if (args.driving) {
@@ -216,10 +217,10 @@ export const saveOwn = mutation({
     const actor = await viewer(ctx); requireRole(actor, "coach", "mentor");
     if (!Number.isSafeInteger(args.expectedProfileRevision) || args.expectedProfileRevision < 0 || args.expectedProfileRevision !== (actor.profileRevision ?? 0)) throw new Error("Profile changed. Reload before saving.");
     const name = clean(args.name, "Name", 100, true);
-    const phone = clean(args.phone, "Phone", 50);
+    const phone = normalizeChangedPhone(args.phone, actor.phone, "Phone");
     const emergencyName = clean(args.emergencyName, "Emergency contact name", 100);
     const emergencyRelationship = clean(args.emergencyRelationship, "Emergency contact relationship", 100);
-    const emergencyPhone = clean(args.emergencyPhone, "Emergency contact phone", 50);
+    const emergencyPhone = normalizeChangedPhone(args.emergencyPhone, actor.emergencyPhone, "Emergency contact phone");
     const profileRevision = (actor.profileRevision ?? 0) + 1;
     await ctx.db.patch(actor._id, { name, phone, shirtSize: args.shirtSize, emergencyName, emergencyRelationship, emergencyPhone, profileRevision });
     const state = await saveDriving(ctx, actor, await driverContext(ctx, actor), name, phone, args);

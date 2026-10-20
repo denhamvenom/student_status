@@ -67,6 +67,7 @@ import type * as lib_chargeCorrection from "../lib/chargeCorrection.js";
 import type * as lib_chargeObligation from "../lib/chargeObligation.js";
 import type * as lib_consentSnapshot from "../lib/consentSnapshot.js";
 import type * as lib_consentSnapshotV2 from "../lib/consentSnapshotV2.js";
+import type * as lib_contactEntry from "../lib/contactEntry.js";
 import type * as lib_eventEnrollmentState from "../lib/eventEnrollmentState.js";
 import type * as lib_feeBulkMoney from "../lib/feeBulkMoney.js";
 import type * as lib_feeDefinitions from "../lib/feeDefinitions.js";
@@ -194,6 +195,7 @@ declare const fullApi: ApiFromModules<{
   "lib/chargeObligation": typeof lib_chargeObligation;
   "lib/consentSnapshot": typeof lib_consentSnapshot;
   "lib/consentSnapshotV2": typeof lib_consentSnapshotV2;
+  "lib/contactEntry": typeof lib_contactEntry;
   "lib/eventEnrollmentState": typeof lib_eventEnrollmentState;
   "lib/feeBulkMoney": typeof lib_feeBulkMoney;
   "lib/feeDefinitions": typeof lib_feeDefinitions;

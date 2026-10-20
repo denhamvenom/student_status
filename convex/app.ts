@@ -1,3 +1,4 @@
+import { normalizeChangedPhone } from "../shared/contact-format";
 import { enrollmentPending } from "./lib/eventEnrollmentState";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
@@ -219,7 +220,7 @@ export const updateStudentProfile = mutation({
     if (args.otcAuthorization !== undefined) throw new Error("Medication choices are no longer part of this profile.");
     if (args.emergencyName !== undefined) changes.emergencyName = args.emergencyName.trim();
     if (args.emergencyRelationship !== undefined) changes.emergencyRelationship = args.emergencyRelationship.trim();
-    if (args.emergencyPhone !== undefined) changes.emergencyPhone = args.emergencyPhone.trim();
+    if (args.emergencyPhone !== undefined) changes.emergencyPhone = normalizeChangedPhone(args.emergencyPhone, student.emergencyPhone, "Emergency contact phone");
     if (args.allergies !== undefined) changes.allergies = args.allergies;
     if (args.medications !== undefined) changes.medications = args.medications;
     if (privateEdit && student.consentProfileV2CompletedAt !== undefined) changes.consentProfileV2CompletedAt = undefined;

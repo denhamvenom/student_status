@@ -1,3 +1,4 @@
+import { normalizeEmail } from "../shared/contact-format";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { components, internal } from "./_generated/api";
@@ -93,7 +94,7 @@ export const createParentInvite = mutation({
     if (own._id !== args.studentId) throw new Error("You can invite a parent for your own student record only.");
     if ((await setting(ctx))?.enabled === false) throw new Error("Parent invitations are disabled. Ask a Coach for help.");
     const student = await eligibleStudent(ctx, args.studentId);
-    const parentEmail = emailKey(args.parentEmail);
+    const parentEmail = normalizeEmail(args.parentEmail, "Parent email");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail) || parentEmail.length > 254) throw new Error("Enter a valid parent email.");
     if (parentEmail === emailKey(actor.email) || parentEmail === emailKey(student.email)) throw new Error("A student cannot invite their own identity as a parent.");
     if (await revokedLinkForEmail(ctx, student._id, parentEmail)) throw new Error("A Coach must resolve this revoked family link.");

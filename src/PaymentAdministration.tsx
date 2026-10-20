@@ -11,6 +11,7 @@ import { parseFundraisingDecimal, formatFundraisingCents } from './Fundraising'
 import styles from './ChargeAdministration.module.css'
 import { paymentAdministrationCopy as copy } from './lib/payment-admin-copy'
 import { FeePaymentImport } from './FeePaymentImport'
+import { normalizeEmail } from '../shared/contact-format'
 type PaymentRow = { studentEmail: string; amountCents: number; method: 'cash' | 'check' | 'other'; reference: string; occurredAt: number; rowReference: string }
 type ReviewedRow = PaymentRow & FunctionReturnType<typeof api.paymentAdministration.previewPayments>[number]
 const message = (error: unknown) => error instanceof Error ? error.message : String(error)
@@ -44,7 +45,9 @@ export function parsePaymentCsv(text: string): PaymentRow[] {
     const number = (type: string) => Number(parts.find(part => part.type === type)?.value)
     const localAtGuess = Date.UTC(number('year'), number('month') - 1, number('day'), number('hour'), number('minute'))
     const teamMidnight = occurredAt - (localAtGuess - guess)
-    return { studentEmail: value('studentemail').toLowerCase(), amountCents, method: method as PaymentRow['method'], reference: value('reference'), occurredAt: teamMidnight, rowReference: value('rowreference') }
+    const studentEmail = normalizeEmail(value('studentemail'), `Row ${index + 2} student email`)
+    if (!studentEmail) throw new Error(`Row ${index + 2}: student email is required.`)
+    return { studentEmail, amountCents, method: method as PaymentRow['method'], reference: value('reference'), occurredAt: teamMidnight, rowReference: value('rowreference') }
   })
 }
 class PaymentBoundary extends Component<{ children: ReactNode; retry: () => void }, { failed: boolean }> {

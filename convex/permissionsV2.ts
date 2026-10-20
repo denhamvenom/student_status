@@ -1,3 +1,5 @@
+import { normalizeEmail } from "../shared/contact-format";
+import { normalizeConsentContacts } from "./lib/contactEntry";
 import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -73,7 +75,7 @@ export const saveProfile = mutation({
     const actor = await viewer(ctx); await parentSigner(ctx, actor); const student = await studentAccess(ctx, actor, args.studentId);
     if ((student.profileRevision ?? 0) !== args.expectedRevision) throw new Error("Profile changed. Reload before saving.");
     const setupDraft = await ctx.db.query("setupDrafts").withIndex("by_studentId", q => q.eq("studentId", student._id)).unique();
-    const value = validateConsentProfileV2({...args.value, grade: gradeForSave(args.value.grade, [student.consentProfileV2?.grade, setupDraft?.grade])});
+    const value = validateConsentProfileV2({...normalizeConsentContacts(args.value, student.consentProfileV2), grade: gradeForSave(args.value.grade, [student.consentProfileV2?.grade, setupDraft?.grade])});
     if (Date.parse(`${value.dateOfBirth}T00:00:00Z`) >= Date.now()) throw new Error("Date of birth must be in the past.");
     if (setupDraft) await ctx.db.delete(setupDraft._id);
     await ctx.db.patch(student._id, {consentProfileV2: value, consentProfileV2CompletedAt: Date.now(), consentProfileV2ConfirmedBy: actor._id, profileRevision: args.expectedRevision + 1});
@@ -86,7 +88,7 @@ export const createDraft = internalMutation({
   args: {studentId: v.id("students"), eventIds: v.array(v.id("events")), source: v.union(v.literal("electronic"), v.literal("paper")), paperName: v.optional(v.string()), paperEmail: v.optional(v.string())}, returns: draftResultValidator,
   handler: async (ctx, args) => {
     const actor = await viewer(ctx);
-    if (args.source === "paper") { operations(actor); boundedText(args.paperName ?? "", 160, "Paper signer name"); if (args.paperEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(args.paperEmail)) throw new Error("Paper signer email is invalid."); }
+    if (args.source === "paper") { operations(actor); boundedText(args.paperName ?? "", 160, "Paper signer name"); if (args.paperEmail) normalizeEmail(args.paperEmail, "Paper signer email"); }
     const prepared = await build(ctx, actor, args.studentId, args.eventIds, args.source, args.source === "paper" ? {name: args.paperName!.trim(), email: args.paperEmail?.trim().toLowerCase() ?? null} : undefined);
     const expiresAt = Date.now() + 30 * 60_000;
     const draftId = await ctx.db.insert("permissionDrafts", {studentId: args.studentId, seasonId: prepared.student.seasonId, parentId: actor._id, versionId: prepared.snapshot.version.versionId, snapshotFormat: 2, snapshotJson: JSON.stringify(prepared.snapshot), snapshotHash: await snapshotHashV2(prepared.snapshot), profileRevision: prepared.student.profileRevision ?? 0, eventFingerprint: prepared.eventFingerprint, expectedCoverage: prepared.expected, createdAt: Date.now(), expiresAt});

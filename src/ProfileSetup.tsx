@@ -8,6 +8,7 @@ import { Input } from './components/ui/input'
 import { Button } from './components/ui/button'
 import { accountCopy } from './lib/account-copy'
 import { liveCopy } from './lib/live-copy'
+import { normalizeChangedEmail, normalizeChangedPhone } from '../shared/contact-format'
 
 const copy = accountCopy.setup
 type Profile = FunctionReturnType<typeof api.profileSetup.get>
@@ -31,6 +32,14 @@ function SetupForm({ profile }: { profile: Profile }) {
   const [error, setError] = useState('')
   async function submit(event: FormEvent) {
     event.preventDefault()
+    if (step >= 3) {
+      try {
+        setPhone(normalizeChangedPhone(phone, profile.guardianPhone))
+        setEmail(normalizeChangedEmail(email, profile.guardianEmail))
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : 'Check the contact information.'); return
+      }
+    }
     if (step < 4) { setStep(step + 1); return }
     if (category !== 'Boys' && category !== 'Girls') return
     setBusy(true); setError('')

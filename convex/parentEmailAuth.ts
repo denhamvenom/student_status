@@ -1,3 +1,4 @@
+import { normalizeEmail } from "../shared/contact-format";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { action, internalMutation } from "./_generated/server";
@@ -10,7 +11,7 @@ import { components } from "./_generated/api";
 import { RateLimiter } from "@convex-dev/rate-limiter";
 
 const codeValidityMs = 10 * 60_000;
-const validEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254;
+const validEmail = (email: string) => { try { return !!normalizeEmail(email); } catch { return false; } };
 const codeLimiter = new RateLimiter(components.rateLimiter, {
   parentCodeMinute: { kind: "fixed window", rate: 1, period: 60_000 },
   parentCodeHour: { kind: "fixed window", rate: 5, period: 60 * 60_000 },

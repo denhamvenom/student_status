@@ -1,5 +1,10 @@
 # Visual review closed — October 16, 2026
 
+## October 20 - Contact input formatting (development)
+
+Phone/email entries now use shared formatting and validation across profiles, setup, driver contacts, invitations, paper signer fields and payment CSV matching, enforced on backend entry too. US phones display as (555) 123-4567; email is trimmed/lowercased and structurally checked. Optional blanks remain optional, unchanged legacy contacts preserved, signed evidence untouched. 84 backend/helper and two payment CSV tests covered; desktop/phone input and wizard browser checks passed with independent source review. See CONTACT_INPUT_FORMATS.md. Development only; no production release authorized.
+
+
 ## October 20 - Approved Mentor landing and fundraiser production release
 
 Owner accepted the localhost changes and authorized production publication. Reviewed source f075087 deployed to production amicable-eel-413 with backend typecheck/schema validation and no deleted indexes. Includes Mentor Profile landing, fundraiser CSV workflow, family Pay/Share, and Coach/Travel connection status. Documentation publishes with source. See RELEASE_2026-10-20_FUNDRAISERS.md for evidence and release boundaries. Earlier development-only statements for these features are superseded.

@@ -1,3 +1,4 @@
+import { normalizeChangedPhone, normalizeChangedEmail } from "../shared/contact-format";
 import { enrollmentPending, requireEnrollmentComplete } from "./lib/eventEnrollmentState";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -65,8 +66,9 @@ export const saveDriver = mutation({
   handler: async (ctx, args) => {
     const user = await viewer(ctx); operator(user);
     const season = await activeSeason(ctx);
-    const name = args.name.trim(), email = args.email.trim(), phone = args.phone.trim(), vehicleName = args.vehicleName.trim();
-    if (!name || name.length > 100 || !email || email.length > 200 || !email.includes("@") || !phone || phone.length > 50 || vehicleName.length > 100) throw new Error("Enter a valid driver name, email, phone and vehicle name.");
+    const priorContact = args.driverId ? await ctx.db.get(args.driverId) : null;
+    const name = args.name.trim(), email = normalizeChangedEmail(args.email, priorContact?.email, "Driver email"), phone = normalizeChangedPhone(args.phone, priorContact?.phone, "Driver phone"), vehicleName = args.vehicleName.trim();
+    if (!name || name.length > 100 || !email || email.length > 254 || !email.includes("@") || !phone || phone.length > 50 || vehicleName.length > 100) throw new Error("Enter a valid driver name, email, phone and vehicle name.");
     whole(args.seats, "Passenger seats", 100);
     const patch = { name, email, phone, vehicleName, seats: args.seats, approved: args.approved, towCapable: args.towCapable, active: args.active };
     const existing = await ctx.db.query("drivers").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(MAX_DRIVERS + 1);

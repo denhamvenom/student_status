@@ -1,3 +1,4 @@
+import { normalizeEmail } from "../shared/contact-format";
 import { v, type Infer } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { env, mutation, query } from "./_generated/server";
@@ -173,7 +174,7 @@ async function paperSnapshot(ctx: MutationCtx, actor: Doc<"appUsers">, args: Pap
   operations(actor); const student = await studentAccess(ctx, actor, args.studentId); await syntheticGate(ctx, student._id);
   boundedText(args.signerName, 160, "Parent or guardian named on paper"); boundedText(args.paperReference, 254, "Paper reference");
   if (!Number.isFinite(args.paperSignedAt) || args.paperSignedAt <= 0 || args.paperSignedAt > Date.now()) throw new Error("Paper signing date must be valid and not in the future.");
-  if (args.signerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(args.signerEmail.trim())) throw new Error("Paper signer email is invalid.");
+  if (args.signerEmail) normalizeEmail(args.signerEmail, "Paper signer email");
   const prepared = await buildSnapshot(ctx, student, actor, args.eventIds, {source: "paper", accountId: null, name: args.signerName.trim(), email: args.signerEmail?.trim().toLowerCase() || null, recordedBy: actor._id});
   return {student, ...prepared};
 }

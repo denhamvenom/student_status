@@ -1,3 +1,4 @@
+import { normalizeEmail } from "../shared/contact-format";
 import { makeFunctionReference, paginationOptsValidator, paginationResultValidator } from "convex/server";
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
@@ -121,7 +122,8 @@ export const previewPayments = query({
     const season = await activeSeason(ctx); const duplicates = new Set<string>(); const result = [];
     for (const item of args.rows) {
       let error: string | null = null; try { receiptFields(item); } catch (failure) { error = failure instanceof Error ? failure.message : "Invalid receipt."; }
-      const email = item.studentEmail.trim().toLowerCase();
+      let email = item.studentEmail.trim().toLowerCase();
+      try { email = normalizeEmail(item.studentEmail, "Student email"); if (!email) throw new Error("Enter a student email."); } catch (failure) { result.push({ studentId: null, studentName: email, expectedGeneration: null, error: failure instanceof Error ? failure.message : "Invalid student email." }); continue; }
       const matches = await ctx.db.query("students").withIndex("by_seasonId_and_email", q => q.eq("seasonId", season._id).eq("email", email)).take(2);
       const student = matches.length === 1 && matches[0].active ? matches[0] : null;
       if (!student) error = "Match one active student's exact email address.";
