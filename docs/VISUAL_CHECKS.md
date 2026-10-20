@@ -1,5 +1,11 @@
 # Visual review closed — October 16, 2026
 
+## October 20 - Mentor Profile and individual fundraiser links (development)
+
+Implemented Mentor Profile as the landing page, retaining Report and Settings. Coaches manage individual student Zeffy links in Money tools. Students and linked parents see Pay Now with a payment-card icon and Share on the selected student's Money page; both hide when no link exists. Desktop copies the URL; phones use native sharing when available, with copy/manual fallback.
+
+11 focused tests passed. Independent source review found no blockers. Synthetic actual-component checks passed for Mentor landing/report navigation, Coach update/clear, family copy/no-link hiding, and desktop/light plus phone/dark layouts. Representative screenshots inspected; no horizontal overflow. Native phone share was tested through mocks, not a physical device. No real payment or fundraiser was created. Development backend third-bandicoot-18 synchronized; production is unchanged. See [feature details](MENTOR_PROFILE_FUNDRAISERS.md).
+
 ## October 20 - Grade dropdown (local development)
 
 Student and parent setup plus the parent health/contact profile now use Freshman, Sophomore, Junior and Senior. Recognized earlier values display canonically and convert on normal save; unknown values remain selectable unchanged. Existing confirmed profile spelling may remain until parent reconfirmation, and signed snapshots are untouched. No bulk migration or production data change.

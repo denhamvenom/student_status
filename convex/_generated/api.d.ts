@@ -50,6 +50,7 @@ import type * as financialAllocation from "../financialAllocation.js";
 import type * as financialOperationsWorker from "../financialOperationsWorker.js";
 import type * as financialSources from "../financialSources.js";
 import type * as firstRegistration from "../firstRegistration.js";
+import type * as fundraiserLinks from "../fundraiserLinks.js";
 import type * as fundraiserPosting from "../fundraiserPosting.js";
 import type * as fundraisers from "../fundraisers.js";
 import type * as historicalCorrections from "../historicalCorrections.js";
@@ -176,6 +177,7 @@ declare const fullApi: ApiFromModules<{
   financialOperationsWorker: typeof financialOperationsWorker;
   financialSources: typeof financialSources;
   firstRegistration: typeof firstRegistration;
+  fundraiserLinks: typeof fundraiserLinks;
   fundraiserPosting: typeof fundraiserPosting;
   fundraisers: typeof fundraisers;
   historicalCorrections: typeof historicalCorrections;

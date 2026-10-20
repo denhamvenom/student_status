@@ -1,5 +1,11 @@
 # Student Status implementation plan
 
+## October 20 - Mentor Profile and individual fundraiser links (development)
+
+Implemented Mentor Profile as the landing page, retaining Report and Settings. Coaches manage individual student Zeffy links in Money tools. Students and linked parents see Pay Now with a payment-card icon and Share on the selected student's Money page; both hide when no link exists. Desktop copies the URL; phones use native sharing when available, with copy/manual fallback.
+
+11 focused tests passed. Independent source review found no blockers. Synthetic actual-component checks passed for Mentor landing/report navigation, Coach update/clear, family copy/no-link hiding, and desktop/light plus phone/dark layouts. Representative screenshots inspected; no horizontal overflow. Native phone share was tested through mocks, not a physical device. No real payment or fundraiser was created. Development backend third-bandicoot-18 synchronized; production is unchanged. See [feature details](MENTOR_PROFILE_FUNDRAISERS.md).
+
 ## October 20 - Staff setup production release
 
 Owner accepted the localhost wizard and authorized release. Source280bc81 deployed successfully to production amicable-eel-413 with backend typecheck/schema validation and no deleted indexes. All personal items can be skipped; optional driving/trailer uses shared contact phone and existing approval rules. Temporary/permanent skip and later Profile editing remain available. Source and documentation publish together. See RELEASE_2026-10-20_STAFF_SETUP.md and release notes for exact merge/build evidence; older development-only statements below are superseded.

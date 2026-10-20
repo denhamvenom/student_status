@@ -1,11 +1,11 @@
 # Current integration handoff
 
-## Staff setup production release
+## Mentor Profile and individual fundraiser links — development
 
-Owner accepted and authorized release of reviewed source280bc81. Production Convex amicable-eel-413 deployment succeeded with typecheck/schema validation; no indexes deleted. Website merge/build evidence is recorded on the release PR and GitHub release. See RELEASE_2026-10-20_STAFF_SETUP.md and STAFF_SETUP_WIZARD.md.
+Built on released main 04272ad. Mentors land on Profile with Report retained. Coach Money tools manages a separate Zeffy URL per active student; students and linked parents see Pay Now/Share on Money only when configured. No financial transactions or balances are changed by these actions. See MENTOR_PROFILE_FUNDRAISERS.md for behavior, authorization and evidence.
 
-The four-step staff wizard offers optional basics and driving/trailer details, skips individual fields without erasing saved values, supports temporary/permanent dismissal, uses shared contact phone and omits account email. Existing driver approval safeguards remain. Coach Profile supports later edits.
+11 focused tests and independent source review passed. Synthetic actual-component checks verified desktop/light and phone/dark layouts, Mentor routing, Coach update/clear and family copy/no-link hiding. Physical-phone sharing and real checkout were not exercised. Development third-bandicoot-18 synchronized; production remains at the approved staff-setup release. No real links were assigned.
 
-17 focused backend tests, independent review, synthetic desktop/phone checks, lint/types/build passed. Earlier full suite561/562: unrelated501-charge fee test exceeded30seconds; leave that recorded follow-up separate. No real profile edits, migrations, invitations, emails or environment changes during release checks.
+Root owns feature/parent-email-invitations in student-status-bulk-invite. Other chat confirmed no conflicting work and held shared sync during integration. Development email remains disabled; Calendar writes remain production-only. Previous unrelated 501-charge fee-test timeout is a separate follow-up.
 
-Root owns release integration in student-status-bulk-invite, feature/parent-email-invitations. Other chat holds shared sync/merges until completion handoff. Development email remains disabled; Calendar writes stay production-only.
+Final lint, frontend/backend typechecks and application build passed.
