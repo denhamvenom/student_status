@@ -2,7 +2,7 @@
 
 ## Scope and behavior
 
-Development-only October 20 feature. Accepted staff accounts (Coaches, Mentors and Travel Leads) see a three-step wizard when basic information is incomplete. It collects full name, phone, adult shirt size and emergency contact name, relationship and phone; sign-in email is read-only. Existing saved values prefill the form. Existing complete staff profiles bypass it. Student/parent setup and invitation acceptance remain unchanged.
+Development-only October 20 feature. Accepted staff accounts (Coaches, Mentors and Travel Leads) see a three-step wizard when basic information is incomplete. It collects full name, phone, adult shirt size and emergency contact name, relationship and phone; account email is established by sign-in/invitation and is not requested or repeated in the wizard. Existing saved values prefill the form. Existing complete staff profiles bypass it. Student/parent setup and invitation acceptance remain unchanged.
 
 Staff can choose Skip for now (only the current mounted session; refreshing or signing in again can prompt again) or Don’t ask me again (permanent account preference across logins and seasons). Both leave missing information missing. A permanent skip is not reported as a completed profile. Profile remains accessible later, including for Coaches. Filling or editing a profile does not reset the permanent preference.
 

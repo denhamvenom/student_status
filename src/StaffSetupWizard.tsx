@@ -89,7 +89,7 @@ function StaffWizard({ profile, reload, skip }: { profile: Basics; reload: () =>
     }
   }
   const review = [
-    ['Full name', name], ['Account email', profile.email], ['Phone', phone], ['Shirt size (adult)', shirtSize],
+    ['Full name', name], ['Phone', phone], ['Shirt size (adult)', shirtSize],
     ['Emergency contact name', emergencyName], ['Relationship', emergencyRelationship], ['Emergency contact phone', emergencyPhone],
   ]
   return <div className={styles.page}><main className={styles.shell}>
@@ -109,7 +109,6 @@ function StaffWizard({ profile, reload, skip }: { profile: Basics; reload: () =>
           {step === 0 ? <>
             <label className={styles.field}>Full name<Input required autoComplete="name" maxLength={100} value={name} onChange={event => setName(event.target.value)} /></label>
             <label className={styles.field}>Phone<Input required type="tel" autoComplete="tel" maxLength={50} value={phone} onChange={event => setPhone(event.target.value)} /></label>
-            <label className={`${styles.field} ${styles.full}`}>Account email<Input type="email" value={profile.email} readOnly /></label>
           </> : step === 1 ? <>
             <label className={`${styles.field} ${styles.full}`}>Shirt size (adult)
               <NativeSelect required value={shirtSize} onChange={event => setShirtSize(event.target.value)}>
