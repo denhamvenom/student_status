@@ -15,6 +15,43 @@ const balanceValidator = v.object({ state: v.union(v.literal("ready"), v.literal
 const accountValidator = v.object({ linkage: v.union(v.literal("linked"), v.literal("unlinked"), v.literal("unavailable")), access: v.union(v.literal("active"), v.literal("inactive"), v.literal("unknown")) });
 const eventValidator = v.union(v.null(), v.object({ eventId: v.id("events"), name: v.string(), startsAt: v.number(), participation: v.union(v.literal("confirmed"), v.literal("pending"), v.literal("waitlist"), v.literal("withdrawn"), v.null()), state: v.union(v.literal("ready"), v.literal("open"), v.literal("unknown")), open: v.array(v.string()) }));
 const rowValidator = v.object({ studentId: v.id("students"), name: v.string(), subteam: v.string(), travelTeam: v.boolean(), active: v.boolean(), profileRevision: v.number(), firstRegistrationState: v.union(v.literal("needsCompletion"),v.literal("awaitingVerification"),v.literal("verified")), account: accountValidator, balance: balanceValidator, nextEvent: eventValidator, readinessCoverage: v.union(v.literal("complete"), v.literal("unknown"), v.literal("notApplicable")), missingSummary: v.array(v.string()) });
+const directoryRowValidator = v.object({studentId:v.id("students"), name:v.string(), lastName:v.string(), subteam:v.string(), travelTeam:v.boolean(), active:v.boolean(), connected:v.boolean(), grade:v.union(v.string(),v.null())});
+
+/** A bounded page of minimal roster data; the client completes these pages before sorting. */
+export const directory = query({
+  args:{paginationOpts:paginationOptsValidator,active:v.optional(v.boolean())},
+  returns:paginationResultValidator(directoryRowValidator),
+  handler:async(ctx,args)=>{
+    requireRole(await viewer(ctx),"coach");
+    if(args.paginationOpts.numItems<1||args.paginationOpts.numItems>100) throw new Error("Directory page size must be between 1 and 100.");
+    const season=await activeSeason(ctx);
+    const page=await ctx.db.query("students").withIndex("by_seasonId_and_active",q=>q.eq("seasonId",season._id).eq("active",args.active??true)).paginate(args.paginationOpts);
+    return {...page,page:await Promise.all(page.page.map(async student=>{
+      const draft=await ctx.db.query("setupDrafts").withIndex("by_studentId",q=>q.eq("studentId",student._id)).unique();
+      const name=student.legalName||student.preferredName;
+      // Older records have no structured surname; skip a common suffix and use the final family token.
+      const tokens=name.trim().split(/\s+/);
+      const final=tokens.at(-1)?.replace(/\.$/,"")??"";
+      const fallback=/^(jr|sr|ii|iii|iv|v)$/i.test(final)&&tokens.length>1?tokens.at(-2)??final:tokens.at(-1)??"";
+      const lastName=student.lastName?.trim()||fallback;
+      return {studentId:student._id,name,lastName,subteam:student.subteam,travelTeam:student.travelTeam,active:student.active,connected:student.userId!==undefined,grade:draft?.grade??student.consentProfileV2?.grade??null};
+    }))};
+  },
+});
+
+export const rowsByIds=query({
+  args:{studentIds:v.array(v.id("students")),asOf:v.number()},returns:v.array(rowValidator),
+  handler:async(ctx,args)=>{
+    requireRole(await viewer(ctx),"coach");
+    if(!Number.isFinite(args.asOf)) throw new Error("A valid current time is required.");
+    if(args.studentIds.length>20) throw new Error("At most 20 roster rows may be requested.");
+    const season=await activeSeason(ctx);
+    const students=await Promise.all(args.studentIds.map(id=>ctx.db.get(id)));
+    if(students.some(student=>!student||student.seasonId!==season._id)) throw new Error("Student is unavailable in the current season.");
+    const upcoming=await upcomingEvents(ctx,season._id,args.asOf);
+    return await Promise.all((students as Doc<"students">[]).map(student=>rosterRow(ctx,student,upcoming)));
+  },
+});
 
 function missingInformation(student: Doc<"students">) {
   const missing: string[] = [];

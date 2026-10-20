@@ -371,3 +371,7 @@ Owner authorized development and production publication of frontend-only invitat
 ## October 19 - Mentor/Staff invitation email (development)
 
 Implemented Send invitation with private emailed links, accurate delivery status and guarded resend; removed public copy-link return/UI. Existing invitation acceptance remains explicit. Development third-bandicoot-18 synced with optional fields/additive index; sending remains disabled, no real messages or production writes. Independent review clear; 535 tests in101 files passed and focused31 account/mail tests passed. See [workflow and verification](ADULT_INVITATION_EMAIL.md). Real-inbox delivery and production promotion remain unverified/unreleased.
+
+## October 20 - Active Roster sorting
+
+Actual CoachRosterManagement component rendered with synthetic mocked Convex hooks at 1440x900/light and 390x844/dark. Full-directory last-name, grade and subteam ordering; 20-row paging; later-page balance/search matches; missing-grade display and no horizontal overflow passed. Existing shared controls/table/mobile cards reused; screenshots inspected. Evidence stays ignored under .test-temp/roster-sort-ui. This is component verification, not a live account rehearsal. Coach acceptance remains pending; no production change.

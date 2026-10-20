@@ -575,3 +575,7 @@ October 19 approval revision: isolated actual-component Coach queue reviewed at 
 
 ## STAFF-MAIL-2026-10-19
 Actual components with mocked hooks checked desktop light/phone dark; phone390px/375px document, no horizontal overflow. Send success/failure, delivery states, disabled cooldown and resend error visible. Live local Coach page shows Send invitation and no copy link. Remaining: real-inbox round trip, owner acceptance and production release. See ADULT_INVITATION_EMAIL.md.
+
+## October 20 - Active Roster sorting
+
+Actual CoachRosterManagement component rendered with synthetic mocked Convex hooks at 1440x900/light and 390x844/dark. Full-directory last-name, grade and subteam ordering; 20-row paging; later-page balance/search matches; missing-grade display and no horizontal overflow passed. Existing shared controls/table/mobile cards reused; screenshots inspected. Evidence stays ignored under .test-temp/roster-sort-ui. This is component verification, not a live account rehearsal. Coach acceptance remains pending; no production change.

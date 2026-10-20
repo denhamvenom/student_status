@@ -8,6 +8,8 @@ import { ensureFinancialAccount } from "./lib/financialSources";
 const modules = import.meta.glob("./**/*.ts");
 const list = makeFunctionReference<"query">("coachRoster:list");
 const detail = makeFunctionReference<"query">("coachRoster:detail");
+const directory = makeFunctionReference<"query">("coachRoster:directory");
+const rowsByIds = makeFunctionReference<"query">("coachRoster:rowsByIds");
 const finance = makeFunctionReference<"query">("financeAdmin:students");
 async function fixture() {
   const t = createTest(schema, modules);
@@ -22,6 +24,41 @@ async function fixture() {
 }
 const page={paginationOpts:{numItems:20,cursor:null},asOf:100};
 describe("Coach student roster and record",()=>{
+  it("pages lightweight directory, projects grade precedence and structured surnames, and scopes enriched IDs",async()=>{
+    const f=await fixture();
+    const other=await f.t.run(async ctx=>{
+      const original=await ctx.db.get(f.ids.student);
+      if(!original)throw new Error("Missing synthetic fixture");
+      const {_id,_creationTime,...fields}=original;
+      void _id;void _creationTime;
+      await ctx.db.patch(f.ids.student,{lastName:"Family",consentProfileV2:{grade:"10",dateOfBirth:"2011-01-15",guardian:{name:"G",relationship:"Parent",phone:"1",email:"g@example.invalid"},emergency:{name:"E",relationship:"Parent",phone:"1"},allergies:{state:"none",entries:[]},prescriptions:{state:"none",entries:[]},insurance:{state:"none",provider:null,policy:null},physician:{state:"none",name:null,phone:null}}});
+      await ctx.db.insert("setupDrafts",{studentId:f.ids.student,seasonId:f.ids.season,grade:"11",updatedBy:f.ids.coach,updatedAt:1});
+      for(let i=0;i<22;i++)await ctx.db.insert("students",{...fields,legalName:i===21?"Member 21 Zulu Jr.":`Member ${i} Zulu`});
+      const oldSeason=await ctx.db.insert("seasons",{name:"Old",year:2026,status:"archived",startsAt:0,permissionVersion:"OLD",createdBy:f.ids.coach});
+      return await ctx.db.insert("students",{...fields,seasonId:oldSeason,legalName:"Other Season"});
+    });
+    await expect(f.t.query(directory,{paginationOpts:{numItems:20,cursor:null}})).rejects.toThrow();
+    await expect(f.t.query(rowsByIds,{studentIds:[f.ids.student],asOf:100})).rejects.toThrow();
+    const first=await f.coach.query(directory,{paginationOpts:{numItems:20,cursor:null}});
+    expect(first.page).toHaveLength(20);
+    expect(first.isDone).toBe(false);
+    const projected=first.page.find((row:{studentId:string})=>row.studentId===f.ids.student);
+    expect(projected).toMatchObject({name:"Synthetic Student",lastName:"Family",grade:"11",connected:false});
+    expect(projected).not.toHaveProperty("email");
+    await f.t.run(async ctx=>{const draft=await ctx.db.query("setupDrafts").withIndex("by_studentId",q=>q.eq("studentId",f.ids.student)).unique();if(draft)await ctx.db.delete(draft._id)});
+    const consentGrade=await f.coach.query(directory,{paginationOpts:{numItems:20,cursor:null}});
+    expect(consentGrade.page.find((row:{studentId:string})=>row.studentId===f.ids.student)?.grade).toBe("10");
+    const second=await f.coach.query(directory,{paginationOpts:{numItems:20,cursor:first.continueCursor}});
+    expect(second.page).toHaveLength(3);
+    expect(second.isDone).toBe(true);
+    expect(second.page.at(-1)).toMatchObject({name:"Member 21 Zulu Jr.",lastName:"Zulu",grade:null});
+    const ids=[...first.page,...second.page].map((row:{studentId:string})=>row.studentId);
+    expect(ids).not.toContain(other);
+    const rows=await f.coach.query(rowsByIds,{studentIds:[ids[21],f.ids.student],asOf:100});
+    expect(rows.map((row:{studentId:string})=>row.studentId)).toEqual([ids[21],f.ids.student]);
+    await expect(f.coach.query(rowsByIds,{studentIds:[other],asOf:100})).rejects.toThrow("current season");
+    await expect(f.coach.query(rowsByIds,{studentIds:Array(21).fill(f.ids.student),asOf:100})).rejects.toThrow("At most 20");
+  });
   it("filters connection across pages without restricting Coach access to unconnected students",async()=>{
     const f=await fixture();
     await f.t.run(async ctx=>{
