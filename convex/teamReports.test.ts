@@ -22,6 +22,24 @@ async function fixture(year=2027){
 }
 const args={paginationOpts:{numItems:10,cursor:null},asOf:100};
 describe("bounded role-scoped team reports",()=>{
+  it("reports link connection to Coaches and Travel without revealing fundraiser URLs",async()=>{
+    const f=await fixture();
+    const roster=makeFunctionReference<"query">("app:teamRoster");
+    expect((await f.lead.query(rows,args)).page[0].fundraiserConnected).toBe(false);
+    expect((await f.lead.query(roster,{}))[0].fundraiserConnected).toBe(false);
+    await f.t.run(ctx=>ctx.db.patch(f.ids.student,{fundraiserUrl:"https://www.zeffy.com/en-US/donation-form/private-synthetic-link"}));
+    for(const actor of [f.coach,f.lead]){
+      const report=await actor.query(rows,args);
+      const team=await actor.query(roster,{});
+      expect(report.page[0].fundraiserConnected).toBe(true);
+      expect(team[0].fundraiserConnected).toBe(true);
+      expect(JSON.stringify({report,team})).not.toContain("private-synthetic-link");
+      expect(team[0]).not.toHaveProperty("fundraiserUrl");
+    }
+    await expect(f.mentor.query(roster,{})).rejects.toThrow("Roster access denied");
+    await f.t.run(ctx=>ctx.db.patch(f.ids.student,{fundraiserUrl:undefined}));
+    expect((await f.lead.query(rows,args)).page[0].fundraiserConnected).toBe(false);
+  });
   it("denies ordinary Mentor/Parent, minimizes Travel rows and exposes incomplete coverage",async()=>{
     const f=await fixture(2028);
     await expect(f.mentor.query(rows,args)).rejects.toThrow("Coach or Travel Lead");

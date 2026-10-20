@@ -83,3 +83,33 @@ describe("individual fundraiser links", () => {
     expect(await f.t.run(ctx => ctx.db.get(f.ids.own))).not.toHaveProperty("fundraiserUrl");
   });
 });
+
+describe("fundraiser CSV import", () => {
+  it("previews canonical names then applies connects and clears atomically without financial changes", async () => {
+    const f = await fixture();
+    await f.coach.mutation(api.fundraiserLinks.save, { studentId: f.ids.other, url, expectedRevision: 0 });
+    const rows = [{ studentId: f.ids.own, url, expectedRevision: 0 }, { studentId: f.ids.other, url: "", expectedRevision: 1 }];
+    const preview = await f.coach.query(api.fundraiserLinks.previewImport, { rows });
+    expect(preview).toEqual([{ studentId: f.ids.own, name: "Synthetic Student", before: null, after: url, changed: true }, { studentId: f.ids.other, name: "Synthetic Student", before: url, after: null, changed: true }]);
+    expect(await f.student.query(api.fundraiserLinks.forStudent, { studentId: f.ids.own })).toBeNull();
+    expect(await f.coach.mutation(api.fundraiserLinks.importLinks, { rows })).toEqual({ updated: 2, unchanged: 0 });
+    expect(await f.parent.query(api.fundraiserLinks.forStudent, { studentId: f.ids.own })).toBe(url);
+    expect(await f.t.run(ctx => ctx.db.get(f.ids.other))).not.toHaveProperty("fundraiserUrl");
+    expect(await f.coach.mutation(api.fundraiserLinks.importLinks, { rows: [{ studentId: f.ids.own, url, expectedRevision: 1 }] })).toEqual({ updated: 0, unchanged: 1 });
+    expect(await f.t.run(ctx => ctx.db.query("ledgerEntries").take(1))).toEqual([]);
+  });
+  it("rejects stale, duplicate, unsafe, unavailable and unauthorized batches without partial writes", async () => {
+    const f = await fixture();
+    const first = { studentId: f.ids.own, url, expectedRevision: 0 };
+    for (const second of [{ ...first }, { studentId: f.ids.other, url, expectedRevision: 1 }, { studentId: f.ids.other, url: "https://evil.invalid", expectedRevision: 0 }, { studentId: f.ids.historic, url, expectedRevision: 0 }, { studentId: f.ids.archived, url, expectedRevision: 0 }]) {
+      await expect(f.coach.mutation(api.fundraiserLinks.importLinks, { rows: [first, second] })).rejects.toThrow();
+      expect(await f.student.query(api.fundraiserLinks.forStudent, { studentId: f.ids.own })).toBeNull();
+    }
+    for (const client of [f.t, f.mentor, f.student, f.parent]) {
+      await expect(client.query(api.fundraiserLinks.previewImport, { rows: [first] })).rejects.toThrow();
+      await expect(client.mutation(api.fundraiserLinks.importLinks, { rows: [first] })).rejects.toThrow();
+    }
+    await expect(f.coach.mutation(api.fundraiserLinks.importLinks, { rows: [] })).rejects.toThrow('500');
+    await expect(f.coach.mutation(api.fundraiserLinks.importLinks, { rows: Array.from({ length: 501 }, () => first) })).rejects.toThrow('500');
+  });
+});

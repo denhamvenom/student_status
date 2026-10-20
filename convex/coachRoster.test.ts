@@ -24,6 +24,17 @@ async function fixture() {
 }
 const page={paginationOpts:{numItems:20,cursor:null},asOf:100};
 describe("Coach student roster and record",()=>{
+  it("shows fundraiser presence without exposing its URL in roster rows",async()=>{
+    const f=await fixture();
+    expect((await f.coach.query(rowsByIds,{studentIds:[f.ids.student],asOf:100}))[0].fundraiserConnected).toBe(false);
+    await f.t.run(ctx=>ctx.db.patch(f.ids.student,{fundraiserUrl:"https://www.zeffy.com/en-US/donation-form/synthetic-private"}));
+    const result=await f.coach.query(list,page);
+    expect(result.page[0].fundraiserConnected).toBe(true);
+    expect(result.page[0]).not.toHaveProperty("fundraiserUrl");
+    expect(JSON.stringify(result)).not.toContain("synthetic-private");
+    await f.t.run(ctx=>ctx.db.patch(f.ids.student,{fundraiserUrl:undefined}));
+    expect((await f.coach.query(rowsByIds,{studentIds:[f.ids.student],asOf:100}))[0].fundraiserConnected).toBe(false);
+  });
   it("pages lightweight directory, projects grade precedence and structured surnames, and scopes enriched IDs",async()=>{
     const f=await fixture();
     const other=await f.t.run(async ctx=>{

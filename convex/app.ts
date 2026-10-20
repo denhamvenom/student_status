@@ -138,7 +138,7 @@ export const teamRoster = query({
     if (user.role !== "coach" && !user.travelLead) throw new Error("Roster access denied.");
     const season = await activeSeason(ctx);
     const students = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(500);
-    return students.map(user.role === "coach" ? privateStudent : publicStudent);
+    return students.map(student => ({ ...(user.role === "coach" ? privateStudent(student) : publicStudent(student)), fundraiserConnected: !!student.fundraiserUrl }));
   },
 });
 

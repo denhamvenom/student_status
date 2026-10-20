@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation, usePaginatedQuery, useQuery } from 'convex/react'
+import { useConvex, useMutation, useQuery } from 'convex/react'
 import { CreditCard, Share2 } from 'lucide-react'
 import { api } from '../convex/_generated/api'
 import type { Id } from '../convex/_generated/dataModel'
@@ -8,6 +8,8 @@ import { Input } from './components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
 import { shareFundraiser } from './lib/share-fundraiser'
 import styles from './FundraiserLinks.module.css'
+import { collectFundraiserExport, fundraiserCsv, parseFundraiserCsv, FUNDRAISER_CSV_BYTES, type FundraiserCsvRow } from './lib/fundraiser-csv'
+import { downloadInviteCsv } from './lib/bulk-invite-csv'
 
 export function FamilyFundraiserLink({ studentId }: { studentId: Id<'students'> }) {
   const url = useQuery(api.fundraiserLinks.forStudent, { studentId })
@@ -38,28 +40,65 @@ export function FundraiserActions({ url }: { url: string }) {
   </CardContent></Card>
 }
 
-type LinkRow = typeof api.fundraiserLinks.list._returnType['page'][number]
-function StudentLinkEditor({ row }: { row: LinkRow }) {
-  const save = useMutation(api.fundraiserLinks.save)
-  const [url, setUrl] = useState(row.url ?? '')
+
+type PreviewRow = typeof api.fundraiserLinks.previewImport._returnType[number]
+export function FundraiserLinkSettings() {
+  const convex = useConvex()
+  const apply = useMutation(api.fundraiserLinks.importLinks)
+  const [rows, setRows] = useState<FundraiserCsvRow[]>([])
+  const [preview, setPreview] = useState<PreviewRow[] | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  return <form className={styles.editor} onSubmit={event => {
-    event.preventDefault(); if (busy) return; setBusy(true); setError('')
-    void save({ studentId: row.studentId, url: url.trim(), expectedRevision: row.revision }).catch(cause => setError(cause instanceof Error ? cause.message : 'Could not save the fundraiser link.')).finally(() => setBusy(false))
-  }}>
-    <label className={styles.linkLabel}>{row.name}<Input aria-label={`${row.name} fundraiser link`} type="url" maxLength={2048} value={url} onChange={event => setUrl(event.target.value)} placeholder="https://www.zeffy.com/…" disabled={busy} /></label>
-    <Button type="submit" variant="outline" disabled={busy || url.trim() === (row.url ?? '')}>{busy ? 'Saving…' : 'Save link'}</Button>
-    {error && <p className={styles.error} role="alert">{error}</p>}
-  </form>
-}
-
-export function FundraiserLinkSettings() {
-  const links = usePaginatedQuery(api.fundraiserLinks.list, {}, { initialNumItems: 25 })
+  const [message, setMessage] = useState('')
+  const args = (items: FundraiserCsvRow[]) => ({ rows: items.map(row => ({ studentId: row.studentId as Id<'students'>, url: row.url ?? '', expectedRevision: row.revision })) })
+  async function exportCsv() {
+    setBusy(true); setError(''); setMessage(''); setPreview(null); setRows([])
+    try {
+      const exported = await collectFundraiserExport(cursor => convex.query(api.fundraiserLinks.list, { paginationOpts: { cursor, numItems: 100 } }))
+      if (!exported.length) throw new Error('No active students in this season.')
+      downloadInviteCsv('student-fundraiser-links.csv', fundraiserCsv(exported))
+      setMessage(`Exported ${exported.length} students. Edit Fundraiser Link, then upload the CSV to review.`)
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not export links.') }
+    finally { setBusy(false) }
+  }
+  async function review(file: File) {
+    setBusy(true); setError(''); setMessage(''); setPreview(null); setRows([])
+    try {
+      if (file.size > FUNDRAISER_CSV_BYTES) throw new Error('Use a CSV under 2 MB.')
+      const parsed = parseFundraiserCsv(await file.text())
+      const checked = await convex.query(api.fundraiserLinks.previewImport, args(parsed))
+      setRows(parsed); setPreview(checked)
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not review this CSV.') }
+    finally { setBusy(false) }
+  }
+  async function saveImport() {
+    setBusy(true); setError(''); setMessage('')
+    try {
+      const result = await apply(args(rows))
+      setMessage(`Import complete: ${result.updated} updated; ${result.unchanged} unchanged. Download a fresh CSV before your next edit.`)
+      setPreview(null); setRows([])
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not import links. No links were changed.')
+      setPreview(null); setRows([])
+    } finally { setBusy(false) }
+  }
+  const changed = preview?.filter(row => row.changed) ?? []
+  const cleared = changed.filter(row => !row.after).length
   return <Card><CardHeader><CardTitle>Student fundraiser links</CardTitle></CardHeader><CardContent className={styles.content}>
-    <p className={styles.note}>Add each student’s Zeffy fundraiser link. Their linked parents use the same link. Clear a link and save to hide Pay Now and Share.</p>
-    {links.results.map(row => <StudentLinkEditor key={`${row.studentId}:${row.revision}`} row={row} />)}
-    {links.status === 'LoadingFirstPage' ? <p role="status">Loading students…</p> : !links.results.length && <p>No active students in this season.</p>}
-    {links.status !== 'Exhausted' && <Button type="button" variant="outline" disabled={links.status !== 'CanLoadMore'} onClick={() => links.loadMore(25)}>Load more students</Button>}
+    <p className={styles.note}>Download the current student CSV, edit only Fundraiser Link, then upload it to review. Use HTTPS Zeffy links. Each student’s linked parents use the same link.</p>
+    <p className={styles.note}>A blank Fundraiser Link removes an existing link and hides Pay Now and Share. Keep Student ID and Link Revision unchanged. Import up to 500 students at a time; remove other rows from larger exports. Students omitted from a file stay unchanged.</p>
+    <div className={styles.actions}><Button type="button" variant="outline" disabled={busy} onClick={() => void exportCsv()}>Download current CSV</Button></div>
+    <label>Upload fundraiser CSV<Input type="file" accept=".csv,text/csv" disabled={busy} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void review(file) }} /></label>
+    {busy && <p role="status">Working…</p>}
+    {error && <p className={styles.error} role="alert">{error}</p>}
+    {message && <p role="status">{message}</p>}
+    {preview && <section aria-label="Review fundraiser import" className={styles.content}>
+      <h3>Review fundraiser import</h3>
+      <p>{changed.length - cleared} links to connect or update; {cleared} links to remove; {preview.length - changed.length} unchanged.</p>
+      <p className={styles.note}>Names below come from the current student records. Confirm each link belongs to the named student.</p>
+      <div style={{ maxHeight: 320, overflow: 'auto' }}><table><thead><tr><th>Student</th><th>Current link</th><th>New link</th></tr></thead><tbody>{changed.map(row => <tr key={row.studentId}><td>{row.name}</td><td style={{ overflowWrap: 'anywhere' }}>{row.before ?? 'Disconnected'}</td><td style={{ overflowWrap: 'anywhere' }}>{row.after ?? 'Remove link'}</td></tr>)}</tbody></table></div>
+      {!changed.length && <p>No link changes to apply.</p>}
+      <div className={styles.actions}><Button type="button" disabled={busy || !changed.length} onClick={() => void saveImport()}>Apply {changed.length} changes</Button><Button type="button" variant="outline" disabled={busy} onClick={() => { setPreview(null); setRows([]) }}>Cancel import</Button></div>
+    </section>}
   </CardContent></Card>
 }
