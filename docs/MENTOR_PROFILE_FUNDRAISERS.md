@@ -27,3 +27,5 @@ These buttons do not process payments, confirm a payment, or change charges/ledg
 Screenshots and browser fixtures remain ignored local artifacts. Previously recorded unrelated 501-charge fee-test timeout remains a separate follow-up; the full suite was not repeated for this feature.
 
 Final integrated checks: lint, frontend/backend typechecks and application build passed. The build retains the existing large-bundle advisory.
+
+Visual correction: the global anchor color overrode the Pay Now foreground in dark mode. The fundraiser action now explicitly uses the shared text-on-gold token. Browser checks confirmed #222 text/icon on #fdd023 in both themes; dark screenshot inspected.
