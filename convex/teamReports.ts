@@ -14,7 +14,7 @@ const attendanceCounts = v.object({offTuesday:v.number(),offThursday:v.number(),
 const attendanceGate = v.object({state:v.union(v.literal("ready"),v.literal("updating"),v.literal("failed"),v.literal("unknownKickoff")),kickoff:v.union(v.null(),v.object({date:v.string(),at:v.number()})),updatedAt:nullableNumber});
 const financeValidator = v.object({state:v.union(v.literal("ready"),v.literal("updating"),v.literal("failed"),v.literal("uninitialized")),chargedCents:nullableNumber,paidCents:nullableNumber,dueCents:nullableNumber,raisedCents:nullableNumber,travelAccountCents:nullableNumber,updatedAt:nullableNumber});
 const selectedValidator = v.union(v.null(),v.object({participation:v.union(v.literal("confirmed"),v.literal("pending"),v.literal("waitlist"),v.literal("withdrawn"),v.null()),state:v.union(v.literal("ready"),v.literal("open"),v.literal("notApplicable"),v.literal("unknown")),outstanding:v.array(v.string())}));
-const rowValidator = v.object({studentId:v.id("students"),name:v.string(),subteam:v.string(),travelTeam:v.boolean(),finance:financeValidator,attendance:v.union(v.null(),attendanceCounts),eventsCount:nullableNumber,selectedEvent:selectedValidator});
+const rowValidator = v.object({studentId:v.id("students"),name:v.string(),subteam:v.string(),travelTeam:v.boolean(),fundraiserConnected:v.boolean(),finance:financeValidator,attendance:v.union(v.null(),attendanceCounts),eventsCount:nullableNumber,selectedEvent:selectedValidator});
 
 async function requireViewer(ctx: QueryCtx) {
   const actor = await viewer(ctx);
@@ -48,7 +48,7 @@ async function reportRow(ctx: QueryCtx, student: Doc<"students">, attendance: Aw
     const awaitingConfirmation = selectedEvent.participation === "pending" || selectedEvent.participation === "waitlist";
     selected = {participation:selectedEvent.participation,state:uncertain?"unknown" as const:awaitingConfirmation?"open" as const:selectedEvent.state,outstanding:awaitingConfirmation && !uncertain?["Participation is not confirmed"]:selectedEvent.open};
   }
-  return {studentId:student._id,name:student.legalName||student.preferredName,subteam:student.subteam,travelTeam:student.travelTeam,finance,attendance:counts,eventsCount,selectedEvent:selected};
+  return {studentId:student._id,name:student.legalName||student.preferredName,subteam:student.subteam,travelTeam:student.travelTeam,fundraiserConnected:!!student.fundraiserUrl,finance,attendance:counts,eventsCount,selectedEvent:selected};
 }
 
 const eventChoice = v.object({eventId:v.id("events"),name:v.string(),startsAt:v.number(),type:v.union(v.literal("Competition"),v.literal("Outreach"),v.literal("Team"))});

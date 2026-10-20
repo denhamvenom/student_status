@@ -1,5 +1,22 @@
 # Student Status Development Checklist
 
+## October 20 - Approved Mentor landing and fundraiser production release
+
+Owner accepted the localhost changes and authorized production publication. Reviewed source f075087 deployed to production amicable-eel-413 with backend typecheck/schema validation and no deleted indexes. Includes Mentor Profile landing, fundraiser CSV workflow, family Pay/Share, and Coach/Travel connection status. Documentation publishes with source. See RELEASE_2026-10-20_FUNDRAISERS.md for evidence and release boundaries. Earlier development-only statements for these features are superseded.
+
+
+## October 20 - Fundraiser CSV and roster status (development)
+
+Replaced the long Money tools link list with Download current CSV and Upload fundraiser CSV. Export includes names, stable IDs, revisions and existing links. Review shows canonical names and connection/update/removal counts; Coach applies one atomic batch of up to 500 rows. Blank links remove; omitted students remain unchanged. Stale, duplicate, unauthorized or invalid rows reject the batch. Coach/Travel rosters and team reports (including CSV) show Fundraiser Link as Connected/Disconnected, without exposing URLs in Travel projections.
+
+25 focused tests passed; independent source review found no blockers. Synthetic browser workflow passed export, removal review, apply, malformed-file rejection and desktop/light plus phone/dark layout checks. Phone screenshot inspected. No real student links, payments or invitations changed. See MENTOR_PROFILE_FUNDRAISERS.md. Production unchanged.
+
+## October 20 - Mentor Profile and individual fundraiser links (development)
+
+Implemented Mentor Profile as the landing page, retaining Report and Settings. Coaches manage individual student Zeffy links in Money tools. Students and linked parents see Pay Now with a payment-card icon and Share on the selected student's Money page; both hide when no link exists. Desktop copies the URL; phones use native sharing when available, with copy/manual fallback.
+
+11 focused tests passed. Independent source review found no blockers. Synthetic actual-component checks passed for Mentor landing/report navigation, Coach update/clear, family copy/no-link hiding, and desktop/light plus phone/dark layouts. Representative screenshots inspected; no horizontal overflow. Native phone share was tested through mocks, not a physical device. No real payment or fundraiser was created. Development backend third-bandicoot-18 synchronized; production is unchanged. See [feature details](MENTOR_PROFILE_FUNDRAISERS.md).
+
 ## October 20 - Staff setup production release
 
 Owner accepted the localhost wizard and authorized release. Source280bc81 deployed successfully to production amicable-eel-413 with backend typecheck/schema validation and no deleted indexes. All personal items can be skipped; optional driving/trailer uses shared contact phone and existing approval rules. Temporary/permanent skip and later Profile editing remain available. Source and documentation publish together. See RELEASE_2026-10-20_STAFF_SETUP.md and release notes for exact merge/build evidence; older development-only statements below are superseded.

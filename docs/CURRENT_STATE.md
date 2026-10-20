@@ -1,11 +1,11 @@
 # Current integration handoff
 
-## Staff setup production release
+## Mentor landing and fundraiser production release
 
-Owner accepted and authorized release of reviewed source280bc81. Production Convex amicable-eel-413 deployment succeeded with typecheck/schema validation; no indexes deleted. Website merge/build evidence is recorded on the release PR and GitHub release. See RELEASE_2026-10-20_STAFF_SETUP.md and STAFF_SETUP_WIZARD.md.
+Owner accepted and authorized release of f075087. Production Convex amicable-eel-413 deployment succeeded with schema/type validation and no indexes deleted. Website merge/build evidence goes in the release PR and release notes. See RELEASE_2026-10-20_FUNDRAISERS.md and MENTOR_PROFILE_FUNDRAISERS.md.
 
-The four-step staff wizard offers optional basics and driving/trailer details, skips individual fields without erasing saved values, supports temporary/permanent dismissal, uses shared contact phone and omits account email. Existing driver approval safeguards remain. Coach Profile supports later edits.
+Mentors land on Profile. Coach fundraiser CSV replaces the long editor; Coach/Travel rosters and reports show connection status. Family Pay/Share appears only with a saved individual link. No real links were assigned or payment records changed.
 
-17 focused backend tests, independent review, synthetic desktop/phone checks, lint/types/build passed. Earlier full suite561/562: unrelated501-charge fee test exceeded30seconds; leave that recorded follow-up separate. No real profile edits, migrations, invitations, emails or environment changes during release checks.
+25 focused CSV/status tests, prior 11 landing/share tests, independent reviews, lint/types/build and synthetic browser checks passed. Real phone sharing and Zeffy checkout remain untested. Unrelated 501-charge fee-test timeout remains separate.
 
-Root owns release integration in student-status-bulk-invite, feature/parent-email-invitations. Other chat holds shared sync/merges until completion handoff. Development email remains disabled; Calendar writes stay production-only.
+Root owns release integration on feature/parent-email-invitations. Other chat holds sync/merges until release handoff. Development email disabled; Calendar writes remain production-only.

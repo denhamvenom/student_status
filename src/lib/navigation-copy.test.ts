@@ -19,4 +19,12 @@ describe('staff navigation', () => {
     expect(menu.parent).toContainEqual(['Student profile', '/profile'])
     expect(menu.coach).toContainEqual(['Archived records', '/retention'])
   })
+
+  it('opens the Mentor profile first and keeps its report separate from operational staff', () => {
+    expect(menu.mentor).toEqual([['Profile', '/'], ['Report', '/report'], ['Settings', '/settings']])
+    expect(menu.coach[0]).toEqual(['Team', '/'])
+    expect(menu.travelLead[0]).toEqual(['Team', '/'])
+    expect(menu.coach.some(([, path]) => path === '/report')).toBe(false)
+    expect(menu.travelLead.some(([, path]) => path === '/report')).toBe(false)
+  })
 })
