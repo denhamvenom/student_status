@@ -13,7 +13,7 @@ import { NativeSelect, NativeSelectOption } from './components/ui/native-select'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './components/ui/dialog'
 import { accountCopy } from './lib/account-copy'
 import styles from './Adults.module.css'
-import { adultInvitationLink, adultInvitationLandingUrl, readAdultInvitationToken, prepareAdultInvitationOAuth, clearAdultInvitationOAuth } from './lib/adult-invitation-token'
+import { adultInvitationLandingUrl, readAdultInvitationToken, prepareAdultInvitationOAuth, clearAdultInvitationOAuth } from './lib/adult-invitation-token'
 
 const copy = accountCopy.adults
 const message = (error: unknown) => error instanceof Error ? error.message : copy.failed
@@ -66,26 +66,39 @@ function InviteAdult() {
   const [health, setHealth] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [share, setShare] = useState<{link: string; expiresAt: number} | null>(null)
-  const [copied, setCopied] = useState(false)
+  const [queued, setQueued] = useState('')
   const submit = async (event: FormEvent) => {
     event.preventDefault(); if (busy) return
-    setBusy(true); setError(''); setShare(null); setCopied(false)
-    try {const result = await create({email: email.trim(), role: choice === 'coach' ? 'coach' : 'mentor', travelLead: choice === 'lead', financialEdit: choice === 'lead' && finance, healthExport: choice === 'lead' && health}); setShare({link: adultInvitationLink(window.location.origin, result.token), expiresAt: result.expiresAt}); setEmail('')} catch (error) {setError(message(error))} finally {setBusy(false)}
+    setBusy(true); setError(''); setQueued('')
+    const recipient = email.trim()
+    try {
+      await create({email: recipient, role: choice === 'coach' ? 'coach' : 'mentor', travelLead: choice === 'lead', financialEdit: choice === 'lead' && finance, healthExport: choice === 'lead' && health})
+      setQueued(recipient); setEmail('')
+    } catch (error) {setError(message(error))} finally {setBusy(false)}
   }
-  const copyLink = async () => {try {await navigator.clipboard.writeText(share!.link); setCopied(true)} catch {setError(copy.copyFailed)}}
-  return <Card className={styles.surface}><CardHeader><CardTitle>{copy.invite}</CardTitle><CardDescription>{copy.sevenDays}</CardDescription></CardHeader><CardContent><form className={styles.form} onSubmit={event => void submit(event)}><label>{copy.email}<Input type="email" autoComplete="email" required maxLength={254} value={email} disabled={busy} onChange={event => setEmail(event.target.value)}/></label><AccessFields {...{choice, setChoice, finance, setFinance, health, setHealth, busy}}/><Button type="submit" disabled={busy}>{busy ? copy.creating : copy.createLink}</Button></form><p className="muted tiny">{copy.noEmail}</p>{share && <section className={styles.share}><h3>{copy.invitationLink}</h3><p role="status">{copy.created}</p><p className="muted tiny">{copy.expires} {when(share.expiresAt)}</p><div className={styles.shareControls}><Input aria-label={copy.invitationLink} value={share.link} readOnly onFocus={event => event.currentTarget.select()}/><Button onClick={() => void copyLink()}>{copy.copy}</Button></div>{copied && <p role="status">{copy.copied}</p>}</section>}{error && <p role="alert" className="open-text">{error}</p>}</CardContent></Card>
+  return <Card className={styles.surface}><CardHeader><CardTitle>{copy.invite}</CardTitle><CardDescription>{copy.sevenDays}</CardDescription></CardHeader><CardContent><form className={styles.form} onSubmit={event => void submit(event)}><label>{copy.email}<Input type="email" autoComplete="email" required maxLength={254} value={email} disabled={busy} onChange={event => setEmail(event.target.value)}/></label><AccessFields {...{choice, setChoice, finance, setFinance, health, setHealth, busy}}/><Button type="submit" disabled={busy}>{busy ? copy.sending : copy.sendInvitation}</Button></form><p className="muted tiny">{copy.emailInstructions}</p>{queued && <p role="status">{copy.queuedFor(queued)}</p>}{error && <p role="alert" className="open-text">{error}</p>}</CardContent></Card>
 }
 
 function InvitationList() {
   const {results, status, loadMore} = usePaginatedQuery(api.accounts.invitations, {}, {initialNumItems: 20})
   const revoke = useMutation(api.accounts.revokeInvitation)
+  const resend = useMutation(api.accounts.resendInvitation)
   const [busy, setBusy] = useState<Id<'adultInvitations'> | null>(null)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState('')
-  const remove = async (invitationId: Id<'adultInvitations'>) => {setBusy(invitationId); setError(''); setSaved(''); try {await revoke({invitationId}); setSaved(copy.revoked)} catch (error) {setError(message(error))} finally {setBusy(null)}}
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {const timer = window.setInterval(() => setNow(Date.now()), 30_000); return () => window.clearInterval(timer)}, [])
+  const act = async (invitationId: Id<'adultInvitations'>, action: 'revoke' | 'resend') => {
+    if (busy) return
+    setBusy(invitationId); setError(''); setSaved('')
+    try {if (action === 'revoke') {await revoke({invitationId}); setSaved(copy.revoked)} else {await resend({invitationId}); setSaved(copy.resendQueued)}} catch (error) {setError(message(error))} finally {setBusy(null)}
+  }
   const labels = {pending: copy.pendingStatus, accepted: copy.acceptedStatus, revoked: copy.revokedStatus, replaced: copy.replacedStatus}
-  return <Card className={styles.surface}><CardHeader><CardTitle>{copy.pending}</CardTitle></CardHeader><CardContent>{status === 'LoadingFirstPage' ? <p role="status">{copy.loadingInvitations}</p> : results.length === 0 ? <p className="muted">{copy.noInvitations}</p> : <div className={styles.invites}>{results.map(row => <div key={row.invitationId}><div><strong>{row.email}</strong><p>{roleLabel(row)}{row.financialEdit && ` · ${copy.finance}`}{row.healthExport && ` · ${copy.health}`}</p><p className="muted tiny">{row.status === 'pending' && row.expiresAt <= Date.now() ? copy.expiredStatus : labels[row.status]}{row.status === 'pending' && row.expiresAt > Date.now() && <> · {copy.expires} {when(row.expiresAt)}</>}</p></div>{row.status === 'pending' && <Button variant="outline" disabled={busy !== null} onClick={() => void remove(row.invitationId)}>{copy.revoke}</Button>}</div>)}</div>}{status !== 'Exhausted' && status !== 'LoadingFirstPage' && <Button variant="outline" disabled={status === 'LoadingMore'} onClick={() => loadMore(20)}>{status === 'LoadingMore' ? copy.loadingMore : copy.loadMore}</Button>}{error && <p role="alert" className="open-text">{error}</p>}{saved && <p role="status" className="ready-text">{saved}</p>}</CardContent></Card>
+  const emailLabels = {not_sent: copy.emailNotSent, queued: copy.emailQueued, sent: copy.emailSent, failed: copy.emailFailed}
+  return <Card className={styles.surface}><CardHeader><CardTitle>{copy.pending}</CardTitle></CardHeader><CardContent>{status === 'LoadingFirstPage' ? <p role="status">{copy.loadingInvitations}</p> : results.length === 0 ? <p className="muted">{copy.noInvitations}</p> : <div className={styles.invites}>{results.map(row => {
+    const active = row.status === 'pending' && row.expiresAt > now
+    return <div key={row.invitationId}><div><strong>{row.email}</strong><p>{roleLabel(row)}{row.financialEdit && ` · ${copy.finance}`}{row.healthExport && ` · ${copy.health}`}</p><p className="muted tiny">{row.status === 'pending' && !active ? copy.expiredStatus : labels[row.status]}{active && <> · {copy.expires} {when(row.expiresAt)}</>}</p>{active && <><p role="status">{emailLabels[row.emailStatus]}</p>{row.emailError && <p className="open-text">{row.emailError}</p>}{row.resendAvailableAt > now && <p className="muted tiny">{copy.resendAfter} {when(row.resendAvailableAt)}</p>}</>}</div>{row.status === 'pending' && <div className={styles.actions}>{active && <Button variant="outline" disabled={busy !== null || row.emailStatus === 'queued' || row.resendAvailableAt > now} onClick={() => void act(row.invitationId, 'resend')}>{copy.resend}</Button>}<Button variant="outline" disabled={busy !== null} onClick={() => void act(row.invitationId, 'revoke')}>{copy.revoke}</Button></div>}</div>
+  })}</div>}{status !== 'Exhausted' && status !== 'LoadingFirstPage' && <Button variant="outline" disabled={status === 'LoadingMore'} onClick={() => loadMore(20)}>{status === 'LoadingMore' ? copy.loadingMore : copy.loadMore}</Button>}{error && <p role="alert" className="open-text">{error}</p>}{saved && <p role="status" className="ready-text">{saved}</p>}</CardContent></Card>
 }
 
 export default function Adults() {return <div className={styles.page}><div className="page-head"><div><h1>{copy.title}</h1><p className="muted lead">{copy.description}</p></div></div><AccountsBoundary><AdultList/><div className={styles.columns}><InviteAdult/><InvitationList/></div></AccountsBoundary></div>}

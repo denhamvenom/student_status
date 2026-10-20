@@ -1,5 +1,21 @@
 # Current integration handoff
 
+## October 20 - Mentor/Staff invitation email production release
+
+Owner authorized production publication, including documentation. Reviewed source78dd107 deployed successfully to production Convex amicable-eel-413 with backend typecheck/schema validation and the additive adultInvitations email/date index; no indexes deleted. No migrations, record edits, environment changes, real test invitations or emails were performed. Production email sender/reply/origin and enabled setting were verified; development sending stays disabled.
+
+Coach invitations now queue private email links with delivery statuses and guarded one-hour resend. Google or email-code sign-in and explicit invitation acceptance remain. Old invitations are not automatically emailed. Parent workflows and student Google login are preserved.
+
+Evidence:535 tests/101 files, focused31 account/mail checks, lint/types/build and independent review passed on the unchanged implementation. Synthetic actual-component desktop/light and phone/dark checks passed. Source, workflow, plan, checklist and verification documentation are included in the release PR. Exact main revision and both automatic Cloudflare build outcomes are recorded on the release PR and immutable release notes after publication. Real-inbox delivery/acceptance remains unverified.
+
+
+## October 19 - Mentor/Staff invitation email (development)
+
+Implemented Send invitation with private emailed links, accurate delivery status and guarded resend; removed public copy-link return/UI. Existing invitation acceptance remains explicit. Development third-bandicoot-18 synced with optional fields/additive index; sending remains disabled, no real messages or production writes. Independent review clear; 535 tests in101 files passed and focused31 account/mail tests passed. See [workflow and verification](ADULT_INVITATION_EMAIL.md). Real-inbox delivery and production promotion remain unverified/unreleased.
+
+The entries below describe earlier releases and remain historical for this development feature.
+
+
 ## Sign-in production release - October 19
 
 Checkout: student-status-readiness-design; branch feature/development-review-fixtures-2026-10-18. Production baseline is main 5fa254c (PR22). Owner authorized production promotion with no record changes. Source 1c8dae9 deployed to production amicable-eel-413 with schema validation and the additive adult identity index; no indexes removed, migrations, record edits, imports or environment changes performed. The parent-invitation chat confirmed shared backend ownership and held synchronization.

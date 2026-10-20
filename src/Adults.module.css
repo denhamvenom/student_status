@@ -19,13 +19,11 @@
 .invites > div { display: flex; gap: 12px; justify-content: space-between; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid var(--border-default); }
 .invites > div > div { min-width: 0; }
 .invites p { margin: 5px 0 0; }
-.invites > div > button { flex-shrink: 0; }
-.share { margin-top: 20px; padding: 16px; border: 1px solid var(--border-default); border-top: 3px solid var(--gold-500); border-radius: 8px; background: var(--surface-metal); }
-.share h3 { margin: 0 0 12px; }
-.shareControls { display: flex; flex-wrap: wrap; gap: 8px; }
-.shareControls input { min-width: 0; flex: 1 1 220px; font-family: ui-monospace, monospace; }
+.invites .actions { flex-shrink: 0; max-width: 160px; }
 @media (max-width: 767px) {
   .columns { grid-template-columns: 1fr; }
+  .invites > div { flex-direction: column; }
+  .invites .actions { max-width: none; justify-content: flex-start; }
   .table { overflow: visible; }
   .table table, .table tbody, .table tr, .table td { display: block; width: 100%; }
   .table thead { display: none; }

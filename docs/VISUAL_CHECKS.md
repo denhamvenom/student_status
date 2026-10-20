@@ -565,3 +565,6 @@ October 19 approval revision: isolated actual-component Coach queue reviewed at 
 | Scope | Evidence | Remaining |
 |---|---|---|
 | Student / Parent or team staff sign-in | Actual components, mocked hooks: desktop light and narrow dark inspected; dark measured487px with no overflow; choices/Back/error/code focus/resend checked. | Coach acceptance; exact390/1440 opposite-theme comparison and real-inbox/OAuth integration unverified. Dev email disabled. |
+
+## STAFF-MAIL-2026-10-19
+Actual components with mocked hooks checked desktop light/phone dark; phone390px/375px document, no horizontal overflow. Send success/failure, delivery states, disabled cooldown and resend error visible. Live local Coach page shows Send invitation and no copy link. Remaining: real-inbox round trip, owner acceptance and production release. See ADULT_INVITATION_EMAIL.md.

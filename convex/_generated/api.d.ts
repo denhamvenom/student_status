@@ -10,6 +10,7 @@
 
 import type * as accounts from "../accounts.js";
 import type * as admin from "../admin.js";
+import type * as adultInviteEmail from "../adultInviteEmail.js";
 import type * as adultProfile from "../adultProfile.js";
 import type * as app from "../app.js";
 import type * as attendanceOperations from "../attendanceOperations.js";
@@ -135,6 +136,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   accounts: typeof accounts;
   admin: typeof admin;
+  adultInviteEmail: typeof adultInviteEmail;
   adultProfile: typeof adultProfile;
   app: typeof app;
   attendanceOperations: typeof attendanceOperations;
