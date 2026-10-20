@@ -1,5 +1,11 @@
 # Student Status implementation plan
 
+## October 20 - Staff setup with optional permanent skip (development)
+
+Implemented a three-step basic-profile wizard for Coaches, Mentors and Travel Leads, including existing accounts with missing information. Full name, phone, shirt size and emergency contact prefill from saved data. Skip for now bypasses the current session; Don’t ask me again stores a permanent per-account preference across logins/seasons. Both can still edit Profile later, and Coaches now have a Profile entry. Student/parent setup remains unchanged. No driver approval or role grants occur during setup.
+
+Focused backend tests, independent review and synthetic actual-component desktop/light and phone/dark browser checks passed. See [staff setup verification and release boundary](STAFF_SETUP_WIZARD.md) for final integrated checks. Development only; Coach acceptance and any production release remain pending.
+
 ## October 20 - Approved grade and roster production release
 
 Coach reviewed and accepted the development roster and authorized production publication of both grade dropdowns and roster sorting, including documentation. Reviewed source 4f414df was successfully deployed to production Convex amicable-eel-413 with backend typecheck and schema validation; no indexes deleted. No bulk migration, record rewrite, email or environment changes were performed.

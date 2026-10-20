@@ -23,13 +23,99 @@ async function fixture() {
   return { t, ids, coach: as(ids.coachAuth), mentor: as(ids.mentorAuth), lead: as(ids.leadAuth), parent: as(ids.parentAuth) };
 }
 const fields = { expectedProfileRevision: 0, expectedDriverFingerprint: null, name: "Mentor Updated", phone: "555-0100", shirtSize: "L" as const, emergencyName: "Contact", emergencyRelationship: "Family", emergencyPhone: "555-0111", canDrive: false, vehicleName: "", passengerSeats: null, towCapable: false };
+const basicFields = { expectedProfileRevision: 0, name: " Staff Updated ", phone: " +1 555-0100 ", shirtSize: "L" as const, emergencyName: " Contact ", emergencyRelationship: " Family ", emergencyPhone: " 555-0111 ext 5 " };
+
+describe("staff basic setup", () => {
+  it("recognizes complete legacy profiles and missing, whitespace or invalid-size profiles without writes", async () => {
+    const f = await fixture();
+    expect(await f.coach.query(api.adultProfile.ownBasics, {})).toMatchObject({ needsSetup: true, dismissed: false, role: "coach", profileRevision: 0 });
+    expect(await f.lead.query(api.adultProfile.ownBasics, {})).toMatchObject({ needsSetup: true, role: "mentor" });
+    await f.t.run(ctx => ctx.db.patch(f.ids.mentor, { name: "Existing Mentor", phone: "555-0100", shirtSize: "M", emergencyName: "Contact", emergencyRelationship: "Family", emergencyPhone: "555-0111" }));
+    expect(await f.mentor.query(api.adultProfile.ownBasics, {})).toMatchObject({ needsSetup: false, dismissed: false, profileRevision: 0 });
+    await f.t.run(ctx => ctx.db.patch(f.ids.mentor, { emergencyPhone: "   " }));
+    expect((await f.mentor.query(api.adultProfile.ownBasics, {})).needsSetup).toBe(true);
+    await f.t.run(ctx => ctx.db.patch(f.ids.mentor, { emergencyPhone: "555-0111", shirtSize: "unknown" }));
+    expect((await f.mentor.query(api.adultProfile.ownBasics, {})).needsSetup).toBe(true);
+    expect(await f.t.run(ctx => ctx.db.get(f.ids.mentor))).not.toHaveProperty("profileRevision");
+  });
+
+  it("saves trimmed staff basics without changing drivers, email or privileges and fences stale updates", async () => {
+    const f = await fixture();
+    const driverId = await f.t.run(ctx => ctx.db.insert("drivers", { seasonId: f.ids.season, ownerAppUserId: f.ids.lead, name: "Approved Driver", email: "lead@example.invalid", phone: "555-0000", seats: 4, approved: true, active: true }));
+    const driverBefore = await f.t.run(ctx => ctx.db.get(driverId));
+    expect(await f.lead.mutation(api.adultProfile.saveBasics, basicFields)).toEqual({ profileRevision: 1 });
+    expect(await f.lead.query(api.adultProfile.ownBasics, {})).toMatchObject({ name: "Staff Updated", phone: "+1 555-0100", emergencyName: "Contact", emergencyRelationship: "Family", emergencyPhone: "555-0111 ext 5", needsSetup: false });
+    expect(await f.t.run(ctx => ctx.db.get(driverId))).toEqual(driverBefore);
+    expect(await f.t.run(ctx => ctx.db.get(f.ids.lead))).toMatchObject({ role: "mentor", travelLead: true, financialEdit: false, email: "lead@example.invalid", active: true });
+    await expect(f.lead.mutation(api.adultProfile.saveBasics, basicFields)).rejects.toThrow("Profile changed");
+    await f.coach.mutation(api.adultProfile.saveBasics, basicFields);
+    expect(await f.coach.query(api.adultProfile.ownBasics, {})).toMatchObject({ needsSetup: false, role: "coach" });
+    expect(await f.t.run(ctx => ctx.db.get(f.ids.mentor))).toMatchObject({ name: "Mentor" });
+    expect(await f.t.run(ctx => ctx.db.query("drivers").take(10))).toEqual([driverBefore]);
+  });
+
+  it("rejects unauthenticated, student, parent and inactive accounts for reads, saves and dismissal", async () => {
+    const f = await fixture();
+    const studentAuth = await f.t.run(async ctx => {
+      const authUserId = await ctx.db.insert("users", { email: "student@example.invalid" });
+      await ctx.db.insert("appUsers", { authUserId, email: "student@example.invalid", name: "Student", role: "student", active: true, travelLead: false, financialEdit: false });
+      return authUserId;
+    });
+    const student = f.t.withIdentity({ subject: `${studentAuth}|session` });
+    await f.t.run(ctx => ctx.db.patch(f.ids.mentor, { active: false }));
+    for (const client of [f.t, f.parent, student, f.mentor]) {
+      await expect(client.query(api.adultProfile.ownBasics, {})).rejects.toThrow();
+      await expect(client.mutation(api.adultProfile.saveBasics, basicFields)).rejects.toThrow();
+      await expect(client.mutation(api.adultProfile.dismissSetup, { expectedProfileRevision: 0 })).rejects.toThrow();
+      await expect(client.query(api.adultProfile.own, {})).rejects.toThrow();
+      await expect(client.mutation(api.adultProfile.saveOwn, fields)).rejects.toThrow();
+    }
+  });
+
+  it("requires every basic field, valid size and bounded values without partial saves", async () => {
+    const f = await fixture();
+    for (const field of ["name", "phone", "emergencyName", "emergencyRelationship", "emergencyPhone"]) {
+      await expect(f.mentor.mutation(api.adultProfile.saveBasics, { ...basicFields, [field]: "   " })).rejects.toThrow("provided");
+      await expect(f.mentor.mutation(api.adultProfile.saveBasics, { ...basicFields, [field]: "x".repeat(101) })).rejects.toThrow("characters");
+    }
+    await expect(f.mentor.mutation(api.adultProfile.saveBasics, { ...basicFields, shirtSize: "invalid" as "L" })).rejects.toThrow();
+    await expect(f.mentor.mutation(api.adultProfile.saveBasics, { ...basicFields, expectedProfileRevision: 0.5 })).rejects.toThrow("Profile changed");
+    expect(await f.t.run(ctx => ctx.db.get(f.ids.mentor))).not.toHaveProperty("profileRevision");
+  });
+
+  it("persists a self-only dismissal across sessions and seasons, preserves it after saves and rejects stale dismissal", async () => {
+    const f = await fixture();
+    expect(await f.mentor.mutation(api.adultProfile.dismissSetup, { expectedProfileRevision: 0 })).toEqual({ profileRevision: 1 });
+    const dismissed = await f.t.run(ctx => ctx.db.get(f.ids.mentor));
+    expect(dismissed?.staffSetupDismissedAt).toBeTypeOf("number");
+    expect(dismissed).toMatchObject({ role: "mentor", active: true, travelLead: false, financialEdit: false, email: "mentor@example.invalid" });
+    expect(dismissed).not.toHaveProperty("phone");
+    await f.t.run(ctx => ctx.db.patch(f.ids.season, { status: "archived" }));
+    const newSession = f.t.withIdentity({ subject: `${f.ids.mentorAuth}|new-session` });
+    expect(await newSession.query(api.adultProfile.ownBasics, {})).toMatchObject({ needsSetup: false, dismissed: true, profileRevision: 1 });
+    await expect(newSession.mutation(api.adultProfile.dismissSetup, { expectedProfileRevision: 0 })).rejects.toThrow("Profile changed");
+    await newSession.mutation(api.adultProfile.saveBasics, { ...basicFields, expectedProfileRevision: 1 });
+    expect((await f.t.run(ctx => ctx.db.get(f.ids.mentor)))?.staffSetupDismissedAt).toBe(dismissed?.staffSetupDismissedAt);
+    expect((await f.coach.query(api.adultProfile.ownBasics, {})).needsSetup).toBe(true);
+    expect(await f.t.run(ctx => ctx.db.query("drivers").take(10))).toEqual([]);
+    await f.coach.mutation(api.adultProfile.dismissSetup, { expectedProfileRevision: 0 });
+    expect(await f.coach.query(api.adultProfile.ownBasics, {})).toMatchObject({ needsSetup: false, dismissed: true });
+  });
+
+  it("allows coaches to maintain their own profile and driving details without self-approval", async () => {
+    const f = await fixture();
+    await f.coach.mutation(api.adultProfile.saveOwn, { ...fields, canDrive: true, vehicleName: "Coach car", passengerSeats: 3 });
+    expect(await f.coach.query(api.adultProfile.own, {})).toMatchObject({ role: "coach", driverState: "owned", approved: false });
+    expect(await f.coach.query(api.adultProfile.ownBasics, {})).toMatchObject({ needsSetup: false });
+  });
+});
 
 describe("adult own profile", () => {
-  it("shows only auth-derived personal fields and denies Coach and Parent route access", async () => {
+  it("shows only auth-derived personal fields and allows staff and denies Parent route access", async () => {
     const f = await fixture();
     expect(await f.mentor.query(api.adultProfile.own, {})).toMatchObject({ name: "Mentor", email: "mentor@example.invalid", role: "mentor", travelLead: false, driverState: "none", profileRevision: 0 });
     expect(await f.lead.query(api.adultProfile.own, {})).toMatchObject({ name: "Travel Lead", travelLead: true });
-    await expect(f.coach.query(api.adultProfile.own, {})).rejects.toThrow("permission");
+    expect(await f.coach.query(api.adultProfile.own, {})).toMatchObject({ role: "coach", name: "Coach" });
     await expect(f.parent.mutation(api.adultProfile.saveOwn, fields)).rejects.toThrow("permission");
     const saved = await f.mentor.mutation(api.adultProfile.saveOwn, fields);
     expect(saved).toEqual({ profileRevision: 1, driverState: "none" });

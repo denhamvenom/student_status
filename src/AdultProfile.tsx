@@ -11,7 +11,7 @@ type Size = 'XS' | 'S' | 'M' | 'L' | 'XL' | '2XL' | '3XL'
 type OwnProfile = {
   name: string; email: string; phone: string; shirtSize: string | null
   emergencyName: string; emergencyRelationship: string; emergencyPhone: string
-  role: 'mentor'; travelLead: boolean; profileRevision: number
+  role: 'coach' | 'mentor'; travelLead: boolean; profileRevision: number
   driverState: 'owned' | 'none' | 'coachReviewRequired' | 'capacityReview' | 'seasonUnavailable'
   driverFingerprint: string | null; canDrive: boolean; vehicleName: string; passengerSeats: number | null; towCapable: boolean; approved: boolean
 }
@@ -44,7 +44,7 @@ function ProfileForm({ profile, saved, onSaved }: { profile: OwnProfile; saved: 
     } catch (error) { setError(message(error)) } finally { setBusy(false) }
   }
   return <form className={styles.page} onSubmit={event => void submit(event)}>
-    <header className={styles.heading}><h1>{copy.title}</h1><div className={styles.roles}><span className={styles.role}>{copy.mentor}</span>{profile.travelLead && <span className={styles.role}>{copy.travelLead}</span>}</div></header>
+    <header className={styles.heading}><h1>{copy.title}</h1><div className={styles.roles}><span className={styles.role}>{profile.role === 'coach' ? 'Coach' : copy.mentor}</span>{profile.travelLead && <span className={styles.role}>{copy.travelLead}</span>}</div></header>
     {!profile.shirtSize && <p className={styles.setup}>{copy.setup}</p>}
     <section className={styles.section} aria-labelledby="adult-about-title"><h2 id="adult-about-title">{copy.about}</h2>
       <div className={styles.fields}><label className={styles.field}>{copy.name}<Input value={name} onChange={event => setName(event.target.value)} maxLength={100} required disabled={busy} /></label><label className={styles.field}>{copy.phone}<Input type="tel" value={phone} onChange={event => setPhone(event.target.value)} maxLength={50} disabled={busy} /></label></div>
@@ -61,7 +61,7 @@ function ProfileForm({ profile, saved, onSaved }: { profile: OwnProfile; saved: 
   </form>
 }
 
-/** Own-account Mentor/Travel Lead profile. Root owns route access and shell integration. */
+/** Own-account staff profile. Root owns route access and shell integration. */
 export function AdultProfile() {
   const profile = useQuery(api.adultProfile.own, {})
   const [saved, setSaved] = useState('')
