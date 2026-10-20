@@ -1,3 +1,4 @@
+import { normalizeChangedPhone, normalizeChangedEmail } from "../shared/contact-format";
 import { v } from "convex/values";
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
 import { mutation, query } from "./_generated/server";
@@ -26,11 +27,11 @@ export const complete = mutation({
     if (!sizes.includes(args.shirtSize) || (args.preferredName?.trim().length ?? 0) > 80) throw new Error("Choose a valid shirt size and preferred name.");
     if (student.roomCategoryLocked && student.roomCategory !== args.roomCategory) throw new Error("Only a Coach may correct the locked room category.");
     for (const field of [args.guardianName, args.guardianRelationship, args.guardianPhone, args.guardianEmail]) if ((field?.trim().length ?? 0) > 254) throw new Error("Parent contact is too long.");
-    const email = args.guardianEmail?.trim().toLowerCase();
+    const email = args.guardianEmail === undefined ? undefined : normalizeChangedEmail(args.guardianEmail, student.guardianEmail, "Parent contact email");
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid parent contact email.");
     if (student.roomCategory !== args.roomCategory) await markRoomCategoryReview(ctx, student._id, student.seasonId);
     const preferredName = args.preferredName?.trim() || student.firstName || student.preferredName || student.legalName;
-    await ctx.db.patch(student._id, { preferredName, shirtSize: args.shirtSize, roomCategory: args.roomCategory, roomCategoryLocked: true, profileCompletedAt: Date.now(), profileRevision: (student.profileRevision ?? 0) + 1, guardianName: args.guardianName?.trim() || undefined, guardianRelationship: args.guardianRelationship?.trim() || undefined, guardianPhone: args.guardianPhone?.trim() || undefined, guardianEmail: email || undefined });
+    await ctx.db.patch(student._id, { preferredName, shirtSize: args.shirtSize, roomCategory: args.roomCategory, roomCategoryLocked: true, profileCompletedAt: Date.now(), profileRevision: (student.profileRevision ?? 0) + 1, guardianName: args.guardianName?.trim() || undefined, guardianRelationship: args.guardianRelationship?.trim() || undefined, guardianPhone: args.guardianPhone === undefined ? undefined : normalizeChangedPhone(args.guardianPhone, student.guardianPhone, "Parent contact phone") || undefined, guardianEmail: email || undefined });
     await audit(ctx, actor, "students", student._id, "completeProfileSetup", { revision: student.profileRevision ?? 0 }, { roomCategory: args.roomCategory, shirtSize: args.shirtSize, revision: (student.profileRevision ?? 0) + 1 });
     return null;
   },

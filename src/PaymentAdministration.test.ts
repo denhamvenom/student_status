@@ -7,3 +7,9 @@ it('parses exact cents and quoted receipt references on team local dates, reject
   expect(() => parsePaymentCsv(header + 'synthetic@example.invalid,10.001,cash,Reference,2026-10-13,1')).toThrow('positive amount')
   expect(() => parsePaymentCsv(header + 'synthetic@example.invalid,10,cash,"Reference"tail,2026-10-13,1')).toThrow('invalid quoting')
 })
+it('normalizes imported student email and rejects malformed email before preview', () => {
+  const header = 'studentEmail,amount,method,reference,date,rowReference\r\n'
+  expect(parsePaymentCsv(header + ' STUDENT@Example.Invalid ,10,cash,Receipt,2026-10-13,1')[0].studentEmail).toBe('student@example.invalid')
+  expect(() => parsePaymentCsv(header + 'bad..email@example.invalid,10,cash,Receipt,2026-10-13,1')).toThrow('Row 2 student email')
+  expect(() => parsePaymentCsv(header + ',10,cash,Receipt,2026-10-13,1')).toThrow('student email is required')
+})

@@ -42,7 +42,7 @@ describe("shared setup and season FIRST registration", () => {
     expect(await save("9th grade",0)).toBe(1);
     expect((await f.student.query(api.setupWizard.get,{studentId:f.ids.student})).student.grade).toBe("Freshman");
     await f.t.run(ctx=>ctx.db.patch(f.ids.student,{consentProfileV2: {
-      grade:"Transfer year",dateOfBirth:"2010-10-15",guardian:{name:"Parent",relationship:"Parent",phone:"555-0100",email:"parent@example.invalid"},emergency:{name:"Alternate",relationship:"Aunt",phone:"555-0101"},allergies:{state:"none",entries:[]},prescriptions:{state:"none",entries:[]},insurance:{state:"unavailable",provider:null,policy:null},physician:{state:"none",name:null,phone:null}
+      grade:"Transfer year",dateOfBirth:"2010-10-15",guardian:{name:"Parent",relationship:"Parent",phone:"(202) 555-0100",email:"parent@example.invalid"},emergency:{name:"Alternate",relationship:"Aunt",phone:"(202) 555-0101"},allergies:{state:"none",entries:[]},prescriptions:{state:"none",entries:[]},insurance:{state:"unavailable",provider:null,policy:null},physician:{state:"none",name:null,phone:null}
     },consentProfileV2CompletedAt:123,consentProfileV2ConfirmedBy:f.ids.auth[2].app}));
     await expect(save("Different year",1)).rejects.toThrow("Choose Freshman");
     expect(await save("Transfer year",1)).toBe(2);
@@ -124,7 +124,7 @@ describe("shared setup and season FIRST registration", () => {
     expect((await f.parent.mutation(api.setupWizard.summary,{})).students[0]).toMatchObject({nextItem:"studentDetails",needsSetup:true});
     let revision=await f.parent.mutation(api.setupWizard.saveParentStudent,{studentId,expectedRevision:0,shirtSize:"M",roomCategory:"Boys",grade:"11",dateOfBirth:"2010-10-15"});
     expect((await f.parent.mutation(api.setupWizard.summary,{})).students[0]).toMatchObject({nextItem:"contacts",needsSetup:true});
-    revision=await f.parent.mutation(api.setupWizard.saveContacts,{studentId,expectedRevision:revision,guardian:{name:"Fictional Guardian",relationship:"Parent",phone:"555-0100",email:"guardian@example.invalid"},emergency:{name:"Fictional Contact",relationship:"Aunt",phone:"555-0101"}});
+    revision=await f.parent.mutation(api.setupWizard.saveContacts,{studentId,expectedRevision:revision,guardian:{name:"Fictional Guardian",relationship:"Parent",phone:"(202) 555-0100",email:"guardian@example.invalid"},emergency:{name:"Fictional Contact",relationship:"Aunt",phone:"(202) 555-0101"}});
     expect((await f.parent.mutation(api.setupWizard.summary,{})).students[0]).toMatchObject({nextItem:"medical",needsSetup:true});
     revision=await f.parent.mutation(api.setupWizard.saveMedical,{studentId,expectedRevision:revision,allergies:{state:"none",entries:[]},prescriptions:{state:"none",entries:[]},insurance:{state:"unavailable",provider:null,policy:null},physician:{state:"unavailable",name:null,phone:null}});
     expect((await f.parent2.query(api.setupWizard.get,{studentId})).student.parentComplete).toBe(false);

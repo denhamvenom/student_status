@@ -1,3 +1,4 @@
+import { normalizeEmail } from "../shared/contact-format";
 import { internal } from "./_generated/api";
 import { parentInviteEmailConfiguration } from "./lib/parentInviteEmail";
 import { v } from "convex/values";
@@ -5,7 +6,7 @@ import { paginationOptsValidator, paginationResultValidator } from "convex/serve
 import { mutation, query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { audit, requireRole, viewer } from "./lib/access";
-import { emailKey, newToken, tokenHash, verifiedAdult } from "./lib/invitationIdentity";
+import { newToken, tokenHash, verifiedAdult } from "./lib/invitationIdentity";
 
 const RESEND_COOLDOWN_MS = 60 * 60_000;
 const resendAvailableAt = (row: Doc<"adultInvitations">) => Math.max(row.emailQueuedAt ?? row.createdAt, row.emailSentAt ?? row.createdAt) + RESEND_COOLDOWN_MS;
@@ -45,7 +46,7 @@ export const inviteAdult = mutation({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach"); grants(args);
     if (!parentInviteEmailConfiguration()) throw new Error("Automatic invitation email is not configured. Ask a Coach for help.");
-    const email = emailKey(args.email);
+    const email = normalizeEmail(args.email, "Account email");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) throw new Error("Enter a valid account email.");
     const existing = await ctx.db.query("appUsers").withIndex("by_email", q => q.eq("email", email)).take(2);
     if (existing.length) throw new Error("This email already has an account. Use account controls instead.");

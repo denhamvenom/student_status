@@ -9,6 +9,7 @@ import { Checkbox } from './components/ui/checkbox'
 import { NativeSelect, NativeSelectOption } from './components/ui/native-select'
 import { adultProfileCopy } from './lib/adult-profile-copy'
 import styles from './StaffSetupWizard.module.css'
+import { normalizeChangedPhone } from '../shared/contact-format'
 
 type Basics = FunctionReturnType<typeof api.adultProfile.ownBasics>
 const steps = ['Contact information', 'Shirt and emergency contact', 'Driving', 'Review your information']
@@ -77,6 +78,12 @@ function StaffWizard({ profile, reload, skip }: { profile: Basics; reload: () =>
     event.preventDefault()
     if (busy || stale) return
     setError('')
+    try {
+      if (step === 0 || step === 3) setPhone(normalizeChangedPhone(phone, profile.phone))
+      if (step === 1 || step === 3) setEmergencyPhone(normalizeChangedPhone(emergencyPhone, profile.emergencyPhone, 'Emergency contact phone'))
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Check your phone number.'); return
+    }
     const size = adultProfileCopy.sizes.find(value => value === shirtSize) ?? null
     if (step >= 2 && drivingEdited && !driverBlocked && canDrive && (!(phone.trim() || profile.phone.trim()) || !vehicleName.trim() || !Number.isInteger(Number(passengerSeats)) || Number(passengerSeats) < 1 || Number(passengerSeats) > 100)) {
       setError('To offer driving, add your phone, vehicle, and 1–100 passenger seats, or skip this step.'); return

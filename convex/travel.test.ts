@@ -80,7 +80,7 @@ describe("travel operations", () => {
 
   it("requires approved assigned tow driver and reacts to driver downgrade or removal", async () => {
     const f = await fixture();
-    const driverArgs = { name: "Synthetic Driver", email: "driver@example.invalid", phone: "555-0100", vehicleName: "Van", seats: 3, approved: true, towCapable: true, active: true };
+    const driverArgs = { name: "Synthetic Driver", email: "driver@example.invalid", phone: "(202) 555-0100", vehicleName: "Van", seats: 3, approved: true, towCapable: true, active: true };
     const driver = await f.coach.mutation(api.travel.saveDriver, driverArgs);
     await f.coach.mutation(api.travel.setEventTransport, { eventId: f.ids.event, transportEnabled: true, busSeats: 0, additionalAdults: 0, trailerRequired: true });
     expect((await f.coach.query(api.travel.eventTransport, { eventId: f.ids.event })).summary.state).toBe("open");
@@ -114,9 +114,9 @@ describe("travel operations", () => {
   it("rejects a driver beyond the bounded list without changing existing records", async () => {
     const f = await fixture();
     await f.t.run(async ctx => {
-      for (let i = 0; i < 200; i++) await ctx.db.insert("drivers", { seasonId: f.ids.season, name: `Driver ${i}`, email: `driver${i}@example.invalid`, phone: "555-0100", seats: 2, approved: true });
+      for (let i = 0; i < 200; i++) await ctx.db.insert("drivers", { seasonId: f.ids.season, name: `Driver ${i}`, email: `driver${i}@example.invalid`, phone: "(202) 555-0100", seats: 2, approved: true });
     });
-    const args = { name: "Overflow", email: "overflow@example.invalid", phone: "555-0100", vehicleName: "Van", seats: 2, approved: true, towCapable: false, active: true };
+    const args = { name: "Overflow", email: "overflow@example.invalid", phone: "(202) 555-0100", vehicleName: "Van", seats: 2, approved: true, towCapable: false, active: true };
     await expect(f.coach.mutation(api.travel.saveDriver, args)).rejects.toThrow("Driver limit");
     const records = await f.coach.query(api.travel.listDrivers, {});
     expect(records).toHaveLength(200);

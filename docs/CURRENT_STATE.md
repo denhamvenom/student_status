@@ -1,11 +1,9 @@
 # Current integration handoff
 
-## Mentor landing and fundraiser production release
+## Contact formatting production release
 
-Owner accepted and authorized release of f075087. Production Convex amicable-eel-413 deployment succeeded with schema/type validation and no indexes deleted. Website merge/build evidence goes in the release PR and release notes. See RELEASE_2026-10-20_FUNDRAISERS.md and MENTOR_PROFILE_FUNDRAISERS.md.
+Owner authorized release of fdabbe3. Production Convex amicable-eel-413 deployment succeeded with typecheck/schema validation; no indexes deleted. Website merge/build evidence is recorded on the release PR and release notes. See RELEASE_2026-10-20_CONTACT_FORMATS.md and CONTACT_INPUT_FORMATS.md.
 
-Mentors land on Profile. Coach fundraiser CSV replaces the long editor; Coach/Travel rosters and reports show connection status. Family Pay/Share appears only with a saved individual link. No real links were assigned or payment records changed.
+Shared phone/email input formatting and backend validation apply throughout contact entry. Optional blanks and unchanged legacy contacts preserved; historical signed snapshots/OAuth identity unchanged. 84 backend/helper tests covered, two CSV tests passed, independent review, browser checks and lint/types/build passed. No real record submits or emails during release.
 
-25 focused CSV/status tests, prior 11 landing/share tests, independent reviews, lint/types/build and synthetic browser checks passed. Real phone sharing and Zeffy checkout remain untested. Unrelated 501-charge fee-test timeout remains separate.
-
-Root owns release integration on feature/parent-email-invitations. Other chat holds sync/merges until release handoff. Development email disabled; Calendar writes remain production-only.
+Root owns release integration on feature/parent-email-invitations. Other chat holds shared sync/merges until handoff. Development email stays disabled and Calendar writes production-only. Historical unrelated501-charge fee timeout remains separate.

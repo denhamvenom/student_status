@@ -1,3 +1,4 @@
+import { normalizeEmail, normalizePhone } from "../shared/contact-format";
 import { requireSeasonFinanceReady } from "./lib/seasonFinance";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
@@ -203,7 +204,7 @@ export const setMeetingCancelled = mutation({
 
 export const createDriver = mutation({
   args: { name: v.string(), phone: v.string(), email: v.string(), seats: v.number(), approved: v.boolean() }, returns: v.id("drivers"),
-  handler: async (ctx, args) => { const user = await viewer(ctx); if (user.role !== "coach" && !user.travelLead) throw new Error("Driver management denied."); if (!Number.isSafeInteger(args.seats) || args.seats < 0) throw new Error("Seats must exclude the driver."); const season = await activeSeason(ctx); return await ctx.db.insert("drivers", { ...args, seasonId: season._id }); },
+  handler: async (ctx, args) => { const user = await viewer(ctx); if (user.role !== "coach" && !user.travelLead) throw new Error("Driver management denied."); if (!Number.isSafeInteger(args.seats) || args.seats < 0) throw new Error("Seats must exclude the driver."); const season = await activeSeason(ctx); return await ctx.db.insert("drivers", { ...args, email: normalizeEmail(args.email, "Driver email"), phone: normalizePhone(args.phone, "Driver phone"), seasonId: season._id }); },
 });
 
 export const assignDriver = mutation({

@@ -13,6 +13,7 @@ import { GradeSelect } from './GradeSelect'
 import { setupWizardCopy as copy } from './lib/setup-wizard-copy'
 import { subteamDisplay } from './lib/subteams'
 import styles from './SetupWizard.module.css'
+import { normalizeEmail } from '../shared/contact-format'
 
 type WizardData = FunctionReturnType<typeof api.setupWizard.get>
 type Medical = Pick<ConsentProfileV2, 'allergies'|'prescriptions'|'insurance'|'physician'>
@@ -62,7 +63,7 @@ function ParentConnection({studentId}:{studentId:Id<'students'>}) {
   const links=useQuery(api.parentInvites.listFamilyLinks,{studentId}),settings=useQuery(api.parentInvites.invitationSettings,{})
   const create=useMutation(api.parentInvites.createParentInvite)
   const [email,setEmail]=useState(''),[sent,setSent]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('')
-  async function invite(){if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())){setError('Enter a valid parent or guardian email.');return}setBusy(true);setError('');setSent(false);try{await create({studentId,parentEmail:email.trim().toLowerCase()});setSent(true);setEmail('')}catch(cause){setError(message(cause))}finally{setBusy(false)}}
+  async function invite(){let normalizedEmail:string;try{normalizedEmail=normalizeEmail(email);if(!normalizedEmail)throw new Error('Enter a parent or guardian email.')}catch(cause){setError(cause instanceof Error?cause.message:'Check the email address.');return}setBusy(true);setError('');setSent(false);try{await create({studentId,parentEmail:normalizedEmail});setSent(true);setEmail('')}catch(cause){setError(message(cause))}finally{setBusy(false)}}
   return <div className={styles.section}><h3>Your parents</h3>{links===undefined?<p role="status">Loading connections...</p>:links.filter(row=>row.active).length?<ul>{links.filter(row=>row.active).map(row=><li key={row._id}>{row.parentName} - connected</li>)}</ul>:<p>No parent or guardian is connected yet.</p>}{settings?.enabled===false&&<p>Parent invitations are paused. Contact a Coach.</p>}{settings?.enabled&&<div className={styles.fields}><WizardField label="Parent or guardian email"><Input type="email" autoComplete="email" value={email} onChange={event=>setEmail(event.target.value)}/></WizardField><Button type="button" disabled={busy} onClick={()=>void invite()} variant="outline">{busy?'Sending...':links?.some(row=>row.active)?'Invite another parent':'Invite a parent'}</Button></div>}{sent&&<p role="status">Invitation requested. Ask your parent to check their inbox and spam folder.</p>}{error&&<p role="alert" className={styles.error}>{error}</p>}</div>
 }
 
