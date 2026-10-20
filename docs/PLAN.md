@@ -1,5 +1,14 @@
 # Student Status implementation plan
 
+## October 20 - Mentor/Staff invitation email production release
+
+Owner authorized production publication, including documentation. Reviewed source78dd107 deployed successfully to production Convex amicable-eel-413 with backend typecheck/schema validation and the additive adultInvitations email/date index; no indexes deleted. No migrations, record edits, environment changes, real test invitations or emails were performed. Production email sender/reply/origin and enabled setting were verified; development sending stays disabled.
+
+Coach invitations now queue private email links with delivery statuses and guarded one-hour resend. Google or email-code sign-in and explicit invitation acceptance remain. Old invitations are not automatically emailed. Parent workflows and student Google login are preserved.
+
+Evidence:535 tests/101 files, focused31 account/mail checks, lint/types/build and independent review passed on the unchanged implementation. Synthetic actual-component desktop/light and phone/dark checks passed. Source, workflow, plan, checklist and verification documentation are included in the release PR. Exact main revision and both automatic Cloudflare build outcomes are recorded on the release PR and immutable release notes after publication. Real-inbox delivery/acceptance remains unverified.
+
+
 ## Private parent sign-in production release - October 19
 
 Owner authorized production publication of the combined parent sign-in and legal-name/Money work. Source 15f2dcc deployed successfully to Convex production amicable-eel-413 with backend typecheck, schema validation and additive indexes; no indexes deleted. Production sender/reply/origin and existing auth credentials were verified without exposing or changing secrets. Production email remains enabled; development sending stays disabled. Calendar write guard is preserved.
