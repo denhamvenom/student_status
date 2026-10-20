@@ -4,7 +4,7 @@
 .header h1,.card>h1{margin:0;font:400 clamp(30px,5vw,44px)/1.06 Anton,Impact,sans-serif}.muted{margin:0;color:var(--text-muted);font-size:14px}
 .card{width:100%;max-width:760px;min-width:0;display:grid;gap:18px;padding:28px;background:var(--surface-card);border:1px solid var(--border-default);border-radius:8px;box-shadow:var(--shadow-sm)}
 .stepHead{display:grid;gap:8px}.stepHead h2{margin:0;font:400 28px/1.1 Anton,Impact,sans-serif}
-.progress{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;list-style:none;margin:0;padding:0}.progress li{min-width:0;height:5px;border-radius:5px;background:var(--border-default)}.progress li[data-active=true]{background:var(--gold-500)}
+.progress{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;list-style:none;margin:0;padding:0}.progress li{min-width:0;height:5px;border-radius:5px;background:var(--border-default)}.progress li[data-active=true]{background:var(--gold-500)}
 .fields{border:0;margin:0;padding:14px 0 20px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;min-width:0}.fields h3{margin:6px 0 0;font-size:18px}
 .field{display:grid;gap:5px;min-width:0;font-size:14px;font-weight:700}.field input,.field select{width:100%;min-height:44px;font-size:16px}.field :global([data-slot=native-select-wrapper]){width:100%}
 .full{grid-column:1/-1}.card form{min-width:0}
@@ -13,4 +13,7 @@
 .review{grid-column:1/-1;display:grid;gap:14px;margin:0}.review>div{display:grid;gap:3px}.review dt{font-size:13px;color:var(--text-muted)}.review dd{margin:0;font-weight:600;overflow-wrap:anywhere}
 .signOut{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px}.srOnly{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .skip{display:grid;gap:8px;padding-top:20px}.skipActions{display:flex;flex-wrap:wrap;gap:8px}.skipActions button{min-height:44px;white-space:normal}
+.check{display:flex;align-items:center;gap:10px;min-height:44px;font-size:14px;font-weight:600}
 @media(max-width:640px){.page{padding:20px 12px 56px}.card{padding:18px}.fields{grid-template-columns:1fr}.actions{align-items:stretch}.actions button{flex:1 1 140px}.spacer{display:none}.stepHead h2{font-size:24px}}
+
+.skipActions button,.signOut button{color:var(--text-body)}

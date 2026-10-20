@@ -43,7 +43,7 @@ describe("staff basic setup", () => {
     const f = await fixture();
     const driverId = await f.t.run(ctx => ctx.db.insert("drivers", { seasonId: f.ids.season, ownerAppUserId: f.ids.lead, name: "Approved Driver", email: "lead@example.invalid", phone: "555-0000", seats: 4, approved: true, active: true }));
     const driverBefore = await f.t.run(ctx => ctx.db.get(driverId));
-    expect(await f.lead.mutation(api.adultProfile.saveBasics, basicFields)).toEqual({ profileRevision: 1 });
+    expect(await f.lead.mutation(api.adultProfile.saveBasics, basicFields)).toEqual({ profileRevision: 1, driverState: null });
     expect(await f.lead.query(api.adultProfile.ownBasics, {})).toMatchObject({ name: "Staff Updated", phone: "+1 555-0100", emergencyName: "Contact", emergencyRelationship: "Family", emergencyPhone: "555-0111 ext 5", needsSetup: false });
     expect(await f.t.run(ctx => ctx.db.get(driverId))).toEqual(driverBefore);
     expect(await f.t.run(ctx => ctx.db.get(f.ids.lead))).toMatchObject({ role: "mentor", travelLead: true, financialEdit: false, email: "lead@example.invalid", active: true });
@@ -116,6 +116,66 @@ describe("staff basic setup", () => {
     await f.coach.mutation(api.adultProfile.saveOwn, { ...fields, canDrive: true, vehicleName: "Coach car", passengerSeats: 3 });
     expect(await f.coach.query(api.adultProfile.own, {})).toMatchObject({ role: "coach", driverState: "owned", approved: false });
     expect(await f.coach.query(api.adultProfile.ownBasics, {})).toMatchObject({ needsSetup: false });
+  });
+});
+
+describe("optional staff setup driving", () => {
+  const driving = { expectedDriverFingerprint: null, canDrive: true, vehicleName: "Truck", passengerSeats: 3, towCapable: true };
+  it("creates an unapproved towing driver and atomically rejects stale driving changes", async () => {
+    const f = await fixture();
+    expect(await f.coach.mutation(api.adultProfile.saveBasics, { ...basicFields, driving })).toEqual({ profileRevision: 1, driverState: "owned" });
+    const before = await f.coach.query(api.adultProfile.ownBasics, {});
+    expect(before).toMatchObject({ canDrive: true, towCapable: true, approved: false, vehicleName: "Truck", passengerSeats: 3 });
+    await expect(f.coach.mutation(api.adultProfile.saveBasics, { ...basicFields, expectedProfileRevision: 1, name: "Must roll back", driving })).rejects.toThrow("Driving details changed");
+    expect(await f.coach.query(api.adultProfile.ownBasics, {})).toEqual(before);
+    await f.coach.mutation(api.adultProfile.saveBasics, { ...basicFields, expectedProfileRevision: 1, driving: { ...driving, expectedDriverFingerprint: before.driverFingerprint, canDrive: false } });
+    expect(await f.coach.query(api.adultProfile.ownBasics, {})).toMatchObject({ canDrive: false, approved: false, profileRevision: 2 });
+  });
+
+  it("preserves an approval on unchanged explicit details and revokes it on towing changes", async () => {
+    const f = await fixture();
+    await f.mentor.mutation(api.adultProfile.saveBasics, { ...basicFields, driving });
+    const driverId = await f.t.run(async ctx => {
+      const driver = await ctx.db.query("drivers").withIndex("by_seasonId_and_ownerAppUserId", q => q.eq("seasonId", f.ids.season).eq("ownerAppUserId", f.ids.mentor)).unique();
+      await ctx.db.patch(driver!._id, { approved: true });
+      return driver!._id;
+    });
+    let own = await f.mentor.query(api.adultProfile.ownBasics, {});
+    await f.mentor.mutation(api.adultProfile.saveBasics, { ...basicFields, expectedProfileRevision: 1, driving: { ...driving, expectedDriverFingerprint: own.driverFingerprint } });
+    expect((await f.t.run(ctx => ctx.db.get(driverId)))?.approved).toBe(true);
+    own = await f.mentor.query(api.adultProfile.ownBasics, {});
+    await f.mentor.mutation(api.adultProfile.saveBasics, { ...basicFields, expectedProfileRevision: 2, driving: { ...driving, expectedDriverFingerprint: own.driverFingerprint, towCapable: false } });
+    expect(await f.t.run(ctx => ctx.db.get(driverId))).toMatchObject({ approved: false, towCapable: false });
+  });
+
+  it("rejects invalid driving details and blocked contexts but allows omitting driving", async () => {
+    const f = await fixture();
+    for (const change of [{ passengerSeats: 0 }, { passengerSeats: 1.5 }, { passengerSeats: 101 }, { vehicleName: "" }]) {
+      await expect(f.mentor.mutation(api.adultProfile.saveBasics, { ...basicFields, driving: { ...driving, ...change } })).rejects.toThrow();
+    }
+    await expect(f.mentor.mutation(api.adultProfile.saveBasics, { ...basicFields, phone: "", driving })).rejects.toThrow("phone");
+    const existing = await f.t.run(ctx => ctx.db.insert("drivers", { seasonId: f.ids.season, name: "Unowned", email: "mentor@example.invalid", phone: "555-0000", seats: 2, approved: true }));
+    expect((await f.mentor.query(api.adultProfile.ownBasics, {})).driverState).toBe("coachReviewRequired");
+    await expect(f.mentor.mutation(api.adultProfile.saveBasics, { ...basicFields, driving })).rejects.toThrow("Skip this step");
+    expect(await f.t.run(ctx => ctx.db.get(f.ids.mentor))).not.toHaveProperty("staffSetupCompletedAt");
+    await f.mentor.mutation(api.adultProfile.saveBasics, basicFields);
+    expect(await f.t.run(ctx => ctx.db.get(existing))).toMatchObject({ name: "Unowned", approved: true });
+    await f.t.run(ctx => ctx.db.patch(f.ids.season, { status: "archived" }));
+    await expect(f.coach.mutation(api.adultProfile.saveBasics, { ...basicFields, driving })).rejects.toThrow("Skip this step");
+    await f.coach.mutation(api.adultProfile.saveBasics, basicFields);
+    expect((await f.coach.query(api.adultProfile.ownBasics, {})).driverState).toBe("seasonUnavailable");
+  });
+
+  it("does not exceed driver capacity or mark blocked driving as completed", async () => {
+    const f = await fixture();
+    await f.t.run(async ctx => {
+      for (let i = 0; i < 200; i++) await ctx.db.insert("drivers", { seasonId: f.ids.season, name: `Synthetic Driver ${i}`, email: `driver${i}@example.invalid`, phone: "555-0000", seats: 2, approved: false });
+    });
+    expect((await f.mentor.query(api.adultProfile.ownBasics, {})).driverState).toBe("capacityReview");
+    await expect(f.mentor.mutation(api.adultProfile.saveBasics, { ...basicFields, driving })).rejects.toThrow("Skip this step");
+    expect(await f.t.run(ctx => ctx.db.get(f.ids.mentor))).not.toHaveProperty("staffSetupCompletedAt");
+    await f.mentor.mutation(api.adultProfile.saveBasics, basicFields);
+    expect(await f.t.run(ctx => ctx.db.query("drivers").take(201))).toHaveLength(200);
   });
 });
 

@@ -964,3 +964,5 @@ Implemented Send invitation with private emailed links, accurate delivery status
 
 
 Staff setup follow-up: development sync/types/build/lint passed; actual signed-in localhost Step 1 and both skip options observed. No profile or preference saved for the user. Coach review pending. Full-suite fee-history timeout recorded separately in STAFF_SETUP_WIZARD.md.
+
+Staff setup now has an optional Driving step before review, shared contact phone, vehicle/seats/trailer capability and Skip driving step preserving existing driver approval. Requested extra informational paragraph removed. Focused17 tests, source review and desktop/phone synthetic browser checks passed; see STAFF_SETUP_WIZARD.md. Development only.

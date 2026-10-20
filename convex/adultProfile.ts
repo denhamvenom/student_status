@@ -12,11 +12,12 @@ const basicFields = {
   role: staffRole, profileRevision: v.number(),
 };
 const driverState = v.union(v.literal("owned"), v.literal("none"), v.literal("coachReviewRequired"), v.literal("capacityReview"), v.literal("seasonUnavailable"));
-const profile = v.object({
-  ...basicFields, travelLead: v.boolean(),
+const drivingFields = {
   driverState, driverFingerprint: v.union(v.string(), v.null()), canDrive: v.boolean(),
   vehicleName: v.string(), passengerSeats: v.union(v.number(), v.null()), towCapable: v.boolean(), approved: v.boolean(),
-});
+};
+const profile = v.object({ ...basicFields, ...drivingFields, travelLead: v.boolean() });
+const drivingInput = v.object({ expectedDriverFingerprint: v.union(v.string(), v.null()), canDrive: v.boolean(), vehicleName: v.string(), passengerSeats: v.union(v.number(), v.null()), towCapable: v.boolean() });
 type Ctx = QueryCtx | MutationCtx;
 type DriverState = "owned" | "none" | "coachReviewRequired" | "capacityReview" | "seasonUnavailable";
 const MAX_DRIVERS = 200;
@@ -97,97 +98,19 @@ async function driverContext(ctx: Ctx, actor: Doc<"appUsers">) {
   return { season, driver: null, state: seasonDrivers.length === MAX_DRIVERS ? "capacityReview" as DriverState : "none" as DriverState };
 }
 
-function clean(value: string, label: string, max: number, required = false) {
-  const result = value.trim();
-  if (result.length > max || required && !result) throw new Error(`${label} must be ${required ? "provided and " : ""}under ${max} characters.`);
-  return result;
+
+function drivingDetails({ driver, state }: Awaited<ReturnType<typeof driverContext>>) {
+  return { driverState: state, driverFingerprint: fingerprint(driver), canDrive: driver?.active !== false && !!driver, vehicleName: driver?.vehicleName ?? "", passengerSeats: driver?.seats ?? null, towCapable: driver?.towCapable ?? false, approved: driver?.approved ?? false };
 }
 
-function basics(actor: Doc<"appUsers">) {
-  requireRole(actor, "coach", "mentor");
-  return {
-    name: actor.name, email: actor.email, phone: actor.phone ?? "", shirtSize: actor.shirtSize ?? null,
-    emergencyName: actor.emergencyName ?? "", emergencyRelationship: actor.emergencyRelationship ?? "", emergencyPhone: actor.emergencyPhone ?? "",
-    role: actor.role as "coach" | "mentor", profileRevision: actor.profileRevision ?? 0,
-  };
-}
-
-/** Existing complete profiles are ready without a migration or a separate completion flag. */
-export const ownBasics = query({
-  args: {}, returns: v.object({ ...basicFields, needsSetup: v.boolean(), dismissed: v.boolean() }),
-  handler: async ctx => {
-    const actor = await viewer(ctx);
-    const basic = basics(actor);
-    const complete = [basic.name, basic.phone, basic.emergencyName, basic.emergencyRelationship, basic.emergencyPhone].every(value => value.trim().length > 0)
-      && ["XS", "S", "M", "L", "XL", "2XL", "3XL"].includes(basic.shirtSize ?? "");
-    const dismissed = actor.staffSetupDismissedAt !== undefined;
-    return { ...basic, needsSetup: !complete && !dismissed && actor.staffSetupCompletedAt === undefined, dismissed };
-  },
-});
-
-export const dismissSetup = mutation({
-  args: { expectedProfileRevision: v.number() },
-  returns: v.object({ profileRevision: v.number() }),
-  handler: async (ctx, args) => {
-    const actor = await viewer(ctx); requireRole(actor, "coach", "mentor");
-    if (!Number.isSafeInteger(args.expectedProfileRevision) || args.expectedProfileRevision < 0 || args.expectedProfileRevision !== (actor.profileRevision ?? 0)) throw new Error("Profile changed. Reload before saving.");
-    const profileRevision = (actor.profileRevision ?? 0) + 1;
-    await ctx.db.patch(actor._id, { staffSetupDismissedAt: actor.staffSetupDismissedAt ?? Date.now(), profileRevision });
-    await audit(ctx, actor, "appUsers", actor._id, "dismissStaffSetup", { profileRevision: actor.profileRevision ?? 0 }, { profileRevision });
-    return { profileRevision };
-  },
-});
-
-/** Onboarding updates personal information only, leaving driving and access decisions untouched. */
-export const saveBasics = mutation({
-  args: { expectedProfileRevision: v.number(), name: v.string(), phone: v.string(), shirtSize: v.union(shirtSize, v.null()), emergencyName: v.string(), emergencyRelationship: v.string(), emergencyPhone: v.string() },
-  returns: v.object({ profileRevision: v.number() }),
-  handler: async (ctx, args) => {
-    const actor = await viewer(ctx); requireRole(actor, "coach", "mentor");
-    if (!Number.isSafeInteger(args.expectedProfileRevision) || args.expectedProfileRevision < 0 || args.expectedProfileRevision !== (actor.profileRevision ?? 0)) throw new Error("Profile changed. Reload before saving.");
-    const profileRevision = (actor.profileRevision ?? 0) + 1;
-    const patch = {
-      name: clean(args.name, "Name", 100) || actor.name, phone: clean(args.phone, "Phone", 50) || actor.phone, shirtSize: args.shirtSize ?? actor.shirtSize,
-      emergencyName: clean(args.emergencyName, "Emergency contact name", 100) || actor.emergencyName,
-      emergencyRelationship: clean(args.emergencyRelationship, "Emergency contact relationship", 100) || actor.emergencyRelationship,
-      emergencyPhone: clean(args.emergencyPhone, "Emergency contact phone", 50) || actor.emergencyPhone, profileRevision, staffSetupCompletedAt: Date.now(),
-    };
-    await ctx.db.patch(actor._id, patch);
-    await audit(ctx, actor, "appUsers", actor._id, "saveOwnBasics", { profileRevision: actor.profileRevision ?? 0 }, { profileRevision });
-    return { profileRevision };
-  },
-});
-
-export const own = query({
-  args: {}, returns: profile,
-  handler: async ctx => {
-    const actor = await viewer(ctx); requireRole(actor, "coach", "mentor");
-    const { driver, state } = await driverContext(ctx, actor);
-    return { ...basics(actor), travelLead: actor.travelLead, driverState: state, driverFingerprint: fingerprint(driver), canDrive: driver?.active !== false && !!driver, vehicleName: driver?.vehicleName ?? "", passengerSeats: driver?.seats ?? null, towCapable: driver?.towCapable ?? false, approved: driver?.approved ?? false };
-  },
-});
-
-export const saveOwn = mutation({
-  args: { expectedProfileRevision: v.number(), expectedDriverFingerprint: v.union(v.string(), v.null()), name: v.string(), phone: v.string(), shirtSize, emergencyName: v.string(), emergencyRelationship: v.string(), emergencyPhone: v.string(), canDrive: v.boolean(), vehicleName: v.string(), passengerSeats: v.union(v.number(), v.null()), towCapable: v.boolean() },
-  returns: v.object({ profileRevision: v.number(), driverState }),
-  handler: async (ctx, args) => {
-    const actor = await viewer(ctx); requireRole(actor, "coach", "mentor");
-    if (!Number.isSafeInteger(args.expectedProfileRevision) || args.expectedProfileRevision < 0 || args.expectedProfileRevision !== (actor.profileRevision ?? 0)) throw new Error("Profile changed. Reload before saving.");
-    const name = clean(args.name, "Name", 100, true);
-    const phone = clean(args.phone, "Phone", 50);
-    const emergencyName = clean(args.emergencyName, "Emergency contact name", 100);
-    const emergencyRelationship = clean(args.emergencyRelationship, "Emergency contact relationship", 100);
-    const emergencyPhone = clean(args.emergencyPhone, "Emergency contact phone", 50);
+async function saveDriving(ctx: MutationCtx, actor: Doc<"appUsers">, context: Awaited<ReturnType<typeof driverContext>>, name: string, phone: string, args: { expectedDriverFingerprint: string | null; canDrive: boolean; vehicleName: string; passengerSeats: number | null; towCapable: boolean }) {
     const vehicleName = clean(args.vehicleName, "Vehicle", 100);
     if (args.canDrive) {
       if (!phone) throw new Error("Drivers need a phone number.");
       if (!vehicleName) throw new Error("Describe your vehicle.");
       if (!Number.isSafeInteger(args.passengerSeats) || args.passengerSeats === null || args.passengerSeats < 1 || args.passengerSeats > 100) throw new Error("Passenger seats must be a whole number from 1 to 100.");
     }
-    const context = await driverContext(ctx, actor);
     if (args.expectedDriverFingerprint !== fingerprint(context.driver)) throw new Error("Driving details changed. Reload before saving.");
-    const profileRevision = (actor.profileRevision ?? 0) + 1;
-    await ctx.db.patch(actor._id, { name, phone, shirtSize: args.shirtSize, emergencyName, emergencyRelationship, emergencyPhone, profileRevision });
     let state = context.state;
     if (context.driver) {
       const driver = context.driver;
@@ -208,6 +131,98 @@ export const saveOwn = mutation({
       await audit(ctx, actor, "drivers", driverId, "selfCreate", null, created);
       state = "owned";
     }
+    return state;
+}
+
+function clean(value: string, label: string, max: number, required = false) {
+  const result = value.trim();
+  if (result.length > max || required && !result) throw new Error(`${label} must be ${required ? "provided and " : ""}under ${max} characters.`);
+  return result;
+}
+
+function basics(actor: Doc<"appUsers">) {
+  requireRole(actor, "coach", "mentor");
+  return {
+    name: actor.name, email: actor.email, phone: actor.phone ?? "", shirtSize: actor.shirtSize ?? null,
+    emergencyName: actor.emergencyName ?? "", emergencyRelationship: actor.emergencyRelationship ?? "", emergencyPhone: actor.emergencyPhone ?? "",
+    role: actor.role as "coach" | "mentor", profileRevision: actor.profileRevision ?? 0,
+  };
+}
+
+/** Existing complete profiles are ready without a migration or a separate completion flag. */
+export const ownBasics = query({
+  args: {}, returns: v.object({ ...basicFields, ...drivingFields, needsSetup: v.boolean(), dismissed: v.boolean() }),
+  handler: async ctx => {
+    const actor = await viewer(ctx);
+    const basic = basics(actor);
+    const complete = [basic.name, basic.phone, basic.emergencyName, basic.emergencyRelationship, basic.emergencyPhone].every(value => value.trim().length > 0)
+      && ["XS", "S", "M", "L", "XL", "2XL", "3XL"].includes(basic.shirtSize ?? "");
+    const dismissed = actor.staffSetupDismissedAt !== undefined;
+    return { ...basic, ...drivingDetails(await driverContext(ctx, actor)), needsSetup: !complete && !dismissed && actor.staffSetupCompletedAt === undefined, dismissed };
+  },
+});
+
+export const dismissSetup = mutation({
+  args: { expectedProfileRevision: v.number() },
+  returns: v.object({ profileRevision: v.number() }),
+  handler: async (ctx, args) => {
+    const actor = await viewer(ctx); requireRole(actor, "coach", "mentor");
+    if (!Number.isSafeInteger(args.expectedProfileRevision) || args.expectedProfileRevision < 0 || args.expectedProfileRevision !== (actor.profileRevision ?? 0)) throw new Error("Profile changed. Reload before saving.");
+    const profileRevision = (actor.profileRevision ?? 0) + 1;
+    await ctx.db.patch(actor._id, { staffSetupDismissedAt: actor.staffSetupDismissedAt ?? Date.now(), profileRevision });
+    await audit(ctx, actor, "appUsers", actor._id, "dismissStaffSetup", { profileRevision: actor.profileRevision ?? 0 }, { profileRevision });
+    return { profileRevision };
+  },
+});
+
+/** Omitted driving information leaves existing driver records and approvals untouched. */
+export const saveBasics = mutation({
+  args: { expectedProfileRevision: v.number(), name: v.string(), phone: v.string(), shirtSize: v.union(shirtSize, v.null()), emergencyName: v.string(), emergencyRelationship: v.string(), emergencyPhone: v.string(), driving: v.optional(drivingInput) },
+  returns: v.object({ profileRevision: v.number(), driverState: v.union(driverState, v.null()) }),
+  handler: async (ctx, args) => {
+    const actor = await viewer(ctx); requireRole(actor, "coach", "mentor");
+    if (!Number.isSafeInteger(args.expectedProfileRevision) || args.expectedProfileRevision < 0 || args.expectedProfileRevision !== (actor.profileRevision ?? 0)) throw new Error("Profile changed. Reload before saving.");
+    const profileRevision = (actor.profileRevision ?? 0) + 1;
+    const patch = {
+      name: clean(args.name, "Name", 100) || actor.name, phone: clean(args.phone, "Phone", 50) || actor.phone, shirtSize: args.shirtSize ?? actor.shirtSize,
+      emergencyName: clean(args.emergencyName, "Emergency contact name", 100) || actor.emergencyName,
+      emergencyRelationship: clean(args.emergencyRelationship, "Emergency contact relationship", 100) || actor.emergencyRelationship,
+      emergencyPhone: clean(args.emergencyPhone, "Emergency contact phone", 50) || actor.emergencyPhone, profileRevision, staffSetupCompletedAt: Date.now(),
+    };
+    let state: DriverState | null = null;
+    if (args.driving) {
+      const context = await driverContext(ctx, actor);
+      if (context.state !== "none" && context.state !== "owned") throw new Error("Driving details need Coach review or an active season. Skip this step to save your personal information.");
+      state = await saveDriving(ctx, actor, context, patch.name, patch.phone ?? "", args.driving);
+    }
+    await ctx.db.patch(actor._id, patch);
+    await audit(ctx, actor, "appUsers", actor._id, "saveOwnBasics", { profileRevision: actor.profileRevision ?? 0 }, { profileRevision });
+    return { profileRevision, driverState: state };
+  },
+});
+
+export const own = query({
+  args: {}, returns: profile,
+  handler: async ctx => {
+    const actor = await viewer(ctx); requireRole(actor, "coach", "mentor");
+    return { ...basics(actor), travelLead: actor.travelLead, ...drivingDetails(await driverContext(ctx, actor)) };
+  },
+});
+
+export const saveOwn = mutation({
+  args: { expectedProfileRevision: v.number(), expectedDriverFingerprint: v.union(v.string(), v.null()), name: v.string(), phone: v.string(), shirtSize, emergencyName: v.string(), emergencyRelationship: v.string(), emergencyPhone: v.string(), canDrive: v.boolean(), vehicleName: v.string(), passengerSeats: v.union(v.number(), v.null()), towCapable: v.boolean() },
+  returns: v.object({ profileRevision: v.number(), driverState }),
+  handler: async (ctx, args) => {
+    const actor = await viewer(ctx); requireRole(actor, "coach", "mentor");
+    if (!Number.isSafeInteger(args.expectedProfileRevision) || args.expectedProfileRevision < 0 || args.expectedProfileRevision !== (actor.profileRevision ?? 0)) throw new Error("Profile changed. Reload before saving.");
+    const name = clean(args.name, "Name", 100, true);
+    const phone = clean(args.phone, "Phone", 50);
+    const emergencyName = clean(args.emergencyName, "Emergency contact name", 100);
+    const emergencyRelationship = clean(args.emergencyRelationship, "Emergency contact relationship", 100);
+    const emergencyPhone = clean(args.emergencyPhone, "Emergency contact phone", 50);
+    const profileRevision = (actor.profileRevision ?? 0) + 1;
+    await ctx.db.patch(actor._id, { name, phone, shirtSize: args.shirtSize, emergencyName, emergencyRelationship, emergencyPhone, profileRevision });
+    const state = await saveDriving(ctx, actor, await driverContext(ctx, actor), name, phone, args);
     await audit(ctx, actor, "appUsers", actor._id, "saveOwnProfile", { profileRevision: actor.profileRevision ?? 0 }, { profileRevision, driverState: state });
     return { profileRevision, driverState: state };
   },

@@ -5,12 +5,13 @@ import type { FunctionReturnType } from 'convex/server'
 import { api } from '../convex/_generated/api'
 import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
+import { Checkbox } from './components/ui/checkbox'
 import { NativeSelect, NativeSelectOption } from './components/ui/native-select'
 import { adultProfileCopy } from './lib/adult-profile-copy'
 import styles from './StaffSetupWizard.module.css'
 
 type Basics = FunctionReturnType<typeof api.adultProfile.ownBasics>
-const steps = ['Contact information', 'Shirt and emergency contact', 'Review your information']
+const steps = ['Contact information', 'Shirt and emergency contact', 'Driving', 'Review your information']
 
 function SignOutButton() {
   const { signOut } = useAuthActions()
@@ -43,12 +44,20 @@ function StaffWizard({ profile, reload, skip }: { profile: Basics; reload: () =>
   const [emergencyName, setEmergencyName] = useState(profile.emergencyName)
   const [emergencyRelationship, setEmergencyRelationship] = useState(profile.emergencyRelationship)
   const [emergencyPhone, setEmergencyPhone] = useState(profile.emergencyPhone)
+  const [initialDriver] = useState(profile)
+  const [drivingEdited, setDrivingEdited] = useState(false)
+  const [canDrive, setCanDrive] = useState(profile.canDrive)
+  const [vehicleName, setVehicleName] = useState(profile.vehicleName)
+  const [passengerSeats, setPassengerSeats] = useState(profile.passengerSeats?.toString() ?? '')
+  const [towCapable, setTowCapable] = useState(profile.towCapable)
   const [step, setStep] = useState(0)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [conflict, setConflict] = useState(false)
   const heading = useRef<HTMLHeadingElement>(null)
-  const stale = initialRevision !== profile.profileRevision || conflict
+  const driverBlocked = profile.driverState === 'coachReviewRequired' || profile.driverState === 'capacityReview' || profile.driverState === 'seasonUnavailable'
+  const driverNotice = profile.driverState === 'coachReviewRequired' ? adultProfileCopy.coachReview : profile.driverState === 'capacityReview' ? adultProfileCopy.capacityReview : profile.driverState === 'seasonUnavailable' ? adultProfileCopy.seasonUnavailable : null
+  const stale = initialRevision !== profile.profileRevision || conflict || drivingEdited && initialDriver.driverFingerprint !== profile.driverFingerprint
   function move(next: number) {
     setStep(next); setError('')
     requestAnimationFrame(() => heading.current?.focus())
@@ -69,11 +78,15 @@ function StaffWizard({ profile, reload, skip }: { profile: Basics; reload: () =>
     if (busy || stale) return
     setError('')
     const size = adultProfileCopy.sizes.find(value => value === shirtSize) ?? null
-    if (step < 2) { move(step + 1); return }
+    if (step >= 2 && drivingEdited && !driverBlocked && canDrive && (!(phone.trim() || profile.phone.trim()) || !vehicleName.trim() || !Number.isInteger(Number(passengerSeats)) || Number(passengerSeats) < 1 || Number(passengerSeats) > 100)) {
+      setError('To offer driving, add your phone, vehicle, and 1–100 passenger seats, or skip this step.'); return
+    }
+    if (step < 3) { move(step + 1); return }
     setBusy(true)
     try {
       await save({ expectedProfileRevision: initialRevision, name: name.trim(), phone: phone.trim(), shirtSize: size,
-        emergencyName: emergencyName.trim(), emergencyRelationship: emergencyRelationship.trim(), emergencyPhone: emergencyPhone.trim() })
+        emergencyName: emergencyName.trim(), emergencyRelationship: emergencyRelationship.trim(), emergencyPhone: emergencyPhone.trim(),
+        ...(drivingEdited && !driverBlocked ? { driving: { expectedDriverFingerprint: initialDriver.driverFingerprint, canDrive, vehicleName: vehicleName.trim(), passengerSeats: passengerSeats.trim() ? Number(passengerSeats) : null, towCapable: canDrive && towCapable } } : {}) })
       // The reactive completeness query opens the requested page after the save.
     } catch (cause) {
       if (cause instanceof Error && /revision|changed|conflict|stale/i.test(cause.message)) setConflict(true)
@@ -84,6 +97,8 @@ function StaffWizard({ profile, reload, skip }: { profile: Basics; reload: () =>
   const review = [
     ['Full name', name], ['Phone', phone], ['Shirt size (adult)', shirtSize],
     ['Emergency contact name', emergencyName], ['Relationship', emergencyRelationship], ['Emergency contact phone', emergencyPhone],
+    ['Driving', drivingEdited && !driverBlocked ? canDrive ? 'Available to drive students' : 'Not available to drive students' : 'No changes to saved driving information'],
+    ...(drivingEdited && !driverBlocked && canDrive ? [['Vehicle', vehicleName], ['Passenger seats', passengerSeats], ['Can pull team trailer', towCapable ? 'Yes' : 'No']] : []),
   ]
   return <div className={styles.page}><main className={styles.shell}>
     <header className={styles.header}><p className={styles.eyebrow}>TEAM 8044</p><h1>Set up your staff profile</h1>
@@ -91,7 +106,7 @@ function StaffWizard({ profile, reload, skip }: { profile: Basics; reload: () =>
       <p className={styles.muted}>Every item is optional. Leave anything blank and continue. Finishing saves your answers; skipped items keep any previously saved information. You can update details later in Profile.</p>
     </header>
     <section className={styles.card}>
-      <div className={styles.stepHead}><p className={styles.eyebrow}>Step {step + 1} of 3</p>
+      <div className={styles.stepHead}><p className={styles.eyebrow}>Step {step + 1} of {steps.length}</p>
         <h2 ref={heading} tabIndex={-1}>{steps[step]}</h2>
         <ol className={styles.progress} aria-label="Staff setup progress">{steps.map((label, index) =>
           <li key={label} data-active={index <= step} aria-current={index === step ? 'step' : undefined} aria-label={`${label}: ${index < step ? 'completed' : index === step ? 'current' : 'upcoming'}`} />)}</ol>
@@ -113,6 +128,19 @@ function StaffWizard({ profile, reload, skip }: { profile: Basics; reload: () =>
             <label className={styles.field}>Emergency contact name<Input maxLength={100} value={emergencyName} onChange={event => setEmergencyName(event.target.value)} /></label>
             <label className={styles.field}>Relationship<Input maxLength={100} value={emergencyRelationship} onChange={event => setEmergencyRelationship(event.target.value)} /></label>
             <label className={styles.field}>Emergency contact phone<Input type="tel" maxLength={50} value={emergencyPhone} onChange={event => setEmergencyPhone(event.target.value)} /></label>
+          </> : step === 2 ? <>
+            <p className={`${styles.muted} ${styles.full}`}>Driving is optional. Continue without changes or skip this step to keep your saved driving information.</p>
+            {driverNotice && <p className={`${styles.notice} ${styles.full}`}>{driverNotice}</p>}
+            <label className={`${styles.check} ${styles.full}`}><Checkbox checked={!driverBlocked && canDrive} disabled={driverBlocked} onCheckedChange={value => { setCanDrive(value); setDrivingEdited(true) }} />{adultProfileCopy.canDrive}</label>
+            {!driverBlocked && canDrive && <>
+              {!(phone.trim() || profile.phone.trim()) && <div className={styles.full}><p className={styles.muted}>Add a phone number in Contact information so the team can reach you when driving.</p><Button type="button" variant="outline" onClick={() => move(0)}>Add contact phone</Button></div>}
+              <label className={styles.field}>{adultProfileCopy.vehicle}<Input maxLength={100} value={vehicleName} onChange={event => { setVehicleName(event.target.value); setDrivingEdited(true) }} /></label>
+              <label className={styles.field}>{adultProfileCopy.passengerSeats}<Input type="number" min={1} max={100} step={1} value={passengerSeats} onChange={event => { setPassengerSeats(event.target.value); setDrivingEdited(true) }} /></label>
+              <label className={`${styles.check} ${styles.full}`}><Checkbox checked={towCapable} onCheckedChange={value => { setTowCapable(value); setDrivingEdited(true) }} />I can pull the team trailer</label>
+            </>}
+            <div className={styles.full}><Button type="button" variant="outline" onClick={() => {
+              setCanDrive(initialDriver.canDrive); setVehicleName(initialDriver.vehicleName); setPassengerSeats(initialDriver.passengerSeats?.toString() ?? ''); setTowCapable(initialDriver.towCapable); setDrivingEdited(false); move(3)
+            }}>Skip driving step</Button></div>
           </> : <dl className={styles.review}>{review.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value.trim() || 'Skipped'}</dd></div>)}</dl>}
         </fieldset>
         {stale && <div className={styles.notice} role="alert"><p>Your profile changed elsewhere. Reload the saved information before continuing. Unsaved answers will be replaced.</p><Button type="button" variant="outline" onClick={reload}>Reload saved information</Button></div>}
@@ -120,7 +148,7 @@ function StaffWizard({ profile, reload, skip }: { profile: Basics; reload: () =>
         <div className={styles.actions}>
           {step > 0 && <Button type="button" variant="outline" disabled={busy || stale} onClick={() => move(step - 1)}>Back</Button>}
           <span className={styles.spacer} />
-          <Button type="submit" disabled={busy || stale}>{busy ? 'Saving…' : step === 2 ? 'Finish setup' : 'Continue'}</Button>
+          <Button type="submit" disabled={busy || stale}>{busy ? 'Saving…' : step === 3 ? 'Finish setup' : 'Continue'}</Button>
         </div>
         <div className={styles.skip}>
           <p className={styles.muted}>You can skip setup and add your information later in Profile. “Don’t ask me again” turns off future setup reminders.</p>
