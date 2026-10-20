@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useAction, useMutation, useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
@@ -37,7 +38,7 @@ export function EventCalendarOperations({ eventId, coach, event }: { eventId: Id
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  useEffect(()=>{if(!coach||status?.state!=='unlinked'&&!status?.canReselect)return;let cancelled=false;setLookupBusy(true);void candidates({startsAt:event.startsAt,endsAt:event.endsAt}).then(result=>{if(cancelled)return;setMatches(result.items);setLookupError(result.error)}).catch(cause=>{if(!cancelled)setLookupError(cause instanceof Error?cause.message:'Calendar matches could not be checked.')}).finally(()=>{if(!cancelled)setLookupBusy(false)});return()=>{cancelled=true}},[status?.state,status?.canReselect,coach,candidates,event.startsAt,event.endsAt])
+  useEffect(()=>{if(!coach||status?.state!=='unlinked'&&!status?.canReselect)return;let cancelled=false;setLookupBusy(true);void candidates({startsAt:event.startsAt,endsAt:event.endsAt}).then(result=>{if(cancelled)return;setMatches(result.items);setLookupError(result.error)}).catch(cause=>{if(!cancelled)setLookupError(userFacingError(cause, 'Calendar matches could not be checked.'))}).finally(()=>{if(!cancelled)setLookupBusy(false)});return()=>{cancelled=true}},[status?.state,status?.canReselect,coach,candidates,event.startsAt,event.endsAt])
   if (!status) return <p role="status">Loading Calendar status…</p>
   const stateLabel = stateText[status.state as keyof typeof stateText] ?? 'Calendar status unavailable.'
   const revision = status.revision
@@ -45,7 +46,7 @@ export function EventCalendarOperations({ eventId, coach, event }: { eventId: Id
   const values = {name:title??event.name,destination:location??event.destination,startsAt:start??chicagoInputTime(event.startsAt),endsAt:end??chicagoInputTime(event.endsAt),mediaSupportRequested:media??status.mediaSupportRequested}
   function resetDraft(){setTitle(null);setLocation(null);setStart(null);setEnd(null);setMedia(null);setDraftRevision(null)}
   function edited(){setDraftRevision(current=>current??revision)}
-  async function act(run:()=>Promise<unknown>,message:string){setBusy(true);setError('');setSuccess('');try{await run();setSuccess(message);resetDraft()}catch(cause){setError(cause instanceof Error?cause.message:'Calendar could not be updated.')}finally{setBusy(false)}}
+  async function act(run:()=>Promise<unknown>,message:string){setBusy(true);setError('');setSuccess('');try{await run();setSuccess(message);resetDraft()}catch(cause){setError(userFacingError(cause, 'Calendar could not be updated.'))}finally{setBusy(false)}}
   function save(e:FormEvent){e.preventDefault();if(staleDraft){setError('This event changed while you were editing. Reload the latest values before saving.');return}const startsAt=parseChicagoInput(values.startsAt),endsAt=parseChicagoInput(values.endsAt);if(!values.name.trim()||!Number.isFinite(startsAt)||!Number.isFinite(endsAt)||endsAt<=startsAt){setError('Enter a title and an end time after the start in Central Time.');return}void act(()=>update({eventId,expectedRevision:draftRevision??revision,...(title!==null?{name:values.name.trim()}:{}),...(location!==null?{destination:values.destination.trim()}:{}),...(start!==null?{startsAt}:{}),...(end!==null?{endsAt}:{}),...(media!==null?{mediaSupportRequested:values.mediaSupportRequested}:{})}),'Changes saved. Calendar status will update when the write finishes.')}
   return <details className={styles.disclosure}><summary><strong>Team Calendar</strong><span>{stateLabel}</span></summary><div className={styles.disclosureBody}>
     <p role="status">{stateLabel}</p>

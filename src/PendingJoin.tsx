@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useAuthActions } from '@convex-dev/auth/react'
 import { useMutation, useQuery } from 'convex/react'
@@ -36,7 +37,7 @@ export function PendingJoin() {
     const timer = window.setTimeout(() => {
       void previewCode({ code: code.trim() }).then(result => {
         if (!canceled && current === generation.current) setPreview({ code, status: result.status })
-      }).catch(() => { if (!canceled && current === generation.current) setPreview({ code, status: 'unavailable' }) })
+      }).catch(cause => { if (!canceled && current === generation.current) { setPreview(null); setError(userFacingError(cause, 'The invitation could not be checked. Try entering the code again or contact a Coach.')) } })
     }, 350)
     return () => { canceled = true; window.clearTimeout(timer) }
   }, [code, valid, pending, sent, previewCode])
@@ -55,12 +56,12 @@ export function PendingJoin() {
         if (!requestId) { setError(liveCopy.join.invalidCode); return }
       }
       setCode(''); setPreview(null)
-    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)) }
+    } catch (cause) { setError(userFacingError(cause)) }
     finally { setBusy(false) }
   }
   async function exit() {
     setBusy(true); setSignOutError('')
-    try { await signOut() } catch { setSignOutError(liveCopy.join.signOutFailed) } finally { setBusy(false) }
+    try { await signOut() } catch (cause) { setSignOutError(userFacingError(cause, liveCopy.join.signOutFailed)) } finally { setBusy(false) }
   }
   if (!joinStatus || !connections) return <section className="card"><p>Checking your join request…</p></section>
   return <PendingJoinView waitingDetail={pending || sent ? "Your request is with your Coach. Your account will connect only after Coach approval." : undefined} declined={declined} submitted={submitted} busy={busy} signOutError={signOutError} onSignOut={() => void exit()}>

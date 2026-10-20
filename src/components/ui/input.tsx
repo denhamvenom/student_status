@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import * as React from "react"
 import { Input as InputPrimitive } from "@base-ui/react/input"
 import { cn } from "cn"
@@ -40,7 +41,7 @@ function ContactInput({ type, onChange, onBlur, onFocus, onInvalid, ...props }: 
   const validate = (input: HTMLInputElement, show: boolean) => {
     let message = ""
     try { normalize(input.value, initial.current) }
-    catch (cause) { message = cause instanceof Error ? cause.message : "Check this contact information." }
+    catch (cause) { message = userFacingError(cause, "Check this contact information.") }
     input.setCustomValidity(message)
     if (show) setError(message)
     return !message

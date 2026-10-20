@@ -1,4 +1,4 @@
-import { normalizeEmail } from "../shared/contact-format";
+import { normalizeEmail } from "./lib/contactValidation";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { action, internalMutation } from "./_generated/server";

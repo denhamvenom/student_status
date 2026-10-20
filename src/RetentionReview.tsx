@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { Component, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { useMutation, usePaginatedQuery, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
@@ -29,7 +30,7 @@ function date(value: number | null) {
 function dateTime(value: number) {
   return `${new Date(value).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' })} UTC`
 }
-function errorMessage(error: unknown) { return error instanceof Error ? error.message : copy.failed }
+function errorMessage(error: unknown) { return userFacingError(error, copy.failed) }
 
 function CandidateList({ rows, status, loadMore, onOpen }: {
   rows: ReadonlyArray<Candidate>
@@ -116,11 +117,11 @@ function RetentionContent() {
   </div>
 }
 
-class RetentionBoundary extends Component<{ children: ReactNode; retry: () => void }, { failed: boolean }> {
-  state = { failed: false }
-  static getDerivedStateFromError() { return { failed: true } }
+class RetentionBoundary extends Component<{ children: ReactNode; retry: () => void }, { error: unknown }> {
+  state = { error: null as unknown }
+  static getDerivedStateFromError(error: unknown) { return { error } }
   render() {
-    return this.state.failed ? <section role="alert"><h1>{copy.title}</h1><p>{copy.failed}</p><Button type="button" onClick={this.props.retry}>{copy.retry}</Button></section> : this.props.children
+    return this.state.error !== null ? <section role="alert"><h1>{copy.title}</h1><p>{userFacingError(this.state.error, copy.failed, false)}</p><Button type="button" onClick={this.props.retry}>{copy.retry}</Button></section> : this.props.children
   }
 }
 

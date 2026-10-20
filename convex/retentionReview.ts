@@ -1,5 +1,5 @@
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
@@ -39,27 +39,27 @@ type ReadCtx = QueryCtx | MutationCtx;
 function key(item: Subject) { return `${item.kind}:${item.id}`; }
 
 function checkPageSize(numItems: number) {
-  if (!Number.isInteger(numItems) || numItems < 1 || numItems > 50) throw new Error("Choose a page size from 1 to 50.");
+  if (!Number.isInteger(numItems) || numItems < 1 || numItems > 50) throw new ConvexError("Choose a page size from 1 to 50.");
 }
 
 function boundedPage(options: typeof paginationOptsValidator.type) {
   checkPageSize(options.numItems);
-  if (options.maximumRowsRead !== undefined && (!Number.isSafeInteger(options.maximumRowsRead) || options.maximumRowsRead < 1)) throw new Error("Maximum rows read must be a positive whole number.");
+  if (options.maximumRowsRead !== undefined && (!Number.isSafeInteger(options.maximumRowsRead) || options.maximumRowsRead < 1)) throw new ConvexError("Maximum rows read must be a positive whole number.");
   return { ...options, maximumRowsRead: Math.min(options.maximumRowsRead ?? 51, 51) };
 }
 
 export function checkHydrationCount(count: number) {
-  if (count > 50) throw new Error("This page is too large to review. Choose a smaller page boundary.");
+  if (count > 50) throw new ConvexError("This page is too large to review. Choose a smaller page boundary.");
 }
 
 function checkAsOf(asOf: number) {
-  if (!Number.isSafeInteger(asOf) || asOf < 0) throw new Error("Review time is invalid.");
+  if (!Number.isSafeInteger(asOf) || asOf < 0) throw new ConvexError("Review time is invalid.");
 }
 
 async function current(ctx: ReadCtx, item: Subject) {
   if (item.kind === "student") {
     const student = await ctx.db.get(item.id);
-    if (!student) throw new Error("Student record is unavailable.");
+    if (!student) throw new ConvexError("Student record is unavailable.");
     const account = student.userId ? await ctx.db.get(student.userId) : null;
     const fingerprint = archiveFingerprint("student", student._id, student.active, student.archivedAt ?? null, account);
     const accountBlocked = account?.active === true;
@@ -68,7 +68,7 @@ async function current(ctx: ReadCtx, item: Subject) {
     return { label: student.legalName, role: null, archivedAt: student.archivedAt ?? null, latest, fingerprint, active: student.active, accountBlocked, missingLinkedDate };
   }
   const account = await ctx.db.get(item.id);
-  if (!account) throw new Error("Application account is unavailable.");
+  if (!account) throw new ConvexError("Application account is unavailable.");
   return { label: account.name, role: account.role, archivedAt: account.archivedAt ?? null, latest: account.archivedAt ?? null, fingerprint: archiveFingerprint("account", account._id, account.active, account.archivedAt ?? null), active: account.active, accountBlocked: false, missingLinkedDate: false };
 }
 
@@ -141,14 +141,14 @@ export const setHold = mutation({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach");
     const reason = args.reason.trim();
-    if (!reason || reason.length > 1000) throw new Error("A reason under 1000 characters is required.");
+    if (!reason || reason.length > 1000) throw new ConvexError("A reason under 1000 characters is required.");
     const state = await current(ctx, args.subject);
-    if (args.action === "hold" && (state.active || state.archivedAt === null)) throw new Error("This account is active or has no archive date. Reload Archived records.");
-    if (state.fingerprint !== args.expectedArchiveFingerprint) throw new Error("Archive status changed. Reload Archived records before recording a decision.");
+    if (args.action === "hold" && (state.active || state.archivedAt === null)) throw new ConvexError("This account is active or has no archive date. Reload Archived records.");
+    if (state.fingerprint !== args.expectedArchiveFingerprint) throw new ConvexError("Archive status changed. Reload Archived records before recording a decision.");
     const previous = await latestEvent(ctx, args.subject);
-    if ((previous?._id ?? null) !== args.expectedLatestHoldEventId) throw new Error("Hold history changed. Reload before recording a decision.");
-    if (args.action === "hold" && previous?.action === "hold") throw new Error("A hold is already active for this archive instance.");
-    if (args.action === "release" && previous?.action !== "hold") throw new Error("There is no active hold to release for this archive instance.");
+    if ((previous?._id ?? null) !== args.expectedLatestHoldEventId) throw new ConvexError("Hold history changed. Reload before recording a decision.");
+    if (args.action === "hold" && previous?.action === "hold") throw new ConvexError("A hold is already active for this archive instance.");
+    if (args.action === "release" && previous?.action !== "hold") throw new ConvexError("There is no active hold to release for this archive instance.");
     return await ctx.db.insert("retentionHoldEvents", { subjectKind: args.subject.kind, subjectId: args.subject.id, subjectKey: key(args.subject), archiveFingerprint: state.fingerprint, archivedAt: state.archivedAt ?? previous!.archivedAt, action: args.action, reason, actorId: actor._id, recordedAt: Date.now() });
   },
 });

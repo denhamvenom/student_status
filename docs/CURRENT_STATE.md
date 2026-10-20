@@ -1,9 +1,11 @@
 # Current integration handoff
 
-## Contact formatting production release
+## Actionable errors - development only
 
-Owner authorized release of fdabbe3. Production Convex amicable-eel-413 deployment succeeded with typecheck/schema validation; no indexes deleted. Website merge/build evidence is recorded on the release PR and release notes. See RELEASE_2026-10-20_CONTACT_FORMATS.md and CONTACT_INPUT_FORMATS.md.
+Active checkout: student-status-readiness-design, branch fix/actionable-errors-2026-10-20, based on verified released main 9deefe7. Prior development-review-fixtures and sibling parent-email-invitations branches shared that base. Preserve sibling worktrees and unrelated local .tmp-adult-tests.
 
-Shared phone/email input formatting and backend validation apply throughout contact entry. Optional blanks and unchanged legacy contacts preserved; historical signed snapshots/OAuth identity unchanged. 84 backend/helper tests covered, two CSV tests passed, independent review, browser checks and lint/types/build passed. No real record submits or emails during release.
+Implemented consistent explicit backend error contracts and shared frontend presentation, including parent-invite cooldown guidance and private internal diagnostics. Independent Astra review has no blockers. Development third-bandicoot-18 synchronized; localhost actual-component error review is ready. See [verification and limitations](ACTIONABLE_ERRORS.md).
 
-Root owns release integration on feature/parent-email-invitations. Other chat holds shared sync/merges until handoff. Development email stays disabled and Calendar writes production-only. Historical unrelated501-charge fee timeout remains separate.
+Reviewed development checkpoint is being published on this feature branch with a draft PR; remote publication must be verified before claiming it complete. Main merge and production remain unauthorized. Next: owner reviews localhost http://127.0.0.1:5182/setup?scenario=cooldown (fictional fixture); real development app is http://127.0.0.1:5173. Development email stays disabled and Calendar writes production-only.
+
+Latest production baseline remains contact formatting PR29 at 9deefe7; see RELEASE_2026-10-20_CONTACT_FORMATS.md. Historical >500-charge fee test timeout remains unresolved and separate.

@@ -1,3 +1,4 @@
+import { savedPublicError } from './lib/publicErrors';
 import { recordChargeRevisionChange, recordPriorityJobChange } from "./lib/financeChanges";
 import { makeFunctionReference } from "convex/server";
 import { v } from "convex/values";
@@ -84,7 +85,7 @@ export const run = internalMutation({
     const job = await ctx.db.get(args.jobId); if (!job || !["draining", "applying"].includes(job.state)) return null;
     try { await ctx.runMutation(stepRef, { jobId: job._id, step: job.step }); }
     catch (error) {
-      await ctx.db.patch(job._id, { state: "failed", lastError: error instanceof Error ? error.message.slice(0, 500) : "Fee priority maintenance failed.", updatedAt: Date.now() });
+      await ctx.db.patch(job._id, { state: "failed", lastError: savedPublicError(error, "Fee priority maintenance failed."), updatedAt: Date.now() });
       const control = await seasonFinanceControl(ctx, job.seasonId);
       if (control?.priorityJobId === job._id) await ctx.db.patch(control._id, { state: "failed", updatedAt: Date.now() });
     }

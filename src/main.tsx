@@ -8,6 +8,7 @@ import App from './App'
 import { AboutPage, PrivacyPage, TermsPage } from './PublicPages'
 import { PublicFooter } from './PublicFooter'
 import { uiCopy } from './lib/ui-copy'
+import { userFacingError } from './lib/error-message'
 import { Toaster } from './components/ui/sonner'
 import './shadcn.css'
 import '@fontsource/anton/latin-400.css'
@@ -15,10 +16,10 @@ import './styles.css'
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL
 const client = convexUrl ? new ConvexReactClient(convexUrl) : null
-class AppErrorBoundary extends React.Component<{children:React.ReactNode},{failed:boolean}> {
-  state={failed:false}
-  static getDerivedStateFromError(){return {failed:true}}
-  render(){return this.state.failed?<div className="signin-content" role="alert"><h1>{uiCopy.errors.pageTitle}</h1><p>{uiCopy.errors.pageBody}</p><button className="button button-primary" onClick={()=>window.location.reload()}>{uiCopy.errors.reload}</button></div>:this.props.children}
+class AppErrorBoundary extends React.Component<{children:React.ReactNode},{error:unknown}> {
+  state={error:null as unknown}
+  static getDerivedStateFromError(error:unknown){return {error}}
+  render(){return this.state.error!==null?<div className="signin-content" role="alert"><h1>{uiCopy.errors.pageTitle}</h1><p>{userFacingError(this.state.error, uiCopy.errors.pageBody, false)}</p><button className="button button-primary" onClick={()=>window.location.reload()}>{uiCopy.errors.reload}</button></div>:this.props.children}
 }
 const app = <div className="app-frame">{client?<ConvexAuthProvider client={client}><App /></ConvexAuthProvider>:<App />}<PublicFooter /></div>
 const router = createBrowserRouter([

@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { operationsCopy, operationsText } from './lib/operations-copy'
 import { useRef, useState, type FormEvent } from 'react'
 import { useMutation, useQuery } from 'convex/react'
@@ -13,7 +14,7 @@ import styles from './features/operations/Operations.module.css'
 import { chargeCurrency } from './lib/charge-money'
 
 const usd = chargeCurrency
-const message = (error:unknown) => error instanceof Error ? error.message : String(error)
+const message = (error:unknown) => userFacingError(error)
 const progressLabel = (state:string) => state === 'complete' ? 'Financial work complete' : state === 'failed' ? 'Needs Coach review' : 'In progress'
 const key = () => crypto.randomUUID()
 const exactCents = (value: string) => {
@@ -30,7 +31,7 @@ function ProcessingStatus({ progress, canRetry = false, alreadyLeft = false }: {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   if (!progress) return <p role="status">{alreadyLeft?'Your place has been released. The fee decision is still being processed.':'Withdrawal processing is underway. Participation and room placement remain unchanged until all work finishes.'}</p>
-  return <section aria-label="Withdrawal processing status"><p role="status">Withdrawal processing: {progressLabel(progress.state)}. Returned to travel accounts: {usd(progress.committedCents)} of {usd(progress.totalCents)}. {progress.state !== 'complete' && (alreadyLeft?'Your place has already been released. Remaining fee changes are not complete.':'Remaining returns and charge changes are not complete. Participation and room placement remain unchanged until all work finishes.')}</p>{progress.lastError && <p role="alert" className="open-text">{progress.lastError}</p>}{canRetry && <form className="form-grid" onSubmit={async event => { event.preventDefault(); if (busy || reason.trim().length < 8) return; setBusy(true); setError(''); try { await retry({ jobId: progress.jobId, reason: reason.trim() }); setReason('') } catch (cause) { setError(message(cause)) } finally { setBusy(false) } }}><label>Reason for retry (at least 8 characters)<Input value={reason} onChange={event => setReason(event.target.value)} minLength={8} maxLength={1000} disabled={busy} required /></label><Button type="submit" disabled={busy || reason.trim().length < 8}>Retry remaining withdrawal work</Button></form>}{error && <p role="alert">{error}</p>}</section>
+  return <section aria-label="Withdrawal processing status"><p role="status">Withdrawal processing: {progressLabel(progress.state)}. Returned to travel accounts: {usd(progress.committedCents)} of {usd(progress.totalCents)}. {progress.state !== 'complete' && (alreadyLeft?'Your place has already been released. Remaining fee changes are not complete.':'Remaining returns and charge changes are not complete. Participation and room placement remain unchanged until all work finishes.')}</p>{progress.lastError && <p role="alert" className="open-text">{userFacingError(new Error(progress.lastError), 'Processing stopped. Check the current status before retrying, or ask a Coach for help.')}</p>}{canRetry && <form className="form-grid" onSubmit={async event => { event.preventDefault(); if (busy || reason.trim().length < 8) return; setBusy(true); setError(''); try { await retry({ jobId: progress.jobId, reason: reason.trim() }); setReason('') } catch (cause) { setError(message(cause)) } finally { setBusy(false) } }}><label>Reason for retry (at least 8 characters)<Input value={reason} onChange={event => setReason(event.target.value)} minLength={8} maxLength={1000} disabled={busy} required /></label><Button type="submit" disabled={busy || reason.trim().length < 8}>Retry remaining withdrawal work</Button></form>}{error && <p role="alert">{error}</p>}</section>
 }
 
 export function StudentWithdrawal({eventId,studentId}:{eventId:Id<'events'>;studentId:Id<'students'>}) {

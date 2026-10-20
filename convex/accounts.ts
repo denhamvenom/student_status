@@ -1,7 +1,7 @@
-import { normalizeEmail } from "../shared/contact-format";
+import { normalizeEmail } from "./lib/contactValidation";
 import { internal } from "./_generated/api";
 import { parentInviteEmailConfiguration } from "./lib/parentInviteEmail";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
 import { mutation, query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
@@ -15,11 +15,11 @@ const adultRole = v.union(v.literal("coach"), v.literal("mentor"));
 const grantFields = { role: adultRole, travelLead: v.boolean(), financialEdit: v.boolean(), healthExport: v.boolean() };
 const adultSummary = v.object({ userId: v.id("appUsers"), name: v.string(), email: v.string(), ...grantFields, active: v.boolean(), revision: v.number() });
 function grants(value: { role: "coach" | "mentor"; travelLead: boolean; financialEdit: boolean; healthExport: boolean }) {
-  if (value.role === "coach" && (value.travelLead || value.financialEdit || value.healthExport)) throw new Error("Coach access includes these capabilities; separate grants are for Travel Leads.");
-  if (value.role === "mentor" && !value.travelLead && (value.financialEdit || value.healthExport)) throw new Error("Separate finance and health export grants require Travel Lead access.");
+  if (value.role === "coach" && (value.travelLead || value.financialEdit || value.healthExport)) throw new ConvexError("Coach access includes these capabilities; separate grants are for Travel Leads.");
+  if (value.role === "mentor" && !value.travelLead && (value.financialEdit || value.healthExport)) throw new ConvexError("Separate finance and health export grants require Travel Lead access.");
 }
 function summary(user: Doc<"appUsers">) {
-  if (user.role !== "coach" && user.role !== "mentor") throw new Error("Adult account required.");
+  if (user.role !== "coach" && user.role !== "mentor") throw new ConvexError("Adult account required.");
   return { userId: user._id, name: user.name, email: user.email, role: user.role, travelLead: user.role === "mentor" && user.travelLead, financialEdit: user.role === "mentor" && user.financialEdit, healthExport: user.role === "mentor" && (user.healthExport ?? false), active: user.active, revision: user.accessRevision ?? 0 };
 }
 
@@ -45,15 +45,15 @@ export const inviteAdult = mutation({
   args: { email: v.string(), ...grantFields }, returns: v.object({ invitationId: v.id("adultInvitations"), expiresAt: v.number() }),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach"); grants(args);
-    if (!parentInviteEmailConfiguration()) throw new Error("Automatic invitation email is not configured. Ask a Coach for help.");
+    if (!parentInviteEmailConfiguration()) throw new ConvexError("Automatic invitation email is not configured. Ask a Coach for help.");
     const email = normalizeEmail(args.email, "Account email");
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) throw new Error("Enter a valid account email.");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) throw new ConvexError("Enter a valid account email.");
     const existing = await ctx.db.query("appUsers").withIndex("by_email", q => q.eq("email", email)).take(2);
-    if (existing.length) throw new Error("This email already has an account. Use account controls instead.");
+    if (existing.length) throw new ConvexError("This email already has an account. Use account controls instead.");
     const prior = await ctx.db.query("adultInvitations").withIndex("by_email_and_status", q => q.eq("email", email).eq("status", "pending")).take(101);
-    if (prior.length > 100) throw new Error("Invitation limit reached; Coach review is required.");
+    if (prior.length > 100) throw new ConvexError("Invitation limit reached; Coach review is required.");
     const latest = await ctx.db.query("adultInvitations").withIndex("by_email_and_createdAt", q => q.eq("email", email)).order("desc").first();
-    if (latest && resendAvailableAt(latest) > Date.now()) throw new Error("Wait one hour before resending this invitation.");
+    if (latest && resendAvailableAt(latest) > Date.now()) throw new ConvexError("Wait one hour before resending this invitation.");
     for (const row of prior) await ctx.db.patch(row._id, { status: "replaced" });
     const token = newToken(); const now = Date.now(); const expiresAt = now + 7 * 86400000;
     const invitationId = await ctx.db.insert("adultInvitations", { email, role: args.role, travelLead: args.travelLead, financialEdit: args.financialEdit, healthExport: args.healthExport, tokenHash: await tokenHash(token), status: "pending", createdBy: actor._id, createdAt: now, expiresAt, emailStatus: "queued", emailQueuedAt: now, emailAttempt: 0 });
@@ -68,13 +68,13 @@ export const resendInvitation = mutation({
   args: { invitationId: v.id("adultInvitations") }, returns: v.object({ invitationId: v.id("adultInvitations"), expiresAt: v.number() }),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach");
-    if (!parentInviteEmailConfiguration()) throw new Error("Automatic invitation email is not configured. Ask a Coach for help.");
+    if (!parentInviteEmailConfiguration()) throw new ConvexError("Automatic invitation email is not configured. Ask a Coach for help.");
     const row = await ctx.db.get(args.invitationId); const now = Date.now();
-    if (!row || row.status !== "pending" || row.expiresAt <= now) throw new Error("Pending active invitation not found.");
+    if (!row || row.status !== "pending" || row.expiresAt <= now) throw new ConvexError("Pending active invitation not found.");
     const issuer = await ctx.db.get(row.createdBy);
-    if (!issuer?.active || issuer.role !== "coach") throw new Error("Inviting Coach access was removed. Create a new invitation.");
-    if (resendAvailableAt(row) > now) throw new Error("Wait one hour before resending this invitation.");
-    if ((await ctx.db.query("appUsers").withIndex("by_email", q => q.eq("email", row.email)).take(1)).length) throw new Error("This email already has an account. Use account controls instead.");
+    if (!issuer?.active || issuer.role !== "coach") throw new ConvexError("Inviting Coach access was removed. Create a new invitation.");
+    if (resendAvailableAt(row) > now) throw new ConvexError("Wait one hour before resending this invitation.");
+    if ((await ctx.db.query("appUsers").withIndex("by_email", q => q.eq("email", row.email)).take(1)).length) throw new ConvexError("This email already has an account. Use account controls instead.");
     const token = newToken(); const hash = await tokenHash(token); const expiresAt = now + 7 * 86400000;
     await ctx.db.patch(row._id, { tokenHash: hash, createdBy: actor._id, expiresAt, emailStatus: "queued", emailQueuedAt: now, emailAttempt: 0, emailError: undefined, emailSentAt: undefined });
     await ctx.scheduler.runAfter(0, internal.adultInviteEmail.send, { inviteId: row._id, token, attempt: 1 });
@@ -89,7 +89,7 @@ export const revokeInvitation = mutation({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach");
     const row = await ctx.db.get(args.invitationId);
-    if (!row || row.status !== "pending") throw new Error("Pending invitation not found.");
+    if (!row || row.status !== "pending") throw new ConvexError("Pending invitation not found.");
     await ctx.db.patch(row._id, { status: "revoked" });
     await audit(ctx, actor, "adultInvitations", row._id, "revoke", "pending", "revoked");
     return null;
@@ -118,23 +118,23 @@ export const preview = mutation({
 export const accept = mutation({
   args: { token: v.string() }, returns: v.object({ userId: v.id("appUsers") }),
   handler: async (ctx, args) => {
-    if (!/^[0-9a-f]{64}$/.test(args.token)) throw new Error("Invitation unavailable.");
+    if (!/^[0-9a-f]{64}$/.test(args.token)) throw new ConvexError("Invitation unavailable.");
     const hash = await tokenHash(args.token);
     const row = await ctx.db.query("adultInvitations").withIndex("by_tokenHash", q => q.eq("tokenHash", hash)).unique();
-    if (!row || row.status !== "pending" || row.expiresAt <= Date.now()) throw new Error("Invitation unavailable or expired.");
+    if (!row || row.status !== "pending" || row.expiresAt <= Date.now()) throw new ConvexError("Invitation unavailable or expired.");
     const issuer = await ctx.db.get(row.createdBy);
-    if (!issuer?.active || issuer.role !== "coach") throw new Error("Inviting Coach access was removed. Ask a Coach for a new invitation.");
+    if (!issuer?.active || issuer.role !== "coach") throw new ConvexError("Inviting Coach access was removed. Ask a Coach for a new invitation.");
     const who = await verifiedAdult(ctx);
-    if (!who || who.email !== row.email) throw new Error("Sign in with the invited verified Google or email-code account.");
-    if (await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique() || (await ctx.db.query("appUsers").withIndex("by_email", q => q.eq("email", who.email)).take(2)).length) throw new Error("This account already has access or another role. Ask a Coach for help.");
+    if (!who || who.email !== row.email) throw new ConvexError("Sign in with the invited verified Google or email-code account.");
+    if (await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique() || (await ctx.db.query("appUsers").withIndex("by_email", q => q.eq("email", who.email)).take(2)).length) throw new ConvexError("This account already has access or another role. Ask a Coach for help.");
     const priorJoins = await ctx.db.query("joinRequests").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).take(21);
     const priorBulk = await ctx.db.query("bulkInviteConnectionRequests").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).take(21);
-    if (priorJoins.length > 20 || priorBulk.length > 20 || priorJoins.some(request => request.status === "approved") || priorBulk.some(request => request.status === "approved")) throw new Error("This account has linked student access or enrollment history requiring Coach review.");
+    if (priorJoins.length > 20 || priorBulk.length > 20 || priorJoins.some(request => request.status === "approved") || priorBulk.some(request => request.status === "approved")) throw new ConvexError("This account has linked student access or enrollment history requiring Coach review.");
     grants(row);
     const userId = await ctx.db.insert("appUsers", { authUserId: who.authUserId, email: who.email, name: who.name, role: row.role, travelLead: row.travelLead, financialEdit: row.financialEdit, healthExport: row.healthExport, active: true, accessRevision: 0 });
     await ctx.db.patch(row._id, { status: "accepted", acceptedBy: userId, acceptedAt: Date.now() });
     const user = await ctx.db.get(userId);
-    if (!user) throw new Error("New account is unavailable.");
+    if (!user) throw new ConvexError("New account is unavailable.");
     await audit(ctx, user, "adultInvitations", row._id, "accept", "pending", summary(user));
     for (const request of priorJoins) if (request.status === "pending") {
       await ctx.db.patch(request._id, { status: "declined", decidedAt: Date.now(), decidedBy: user._id });
@@ -153,13 +153,13 @@ export const updateAdult = mutation({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach"); grants(args);
     const user = await ctx.db.get(args.userId);
-    if (!user || (user.role !== "coach" && user.role !== "mentor")) throw new Error("Adult account not found. Student and parent roles cannot be converted here.");
-    if ((user.accessRevision ?? 0) !== args.expectedRevision) throw new Error("Account changed. Reload before saving access.");
-    if (!args.reason.trim() || args.reason.trim().length > 1000) throw new Error("A reason under 1000 characters is required.");
+    if (!user || (user.role !== "coach" && user.role !== "mentor")) throw new ConvexError("Adult account not found. Student and parent roles cannot be converted here.");
+    if ((user.accessRevision ?? 0) !== args.expectedRevision) throw new ConvexError("Account changed. Reload before saving access.");
+    if (!args.reason.trim() || args.reason.trim().length > 1000) throw new ConvexError("A reason under 1000 characters is required.");
     if (user.active && user.role === "coach" && (!args.active || args.role !== "coach")) {
       const coaches = await ctx.db.query("appUsers").withIndex("by_role", q => q.eq("role", "coach")).take(501);
-      if (coaches.length > 500) throw new Error("Coach roster limit reached; account review is required.");
-      if (!coaches.some(coach => coach._id !== user._id && coach.active)) throw new Error("The last active Coach cannot lose Coach access.");
+      if (coaches.length > 500) throw new ConvexError("Coach roster limit reached; account review is required.");
+      if (!coaches.some(coach => coach._id !== user._id && coach.active)) throw new ConvexError("The last active Coach cannot lose Coach access.");
     }
     const patch = { role: args.role, travelLead: args.travelLead, financialEdit: args.financialEdit, healthExport: args.healthExport, active: args.active, accessRevision: (user.accessRevision ?? 0) + 1, ...(user.active && !args.active ? { archivedAt: Date.now() } : {}) };
     await ctx.db.patch(user._id, patch);

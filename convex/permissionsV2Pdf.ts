@@ -1,6 +1,6 @@
 "use node";
 
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
@@ -16,7 +16,7 @@ async function sha256(bytes: Uint8Array) {
   return Buffer.from(digest).toString("hex");
 }
 async function storePdf(ctx: {storage: {store(blob: Blob): Promise<import("./_generated/dataModel").Id<"_storage">>}}, bytes: Uint8Array) {
-  if (bytes.length < 100 || bytes.length > 4_000_000 || Buffer.from(bytes.subarray(0, 5)).toString("ascii") !== "%PDF-") throw new Error("Rendered PDF is invalid or too large.");
+  if (bytes.length < 100 || bytes.length > 4_000_000 || Buffer.from(bytes.subarray(0, 5)).toString("ascii") !== "%PDF-") throw new ConvexError("Rendered PDF is invalid or too large.");
   const storageId = await ctx.storage.store(new Blob([Uint8Array.from(bytes)], {type: "application/pdf"}));
   return {storageId, sha256: await sha256(bytes)};
 }
@@ -44,9 +44,9 @@ export const submit = action({
     const prepared: Preflight = await ctx.runMutation(internal.permissionsV2.preflightSubmit, args);
     if (prepared.kind === "existing") return prepared.submissionId;
     const reviewedBlob = await ctx.storage.get(prepared.reviewedPdfId);
-    if (!reviewedBlob) throw new Error("Reviewed PDF is unavailable.");
+    if (!reviewedBlob) throw new ConvexError("Reviewed PDF is unavailable.");
     const reviewedBytes = new Uint8Array(await reviewedBlob.arrayBuffer());
-    if (await sha256(reviewedBytes) !== prepared.reviewedPdfSha256) throw new Error("Reviewed PDF failed integrity check.");
+    if (await sha256(reviewedBytes) !== prepared.reviewedPdfSha256) throw new ConvexError("Reviewed PDF failed integrity check.");
     const bytes = await appendFieldTripSignature(reviewedBytes, {typedName: args.typedName.trim(), signedAt: prepared.signedAt, reviewedSha256: prepared.reviewedPdfSha256, source: "electronic", templateVersion: prepared.snapshot.templateVersion});
     const pdf = await storePdf(ctx, bytes);
     return ctx.runMutation(internal.permissionsV2.commitSubmit, {...args, signedAt: prepared.signedAt, signedPdfId: pdf.storageId, signedPdfSha256: pdf.sha256, reviewedPdfSha256: prepared.reviewedPdfSha256});
@@ -57,11 +57,11 @@ export const submitPaper = action({
   handler: async (ctx, args): Promise<Id<"permissionSubmissions">> => {
     const prepared: Preflight = await ctx.runMutation(internal.permissionsV2.preflightSubmit, args);
     if (prepared.kind === "existing") return prepared.submissionId;
-    if (prepared.snapshot.signer.source !== "paper") throw new Error("This is not a paper record.");
+    if (prepared.snapshot.signer.source !== "paper") throw new ConvexError("This is not a paper record.");
     const reviewedBlob = await ctx.storage.get(prepared.reviewedPdfId);
-    if (!reviewedBlob) throw new Error("Reviewed PDF is unavailable.");
+    if (!reviewedBlob) throw new ConvexError("Reviewed PDF is unavailable.");
     const reviewedBytes = new Uint8Array(await reviewedBlob.arrayBuffer());
-    if (await sha256(reviewedBytes) !== prepared.reviewedPdfSha256) throw new Error("Reviewed PDF failed integrity check.");
+    if (await sha256(reviewedBytes) !== prepared.reviewedPdfSha256) throw new ConvexError("Reviewed PDF failed integrity check.");
     const pdf = await storePdf(ctx, await appendFieldTripSignature(reviewedBytes, {typedName: args.typedName.trim(), signedAt: prepared.signedAt, reviewedSha256: prepared.reviewedPdfSha256, source: "paper", templateVersion: prepared.snapshot.templateVersion}));
     return ctx.runMutation(internal.permissionsV2.commitSubmit, {...args, signedAt: prepared.signedAt, signedPdfId: pdf.storageId, signedPdfSha256: pdf.sha256, reviewedPdfSha256: prepared.reviewedPdfSha256});
   },
@@ -71,9 +71,9 @@ export const pdf = action({
   handler: async (ctx, args) => {
     const access: {storageId: Id<"_storage">; sha256: string} = await ctx.runQuery(internal.permissionsV2.pdfAccess, {...args, now: Date.now()});
     const blob: Blob | null = await ctx.storage.get(access.storageId);
-    if (!blob) throw new Error("PDF evidence is unavailable.");
+    if (!blob) throw new ConvexError("PDF evidence is unavailable.");
     const bytes = new Uint8Array(await blob.arrayBuffer());
-    if (await sha256(bytes) !== access.sha256) throw new Error("PDF evidence failed integrity check.");
+    if (await sha256(bytes) !== access.sha256) throw new ConvexError("PDF evidence failed integrity check.");
     return {bytes: Uint8Array.from(bytes).buffer, sha256: access.sha256};
   },
 });

@@ -1,8 +1,9 @@
+import { savedPublicError, publicErrorResult } from './lib/publicErrors';
 import { requireSeasonTransitionFinancialAccess } from "./lib/seasonFinance";
 import { recordOperationChange } from "./lib/financeChanges";
 import { requireSeasonFinancialRetry, seasonFinancialRetryAvailable } from "./lib/seasonFinance";
 import { makeFunctionReference } from "convex/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import schema from "./schema";
 import { activeSeason, audit, viewer } from "./lib/access";
@@ -21,11 +22,11 @@ export const status = query({
   args: { studentId: v.id("students"), operationId: v.optional(v.id("financeOperations")) }, returns: v.object({ job: v.union(schema.doc("financialOperationJobs"), v.null()), operation: v.union(schema.doc("financeOperations"), v.null()), canRetry: v.boolean() }),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); const season = await activeSeason(ctx); const student = await ctx.db.get(args.studentId);
-    if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new Error("Financial operation access denied.");
-    if (!student || student.seasonId !== season._id) throw new Error("Student is unavailable in the active season.");
+    if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Financial operation access denied.");
+    if (!student || student.seasonId !== season._id) throw new ConvexError("Student is unavailable in the active season.");
     const account = await financialAccount(ctx, student._id);
     const operation = args.operationId ? await ctx.db.get(args.operationId) : null;
-    if (args.operationId && (!operation || operation.studentId !== student._id)) throw new Error("Financial operation is unavailable for this student.");
+    if (args.operationId && (!operation || operation.studentId !== student._id)) throw new ConvexError("Financial operation is unavailable for this student.");
     const jobId = operation?.jobId ?? account?.operationJobId;
     const job = jobId ? await ctx.db.get(jobId) : null;
     let canRetry = actor.role === "coach" && job?.state === "failed" && student.active;
@@ -34,7 +35,7 @@ export const status = query({
       canRetry = !!event && !event.archived && event.seasonId === season._id;
     }
     if (canRetry && job) canRetry = await seasonFinancialRetryAvailable(ctx, season._id, job._id);
-    return { job, operation, canRetry };
+    return publicErrorResult({ job, operation, canRetry });
   },
 });
 
@@ -133,12 +134,12 @@ export const run = internalMutation({
     if (!job || job.state !== "running") return null;
     try { await ctx.runMutation(pageRef, { jobId: job._id, step: job.step }); }
     catch (error) {
-      await ctx.db.patch(job._id, { state: "failed", lastError: error instanceof Error ? error.message.slice(0, 500) : "Financial operation failed; Coach review is required.", updatedAt: Date.now() });
+      await ctx.db.patch(job._id, { state: "failed", lastError: savedPublicError(error, "Financial operation failed; Coach review is required."), updatedAt: Date.now() });
       if (job.operationId) await ctx.db.patch(job.operationId, { state: "failed" });
       for (const studentId of [job.studentId, job.recipientStudentId]) {
         if (!studentId) continue;
         const account = await financialAccount(ctx, studentId);
-        if (account?.operationJobId === job._id && account.state === "posting") await ctx.db.patch(account._id, { state: "failed", lastError: "Financial operation failed; Coach retry is required." });
+        if (account?.operationJobId === job._id && account.state === "posting") await ctx.db.patch(account._id, { state: "failed", lastError: savedPublicError(null, "Financial operation failed; Coach retry is required.") });
       }
     }
     return null;
@@ -149,22 +150,22 @@ export const retry = mutation({
   args: { jobId: v.id("financialOperationJobs"), reason: v.string() }, returns: v.null(),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx);
-    if (actor.role !== "coach") throw new Error("Only a Coach may retry a financial operation.");
-    if (args.reason.trim().length < 8 || args.reason.length > 1000) throw new Error("Provide a reason of at least eight characters.");
+    if (actor.role !== "coach") throw new ConvexError("Only a Coach may retry a financial operation.");
+    if (args.reason.trim().length < 8 || args.reason.length > 1000) throw new ConvexError("Provide a reason of at least eight characters.");
     const season = await activeSeason(ctx);
     const job = await ctx.db.get(args.jobId);
-    if (!job || job.state !== "failed") throw new Error("No failed operation is available to retry.");
+    if (!job || job.state !== "failed") throw new ConvexError("No failed operation is available to retry.");
     await requireSeasonFinancialRetry(ctx, season._id, job._id);
     if (job.kind === "chargeCorrection" && job.eventId) {
       const event = await ctx.db.get(job.eventId);
-      if (!event || event.archived || event.seasonId !== season._id) throw new Error("Correction event is archived or unavailable; explicit historical review is required.");
+      if (!event || event.archived || event.seasonId !== season._id) throw new ConvexError("Correction event is archived or unavailable; explicit historical review is required.");
     }
     for (const studentId of [job.studentId, job.recipientStudentId]) {
       if (!studentId) continue;
       const account = await financialAccount(ctx, studentId);
       const student = await ctx.db.get(studentId);
       const generation = studentId === job.studentId ? job.generation : job.recipientGeneration;
-      if (!student?.active || student.seasonId !== season._id || !account || account.state !== "failed" || account.operationJobId !== job._id || account.generation !== generation) throw new Error("Financial operation account changed.");
+      if (!student?.active || student.seasonId !== season._id || !account || account.state !== "failed" || account.operationJobId !== job._id || account.generation !== generation) throw new ConvexError("Financial operation account changed.");
       await ctx.db.patch(account._id, { state: "posting", lastError: undefined });
     }
     await ctx.db.patch(job._id, { state: "running", actorId: actor._id, lastError: undefined });

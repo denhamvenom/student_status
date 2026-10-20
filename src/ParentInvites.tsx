@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { ConfirmAction } from './ConfirmAction'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useAuthActions } from '@convex-dev/auth/react'
@@ -17,7 +18,7 @@ type Viewer = {status:'signedOut'|'pending'|'active'; user:{email:string;role:st
 type RosterStudent = {_id:string;name:string}
 const studentId = (value:string) => value as Id<'students'>
 const when = (value:number) => new Date(value).toLocaleString('en-US',{dateStyle:'medium',timeStyle:'short'})
-const message = (error:unknown) => error instanceof Error ? error.message : String(error)
+const message = (error:unknown) => userFacingError(error)
 const oauthTokenKey = 'student-status-parent-invite-oauth'
 const focusAcceptedHeading = (element:HTMLHeadingElement|null) => element?.focus()
 const deliveryText = (status:string|null|undefined) => familyCopy.parent[invitationEmailStatus(status)]
@@ -140,7 +141,7 @@ export function StudentParents({student}:{student:RosterStudent|null}) {
         {settings?.enabled === false && <p role="status">{familyCopy.parent.pausedNotice}</p>}
         <form className="parent-invite-form" onSubmit={e=>void submit(e)}><label htmlFor="parent-email">{familyCopy.parent.parentEmail}</label><Input id="parent-email" type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} required disabled={busy || resendingInviteId!==null || settings?.enabled !== true}/><Button className="button button-primary" type="submit" disabled={busy || resendingInviteId!==null || settings?.enabled !== true}>{busy?familyCopy.parent.creating:familyCopy.parent.createLink}</Button></form>
         <p className="muted tiny">{familyCopy.parent.emailOnly}</p>
-        {createdInviteId && <section className={`parent-share ${styles.inviteShare}`} aria-labelledby="parent-delivery-title"><h3 id="parent-delivery-title">{familyCopy.parent.invitationCreated} {expiry ? when(expiry) : familyCopy.parent.expiryFallback}.</h3><p role="status">{deliveryText(emailStatus)} {emailStatus==='sent' && familyCopy.parent.emailSentNext} {(emailStatus==='not_sent'||emailStatus==='failed') && createdInvite?.emailError}</p></section>}
+        {createdInviteId && <section className={`parent-share ${styles.inviteShare}`} aria-labelledby="parent-delivery-title"><h3 id="parent-delivery-title">{familyCopy.parent.invitationCreated} {expiry ? when(expiry) : familyCopy.parent.expiryFallback}.</h3><p role="status">{deliveryText(emailStatus)} {emailStatus==='sent' && familyCopy.parent.emailSentNext} {(emailStatus==='not_sent'||emailStatus==='failed') && createdInvite?.emailError && userFacingError(new Error(createdInvite.emailError), 'The invitation email could not be delivered. Check the address and contact a Coach if resending fails.')}</p></section>}
         {error && <p role="alert" className="open-text">{error}</p>}
       </section>
       <section className={`card parent-section ${styles.surface}`}><h2>{familyCopy.parent.accessHeading}</h2>

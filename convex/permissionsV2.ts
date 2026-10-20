@@ -1,6 +1,6 @@
-import { normalizeEmail } from "../shared/contact-format";
+import { normalizeEmail } from "./lib/contactValidation";
 import { normalizeConsentContacts } from "./lib/contactEntry";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
@@ -73,10 +73,10 @@ export const saveProfile = mutation({
   args: {studentId: v.id("students"), expectedRevision: v.number(), value: consentProfileV2Validator}, returns: v.null(),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); await parentSigner(ctx, actor); const student = await studentAccess(ctx, actor, args.studentId);
-    if ((student.profileRevision ?? 0) !== args.expectedRevision) throw new Error("Profile changed. Reload before saving.");
+    if ((student.profileRevision ?? 0) !== args.expectedRevision) throw new ConvexError("Profile changed. Reload before saving.");
     const setupDraft = await ctx.db.query("setupDrafts").withIndex("by_studentId", q => q.eq("studentId", student._id)).unique();
     const value = validateConsentProfileV2({...normalizeConsentContacts(args.value, student.consentProfileV2), grade: gradeForSave(args.value.grade, [student.consentProfileV2?.grade, setupDraft?.grade])});
-    if (Date.parse(`${value.dateOfBirth}T00:00:00Z`) >= Date.now()) throw new Error("Date of birth must be in the past.");
+    if (Date.parse(`${value.dateOfBirth}T00:00:00Z`) >= Date.now()) throw new ConvexError("Date of birth must be in the past.");
     if (setupDraft) await ctx.db.delete(setupDraft._id);
     await ctx.db.patch(student._id, {consentProfileV2: value, consentProfileV2CompletedAt: Date.now(), consentProfileV2ConfirmedBy: actor._id, profileRevision: args.expectedRevision + 1});
     await audit(ctx, actor, "students", student._id, "confirmStructuredConsentProfile", {revision: args.expectedRevision}, {revision: args.expectedRevision + 1, completed: true});
@@ -163,7 +163,7 @@ export const receipt = query({
   args: {submissionId: v.id("permissionSubmissions")}, returns: v.object({snapshot: consentSnapshotV2Validator, reviewedPdfSha256: v.string(), signedPdfSha256: v.string()}),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); formReader(actor); const submission = await ctx.db.get(args.submissionId);
-    if (!submission) throw new Error("Signed form not found."); await studentAccess(ctx, actor, submission.studentId);
+    if (!submission) throw new ConvexError("Signed form not found."); await studentAccess(ctx, actor, submission.studentId);
     const snapshot = await sealedSnapshotV2(ctx, submission);
     return {snapshot, reviewedPdfSha256: submission.reviewedPdfSha256!, signedPdfSha256: submission.signedPdfSha256!};
   },

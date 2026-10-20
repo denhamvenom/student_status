@@ -1,6 +1,6 @@
-import { normalizeEmail } from "../shared/contact-format";
+import { normalizeEmail } from "./lib/contactValidation";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { components, internal } from "./_generated/api";
 import { mutation, query } from "./_generated/server";
 import { RateLimiter } from "@convex-dev/rate-limiter";
@@ -27,7 +27,7 @@ async function setting(ctx: Ctx) {
 async function eligibleStudent(ctx: Ctx, studentId: Id<"students">) {
   const season = await activeSeason(ctx);
   const student = await ctx.db.get(studentId);
-  if (!student || !student.active || student.seasonId !== season._id) throw new Error("Student is unavailable in the active season.");
+  if (!student || !student.active || student.seasonId !== season._id) throw new ConvexError("Student is unavailable in the active season.");
   return student;
 }
 async function existingParent(ctx: Ctx, authUserId: Id<"users">) {
@@ -48,12 +48,12 @@ async function revokedLinkForEmail(ctx: Ctx, studentId: Id<"students">, email: s
 
 async function queueParentInvite(ctx: MutationCtx, actor: Doc<"appUsers">, student: Doc<"students">, parentEmail: string, previous: Doc<"parentInvitations">[]) {
   const emailConfiguration = parentInviteEmailConfiguration();
-  if (!emailConfiguration) throw new Error("Private parent email is unavailable. Ask a Coach for help.");
+  if (!emailConfiguration) throw new ConvexError("Private parent email is unavailable. Ask a Coach for help.");
   if (emailConfiguration) {
     const key = `${student._id}:${parentEmail}`;
     if (!(await emailLimiter.limit(ctx, "parentInviteEmailHourly", { key })).ok ||
         !(await emailLimiter.limit(ctx, "parentInviteEmailDaily", { key: actor._id })).ok) {
-      throw new Error("Too many email invitations. Wait before creating another link.");
+      throw new ConvexError("Too many email invitations. Wait before creating another link.");
     }
   }
   for (const row of previous) await ctx.db.patch(row._id, { status: "replaced" });
@@ -91,20 +91,20 @@ export const createParentInvite = mutation({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "student");
     const own = await ownStudent(ctx, actor);
-    if (own._id !== args.studentId) throw new Error("You can invite a parent for your own student record only.");
-    if ((await setting(ctx))?.enabled === false) throw new Error("Parent invitations are disabled. Ask a Coach for help.");
+    if (own._id !== args.studentId) throw new ConvexError("You can invite a parent for your own student record only.");
+    if ((await setting(ctx))?.enabled === false) throw new ConvexError("Parent invitations are disabled. Ask a Coach for help.");
     const student = await eligibleStudent(ctx, args.studentId);
     const parentEmail = normalizeEmail(args.parentEmail, "Parent email");
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail) || parentEmail.length > 254) throw new Error("Enter a valid parent email.");
-    if (parentEmail === emailKey(actor.email) || parentEmail === emailKey(student.email)) throw new Error("A student cannot invite their own identity as a parent.");
-    if (await revokedLinkForEmail(ctx, student._id, parentEmail)) throw new Error("A Coach must resolve this revoked family link.");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail) || parentEmail.length > 254) throw new ConvexError("Enter a valid parent email.");
+    if (parentEmail === emailKey(actor.email) || parentEmail === emailKey(student.email)) throw new ConvexError("A student cannot invite their own identity as a parent.");
+    if (await revokedLinkForEmail(ctx, student._id, parentEmail)) throw new ConvexError("A Coach must resolve this revoked family link.");
     const revoked = await ctx.db.query("parentInvitations").withIndex("by_studentId_and_parentEmail_and_status", q => q.eq("studentId", student._id).eq("parentEmail", parentEmail).eq("status", "revoked")).first();
-    if (revoked) throw new Error("A Coach must resolve this revoked invitation.");
+    if (revoked) throw new ConvexError("A Coach must resolve this revoked invitation.");
     const previous = await ctx.db.query("parentInvitations").withIndex("by_studentId_and_parentEmail_and_status", q => q.eq("studentId", student._id).eq("parentEmail", parentEmail).eq("status", "pending")).take(101);
-    if (previous.length > 100) throw new Error("Too many pending invitations. Ask a Coach for help.");
+    if (previous.length > 100) throw new ConvexError("Too many pending invitations. Ask a Coach for help.");
     const now = Date.now();
     if (previous.some(row => row.expiresAt > now && resendAvailableAt(row) > now)) {
-      throw new Error("Wait one hour before sending another invitation to this parent.");
+      throw new ConvexError("An invitation was already requested for this parent. Wait one hour after the last request before sending another. Ask your parent to check their inbox and spam folder.");
     }
     const result = await queueParentInvite(ctx, actor, student, parentEmail, previous);
     await audit(ctx, actor, "parentInvitations", result.inviteId, "create", null, { studentId: student._id, parentEmail, expiresAt: result.expiresAt });
@@ -118,17 +118,17 @@ export const resendParentInvite = mutation({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "student");
     const own = await ownStudent(ctx, actor);
-    if ((await setting(ctx))?.enabled === false) throw new Error("Parent invitations are disabled. Ask a Coach for help.");
+    if ((await setting(ctx))?.enabled === false) throw new ConvexError("Parent invitations are disabled. Ask a Coach for help.");
     const old = await ctx.db.get(args.inviteId);
-    if (!old || old.studentId !== own._id || old.status !== "pending" || old.expiresAt <= Date.now()) throw new Error("Pending invitation unavailable.");
+    if (!old || old.studentId !== own._id || old.status !== "pending" || old.expiresAt <= Date.now()) throw new ConvexError("Pending invitation unavailable.");
     const student = await eligibleStudent(ctx, own._id);
     const latest = await ctx.db.query("parentInvitations").withIndex("by_studentId_and_parentEmail", q => q.eq("studentId", own._id).eq("parentEmail", old.parentEmail)).order("desc").first();
-    if (latest?._id !== old._id) throw new Error("Only the latest pending invitation can be resent.");
+    if (latest?._id !== old._id) throw new ConvexError("Only the latest pending invitation can be resent.");
     const now = Date.now();
-    if (resendAvailableAt(old) > now) throw new Error("Wait one hour before resending this invitation.");
-    if (await revokedLinkForEmail(ctx, student._id, old.parentEmail)) throw new Error("A Coach must resolve this revoked family link.");
+    if (resendAvailableAt(old) > now) throw new ConvexError("Wait one hour after the last request before resending. Ask your parent to check their inbox and spam folder.");
+    if (await revokedLinkForEmail(ctx, student._id, old.parentEmail)) throw new ConvexError("A Coach must resolve this revoked family link.");
     const revoked = await ctx.db.query("parentInvitations").withIndex("by_studentId_and_parentEmail_and_status", q => q.eq("studentId", student._id).eq("parentEmail", old.parentEmail).eq("status", "revoked")).first();
-    if (revoked) throw new Error("A Coach must resolve this revoked invitation.");
+    if (revoked) throw new ConvexError("A Coach must resolve this revoked invitation.");
     const result = await queueParentInvite(ctx, actor, student, old.parentEmail, [old]);
     await audit(ctx, actor, "parentInvitations", result.inviteId, "resend", { replacedInviteId: old._id }, { studentId: student._id, parentEmail: old.parentEmail, expiresAt: result.expiresAt });
     return result;
@@ -165,27 +165,27 @@ export const acceptParentInvite = mutation({
   args: { token: v.string(), relationship: v.string(), authorityAttested: v.boolean(), attestationVersion: v.string() },
   returns: v.object({ studentId: v.id("students") }),
   handler: async (ctx, args) => {
-    if (!/^[0-9a-f]{64}$/.test(args.token)) throw new Error("Invitation unavailable.");
+    if (!/^[0-9a-f]{64}$/.test(args.token)) throw new ConvexError("Invitation unavailable.");
     const hash = await tokenHash(args.token);
     const row = await ctx.db.query("parentInvitations").withIndex("by_tokenHash", q => q.eq("tokenHash", hash)).unique();
-    if (!row || row.status !== "pending" || row.expiresAt <= Date.now()) throw new Error("Invitation unavailable or expired.");
+    if (!row || row.status !== "pending" || row.expiresAt <= Date.now()) throw new ConvexError("Invitation unavailable or expired.");
     const who = await verifiedParent(ctx);
-    if (!who || who.email !== row.parentEmail) throw new Error("Sign in with the invited parent email.");
+    if (!who || who.email !== row.parentEmail) throw new ConvexError("Sign in with the invited parent email.");
     const relationship = args.relationship.trim();
-    if (!relationship || relationship.length > 80 || !args.authorityAttested || args.attestationVersion !== ATTESTATION_VERSION) throw new Error("Current relationship and legal guardian authority attestation are required.");
+    if (!relationship || relationship.length > 80 || !args.authorityAttested || args.attestationVersion !== ATTESTATION_VERSION) throw new ConvexError("Current relationship and legal guardian authority attestation are required.");
     const student = await eligibleStudent(ctx, row.studentId);
     await requireSeasonProfileWritable(ctx, student.seasonId);
-    if (who.email === emailKey(student.email)) throw new Error("A student cannot link their own identity as a parent.");
+    if (who.email === emailKey(student.email)) throw new ConvexError("A student cannot link their own identity as a parent.");
     let parent = await existingParent(ctx, who.authUserId);
-    if ((parent && (!parent.active || parent.role !== "parent")) || await emailAccountConflict(ctx, who.email, who.authUserId)) throw new Error("This account has another role or is inactive. Ask a Coach for help.");
-    if (await revokedLinkForEmail(ctx, student._id, who.email)) throw new Error("A Coach must resolve this revoked family link.");
+    if ((parent && (!parent.active || parent.role !== "parent")) || await emailAccountConflict(ctx, who.email, who.authUserId)) throw new ConvexError("This account has another role or is inactive. Ask a Coach for help.");
+    if (await revokedLinkForEmail(ctx, student._id, who.email)) throw new ConvexError("A Coach must resolve this revoked family link.");
     if (!parent) {
       const parentId = await ctx.db.insert("appUsers", { authUserId: who.authUserId, email: who.email, name: who.name, role: "parent", travelLead: false, financialEdit: false, active: true });
       parent = await ctx.db.get(parentId) as Doc<"appUsers">;
     }
     const link = await ctx.db.query("familyLinks").withIndex("by_parentUserId_and_studentId", q => q.eq("parentUserId", parent._id).eq("studentId", student._id)).unique();
-    if (link && !link.active) throw new Error("A Coach must resolve this revoked family link.");
-    if (link?.seasonId && link.seasonId !== student.seasonId) throw new Error("Family link season changed; a Coach must review it.");
+    if (link && !link.active) throw new ConvexError("A Coach must resolve this revoked family link.");
+    if (link?.seasonId && link.seasonId !== student.seasonId) throw new ConvexError("Family link season changed; a Coach must review it.");
     if (link && !link.seasonId) await ctx.db.patch(link._id, { seasonId: student.seasonId });
     if (!link) await ctx.db.insert("familyLinks", { parentUserId: parent._id, studentId: student._id, seasonId: student.seasonId, active: true, createdBy: parent._id });
     const now = Date.now();
@@ -205,7 +205,7 @@ async function studentManager(ctx: Ctx, studentId: Id<"students">) {
   if (actor.role === "coach") { await eligibleStudent(ctx, studentId); return actor; }
   requireRole(actor, "student");
   const own = await ownStudent(ctx, actor);
-  if (own._id !== studentId) throw new Error("You do not have permission for this student.");
+  if (own._id !== studentId) throw new ConvexError("You do not have permission for this student.");
   await eligibleStudent(ctx, studentId);
   return actor;
 }
@@ -218,7 +218,7 @@ export const listStudentInvites = query({
     const recent = await ctx.db.query("parentInvitations").withIndex("by_studentId", q => q.eq("studentId", args.studentId)).order("desc").take(100);
     const pending = await ctx.db.query("parentInvitations").withIndex("by_studentId_and_status", q => q.eq("studentId", args.studentId).eq("status", "pending")).take(101);
     const revoked = await ctx.db.query("parentInvitations").withIndex("by_studentId_and_status", q => q.eq("studentId", args.studentId).eq("status", "revoked")).take(101);
-    if (pending.length > 100 || revoked.length > 100) throw new Error("Too many actionable invitations. Ask a Coach for help.");
+    if (pending.length > 100 || revoked.length > 100) throw new ConvexError("Too many actionable invitations. Ask a Coach for help.");
     const byId = new Map([...recent, ...pending, ...revoked].map(row => [row._id, row]));
     const rows = [...byId.values()].sort((a, b) => b._creationTime - a._creationTime);
     return rows.map(row => ({ _id: row._id, parentEmail: row.parentEmail, status: row.status, emailStatus: row.emailStatus ?? "not_sent" as const, emailError: row.emailError ?? null, createdAt: row.createdAt, resendAvailableAt: resendAvailableAt(row), expiresAt: row.expiresAt, acceptedAt: row.acceptedAt ?? null }));
@@ -241,7 +241,7 @@ export const revokeParentInvite = mutation({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach");
     const row = await ctx.db.get(args.inviteId);
-    if (!row || row.status !== "pending") throw new Error("Pending invitation not found.");
+    if (!row || row.status !== "pending") throw new ConvexError("Pending invitation not found.");
     await ctx.db.patch(row._id, { status: "revoked" });
     await audit(ctx, actor, "parentInvitations", row._id, "revoke", "pending", "revoked");
     return null;
@@ -253,7 +253,7 @@ export const allowParentReinvite = mutation({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach");
     const row = await ctx.db.get(args.inviteId);
-    if (!row || row.status !== "revoked" || !args.reason.trim()) throw new Error("Revoked invitation and reason are required.");
+    if (!row || row.status !== "revoked" || !args.reason.trim()) throw new ConvexError("Revoked invitation and reason are required.");
     await ctx.db.patch(row._id, { status: "replaced" });
     await audit(ctx, actor, "parentInvitations", row._id, "allowReinvite", "revoked", "replaced", args.reason.trim());
     return null;
@@ -265,7 +265,7 @@ export const revokeFamilyLink = mutation({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach");
     const link = await ctx.db.get(args.linkId);
-    if (!link || !link.active) throw new Error("Active family link not found.");
+    if (!link || !link.active) throw new ConvexError("Active family link not found.");
     await ctx.db.patch(link._id, { active: false, revokedAt: Date.now(), revokedBy: actor._id });
     const source = await ctx.db.get(link.studentId);
     if (source) {
@@ -291,12 +291,12 @@ export const restoreFamilyLink = mutation({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach");
     const link = await ctx.db.get(args.linkId);
-    if (!link || link.active || !args.reason.trim()) throw new Error("Revoked family link and reason are required.");
+    if (!link || link.active || !args.reason.trim()) throw new ConvexError("Revoked family link and reason are required.");
     const student = await eligibleStudent(ctx, link.studentId);
     await requireSeasonProfileWritable(ctx, student.seasonId);
     const parent = await ctx.db.get(link.parentUserId);
-    if (!parent || !parent.active || parent.role !== "parent" || parent.email === student.email) throw new Error("This family link cannot be restored.");
-    if (link.seasonId && link.seasonId !== student.seasonId) throw new Error("Family link season changed; a Coach must review it.");
+    if (!parent || !parent.active || parent.role !== "parent" || parent.email === student.email) throw new ConvexError("This family link cannot be restored.");
+    if (link.seasonId && link.seasonId !== student.seasonId) throw new ConvexError("Family link season changed; a Coach must review it.");
     await ctx.db.patch(link._id, { active: true, seasonId: student.seasonId, revokedAt: undefined, revokedBy: undefined });
     await audit(ctx, actor, "familyLinks", link._id, "restore", false, true, args.reason.trim());
     return null;

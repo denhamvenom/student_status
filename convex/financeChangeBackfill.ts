@@ -1,3 +1,4 @@
+import { savedPublicError } from './lib/publicErrors';
 import { v } from "convex/values";
 import { makeFunctionReference } from "convex/server";
 import { internalMutation, mutation } from "./_generated/server";
@@ -24,7 +25,7 @@ export const run = internalMutation({
   handler: async (ctx, args) => {
     const job = await ctx.db.get(args.id); if (!job || job.state !== "running") return null;
     try { await ctx.runMutation(pageRef, { id: job._id, phase: job.phase, cursor: job.cursor }); }
-    catch (error) { await ctx.db.patch(job._id, { state: "failed", lastError: error instanceof Error ? error.message : "Finance change preparation failed.", updatedAt: Date.now() }); }
+    catch (error) { await ctx.db.patch(job._id, { state: "failed", lastError: savedPublicError(error, "Finance change preparation failed."), updatedAt: Date.now() }); }
     return null;
   },
 });

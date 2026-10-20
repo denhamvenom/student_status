@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { useRef, useState, type FormEvent } from 'react'
 import { useMutation, usePaginatedQuery, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
@@ -9,7 +10,7 @@ import styles from './SeasonAdministration.module.css'
 import { SeasonReviewSteps, SeasonTransitionProgress, SeasonHistory } from './SeasonReviewSteps'
 
 type Plan = { id: Id<'seasonTransitionPlans'>; targetName: string; targetCompetitionYear: number; targetStartDate: string; targetEndDate: string; revision: number; state: string; updatedAt: number }
-const message = (error: unknown) => error instanceof Error ? error.message : copy.retry
+const message = (error: unknown) => userFacingError(error, copy.retry)
 const steps = [copy.newSeason, copy.returningStudents, copy.archiveDeparting, copy.balances, copy.retainReset, copy.confirm]
 
 function DraftForm({plan, sourceYear}: {plan: Plan | null; sourceYear: number}) {

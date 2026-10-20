@@ -1,5 +1,5 @@
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { activeSeason, audit, requireRole, studentAccess, viewer } from "./lib/access";
 
@@ -7,12 +7,12 @@ function validatedUrl(value: string): string | undefined {
   const url = value.trim();
   if (!url) return undefined;
   if (url.length > 2048 || /[\s\\]/.test(url) || !/^https:\/\/(?:www\.)?zeffy\.com(?:[/?]|$)/i.test(url)) {
-    throw new Error("Use an HTTPS Zeffy link from zeffy.com or www.zeffy.com, up to 2048 characters.");
+    throw new ConvexError("Use an HTTPS Zeffy link from zeffy.com or www.zeffy.com, up to 2048 characters.");
   }
   let parsed: URL;
-  try { parsed = new URL(url); } catch { throw new Error("Enter a valid Zeffy link."); }
+  try { parsed = new URL(url); } catch { throw new ConvexError("Enter a valid Zeffy link."); }
   if (parsed.protocol !== "https:" || !["zeffy.com", "www.zeffy.com"].includes(parsed.hostname) || parsed.username || parsed.password || parsed.port || url.includes("#")) {
-    throw new Error("Zeffy links cannot include credentials, ports, or fragments.");
+    throw new ConvexError("Zeffy links cannot include credentials, ports, or fragments.");
   }
   return parsed.href;
 }
@@ -34,7 +34,7 @@ export const list = query({
   returns: paginationResultValidator(v.object({ studentId: v.id("students"), name: v.string(), url: v.union(v.string(), v.null()), revision: v.number() })),
   handler: async (ctx, args) => {
     requireRole(await viewer(ctx), "coach");
-    if (!Number.isInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 100) throw new Error("Choose a page size from 1 to 100.");
+    if (!Number.isInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 100) throw new ConvexError("Choose a page size from 1 to 100.");
     const season = await activeSeason(ctx);
     const page = await ctx.db.query("students").withIndex("by_seasonId_and_active", q => q.eq("seasonId", season._id).eq("active", true)).paginate(args.paginationOpts);
     return { ...page, page: page.page.map(student => ({ studentId: student._id, name: student.legalName || student.preferredName, url: student.fundraiserUrl ?? null, revision: student.fundraiserLinkRevision ?? 0 })) };
@@ -49,7 +49,7 @@ export const save = mutation({
     requireRole(actor, "coach");
     const student = await studentAccess(ctx, actor, args.studentId);
     const beforeRevision = student.fundraiserLinkRevision ?? 0;
-    if (!Number.isSafeInteger(args.expectedRevision) || args.expectedRevision < 0 || args.expectedRevision !== beforeRevision) throw new Error("This fundraiser link changed. Reload before saving.");
+    if (!Number.isSafeInteger(args.expectedRevision) || args.expectedRevision < 0 || args.expectedRevision !== beforeRevision) throw new ConvexError("This fundraiser link changed. Reload before saving.");
     const url = validatedUrl(args.url);
     const revision = beforeRevision + 1;
     await ctx.db.patch(student._id, { fundraiserUrl: url, fundraiserLinkRevision: revision });
@@ -64,15 +64,15 @@ const importArgs = { rows: v.array(importRow) };
 async function prepareImport(ctx: import("./_generated/server").QueryCtx | import("./_generated/server").MutationCtx, rows: Array<{ studentId: import("./_generated/dataModel").Id<"students">; url: string; expectedRevision: number }>) {
   const actor = await viewer(ctx);
   requireRole(actor, "coach");
-  if (!rows.length || rows.length > 500) throw new Error("Import 1 to 500 students at a time.");
+  if (!rows.length || rows.length > 500) throw new ConvexError("Import 1 to 500 students at a time.");
   const seen = new Set<string>();
   const prepared = [];
   for (const row of rows) {
-    if (seen.has(row.studentId)) throw new Error("The CSV repeats a Student ID.");
+    if (seen.has(row.studentId)) throw new ConvexError("The CSV repeats a Student ID.");
     seen.add(row.studentId);
     const student = await studentAccess(ctx, actor, row.studentId);
     const revision = student.fundraiserLinkRevision ?? 0;
-    if (!Number.isSafeInteger(row.expectedRevision) || row.expectedRevision < 0 || row.expectedRevision !== revision) throw new Error("A fundraiser link changed since export. Download a fresh CSV and review again.");
+    if (!Number.isSafeInteger(row.expectedRevision) || row.expectedRevision < 0 || row.expectedRevision !== revision) throw new ConvexError("A fundraiser link changed since export. Download a fresh CSV and review again.");
     const url = validatedUrl(row.url);
     prepared.push({ student, url, revision });
   }

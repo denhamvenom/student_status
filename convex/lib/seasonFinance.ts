@@ -1,3 +1,4 @@
+import { ConvexError } from 'convex/values';
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { v } from "convex/values";
@@ -16,7 +17,7 @@ export async function seasonFinanceControl(ctx: Ctx, seasonId: Id<"seasons">) {
 export async function requireNoUnfinishedFeeScopes(ctx: Ctx, seasonId: Id<"seasons">) {
   for (const state of ["draining", "preparing", "prepared", "applying", "held", "failed"] as const) {
     const job = await ctx.db.query("feeBulkJobs").withIndex("by_seasonId_and_state", q => q.eq("seasonId", seasonId).eq("state", state)).first();
-    if (job) throw new Error("Finish or cancel every prepared or held shared fee scope before remapping the season order.");
+    if (job) throw new ConvexError("Finish or cancel every prepared or held shared fee scope before remapping the season order.");
   }
 }
 
@@ -25,14 +26,14 @@ export async function requireSeasonTransitionFinancialAccess(ctx: Ctx, seasonId:
   const plan = await ctx.db.query("seasonTransitionPlans").withIndex("by_sourceSeasonId_and_open", q => q.eq("sourceSeasonId", seasonId).eq("open", true)).unique();
   if (!plan || plan.state === "draft" || plan.state === "reviewing") return;
   if (continuation && plan.state === "draining") return;
-  throw new Error("Season transition is locked. Finish or retry the transition before changing financial records.");
+  throw new ConvexError("Season transition is locked. Finish or retry the transition before changing financial records.");
 }
 
 /** New commands cannot enter while shared definitions are being changed. */
 export async function requireSeasonFinanceReady(ctx: Ctx, seasonId: Id<"seasons">) {
   await requireSeasonTransitionFinancialAccess(ctx, seasonId);
   const control = await seasonFinanceControl(ctx, seasonId);
-  if (control && control.state !== "ready") throw new Error("Season fees are being maintained. Finish or retry that maintenance before starting another financial change.");
+  if (control && control.state !== "ready") throw new ConvexError("Season fees are being maintained. Finish or retry that maintenance before starting another financial change.");
 }
 
 /** Indexed upstream checks and the control transition share one transaction/OCC fence. */
@@ -62,7 +63,7 @@ export async function historicalFinancialContinuation(ctx: Ctx, seasonId: Id<"se
   const actor = await ctx.db.get(origin.actorId);
   const season = await ctx.db.get(seasonId);
   const student = await ctx.db.get(origin.studentId);
-  if (!grant || grant.actorId !== actor?._id || grant.seasonId !== seasonId || grant.closedAt !== undefined || grant.expiresAt <= Date.now() || !actor?.active || actor.role !== "coach" || season?.status !== "archived" || student?.seasonId !== seasonId) throw new Error("Historical financial access has ended. Open correction mode again and retry with the fresh grant.");
+  if (!grant || grant.actorId !== actor?._id || grant.seasonId !== seasonId || grant.closedAt !== undefined || grant.expiresAt <= Date.now() || !actor?.active || actor.role !== "coach" || season?.status !== "archived" || student?.seasonId !== seasonId) throw new ConvexError("Historical financial access has ended. Open correction mode again and retry with the fresh grant.");
   return true;
 }
 
@@ -115,7 +116,7 @@ export async function requireSeasonFinancialRetry(ctx: Ctx, seasonId: Id<"season
   if ("maintenanceOriginId" in job && job.maintenanceOriginId) {
     await requireSeasonFinancialContinuation(ctx, seasonId, job.maintenanceOriginId); return;
   }
-  throw new Error("Finish active season fee maintenance before restarting this upstream job.");
+  throw new ConvexError("Finish active season fee maintenance before restarting this upstream job.");
 }
 
 export async function seasonFinancialRetryAvailable(ctx: Ctx, seasonId: Id<"seasons">, jobId: FinancialContinuationId | Id<"financialAllocationJobs">) {

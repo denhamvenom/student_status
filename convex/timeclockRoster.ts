@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { activeSeason, audit, maybeViewer, viewer } from "./lib/access";
 
@@ -17,10 +17,10 @@ export const list = query({
   returns: v.object({ students: v.array(v.object({ studentId: v.id("students"), displayName: v.string(), subteam: v.union(v.string(), v.null()), collision: v.boolean() })), unreviewedCount: v.number() }),
   handler: async ctx => {
     const user = await viewer(ctx);
-    if (user.role !== "coach" && user.role !== "mentor") throw new Error("Timeclock operator access required.");
+    if (user.role !== "coach" && user.role !== "mentor") throw new ConvexError("Timeclock operator access required.");
     const season = await activeSeason(ctx);
     const all = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(501);
-    if (all.length > 500) throw new Error("Roster exceeds the supported 500-record season; narrow the roster before operating.");
+    if (all.length > 500) throw new ConvexError("Roster exceeds the supported 500-record season; narrow the roster before operating.");
     const active = all.filter(s => s.active);
     const reviewed = active.filter(s => s.structuredNameReviewed && s.firstName?.trim() && s.lastName?.trim());
     reviewed.sort((a, b) => a.lastName!.localeCompare(b.lastName!, "en") || a.firstName!.localeCompare(b.firstName!, "en") || a._id.localeCompare(b._id));
@@ -57,12 +57,12 @@ export const clockStatus = query({
   }),
   handler: async (ctx, args) => {
     const user = await viewer(ctx);
-    if (user.role !== "coach" && user.role !== "mentor") throw new Error("Timeclock operator access required.");
+    if (user.role !== "coach" && user.role !== "mentor") throw new ConvexError("Timeclock operator access required.");
     const season = await activeSeason(ctx);
     const session = await ctx.db.get(args.sessionId);
-    if (!session || session.seasonId !== season._id) throw new Error("Timeclock session unavailable in active season.");
+    if (!session || session.seasonId !== season._id) throw new ConvexError("Timeclock session unavailable in active season.");
     const all = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(501);
-    if (all.length > 500) throw new Error("Roster exceeds the supported 500-record season; narrow the roster before operating.");
+    if (all.length > 500) throw new ConvexError("Roster exceeds the supported 500-record season; narrow the roster before operating.");
     const reviewed = all.filter(s => s.active && s.structuredNameReviewed && s.firstName?.trim() && s.lastName?.trim());
     const students = await Promise.all(reviewed.map(async student => {
       const [lock, selectedHistory] = await Promise.all([
@@ -92,10 +92,10 @@ export const namesForReview = query({
   returns: v.array(v.object({ studentId: v.id("students"), legalName: v.string(), firstName: v.union(v.string(), v.null()), lastName: v.union(v.string(), v.null()), reviewed: v.boolean() })),
   handler: async ctx => {
     const user = await viewer(ctx);
-    if (user.role !== "coach") throw new Error("Name review is Coach-only.");
+    if (user.role !== "coach") throw new ConvexError("Name review is Coach-only.");
     const season = await activeSeason(ctx);
     const students = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(501);
-    if (students.length > 500) throw new Error("Name review exceeds the supported season size.");
+    if (students.length > 500) throw new ConvexError("Name review exceeds the supported season size.");
     return students.filter(s => s.active).map(s => ({ studentId: s._id, legalName: s.legalName, firstName: s.firstName ?? null, lastName: s.lastName ?? null, reviewed: s.structuredNameReviewed ?? false }));
   },
 });
@@ -105,12 +105,12 @@ export const reviewNames = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx);
-    if (actor.role !== "coach") throw new Error("Name review is Coach-only.");
+    if (actor.role !== "coach") throw new ConvexError("Name review is Coach-only.");
     const season = await activeSeason(ctx);
     const student = await ctx.db.get(args.studentId);
-    if (!student?.active || student.seasonId !== season._id) throw new Error("Student unavailable in active season.");
+    if (!student?.active || student.seasonId !== season._id) throw new ConvexError("Student unavailable in active season.");
     const firstName = args.firstName.trim(), lastName = args.lastName.trim(), reason = args.reason.trim();
-    if (!firstName || !lastName || firstName.length > 100 || lastName.length > 100 || !reason || reason.length > 500) throw new Error("Reviewed names and a short reason are required.");
+    if (!firstName || !lastName || firstName.length > 100 || lastName.length > 100 || !reason || reason.length > 500) throw new ConvexError("Reviewed names and a short reason are required.");
     const after = { firstName, lastName, structuredNameReviewed: true, profileRevision: (student.profileRevision ?? 0) + 1 };
     await ctx.db.patch(student._id, after);
     await audit(ctx, actor, "students", student._id, "reviewStructuredName", { firstName: student.firstName ?? null, lastName: student.lastName ?? null, structuredNameReviewed: student.structuredNameReviewed ?? false }, after, reason);

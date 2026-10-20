@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { Component, useRef, useState, type ReactNode } from 'react'
 import { useMutation, usePaginatedQuery, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
@@ -11,10 +12,10 @@ import { parseFundraisingDecimal, formatFundraisingCents } from './Fundraising'
 import { historicalFinanceCopy as copy } from './lib/historical-finance-copy'
 import styles from './ChargeAdministration.module.css'
 const usd = formatFundraisingCents
-class HistoricalFinanceBoundary extends Component<{ children: ReactNode; retry: () => void }, { failed: boolean }> {
-  state = { failed: false }
-  static getDerivedStateFromError() { return { failed: true } }
-  render() { return this.state.failed ? <p role="alert">{copy.unavailable} <Button variant="outline" onClick={this.props.retry}>{copy.reload}</Button></p> : this.props.children }
+class HistoricalFinanceBoundary extends Component<{ children: ReactNode; retry: () => void }, { error: unknown }> {
+  state = { error: null as unknown }
+  static getDerivedStateFromError(error: unknown) { return { error } }
+  render() { return this.state.error !== null ? <p role="alert">{userFacingError(this.state.error, copy.unavailable, false)} <Button variant="outline" onClick={this.props.retry}>{copy.reload}</Button></p> : this.props.children }
 }
 export function HistoricalFinancialCorrections({ seasonId, studentId, grantId }: { seasonId: Id<'seasons'>; studentId: Id<'students'>; grantId: Id<'historicalCorrectionSessions'> }) {
   const [version, setVersion] = useState(0)
@@ -45,13 +46,13 @@ function CorrectionForm({ seasonId, chargeId, grantId, onAnother }: { seasonId: 
     if (guard.current || !ready || !review || review.expectedFinancialRevision === null || target === null || pending || finished) return
     guard.current = true; setBusy(true); setError('')
     try { setRequested(await correct({ correctionSessionId: grantId, chargeId, kind, targetEffectiveCents: target, expectedChargeRevision: review.expectedChargeRevision, expectedFinancialRevision: review.expectedFinancialRevision, reason, idempotencyKey: key.current })) }
-    catch (failure) { setError(failure instanceof Error ? failure.message : copy.unavailable) }
+    catch (failure) { setError(userFacingError(failure, copy.unavailable)) }
     finally { guard.current = false; setBusy(false) }
   }
   async function recover() {
     if (!status?.job || guard.current) return; guard.current = true; setBusy(true); setError('')
     try { await retry({ correctionSessionId: grantId, jobId: status.job._id, reason: reason.trim().length >= 8 ? reason : copy.retryReason }); setRequested(status.job._id) }
-    catch (failure) { setError(failure instanceof Error ? failure.message : copy.failed) }
+    catch (failure) { setError(userFacingError(failure, copy.failed)) }
     finally { guard.current = false; setBusy(false) }
   }
   return <div className={styles.form}><div className={styles.fields}><label className={styles.field}>{copy.kind}<NativeSelect value={kind} disabled={busy || pending || finished} onChange={event => { setKind(event.target.value as typeof kind); changed() }}><NativeSelectOption value="adjustment">{copy.adjustment}</NativeSelectOption><NativeSelectOption value="cancellation">{copy.cancellation}</NativeSelectOption></NativeSelect></label><label className={styles.field}>{copy.target}<Input inputMode="decimal" value={amount} disabled={busy || pending || finished} onChange={event => { setAmount(event.target.value); changed() }}/></label><label className={styles.field}>{copy.reason}<Input value={reason} maxLength={1000} disabled={busy || pending || finished} onChange={event => { setReason(event.target.value); changed() }}/></label></div>
@@ -59,7 +60,7 @@ function CorrectionForm({ seasonId, chargeId, grantId, onAnother }: { seasonId: 
     {!pending && !finished && <Button variant="outline" disabled={!preview || busy || reason.trim().length < 8} onClick={() => setReview(preview!)}>{copy.preview}</Button>}
     {review && <div className={styles.notice}><p>{copy.original} {usd(review.originalCents)} / {copy.current} {usd(review.effectiveCents)} / {copy.targetLabel} {usd(review.targetEffectiveCents)}</p><p>{copy.release} {usd(review.releaseRequiredCents)}</p>{!review.ready && <p>{copy.held}</p>}{review.ready && !ready && !requested && <p role="status">{copy.stale}</p>}</div>}
     {!pending && !finished && <Button disabled={busy || !ready || reason.trim().length < 8} onClick={() => void commit()}>{copy.confirm}</Button>}
-    {pending && <p role={status?.canRetry ? 'alert' : 'status'}>{status?.canRetry ? status.job?.lastError ?? copy.failed : status?.job?.state === 'complete' ? copy.allocating : copy.working}</p>}
+    {pending && <p role={status?.canRetry ? 'alert' : 'status'}>{status?.canRetry ? userFacingError(new Error(status.job?.lastError ?? ''), copy.failed) : status?.job?.state === 'complete' ? copy.allocating : copy.working}</p>}
     {status?.canRetry && <Button disabled={busy} onClick={() => void recover()}>{copy.retry}</Button>}
     {finished && <p role="status">{copy.complete}</p>}
     {(finished || error) && <Button variant="outline" disabled={busy} onClick={onAnother}>{copy.another}</Button>}

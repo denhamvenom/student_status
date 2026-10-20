@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { useState } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
@@ -17,7 +18,7 @@ export function EventEnrollmentNotice({ eventId, staff, coach, failed }: { event
     setBusy(true)
     setError(null)
     try { await retry({ eventId }) }
-    catch (cause) { setError(cause instanceof Error ? cause.message : copy.retryError) }
+    catch (cause) { setError(userFacingError(cause, copy.retryError)) }
     finally { setBusy(false) }
   }
   return <Card aria-live="polite">
@@ -25,7 +26,7 @@ export function EventEnrollmentNotice({ eventId, staff, coach, failed }: { event
     <CardContent>
       <p>{copy.description}</p>
       {progress && <p>{copy.progress(progress.processed, progress.assigned)}</p>}
-      {staff && progress?.lastError && <p role="alert">{progress.lastError}</p>}
+      {staff && progress?.lastError && <p role="alert">{userFacingError(new Error(progress.lastError), 'Processing stopped. Check the current status before retrying, or ask a Coach for help.')}</p>}
       {failed && coach && <Button type="button" disabled={busy || !progress?.canRetry} onClick={() => void retryEnrollment()}>{busy ? copy.retrying : copy.retry}</Button>}
       {error && <p role="alert">{error}</p>}
     </CardContent>

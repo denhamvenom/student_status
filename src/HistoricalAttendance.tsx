@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { HistoricalFinancialCorrections } from './HistoricalFinancialCorrections'
 import { HistoricalRosterCorrection } from './HistoricalRosterCorrection'
 import { useRef, useState } from 'react'
@@ -13,7 +14,7 @@ import styles from './SeasonAdministration.module.css'
 type Session = { id: Id<'timeclockSessions'>; title: string; revision: number; start: number; end: number; state: string }
 const date = (value: number) => new Date(value).toLocaleString()
 const local = (value: number) => { const d = new Date(value); return new Date(value - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16) }
-const errorText = (error: unknown) => error instanceof Error ? error.message : 'Unable to save correction.'
+const errorText = (error: unknown) => userFacingError(error, 'Unable to save correction.')
 
 function CorrectionForm({ session, studentId, grantId, onReview }: { onReview: () => void; session: Session; studentId: Id<'students'>; grantId: Id<'historicalCorrectionSessions'> }) {
   const evidence = useQuery(api.timeclock.correctionEvidence, { sessionId: session.id, studentId })

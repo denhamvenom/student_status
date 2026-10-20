@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { useLocation } from 'react-router'
 import { Component, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { RadioGroup } from '@base-ui/react/radio-group'
@@ -36,12 +37,12 @@ const when=(at:number)=>new Intl.DateTimeFormat('en-US',{timeZone:'America/Chica
 const date=(at:number)=>new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',year:'numeric',month:'short',day:'numeric'}).format(at)
 export const eventDateRange=(startsAt:number,endsAt:number)=>{const start=date(startsAt),end=date(endsAt);return start===end?start:start+' – '+end}
 const healthText=(report:ConsentSnapshot['health']['allergies'])=>report.state==='none'?copy.healthOptions.none:report.text??copy.healthOptions.reported
-const errorText=(error:unknown,fallback:string)=>error instanceof Error?error.message:fallback
+const errorText=(error:unknown,fallback:string)=>userFacingError(error, fallback)
 
-class PermissionBoundary extends Component<{children:ReactNode;retry:()=>void},{failed:boolean}>{
-  state={failed:false}
-  static getDerivedStateFromError(){return{failed:true}}
-  render(){return this.state.failed?<Card className={styles.card}><h2>{copy.unavailable}</h2><p>{copy.unavailableDescription}</p><Button variant="outline" onClick={this.props.retry}>{copy.retry}</Button></Card>:this.props.children}
+class PermissionBoundary extends Component<{children:ReactNode;retry:()=>void},{error:unknown}>{
+  state={error:null as unknown}
+  static getDerivedStateFromError(error:unknown){return{error}}
+  render(){return this.state.error!==null?<Card className={styles.card}><h2>{copy.unavailable}</h2><p role="alert">{userFacingError(this.state.error, copy.unavailableDescription, false)}</p><Button variant="outline" onClick={this.props.retry}>{copy.retry}</Button></Card>:this.props.children}
 }
 function WorkspaceBoundary({children}:{children:ReactNode}){const[attempt,setAttempt]=useState(0);return<PermissionBoundary key={attempt} retry={()=>setAttempt(attempt+1)}>{children}</PermissionBoundary>}
 function Status({state}:{state:keyof typeof copy.status}){return<span className={`${styles.status} ${state==='accepted'?styles.accepted:state==='correction'?styles.correction:''}`}>{copy.status[state]}</span>}
@@ -207,7 +208,7 @@ export function PermissionVersionAuthoring(){
   const select=useMutation(api.permissionVersions.selectApprovedFieldTripTemplate)
   const[busy,setBusy]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState(false)
   const active=current?.formFormat===2&&current.version===fieldTripApproved.templateVersion
-  async function useApproved(){setBusy(true);setError('');setSaved(false);try{await select({});setSaved(true)}catch{setError('The approved form could not be selected. Retry or ask a Coach to review the current version.')}finally{setBusy(false)}}
+  async function useApproved(){setBusy(true);setError('');setSaved(false);try{await select({});setSaved(true)}catch(error){setError(userFacingError(error, 'The approved form could not be selected. Retry or ask a Coach to review the current version.'))}finally{setBusy(false)}}
   return <Card className={styles.card}><CardTitle>Field trip form template</CardTitle><p className={styles.notice}>This is the Coach-approved field trip form. It keeps the original one-page layout and wording, including minor first aid.</p>{current===undefined?<p role="status">{copy.loading}</p>:<><p><strong>{fieldTripApproved.title}</strong> · Version: {fieldTripApproved.templateVersion}</p><p className={styles.muted}>{fieldTripApproved.schoolName} · {fieldTripApproved.teamName}</p><p id="approved-template-status" role="status">{active?'New forms will use this form.':current?`Currently selected: ${current.title} · Version: ${current.version}`:'No PDF template selected.'}</p><Button variant="outline" disabled={busy||active} aria-describedby={active?"approved-template-status":undefined} onClick={()=>void useApproved()}>{busy?'Selecting…':'Use approved field trip form'}</Button>{saved&&<p role="status" className={styles.success}>Approved form selected for new PDFs. Existing signed forms keep their original layout and wording.</p>}{error&&<p role="alert" className={styles.error}>{error}</p>}</>}</Card>
 }
 

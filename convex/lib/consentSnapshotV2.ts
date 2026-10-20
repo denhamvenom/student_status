@@ -1,3 +1,4 @@
+import { ConvexError } from 'convex/values';
 import { v, type Infer } from "convex/values";
 import { consentProfileV2Validator, type ConsentProfileV2 } from "../consentProfileV2Schema";
 export { consentProfileV2Validator, type ConsentProfileV2 } from "../consentProfileV2Schema";
@@ -38,41 +39,41 @@ export function validateConsentProfileV2(profile: ConsentProfileV2): ConsentProf
     physician: { state: profile.physician.state, name: profile.physician.name?.trim() || null, phone: profile.physician.phone?.trim() || null },
   };
   const born = Date.parse(`${normalized.dateOfBirth}T00:00:00Z`);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized.dateOfBirth) || !Number.isFinite(born) || new Date(born).toISOString().slice(0, 10) !== normalized.dateOfBirth || born >= Date.UTC(2100, 0, 1)) throw new Error("Enter a valid date of birth.");
-  if (!emailPattern.test(normalized.guardian.email)) throw new Error("Enter a valid guardian email.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized.dateOfBirth) || !Number.isFinite(born) || new Date(born).toISOString().slice(0, 10) !== normalized.dateOfBirth || born >= Date.UTC(2100, 0, 1)) throw new ConvexError("Enter a valid date of birth.");
+  if (!emailPattern.test(normalized.guardian.email)) throw new ConvexError("Enter a valid guardian email.");
   for (const [label, report] of [["Allergies", normalized.allergies], ["Prescriptions", normalized.prescriptions]] as const) {
-    if (report.entries.length > 20 || report.state === "none" && report.entries.length !== 0 || report.state === "reported" && report.entries.length === 0) throw new Error(`${label} require explicit none or complete entries.`);
+    if (report.entries.length > 20 || report.state === "none" && report.entries.length !== 0 || report.state === "reported" && report.entries.length === 0) throw new ConvexError(`${label} require explicit none or complete entries.`);
   }
   for (const [label, pair] of [["Insurance", normalized.insurance], ["Physician", normalized.physician]] as const) {
     const values = label === "Insurance" ? [normalized.insurance.provider, normalized.insurance.policy] : [normalized.physician.name, normalized.physician.phone];
-    if (pair.state === "provided" && values.some(value => !value) || pair.state !== "provided" && values.some(value => value !== null) || values.some(value => (value?.length ?? 0) > 254)) throw new Error(`${label} needs complete details or an explicit none/unavailable choice.`);
+    if (pair.state === "provided" && values.some(value => !value) || pair.state !== "provided" && values.some(value => value !== null) || values.some(value => (value?.length ?? 0) > 254)) throw new ConvexError(`${label} needs complete details or an explicit none/unavailable choice.`);
   }
   return normalized;
 }
 
 type Ctx = QueryCtx | MutationCtx;
 export async function selectedEventsV2(ctx: Ctx, student: Doc<"students">, eventIds: Id<"events">[]) {
-  if (!eventIds.length || eventIds.length > MAX_CONSENT_EVENTS || new Set(eventIds).size !== eventIds.length) throw new Error("Choose between 1 and 50 unique covered events.");
+  if (!eventIds.length || eventIds.length > MAX_CONSENT_EVENTS || new Set(eventIds).size !== eventIds.length) throw new ConvexError("Choose between 1 and 50 unique covered events.");
   const result: ConsentSnapshotV2["events"] = [];
   for (const eventId of [...eventIds].sort()) {
     const event = await ctx.db.get(eventId);
-    if (!event || event.archived || event.cancelled || event.seasonId !== student.seasonId) throw new Error("A covered event is unavailable.");
+    if (!event || event.archived || event.cancelled || event.seasonId !== student.seasonId) throw new ConvexError("A covered event is unavailable.");
     requireEnrollmentComplete(event);
     const participant = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", eventId).eq("studentId", student._id)).unique();
-    if (participant?.status !== "confirmed") throw new Error("Permission forms cover confirmed event participation only.");
+    if (participant?.status !== "confirmed") throw new ConvexError("Permission forms cover confirmed event participation only.");
     result.push({ eventId, name: event.name, type: event.type, startsAt: event.startsAt, endsAt: event.endsAt, destination: event.destination, travel: event.travel, overnight: event.overnight, feeCents: event.feeCents, independentTravel: participant.independentTravel ?? false, transportEnabled: event.transportEnabled ?? event.travel !== "None", busSeats: event.busSeats ?? null, additionalAdults: event.additionalAdults ?? null, trailerRequired: event.trailerRequired ?? false, signupMode: event.signupMode, capacity: event.capacity ?? null, signupClosesAt: event.signupClosesAt ?? null, roomingEnabled: event.roomingEnabled, roomDeadline: event.roomDeadline ?? null, permissionRequired: event.permissionRequired, firstRequired: event.firstRequired, sponsorName: null, sponsorPhone: null, lodging: null });
   }
   return result;
 }
 export function validateSnapshotV2(snapshot: ConsentSnapshotV2) {
   validateConsentProfileV2(snapshot.profile);
-  if (snapshot.student.grade !== snapshot.profile.grade || snapshot.student.dateOfBirth !== snapshot.profile.dateOfBirth || !snapshot.events.length || snapshot.events.length > MAX_CONSENT_EVENTS || snapshot.priorCoverage.length !== snapshot.events.length || new Set(snapshot.events.map(event => event.eventId)).size !== snapshot.events.length || snapshot.priorCoverage.some(row => !snapshot.events.some(event => event.eventId === row.eventId))) throw new Error("Permission snapshot evidence is inconsistent.");
+  if (snapshot.student.grade !== snapshot.profile.grade || snapshot.student.dateOfBirth !== snapshot.profile.dateOfBirth || !snapshot.events.length || snapshot.events.length > MAX_CONSENT_EVENTS || snapshot.priorCoverage.length !== snapshot.events.length || new Set(snapshot.events.map(event => event.eventId)).size !== snapshot.events.length || snapshot.priorCoverage.some(row => !snapshot.events.some(event => event.eventId === row.eventId))) throw new ConvexError("Permission snapshot evidence is inconsistent.");
   if (snapshot.templateVersion === fieldTripApproved.templateVersion) {
     const version = snapshot.version;
-    if (version.version !== fieldTripApproved.templateVersion || version.title !== fieldTripApproved.title || version.wording !== fieldTripApproved.wording || version.schoolName !== fieldTripApproved.schoolName || version.teamName !== fieldTripApproved.teamName || version.acknowledgmentText !== fieldTripApproved.acknowledgmentText || snapshot.events.some(event => event.sponsorName !== fieldTripApproved.sponsorName || event.sponsorPhone !== fieldTripApproved.sponsorPhone)) throw new Error("Approved field trip template evidence is inconsistent.");
-  } else if (!snapshot.version.wording.toLowerCase().includes("minor first aid") || /medication choices|pain medication|cold medication|allergy medication/i.test(snapshot.version.wording)) throw new Error("New permission wording must include minor first aid and omit OTC choices.");
-  if (snapshot.signedAt !== null && (!snapshot.pdf || !/^[0-9a-f]{64}$/.test(snapshot.pdf.reviewedSha256) || !/^[0-9a-f]{64}$/.test(snapshot.pdf.signedSha256)) || snapshot.signedAt === null && snapshot.pdf !== null) throw new Error("PDF evidence binding is invalid.");
-  if (new TextEncoder().encode(JSON.stringify(snapshot)).byteLength > MAX_SNAPSHOT_BYTES) throw new Error("Permission snapshot is too large.");
+    if (version.version !== fieldTripApproved.templateVersion || version.title !== fieldTripApproved.title || version.wording !== fieldTripApproved.wording || version.schoolName !== fieldTripApproved.schoolName || version.teamName !== fieldTripApproved.teamName || version.acknowledgmentText !== fieldTripApproved.acknowledgmentText || snapshot.events.some(event => event.sponsorName !== fieldTripApproved.sponsorName || event.sponsorPhone !== fieldTripApproved.sponsorPhone)) throw new ConvexError("Approved field trip template evidence is inconsistent.");
+  } else if (!snapshot.version.wording.toLowerCase().includes("minor first aid") || /medication choices|pain medication|cold medication|allergy medication/i.test(snapshot.version.wording)) throw new ConvexError("New permission wording must include minor first aid and omit OTC choices.");
+  if (snapshot.signedAt !== null && (!snapshot.pdf || !/^[0-9a-f]{64}$/.test(snapshot.pdf.reviewedSha256) || !/^[0-9a-f]{64}$/.test(snapshot.pdf.signedSha256)) || snapshot.signedAt === null && snapshot.pdf !== null) throw new ConvexError("PDF evidence binding is invalid.");
+  if (new TextEncoder().encode(JSON.stringify(snapshot)).byteLength > MAX_SNAPSHOT_BYTES) throw new ConvexError("Permission snapshot is too large.");
   return snapshot;
 }
 export async function snapshotHashV2(snapshot: ConsentSnapshotV2) { return tokenHash(JSON.stringify(snapshot)); }

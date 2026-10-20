@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { FirstStudentStatus } from './FirstRegistration'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
@@ -27,7 +28,7 @@ function useAsOf(){const state=useState(()=>Date.now());const setAsOf=state[1];u
 
 function RosterRow({row,grade}:{row:Row;grade:string|null}){
   const update=useMutation(api.admin.updateRoster),[busy,setBusy]=useState(false),[error,setError]=useState('')
-  const change=async(fields:{subteam?:string;travelTeam?:boolean})=>{setBusy(true);setError('');try{await update({studentId:row.studentId,expectedRevision:row.profileRevision,...fields})}catch(e){setError(e instanceof Error?e.message:copy.failed)}finally{setBusy(false)}}
+  const change=async(fields:{subteam?:string;travelTeam?:boolean})=>{setBusy(true);setError('');try{await update({studentId:row.studentId,expectedRevision:row.profileRevision,...fields})}catch(e){setError(userFacingError(e, copy.failed))}finally{setBusy(false)}}
   const missingItems=row.missingSummary.filter(item=>item!=='Profile setup').map(profileItem)
   return <tr>
     <td data-label={liveCopy.roster.student}><Link className={styles.name} to={`/team/${row.studentId}`}>{row.name}</Link>{error&&<p role="alert" className="open-text">{error}</p>}</td>

@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { Component, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useConvex, useMutation, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
@@ -13,10 +14,10 @@ export function FinanceExport(props: Props) {
   const [attempt, setAttempt] = useState(0)
   return <ExportBoundary key={attempt} onRetry={() => setAttempt(value => value + 1)}><ExportContent key={props.selectedStudentId ?? 'all'} {...props}/></ExportBoundary>
 }
-class ExportBoundary extends Component<{ children: ReactNode; onRetry: () => void }, { failed: boolean }> {
-  state = { failed: false }
-  static getDerivedStateFromError() { return { failed: true } }
-  render() { return this.state.failed ? <Card><CardContent><p role="alert">{copy.unavailable}</p><Button type="button" variant="outline" onClick={this.props.onRetry}>{copy.recover}</Button></CardContent></Card> : this.props.children }
+class ExportBoundary extends Component<{ children: ReactNode; onRetry: () => void }, { error: unknown }> {
+  state = { error: null as unknown }
+  static getDerivedStateFromError(error: unknown) { return { error } }
+  render() { return this.state.error !== null ? <Card><CardContent><p role="alert">{userFacingError(this.state.error, copy.unavailable, false)}</p><Button type="button" variant="outline" onClick={this.props.onRetry}>{copy.recover}</Button></CardContent></Card> : this.props.children }
 }
 function ExportContent({ selectedStudentId, selectedStudentName, disabled = false }: Props) {
   const client = useConvex()
@@ -44,7 +45,7 @@ function ExportContent({ selectedStudentId, selectedStudentName, disabled = fals
         const id = await prepare({ scope, ...(scope === 'selected' && selectedStudentId ? { studentIds: [selectedStudentId] } : {}), idempotencyKey: crypto.randomUUID() })
         if (mounted.current) setJobId(id)
       }
-    } catch (error) { if (mounted.current) setError(error instanceof Error ? error.message : copy.failed) }
+    } catch (error) { if (mounted.current) setError(userFacingError(error, copy.failed)) }
     finally { pending.current = false; if (mounted.current) setBusy(null) }
   }
   async function download(kind: 'csv' | 'manifest') {
@@ -66,7 +67,7 @@ function ExportContent({ selectedStudentId, selectedStudentName, disabled = fals
       anchor.href = url; anchor.download = `student-finances-${job.seasonId}-${kind === 'csv' ? 'charges.csv' : 'manifest.json'}`
       document.body.append(anchor); anchor.click(); anchor.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 1000)
       setNotice(copy.completed)
-    } catch (error) { if (mounted.current) setError(abort.signal.aborted ? copy.cancelled : error instanceof Error ? error.message : copy.failed) }
+    } catch (error) { if (mounted.current) setError(abort.signal.aborted ? copy.cancelled : userFacingError(error, copy.failed)) }
     finally { pending.current = false; controller.current = null; if (mounted.current) setBusy(null) }
   }
   const capturing = job?.state === 'preparing'

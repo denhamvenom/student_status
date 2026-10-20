@@ -8,6 +8,7 @@ import { Input } from './components/ui/input'
 import { Checkbox } from './components/ui/checkbox'
 import { NativeSelect, NativeSelectOption } from './components/ui/native-select'
 import { adultProfileCopy } from './lib/adult-profile-copy'
+import { userFacingError } from './lib/error-message'
 import styles from './StaffSetupWizard.module.css'
 import { normalizeChangedPhone } from '../shared/contact-format'
 
@@ -17,19 +18,19 @@ const steps = ['Contact information', 'Shirt and emergency contact', 'Driving', 
 function SignOutButton() {
   const { signOut } = useAuthActions()
   const [busy, setBusy] = useState(false)
-  const [failed, setFailed] = useState(false)
+  const [error, setError] = useState('')
   return <><Button type="button" variant="ghost" disabled={busy} onClick={() => {
-    setBusy(true); setFailed(false)
-    void signOut().catch(() => { setFailed(true); setBusy(false) })
-  }}>{busy ? 'Signing out…' : 'Sign out'}</Button>{failed && <p role="alert">Could not sign out. Please try again.</p>}</>
+    setBusy(true); setError('')
+    void signOut().catch(cause => { setError(userFacingError(cause, 'Could not sign out. Please try again.')); setBusy(false) })
+  }}>{busy ? 'Signing out…' : 'Sign out'}</Button>{error && <p role="alert">{error}</p>}</>
 }
 
-class SetupBoundary extends Component<{ children: ReactNode; retry: () => void }, { failed: boolean }> {
-  state = { failed: false }
-  static getDerivedStateFromError() { return { failed: true } }
+class SetupBoundary extends Component<{ children: ReactNode; retry: () => void }, { error: unknown }> {
+  state = { error: null as unknown }
+  static getDerivedStateFromError(error: unknown) { return { error } }
   render() {
-    return this.state.failed ? <div className={styles.page}><main className={styles.card}>
-      <h1>Staff profile unavailable</h1><p role="alert">We couldn’t load your information. Please try again.</p>
+    return this.state.error !== null ? <div className={styles.page}><main className={styles.card}>
+      <h1>Staff profile unavailable</h1><p role="alert">{userFacingError(this.state.error, 'We couldn’t load your information. Please try again.', false)}</p>
       <div className={styles.actions}><Button onClick={this.props.retry}>Try again</Button><SignOutButton /></div>
     </main></div> : this.props.children
   }
@@ -69,8 +70,9 @@ function StaffWizard({ profile, reload, skip }: { profile: Basics; reload: () =>
     try {
       await dismiss({ expectedProfileRevision: initialRevision })
     } catch (cause) {
-      if (cause instanceof Error && /revision|changed|conflict|stale/i.test(cause.message)) setConflict(true)
-      else setError('Your preference could not be saved. Please try again.')
+      const message = userFacingError(cause, 'Your preference could not be saved. Please try again.')
+      if (/revision|changed|conflict|stale/i.test(message)) setConflict(true)
+      else setError(message)
       setBusy(false)
     }
   }
@@ -82,7 +84,7 @@ function StaffWizard({ profile, reload, skip }: { profile: Basics; reload: () =>
       if (step === 0 || step === 3) setPhone(normalizeChangedPhone(phone, profile.phone))
       if (step === 1 || step === 3) setEmergencyPhone(normalizeChangedPhone(emergencyPhone, profile.emergencyPhone, 'Emergency contact phone'))
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Check your phone number.'); return
+      setError(userFacingError(cause, 'Check your phone number.')); return
     }
     const size = adultProfileCopy.sizes.find(value => value === shirtSize) ?? null
     if (step >= 2 && drivingEdited && !driverBlocked && canDrive && (!(phone.trim() || profile.phone.trim()) || !vehicleName.trim() || !Number.isInteger(Number(passengerSeats)) || Number(passengerSeats) < 1 || Number(passengerSeats) > 100)) {
@@ -96,8 +98,9 @@ function StaffWizard({ profile, reload, skip }: { profile: Basics; reload: () =>
         ...(drivingEdited && !driverBlocked ? { driving: { expectedDriverFingerprint: initialDriver.driverFingerprint, canDrive, vehicleName: vehicleName.trim(), passengerSeats: passengerSeats.trim() ? Number(passengerSeats) : null, towCapable: canDrive && towCapable } } : {}) })
       // The reactive completeness query opens the requested page after the save.
     } catch (cause) {
-      if (cause instanceof Error && /revision|changed|conflict|stale/i.test(cause.message)) setConflict(true)
-      else setError('Your information could not be saved. Please try again.')
+      const message = userFacingError(cause, 'Your information could not be saved. Please try again.')
+      if (/revision|changed|conflict|stale/i.test(message)) setConflict(true)
+      else setError(message)
       setBusy(false)
     }
   }

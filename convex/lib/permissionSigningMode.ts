@@ -1,3 +1,4 @@
+import { ConvexError } from 'convex/values';
 import { env } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
@@ -35,6 +36,6 @@ export async function v2SigningAllowed(ctx: Ctx, studentId: Id<"students">, pare
 
 export async function requireV2Signing(ctx: Ctx, studentId: Id<"students">, parentId?: Id<"appUsers">) {
   const mode = permissionSigningMode();
-  if (!await v2SigningAllowed(ctx, studentId, parentId)) throw new Error(mode === "synthetic" ? "Only registered fictional development subjects may use consent." : "You cannot sign for this student right now.");
+  if (!await v2SigningAllowed(ctx, studentId, parentId)) throw new ConvexError(mode === "synthetic" ? "Only registered fictional development subjects may use consent." : "You cannot sign for this student right now.");
   return mode;
 }

@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { EventEnrollmentNotice } from '../../EventEnrollmentNotice'
 import { eventCopy } from '../../lib/event-copy'
 import { AppShell } from '../../AppShell'
@@ -47,7 +48,7 @@ function FirstAction({ eventId, row }: { eventId: Id<'events'>; row: StudentRow 
   const change = async () => {
     setBusy(true); setError('')
     try { await update({ eventId, studentId: row.student._id, key: 'first', complete: open }) }
-    catch { setError(copy.updateFailed) }
+    catch (cause) { setError(userFacingError(cause, copy.updateFailed)) }
     finally { setBusy(false) }
   }
   return <span className={styles.firstAction}>

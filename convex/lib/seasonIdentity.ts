@@ -1,3 +1,4 @@
+import { ConvexError } from 'convex/values';
 import type { Doc } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { activeSeason, requireRole, viewer } from "./access";
@@ -10,6 +11,6 @@ export async function currentSeasonOwnStudent(ctx: Ctx): Promise<Doc<"students">
   requireRole(actor, "student");
   const season = await activeSeason(ctx);
   const student = await ctx.db.query("students").withIndex("by_seasonId_and_userId", q => q.eq("seasonId", season._id).eq("userId", actor._id)).unique();
-  if (!student?.active) throw new Error("No active student profile is linked to this account in the active season.");
+  if (!student?.active) throw new ConvexError("No active student profile is linked to this account in the active season.");
   return student;
 }

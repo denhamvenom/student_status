@@ -1,5 +1,6 @@
+import { savedPublicError, publicErrorResult } from './lib/publicErrors';
 import { requireSeasonFinancialRetry, seasonFinancialRetryAvailable } from "./lib/seasonFinance";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { internalMutation, mutation, query } from "./_generated/server";
@@ -12,11 +13,11 @@ export const status = query({
   returns: v.union(v.null(), v.object({ state: v.union(v.literal("running"), v.literal("failed"), v.literal("complete"), v.literal("cancelled")), processed: v.number(), assigned: v.number(), canRetry: v.boolean(), lastError: v.union(v.string(), v.null()) })),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx);
-    if (actor.role !== "coach" && !actor.travelLead) throw new Error("Enrollment status access denied.");
+    if (actor.role !== "coach" && !actor.travelLead) throw new ConvexError("Enrollment status access denied.");
     const event = await ctx.db.get(args.eventId); const season = await activeSeason(ctx);
-    if (!event || event.seasonId !== season._id) throw new Error("Event not found.");
+    if (!event || event.seasonId !== season._id) throw new ConvexError("Event not found.");
     const job = await ctx.db.query("eventEnrollmentJobs").withIndex("by_eventId", q => q.eq("eventId", event._id)).unique();
-    return job ? { state: job.state, processed: job.processed, assigned: event.wholeTeamParticipantCount ?? 0, canRetry: actor.role === "coach" && job.state === "failed" && !event.archived && !event.cancelled && await seasonFinancialRetryAvailable(ctx, event.seasonId, job._id), lastError: job.lastError ?? null } : null;
+    return publicErrorResult(job ? { state: job.state, processed: job.processed, assigned: event.wholeTeamParticipantCount ?? 0, canRetry: actor.role === "coach" && job.state === "failed" && !event.archived && !event.cancelled && await seasonFinancialRetryAvailable(ctx, event.seasonId, job._id), lastError: job.lastError ?? null } : null);
   },
 });
 
@@ -69,7 +70,7 @@ export const run = internalMutation({
       await ctx.runMutation(internal.eventEnrollment.processPage, { jobId: job._id, expectedCursor: job.cursor });
     } catch (error) {
       // The failed nested mutation rolls back this student's participation and fee.
-      await ctx.db.patch(job._id, { state: "failed", lastError: error instanceof Error ? error.message.slice(0, 500) : "Enrollment failed; Coach review is required.", updatedAt: Date.now() });
+      await ctx.db.patch(job._id, { state: "failed", lastError: savedPublicError(error, "Enrollment failed; Coach review is required."), updatedAt: Date.now() });
       const event = await ctx.db.get(job.eventId);
       if (event) await ctx.db.patch(event._id, { enrollmentState: "failed" });
     }
@@ -81,11 +82,11 @@ export const retry = mutation({
   args: { eventId: v.id("events") }, returns: v.null(),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx);
-    if (actor.role !== "coach") throw new Error("Only a Coach may retry Whole Team enrollment.");
+    if (actor.role !== "coach") throw new ConvexError("Only a Coach may retry Whole Team enrollment.");
     const event = await ctx.db.get(args.eventId); const season = await activeSeason(ctx);
-    if (!event || event.archived || event.cancelled || event.seasonId !== season._id) throw new Error("Event is unavailable.");
+    if (!event || event.archived || event.cancelled || event.seasonId !== season._id) throw new ConvexError("Event is unavailable.");
     const job = await ctx.db.query("eventEnrollmentJobs").withIndex("by_eventId", q => q.eq("eventId", event._id)).unique();
-    if (!job || job.state !== "failed") throw new Error("No failed enrollment is available to retry.");
+    if (!job || job.state !== "failed") throw new ConvexError("No failed enrollment is available to retry.");
     await requireSeasonFinancialRetry(ctx, season._id, job._id);
     await ctx.db.patch(job._id, { actorId: actor._id, state: "running", lastError: undefined, updatedAt: Date.now() });
     await ctx.db.patch(event._id, { enrollmentState: "running" });

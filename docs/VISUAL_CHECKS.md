@@ -1,5 +1,9 @@
 # Visual review closed — October 16, 2026
 
+## October 20 - Actionable error review
+
+Eight actual-component checks passed: cooldown, network, session and unexpected errors at 390px dark and 1440px light. Input retained, retry enabled, no horizontal overflow. Owner localhost acceptance is pending at http://127.0.0.1:5182/setup?scenario=cooldown; synthetic fixture sends no emails. See [ACTIONABLE_ERRORS.md](ACTIONABLE_ERRORS.md). This adds no historical visual backlog and does not authorize production.
+
 ## October 20 - Approved contact formatting production release
 
 Owner authorized publishing reviewed fdabbe3. Production backend amicable-eel-413 deployed successfully with schema/type validation and no index deletion. Phone/email formatting and validation cover live input and backend paths; optional blanks, unchanged legacy values and signed records are preserved. Documentation publishes with source. See RELEASE_2026-10-20_CONTACT_FORMATS.md. Earlier development-only statements for this feature are superseded.

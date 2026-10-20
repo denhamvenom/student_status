@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { ConfirmAction } from '../../ConfirmAction'
 import { EventEnrollmentNotice } from "../../EventEnrollmentNotice";
 import { operationsCopy, operationsText } from '../../lib/operations-copy'
@@ -33,7 +34,7 @@ function StudentRoom({ eventId }: { eventId: Id<"events"> }) {
   const [message, setMessage] = useState("");
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
-  async function act(fn: () => Promise<unknown>, result: string) { setBusy(true); setError(""); setMessage(""); try { await fn(); setMessage(result); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); } }
+  async function act(fn: () => Promise<unknown>, result: string) { setBusy(true); setError(""); setMessage(""); try { await fn(); setMessage(result); } catch (e) { setError(userFacingError(e)); } finally { setBusy(false); } }
   if (!data || !peers) return <p role="status">{operationsCopy.rooms.loadingRoomSelection}</p>;
   const group = data.group;
   const closed = data.roomDeadline !== null && now > data.roomDeadline;
@@ -63,7 +64,7 @@ function AdultRoom({ eventId }: { eventId: Id<"events"> }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  async function act(fn: () => Promise<unknown>, result: string) { setBusy(true); setError(""); setMessage(""); try { await fn(); setMessage(result); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); } }
+  async function act(fn: () => Promise<unknown>, result: string) { setBusy(true); setError(""); setMessage(""); try { await fn(); setMessage(result); } catch (e) { setError(userFacingError(e)); } finally { setBusy(false); } }
   if (!data) return <p role="status">{operationsCopy.rooms.loadingRoomRoster}</p>;
   const groups = data.groups as Group[];
   const students = data.students as Student[];

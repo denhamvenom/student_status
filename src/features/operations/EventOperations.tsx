@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { operationsCopy, operationsText } from '../../lib/operations-copy'
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery } from "convex/react";
@@ -37,7 +38,7 @@ export function EventOperations({ eventId, coach=false }: { eventId: Id<"events"
 
   async function act(fn: () => Promise<unknown>, message: string) {
     setBusy(true); setError(""); setSuccess("");
-    try { await fn(); setSuccess(message); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
+    try { await fn(); setSuccess(message); } catch (e) { setError(userFacingError(e)); } finally { setBusy(false); }
   }
   if (!data) return <p role="status">{operationsCopy.event.loadingEventOperations}</p>;
   const event = data.event;
