@@ -72,15 +72,24 @@ describe("staff basic setup", () => {
     }
   });
 
-  it("requires every basic field, valid size and bounded values without partial saves", async () => {
+  it("validates supplied values without partial saves", async () => {
     const f = await fixture();
     for (const field of ["name", "phone", "emergencyName", "emergencyRelationship", "emergencyPhone"]) {
-      await expect(f.mentor.mutation(api.adultProfile.saveBasics, { ...basicFields, [field]: "   " })).rejects.toThrow("provided");
       await expect(f.mentor.mutation(api.adultProfile.saveBasics, { ...basicFields, [field]: "x".repeat(101) })).rejects.toThrow("characters");
     }
     await expect(f.mentor.mutation(api.adultProfile.saveBasics, { ...basicFields, shirtSize: "invalid" as "L" })).rejects.toThrow();
     await expect(f.mentor.mutation(api.adultProfile.saveBasics, { ...basicFields, expectedProfileRevision: 0.5 })).rejects.toThrow("Profile changed");
     expect(await f.t.run(ctx => ctx.db.get(f.ids.mentor))).not.toHaveProperty("profileRevision");
+  });
+
+  it("finishes with individual skipped fields, preserves saved values and does not prompt again", async () => {
+    const f = await fixture();
+    await f.t.run(ctx => ctx.db.patch(f.ids.mentor, { phone: "555-0199" }));
+    await f.mentor.mutation(api.adultProfile.saveBasics, { expectedProfileRevision: 0, name: "", phone: "", shirtSize: null, emergencyName: "Contact", emergencyRelationship: "", emergencyPhone: "" });
+    expect(await f.mentor.query(api.adultProfile.ownBasics, {})).toMatchObject({ name: "Mentor", phone: "555-0199", shirtSize: null, emergencyName: "Contact", emergencyRelationship: "", needsSetup: false, dismissed: false });
+    const returning = f.t.withIdentity({ subject: `${f.ids.mentorAuth}|returning` });
+    expect((await returning.query(api.adultProfile.ownBasics, {})).needsSetup).toBe(false);
+    expect(await f.t.run(ctx => ctx.db.query("drivers").take(10))).toEqual([]);
   });
 
   it("persists a self-only dismissal across sessions and seasons, preserves it after saves and rejects stale dismissal", async () => {

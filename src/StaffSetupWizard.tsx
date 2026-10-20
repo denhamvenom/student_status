@@ -68,15 +68,8 @@ function StaffWizard({ profile, reload, skip }: { profile: Basics; reload: () =>
     event.preventDefault()
     if (busy || stale) return
     setError('')
-    if (step === 0 && (!name.trim() || !phone.trim())) {
-      setError('Enter your full name and phone number.'); return
-    }
-    const size = adultProfileCopy.sizes.find(value => value === shirtSize)
-    if (step >= 1 && (!size || !emergencyName.trim() || !emergencyRelationship.trim() || !emergencyPhone.trim())) {
-      setError('Choose a shirt size and complete all emergency contact fields.'); return
-    }
+    const size = adultProfileCopy.sizes.find(value => value === shirtSize) ?? null
     if (step < 2) { move(step + 1); return }
-    if (!size) return
     setBusy(true)
     try {
       await save({ expectedProfileRevision: initialRevision, name: name.trim(), phone: phone.trim(), shirtSize: size,
@@ -95,7 +88,7 @@ function StaffWizard({ profile, reload, skip }: { profile: Basics; reload: () =>
   return <div className={styles.page}><main className={styles.shell}>
     <header className={styles.header}><p className={styles.eyebrow}>TEAM 8044</p><h1>Set up your staff profile</h1>
       <p className={styles.muted}>Please confirm your basic information. This applies to all Coaches and Mentors.</p>
-      <p className={styles.muted}>Your answers are saved when you finish. You can update them later in Profile.</p>
+      <p className={styles.muted}>Every item is optional. Leave anything blank and continue. Finishing saves your answers; skipped items keep any previously saved information. You can update details later in Profile.</p>
     </header>
     <section className={styles.card}>
       <div className={styles.stepHead}><p className={styles.eyebrow}>Step {step + 1} of 3</p>
@@ -107,20 +100,20 @@ function StaffWizard({ profile, reload, skip }: { profile: Basics; reload: () =>
         <fieldset className={styles.fields} disabled={busy || stale}>
           <legend className={styles.srOnly}>{steps[step]}</legend>
           {step === 0 ? <>
-            <label className={styles.field}>Full name<Input required autoComplete="name" maxLength={100} value={name} onChange={event => setName(event.target.value)} /></label>
-            <label className={styles.field}>Phone<Input required type="tel" autoComplete="tel" maxLength={50} value={phone} onChange={event => setPhone(event.target.value)} /></label>
+            <label className={styles.field}>Full name<Input autoComplete="name" maxLength={100} value={name} onChange={event => setName(event.target.value)} /></label>
+            <label className={styles.field}>Phone<Input type="tel" autoComplete="tel" maxLength={50} value={phone} onChange={event => setPhone(event.target.value)} /></label>
           </> : step === 1 ? <>
             <label className={`${styles.field} ${styles.full}`}>Shirt size (adult)
-              <NativeSelect required value={shirtSize} onChange={event => setShirtSize(event.target.value)}>
-                <NativeSelectOption value="">Choose a size</NativeSelectOption>
+              <NativeSelect value={shirtSize} onChange={event => setShirtSize(event.target.value)}>
+                <NativeSelectOption value="">Skip / prefer not to answer</NativeSelectOption>
                 {adultProfileCopy.sizes.map(size => <NativeSelectOption key={size} value={size}>{size}</NativeSelectOption>)}
               </NativeSelect>
             </label>
             <h3 className={styles.full}>Emergency contact</h3>
-            <label className={styles.field}>Emergency contact name<Input required maxLength={100} value={emergencyName} onChange={event => setEmergencyName(event.target.value)} /></label>
-            <label className={styles.field}>Relationship<Input required maxLength={100} value={emergencyRelationship} onChange={event => setEmergencyRelationship(event.target.value)} /></label>
-            <label className={styles.field}>Emergency contact phone<Input required type="tel" maxLength={50} value={emergencyPhone} onChange={event => setEmergencyPhone(event.target.value)} /></label>
-          </> : <dl className={styles.review}>{review.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
+            <label className={styles.field}>Emergency contact name<Input maxLength={100} value={emergencyName} onChange={event => setEmergencyName(event.target.value)} /></label>
+            <label className={styles.field}>Relationship<Input maxLength={100} value={emergencyRelationship} onChange={event => setEmergencyRelationship(event.target.value)} /></label>
+            <label className={styles.field}>Emergency contact phone<Input type="tel" maxLength={50} value={emergencyPhone} onChange={event => setEmergencyPhone(event.target.value)} /></label>
+          </> : <dl className={styles.review}>{review.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value.trim() || 'Skipped'}</dd></div>)}</dl>}
         </fieldset>
         {stale && <div className={styles.notice} role="alert"><p>Your profile changed elsewhere. Reload the saved information before continuing. Unsaved answers will be replaced.</p><Button type="button" variant="outline" onClick={reload}>Reload saved information</Button></div>}
         {error && <p className={styles.error} role="alert">{error}</p>}

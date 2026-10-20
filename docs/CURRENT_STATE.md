@@ -9,3 +9,5 @@ Focused backend tests and independent review passed. Actual-component synthetic 
 ## Production baseline
 
 Grade dropdowns and roster sorting released in PR26 at e3bf53d4069a2777ee26c9ca146e792e0c7e4731, release v0.1.0-onboarding.7. Production backend amicable-eel-413 and both Cloudflare builds succeeded. Source and documentation are published. See RELEASE_2026-10-20_GRADES_ROSTER.md and GitHub release evidence. Development email remains disabled; Calendar writes remain production-only. No real records used for staff verification.
+
+Individual-item skipping added: blank answers allowed throughout, supplied fields saved, skipped saved values preserved, completion suppresses future prompts. Focused13 tests and synthetic browser flow passed. See STAFF_SETUP_WIZARD.md.

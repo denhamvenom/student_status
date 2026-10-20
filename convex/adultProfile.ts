@@ -121,7 +121,7 @@ export const ownBasics = query({
     const complete = [basic.name, basic.phone, basic.emergencyName, basic.emergencyRelationship, basic.emergencyPhone].every(value => value.trim().length > 0)
       && ["XS", "S", "M", "L", "XL", "2XL", "3XL"].includes(basic.shirtSize ?? "");
     const dismissed = actor.staffSetupDismissedAt !== undefined;
-    return { ...basic, needsSetup: !complete && !dismissed, dismissed };
+    return { ...basic, needsSetup: !complete && !dismissed && actor.staffSetupCompletedAt === undefined, dismissed };
   },
 });
 
@@ -140,17 +140,17 @@ export const dismissSetup = mutation({
 
 /** Onboarding updates personal information only, leaving driving and access decisions untouched. */
 export const saveBasics = mutation({
-  args: { expectedProfileRevision: v.number(), name: v.string(), phone: v.string(), shirtSize, emergencyName: v.string(), emergencyRelationship: v.string(), emergencyPhone: v.string() },
+  args: { expectedProfileRevision: v.number(), name: v.string(), phone: v.string(), shirtSize: v.union(shirtSize, v.null()), emergencyName: v.string(), emergencyRelationship: v.string(), emergencyPhone: v.string() },
   returns: v.object({ profileRevision: v.number() }),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach", "mentor");
     if (!Number.isSafeInteger(args.expectedProfileRevision) || args.expectedProfileRevision < 0 || args.expectedProfileRevision !== (actor.profileRevision ?? 0)) throw new Error("Profile changed. Reload before saving.");
     const profileRevision = (actor.profileRevision ?? 0) + 1;
     const patch = {
-      name: clean(args.name, "Name", 100, true), phone: clean(args.phone, "Phone", 50, true), shirtSize: args.shirtSize,
-      emergencyName: clean(args.emergencyName, "Emergency contact name", 100, true),
-      emergencyRelationship: clean(args.emergencyRelationship, "Emergency contact relationship", 100, true),
-      emergencyPhone: clean(args.emergencyPhone, "Emergency contact phone", 50, true), profileRevision,
+      name: clean(args.name, "Name", 100) || actor.name, phone: clean(args.phone, "Phone", 50) || actor.phone, shirtSize: args.shirtSize ?? actor.shirtSize,
+      emergencyName: clean(args.emergencyName, "Emergency contact name", 100) || actor.emergencyName,
+      emergencyRelationship: clean(args.emergencyRelationship, "Emergency contact relationship", 100) || actor.emergencyRelationship,
+      emergencyPhone: clean(args.emergencyPhone, "Emergency contact phone", 50) || actor.emergencyPhone, profileRevision, staffSetupCompletedAt: Date.now(),
     };
     await ctx.db.patch(actor._id, patch);
     await audit(ctx, actor, "appUsers", actor._id, "saveOwnBasics", { profileRevision: actor.profileRevision ?? 0 }, { profileRevision });
