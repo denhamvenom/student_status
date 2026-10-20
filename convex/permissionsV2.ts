@@ -9,6 +9,7 @@ import { boundedText, expectedCoverageValidator } from "./lib/consentSnapshot";
 import { consentProfileV2Validator, consentSnapshotV2Validator, selectedEventsV2, snapshotHashV2, validateConsentProfileV2, validateSnapshotV2, type ConsentSnapshotV2 } from "./lib/consentSnapshotV2";
 import { fieldTripApproved } from "../src/lib/field-trip-approved";
 import { requireV2Signing } from "./lib/permissionSigningMode";
+import { gradeForSave } from "../src/lib/grades";
 
 type Ctx = QueryCtx | MutationCtx;
 const hashPattern = /^[0-9a-f]{64}$/;
@@ -71,9 +72,9 @@ export const saveProfile = mutation({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); await parentSigner(ctx, actor); const student = await studentAccess(ctx, actor, args.studentId);
     if ((student.profileRevision ?? 0) !== args.expectedRevision) throw new Error("Profile changed. Reload before saving.");
-    const value = validateConsentProfileV2(args.value);
-    if (Date.parse(`${value.dateOfBirth}T00:00:00Z`) >= Date.now()) throw new Error("Date of birth must be in the past.");
     const setupDraft = await ctx.db.query("setupDrafts").withIndex("by_studentId", q => q.eq("studentId", student._id)).unique();
+    const value = validateConsentProfileV2({...args.value, grade: gradeForSave(args.value.grade, [student.consentProfileV2?.grade, setupDraft?.grade])});
+    if (Date.parse(`${value.dateOfBirth}T00:00:00Z`) >= Date.now()) throw new Error("Date of birth must be in the past.");
     if (setupDraft) await ctx.db.delete(setupDraft._id);
     await ctx.db.patch(student._id, {consentProfileV2: value, consentProfileV2CompletedAt: Date.now(), consentProfileV2ConfirmedBy: actor._id, profileRevision: args.expectedRevision + 1});
     await audit(ctx, actor, "students", student._id, "confirmStructuredConsentProfile", {revision: args.expectedRevision}, {revision: args.expectedRevision + 1, completed: true});

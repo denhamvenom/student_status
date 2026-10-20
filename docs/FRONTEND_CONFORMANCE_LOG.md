@@ -1,5 +1,12 @@
 # Frontend conformance work log
 
+## October 20 - Grade dropdown (local development)
+
+Student and parent setup plus the parent health/contact profile now use Freshman, Sophomore, Junior and Senior. Recognized earlier values display canonically and convert on normal save; unknown values remain selectable unchanged. Existing confirmed profile spelling may remain until parent reconfirmation, and signed snapshots are untouched. No bulk migration or production data change.
+
+Validation:552 tests/102 files passed, focused tests/types/lint and independent review passed. Shared dropdown browser checks passed at desktop/light and phone/dark. Application build and development third-bandicoot-18 synchronization passed, including backend typecheck. See [behavior and evidence](STUDENT_GRADE_DROPDOWN.md). Production release is not authorized for this change.
+
+
 ## October 19 private parent sign-in: development verified
 
 Implemented inbox-only parent sign-in links, removed student Share/Copy, preserved one-hour invitation resend and student Google login. Parent login still requires separate relationship/authority confirmation. Returning parents and expired private links support six-digit email codes. Integrated Calendar main b1f730a and reviewed legal-name/Money checkpoint 2bd052a without source conflicts.
@@ -364,3 +371,7 @@ Owner authorized development and production publication of frontend-only invitat
 ## October 19 - Mentor/Staff invitation email (development)
 
 Implemented Send invitation with private emailed links, accurate delivery status and guarded resend; removed public copy-link return/UI. Existing invitation acceptance remains explicit. Development third-bandicoot-18 synced with optional fields/additive index; sending remains disabled, no real messages or production writes. Independent review clear; 535 tests in101 files passed and focused31 account/mail tests passed. See [workflow and verification](ADULT_INVITATION_EMAIL.md). Real-inbox delivery and production promotion remain unverified/unreleased.
+
+## October 20 - Active Roster sorting
+
+Actual CoachRosterManagement component rendered with synthetic mocked Convex hooks at 1440x900/light and 390x844/dark. Full-directory last-name, grade and subteam ordering; 20-row paging; later-page balance/search matches; missing-grade display and no horizontal overflow passed. Existing shared controls/table/mobile cards reused; screenshots inspected. Evidence stays ignored under .test-temp/roster-sort-ui. This is component verification, not a live account rehearsal. Coach acceptance remains pending; no production change.
