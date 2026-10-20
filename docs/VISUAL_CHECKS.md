@@ -1,5 +1,10 @@
 # Visual review closed — October 16, 2026
 
+## October 20 - Approved Mentor landing and fundraiser production release
+
+Owner accepted the localhost changes and authorized production publication. Reviewed source f075087 deployed to production amicable-eel-413 with backend typecheck/schema validation and no deleted indexes. Includes Mentor Profile landing, fundraiser CSV workflow, family Pay/Share, and Coach/Travel connection status. Documentation publishes with source. See RELEASE_2026-10-20_FUNDRAISERS.md for evidence and release boundaries. Earlier development-only statements for these features are superseded.
+
+
 ## October 20 - Fundraiser CSV and roster status (development)
 
 Replaced the long Money tools link list with Download current CSV and Upload fundraiser CSV. Export includes names, stable IDs, revisions and existing links. Review shows canonical names and connection/update/removal counts; Coach applies one atomic batch of up to 500 rows. Blank links remove; omitted students remain unchanged. Stale, duplicate, unauthorized or invalid rows reject the batch. Coach/Travel rosters and team reports (including CSV) show Fundraiser Link as Connected/Disconnected, without exposing URLs in Travel projections.

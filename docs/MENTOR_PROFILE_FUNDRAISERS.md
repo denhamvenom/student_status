@@ -1,6 +1,6 @@
 # Mentor Profile and individual fundraiser links
 
-Development feature, October 20, 2026. Production release is not authorized.
+Owner accepted and authorized production release October 20, 2026. Backend f075087 deployed successfully. See RELEASE_2026-10-20_FUNDRAISERS.md and release notes for exact website build evidence. Earlier development-only evidence below is historical.
 
 ## Behavior
 
@@ -40,3 +40,4 @@ Replaced the long Money tools link list with Download current CSV and Upload fun
 25 focused tests passed; independent source review found no blockers. Synthetic browser workflow passed export, removal review, apply, malformed-file rejection and desktop/light plus phone/dark layout checks. Phone screenshot inspected. No real student links, payments or invitations changed. See MENTOR_PROFILE_FUNDRAISERS.md. Production unchanged.
 
 CSV checkpoint final checks: development sync with backend types, lint, frontend types and build passed. Fixed an empty-roster row reference caught by the integrated typecheck.
+

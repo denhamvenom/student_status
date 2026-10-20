@@ -1,13 +1,11 @@
 # Current integration handoff
 
-## Mentor Profile and individual fundraiser links — development
+## Mentor landing and fundraiser production release
 
-Built on released main 04272ad. Mentors land on Profile with Report retained. Coach Money tools imports/exports individual Zeffy links through reviewed CSV batches; Coach/Travel rosters and team reports show connected/disconnected status; students and linked parents see Pay Now/Share on Money only when configured. No financial transactions or balances are changed by these actions. See MENTOR_PROFILE_FUNDRAISERS.md for behavior, authorization and evidence.
+Owner accepted and authorized release of f075087. Production Convex amicable-eel-413 deployment succeeded with schema/type validation and no indexes deleted. Website merge/build evidence goes in the release PR and release notes. See RELEASE_2026-10-20_FUNDRAISERS.md and MENTOR_PROFILE_FUNDRAISERS.md.
 
-11 focused tests and independent source review passed. Synthetic actual-component checks verified desktop/light and phone/dark layouts, Mentor routing, Coach update/clear and family copy/no-link hiding. Physical-phone sharing and real checkout were not exercised. Development third-bandicoot-18 synchronized; production remains at the approved staff-setup release. No real links were assigned.
+Mentors land on Profile. Coach fundraiser CSV replaces the long editor; Coach/Travel rosters and reports show connection status. Family Pay/Share appears only with a saved individual link. No real links were assigned or payment records changed.
 
-Root owns feature/parent-email-invitations in student-status-bulk-invite. Other chat confirmed no conflicting work and held shared sync during integration. Development email remains disabled; Calendar writes remain production-only. Previous unrelated 501-charge fee-test timeout is a separate follow-up.
+25 focused CSV/status tests, prior 11 landing/share tests, independent reviews, lint/types/build and synthetic browser checks passed. Real phone sharing and Zeffy checkout remain untested. Unrelated 501-charge fee-test timeout remains separate.
 
-Final lint, frontend/backend typechecks and application build passed.
-
-Latest CSV/status checkpoint: 25 focused tests and independent review passed; synthetic desktop/light and phone/dark CSV browser workflow verified. Blank clears, omitted rows untouched, maximum 500 rows per atomic import. Earlier single-row editor evidence is historical.
+Root owns release integration on feature/parent-email-invitations. Other chat holds sync/merges until release handoff. Development email disabled; Calendar writes remain production-only.
