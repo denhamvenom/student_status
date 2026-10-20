@@ -1,5 +1,10 @@
 # Student Status Development Checklist
 
+## October 20 - Staff setup production release
+
+Owner accepted the localhost wizard and authorized release. Source280bc81 deployed successfully to production amicable-eel-413 with backend typecheck/schema validation and no deleted indexes. All personal items can be skipped; optional driving/trailer uses shared contact phone and existing approval rules. Temporary/permanent skip and later Profile editing remain available. Source and documentation publish together. See RELEASE_2026-10-20_STAFF_SETUP.md and release notes for exact merge/build evidence; older development-only statements below are superseded.
+
+
 ## October 20 - Staff setup with optional permanent skip (development)
 
 Implemented a three-step basic-profile wizard for Coaches, Mentors and Travel Leads, including existing accounts with missing information. Full name, phone, shirt size and emergency contact prefill from saved data. Skip for now bypasses the current session; Don’t ask me again stores a permanent per-account preference across logins/seasons. Both can still edit Profile later, and Coaches now have a Profile entry. Student/parent setup remains unchanged. No driver approval or role grants occur during setup.

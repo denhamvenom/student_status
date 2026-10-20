@@ -1,5 +1,10 @@
 # Staff profile setup
 
+## October 20 - Staff setup production release
+
+Owner accepted the localhost wizard and authorized release. Source280bc81 deployed successfully to production amicable-eel-413 with backend typecheck/schema validation and no deleted indexes. All personal items can be skipped; optional driving/trailer uses shared contact phone and existing approval rules. Temporary/permanent skip and later Profile editing remain available. Source and documentation publish together. See RELEASE_2026-10-20_STAFF_SETUP.md and release notes for exact merge/build evidence; older development-only statements below are superseded.
+
+
 ## Scope and behavior
 
 Development-only October 20 feature. Accepted staff accounts (Coaches, Mentors and Travel Leads) see a four-step wizard when basic information is incomplete. It offers optional full name, phone, adult shirt size and emergency contact name, relationship and phone; account email is established by sign-in/invitation and is not requested or repeated in the wizard. Existing saved values prefill the form. Existing complete staff profiles bypass it. Student/parent setup and invitation acceptance remain unchanged.
