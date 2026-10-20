@@ -11,3 +11,7 @@ Use the stored lastName when available; for older names without structured parts
 ## Verification
 
 556 tests across 103 files passed, plus lint, application typecheck/build and independent review. Development third-bandicoot-18 synchronized successfully with backend typecheck. Actual roster component browser checks used 25 synthetic students and mocked Convex hooks at 1440x900 light and 390x844 dark: full-directory sorting, pagination, later-page search/quick filters, missing grade visibility and responsive width passed. Screenshots inspected; evidence remains ignored in .test-temp/roster-sort-ui. Live Coach acceptance remains pending. No production deployment, record migration or signed-permission modification.
+
+
+## Release status
+Coach accepted and authorized production publication October 20. Production backend sync succeeded; see RELEASE_2026-10-20_GRADES_ROSTER.md and the release notes for frontend build outcomes. This supersedes the development-only status above.
