@@ -35,6 +35,21 @@ async function fixture() {
 }
 
 describe("shared setup and season FIRST registration", () => {
+  it("normalizes known grades, preserves old unknown grades, and rejects new arbitrary grades", async () => {
+    const f=await fixture();
+    const save=(grade:string,expectedRevision:number)=>f.student.mutation(api.setupWizard.saveStudentAbout,{studentId:f.ids.student,expectedRevision,preferredName:"Synthetic",grade,dateOfBirth:"2010-10-15"});
+    await expect(save("Transfer year",0)).rejects.toThrow("Choose Freshman");
+    expect(await save("9th grade",0)).toBe(1);
+    expect((await f.student.query(api.setupWizard.get,{studentId:f.ids.student})).student.grade).toBe("Freshman");
+    await f.t.run(ctx=>ctx.db.patch(f.ids.student,{consentProfileV2: {
+      grade:"Transfer year",dateOfBirth:"2010-10-15",guardian:{name:"Parent",relationship:"Parent",phone:"555-0100",email:"parent@example.invalid"},emergency:{name:"Alternate",relationship:"Aunt",phone:"555-0101"},allergies:{state:"none",entries:[]},prescriptions:{state:"none",entries:[]},insurance:{state:"unavailable",provider:null,policy:null},physician:{state:"none",name:null,phone:null}
+    },consentProfileV2CompletedAt:123,consentProfileV2ConfirmedBy:f.ids.auth[2].app}));
+    await expect(save("Different year",1)).rejects.toThrow("Choose Freshman");
+    expect(await save("Transfer year",1)).toBe(2);
+    const stored=await f.t.run(ctx=>ctx.db.get(f.ids.student));
+    expect(stored?.consentProfileV2?.grade).toBe("Transfer year");
+    expect(stored?.consentProfileV2CompletedAt).toBe(123);
+  });
   it("uses the Chicago eighteenth birthday for access and keeps minor medical data private", async () => {
     expect(age18("2008-10-15",Date.parse("2026-10-15T04:59:00Z"))).toBe(false);
     expect(age18("2008-10-15",Date.parse("2026-10-15T05:00:00Z"))).toBe(true);

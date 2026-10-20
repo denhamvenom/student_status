@@ -1,5 +1,12 @@
 # Frontend conformance work log
 
+## October 20 - Grade dropdown (local development)
+
+Student and parent setup plus the parent health/contact profile now use Freshman, Sophomore, Junior and Senior. Recognized earlier values display canonically and convert on normal save; unknown values remain selectable unchanged. Existing confirmed profile spelling may remain until parent reconfirmation, and signed snapshots are untouched. No bulk migration or production data change.
+
+Validation:552 tests/102 files passed, focused tests/types/lint and independent review passed. Shared dropdown browser checks passed at desktop/light and phone/dark. Application build and development third-bandicoot-18 synchronization passed, including backend typecheck. See [behavior and evidence](STUDENT_GRADE_DROPDOWN.md). Production release is not authorized for this change.
+
+
 ## October 19 private parent sign-in: development verified
 
 Implemented inbox-only parent sign-in links, removed student Share/Copy, preserved one-hour invitation resend and student Google login. Parent login still requires separate relationship/authority confirmation. Returning parents and expired private links support six-digit email codes. Integrated Calendar main b1f730a and reviewed legal-name/Money checkpoint 2bd052a without source conflicts.

@@ -48,6 +48,16 @@ async function fixture() {
   return {t, ids, ...actors};
 }
 
+it("accepts only recognized or unchanged legacy profile grades", async () => {
+  const f = await fixture();
+  await expect(f.parent.mutation(api.permissionsV2.saveProfile, {studentId:f.ids.student,expectedRevision:0,value:{...profile,grade:"Transfer year"}})).rejects.toThrow("Choose Freshman");
+  await f.parent.mutation(api.permissionsV2.saveProfile, {studentId:f.ids.student,expectedRevision:0,value:{...profile,grade:"10th grade"}});
+  expect((await f.parent.query(api.permissionsV2.profile,{studentId:f.ids.student})).value?.grade).toBe("Sophomore");
+  await f.t.run(ctx=>ctx.db.patch(f.ids.student,{consentProfileV2:{...profile,grade:"Transfer year"}}));
+  await f.parent.mutation(api.permissionsV2.saveProfile, {studentId:f.ids.student,expectedRevision:1,value:{...profile,grade:"Transfer year"}});
+  expect((await f.parent.query(api.permissionsV2.profile,{studentId:f.ids.student})).value?.grade).toBe("Transfer year");
+});
+
 it("requires student setup and explicit parent confirmation before a populated PDF draft", async () => {
   const f = await fixture();
   await expect(f.parent.mutation(internal.permissionsV2.createDraft, {studentId: f.ids.student, eventIds: [f.ids.event], source: "electronic"})).rejects.toThrow("Student setup");
