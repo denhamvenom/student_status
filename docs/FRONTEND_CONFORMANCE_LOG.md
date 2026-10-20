@@ -1,5 +1,10 @@
 # Frontend conformance work log
 
+## October 20 - Approved contact formatting production release
+
+Owner authorized publishing reviewed fdabbe3. Production backend amicable-eel-413 deployed successfully with schema/type validation and no index deletion. Phone/email formatting and validation cover live input and backend paths; optional blanks, unchanged legacy values and signed records are preserved. Documentation publishes with source. See RELEASE_2026-10-20_CONTACT_FORMATS.md. Earlier development-only statements for this feature are superseded.
+
+
 ## October 20 - Contact input formatting (development)
 
 Phone/email entries now use shared formatting and validation across profiles, setup, driver contacts, invitations, paper signer fields and payment CSV matching, enforced on backend entry too. US phones display as (555) 123-4567; email is trimmed/lowercased and structurally checked. Optional blanks remain optional, unchanged legacy contacts preserved, signed evidence untouched. 84 backend/helper and two payment CSV tests covered; desktop/phone input and wizard browser checks passed with independent source review. See CONTACT_INPUT_FORMATS.md. Development only; no production release authorized.

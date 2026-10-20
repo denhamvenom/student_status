@@ -1,9 +1,9 @@
 # Current integration handoff
 
-## Contact entry formatting — development
+## Contact formatting production release
 
-Based on released main96b38c6 (PR28, v0.1.0-onboarding.9). Mentor/fundraiser release is complete; both production builds succeeded. Release notes record exact evidence.
+Owner authorized release of fdabbe3. Production Convex amicable-eel-413 deployment succeeded with typecheck/schema validation; no indexes deleted. Website merge/build evidence is recorded on the release PR and release notes. See RELEASE_2026-10-20_CONTACT_FORMATS.md and CONTACT_INPUT_FORMATS.md.
 
-Current work enforces shared phone/email format and validation across live contact entry forms and backend writes. US phone format (555) 123-4567; email trim/lowercase and structural checks. Optional and unchanged legacy data preserved; no signed snapshot or OAuth rewrite. See CONTACT_INPUT_FORMATS.md.
+Shared phone/email input formatting and backend validation apply throughout contact entry. Optional blanks and unchanged legacy contacts preserved; historical signed snapshots/OAuth identity unchanged. 84 backend/helper tests covered, two CSV tests passed, independent review, browser checks and lint/types/build passed. No real record submits or emails during release.
 
-84 backend/helper and two frontend CSV tests covered, actual input/wizard desktop-phone checks and independent review passed. Development third-bandicoot-18 synced. No production authorization for these changes. Root owns branch feature/parent-email-invitations; other chat holds shared sync pending handoff. Development email remains disabled and Calendar writes production-only. Unrelated historical 501-charge fee-test timeout remains separate.
+Root owns release integration on feature/parent-email-invitations. Other chat holds shared sync/merges until handoff. Development email stays disabled and Calendar writes production-only. Historical unrelated501-charge fee timeout remains separate.
