@@ -375,3 +375,10 @@ Implemented Send invitation with private emailed links, accurate delivery status
 ## October 20 - Active Roster sorting
 
 Actual CoachRosterManagement component rendered with synthetic mocked Convex hooks at 1440x900/light and 390x844/dark. Full-directory last-name, grade and subteam ordering; 20-row paging; later-page balance/search matches; missing-grade display and no horizontal overflow passed. Existing shared controls/table/mobile cards reused; screenshots inspected. Evidence stays ignored under .test-temp/roster-sort-ui. This is component verification, not a live account rehearsal. Coach acceptance remains pending; no production change.
+## STAFF-SETUP-2026-10-20 - development staff wizard
+
+Actual StaffSetupGate component with synthetic mocked Convex/Auth checked at 1440x900/light and 390x844/dark. Three-step fields/review/Back/save, temporary skip, persistent-dismiss response, complete/dismissed bypass, failed-dismiss retry and stale-profile reload passed. Shared type, tokens, controls and wizard card/progress patterns reused. Full-page fields and review screenshots inspected; no horizontal overflow. Evidence ignored in .test-temp/staff-setup-ui. Server persistence/role restrictions verified separately in backend tests; this is not a live Google/inbox rehearsal. Remaining: Coach acceptance in development. No production authorization.
+
+Staff setup follow-up: development sync/types/build/lint passed; actual signed-in localhost Step 1 and both skip options observed. No profile or preference saved for the user. Coach review pending. Full-suite fee-history timeout recorded separately in STAFF_SETUP_WIZARD.md.
+
+Staff setup now has an optional Driving step before review, shared contact phone, vehicle/seats/trailer capability and Skip driving step preserving existing driver approval. Requested extra informational paragraph removed. Focused17 tests, source review and desktop/phone synthetic browser checks passed; see STAFF_SETUP_WIZARD.md. Development only.
