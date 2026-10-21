@@ -1,5 +1,9 @@
 # Visual review closed — October 16, 2026
 
+## October 20 - Approved actionable error production release
+
+Owner accepted the localhost preview and explicitly authorized production release of PR30. Reviewed implementation 67c2145 preserves expected backend validation and recovery errors across Student Status while keeping internal diagnostics private. See [RELEASE_2026-10-20_ACTIONABLE_ERRORS.md](RELEASE_2026-10-20_ACTIONABLE_ERRORS.md) for validation and release boundaries. Earlier development-only restrictions for this change are superseded by this approval.
+
 ## October 20 - Actionable error review
 
 Eight actual-component checks passed: cooldown, network, session and unexpected errors at 390px dark and 1440px light. Input retained, retry enabled, no horizontal overflow. Owner localhost acceptance is pending at http://127.0.0.1:5182/setup?scenario=cooldown; synthetic fixture sends no emails. See [ACTIONABLE_ERRORS.md](ACTIONABLE_ERRORS.md). This adds no historical visual backlog and does not authorize production.
