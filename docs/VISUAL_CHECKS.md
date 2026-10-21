@@ -1,5 +1,12 @@
 # Visual review closed — October 16, 2026
 
+## October 21 - Student event times and Pay link (development candidate)
+
+- [x] Dashboard, event list and details show Central start/end times; Calendar all-day dates are preserved.
+- [x] Pay Now uses the established gold button with readable dark text and keyboard focus.
+- [x] 630 tests, source lint, types/build, independent Astra review and representative phone/dark + desktop/light browser checks passed.
+- [ ] Owner visual acceptance and release authorization. Original reported Pay contrast issue was not reproduced in the harness; see FRONTEND_CONFORMANCE_LOG.md for evidence and limitations. Production unchanged.
+
 ## October 21 - Timeclock calendar controls
 
 Refresh Calendar and its pending/success/cooldown states were exercised on signed-in development localhost. Phone/dark and desktop/light checked without horizontal overflow; existing approved Timeclock styles reused. No new visual defect remains; owner review at localhost:5174 is pending. See FRONTEND_CONFORMANCE_LOG.md and USAGE_OPTIMIZATION.md. Production remains unchanged.

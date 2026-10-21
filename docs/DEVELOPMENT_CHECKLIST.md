@@ -1,5 +1,12 @@
 # Student Status Development Checklist
 
+## October 21 - Student event times and Pay link (development candidate)
+
+- [x] Dashboard, event list and details show Central start/end times; Calendar all-day dates are preserved.
+- [x] Pay Now uses the established gold button with readable dark text and keyboard focus.
+- [x] 630 tests, source lint, types/build, independent Astra review and representative phone/dark + desktop/light browser checks passed.
+- [x] Owner approved production release on October 21. See RELEASE_2026-10-21_EVENT_DISPLAY.md for rollout evidence and limitations.
+
 ## October 21 - Approved conservative test cleanup
 
 - [x] Removed unused roster cancellation case; consolidated legacy consent without losing empty/event input coverage.
