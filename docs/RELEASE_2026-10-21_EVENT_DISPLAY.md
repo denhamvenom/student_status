@@ -9,3 +9,5 @@ Pre-integration evidence: 630 tests, source lint, strict types/build, independen
 Production target: Team 8044 account, denham-venom-student-status Worker, https://students.team8044.org. Main merge triggers existing builds for both frontends. No Convex deployment is required. Confirm the actual served entry and deferred LiveApp assets contain the reviewed implementation and production Convex endpoint; document any CLI fallback if automatic builds are delayed. Final execution evidence will be recorded in immutable GitHub release notes.
 
 Rollback baseline Student Status Worker: a31339f5-3763-4572-8535-a51d41140f8c. Frontend-only rollback requires no database reversal. Existing clients may need a reload to receive the updated bundle.
+
+Integrated release validation: 630/631 tests passed in the full run. The known intermittent bulk-invitation daily-limit assertion failed; its complete 26-test file passed on targeted rerun. Source lint, strict types, production-target build and Wrangler packaging dry-run passed. Runtime source is unchanged from the reviewed implementation; integration added approved tests/instructions and reconciled docs.
