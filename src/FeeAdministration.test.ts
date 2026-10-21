@@ -1,13 +1,15 @@
+import { getFunctionName } from 'convex/server'
+import { api } from '../convex/_generated/api'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import FeeAdministration, { BulkJobSummary, BulkRowEvidence, FeeDefinitionDraftForm, FeeMaintenanceNotice, LiveMappingReceipt, FeePriorityReceipt, FeePriorityRows, UnmappedFeeEvidence, bulkCommitArgs, bulkReviewComplete, bulkReviewUnchanged, shouldLoadPreparedRows, shouldLoadStudentChoices } from './FeeAdministration'
 import type { Doc, Id } from '../convex/_generated/dataModel'
 
-const queryState = vi.hoisted(() => ({ loaded: true, queryCount: 0, mapping: null as null | { job: { state: string; processed: number; mapped: number; unmapped: number; reason: string }; originalActorName: string; processingActorName: string; canRetry: boolean; canCancel: boolean } }))
+const queryState = vi.hoisted(() => ({ loaded: true, queries: [] as { name: string; args: unknown }[], mapping: null as null | { job: { state: string; processed: number; mapped: number; unmapped: number; reason: string }; originalActorName: string; processingActorName: string; canRetry: boolean; canCancel: boolean } }))
 vi.mock('convex/react', () => ({
-  useQuery: () => { queryState.queryCount += 1; return queryState.mapping ?? (queryState.loaded ? { control: null, mappingState: 'reviewRequired', hasUnmapped: true, canManageFees: false, canMove: false, canMap: false } : undefined) },
-  usePaginatedQuery: () => ({ results: [], status: queryState.loaded ? 'Exhausted' : 'LoadingFirstPage', loadMore: vi.fn() }),
+  useQuery: (reference: Parameters<typeof getFunctionName>[0], args: unknown) => { const name = getFunctionName(reference); queryState.queries.push({ name, args }); if (args === 'skip') return undefined; if (name === 'feeDefinitions:mappingStatus') return queryState.mapping; return name === 'feePriorities:maintenance' && queryState.loaded ? { control: null, mappingState: 'reviewRequired', hasUnmapped: true, canManageFees: false, canMove: false, canMap: false } : undefined },
+  usePaginatedQuery: (reference: Parameters<typeof getFunctionName>[0], args: unknown) => { queryState.queries.push({ name: getFunctionName(reference), args }); return { results: [], status: queryState.loaded ? 'Exhausted' : 'LoadingFirstPage', loadMore: vi.fn() } },
   useMutation: () => vi.fn(),
 }))
 
@@ -51,9 +53,10 @@ describe('shared fee presentation', () => {
     } finally { queryState.mapping = null }
   })
   it('keeps a finance reader out of Coach-only mapping queries and commands', () => {
-    queryState.loaded = true; queryState.queryCount = 0
+    queryState.loaded = true; queryState.queries = []
     const html = renderToStaticMarkup(createElement(FeeAdministration, { isCoach: false }))
-    expect(queryState.queryCount).toBe(1)
+    const forbidden = new Set([getFunctionName(api.feeDefinitions.unmapped), getFunctionName(api.feeDefinitions.mappingStatus)])
+    expect(queryState.queries.filter(query => forbidden.has(query.name) && query.args !== 'skip')).toEqual([])
     expect(html).toContain('Some earlier charges still need a Coach to match them to shared fees')
     expect(html).not.toContain('<form')
     expect(html).not.toContain('Match earlier charges')

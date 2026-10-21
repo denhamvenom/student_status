@@ -1,6 +1,8 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, expect, it, vi } from 'vitest'
+import { getFunctionName } from 'convex/server'
+import { api } from '../convex/_generated/api'
 import type { Id } from '../convex/_generated/dataModel'
 const mocks = vi.hoisted(() => ({ useQuery: vi.fn(), useMutation: vi.fn(), useConvex: vi.fn() }))
 vi.mock('convex/react', () => mocks)
@@ -10,7 +12,7 @@ it('offers the complete active scope without pretending an unprepared file is av
   const html = renderToStaticMarkup(createElement(FinanceExport))
   expect(html).toContain('All active students'); expect(html).toContain('Prepare export'); expect(html).not.toContain('Download charge details (CSV)'); expect(html).not.toContain('Download student list and collection details (JSON)')
   expect(html).toContain('The data is gathered over a short time, not at one exact moment.'); expect(html).toContain('those with no charges')
-  expect(mocks.useQuery.mock.calls.at(-1)?.[1]).toBe('skip')
+  expect(mocks.useQuery.mock.calls.filter(([reference]) => getFunctionName(reference) === getFunctionName(api.financeExport.status)).map(([, args]) => args)).toEqual(['skip'])
 })
 it('offers selected-student export only when an explicit student was supplied', () => {
   const html = renderToStaticMarkup(createElement(FinanceExport, { selectedStudentId: 'synthetic' as Id<'students'>, selectedStudentName: 'Fictional Member' }))

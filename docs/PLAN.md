@@ -1,5 +1,14 @@
 # Student Status implementation plan
 
+## October 21 - Conservative test cleanup
+
+- [x] Completed only the owner-approved audit subset and two authorization regressions; other missing tests remain deferred.
+- [x] Recorded one full run (628/629), PDF assertion correction and targeted 5/5 pass, source lint/typecheck and independent review in test-audit.md. No runtime, schema, dependency or production changes.
+
+## October 21 - Optimizations released
+
+- [x] PR31 merged, production backend and both websites deployed, live assets verified, and v0.1.0-onboarding.12 published. See RELEASE_2026-10-21_OPTIMIZATIONS.md for execution evidence and limitations. Earlier development-only restrictions for this scope are superseded by owner release approval.
+
 ## October 21 - Calendar cadence and fixed event roster (development only)
 
 - [x] Calendar sync at 6 AM and 3 PM Chicago time, DST-aware, plus authenticated Refresh with pending and recovery states.

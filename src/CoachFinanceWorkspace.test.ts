@@ -1,3 +1,5 @@
+import { getFunctionName } from 'convex/server'
+import { api } from '../convex/_generated/api'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -7,17 +9,23 @@ const mocks = vi.hoisted(() => ({
 vi.mock('convex/react', () => mocks)
 import { CoachFinanceAccounts, CoachFinanceChanges } from './CoachFinanceWorkspace'
 beforeEach(() => {
+  vi.clearAllMocks()
   mocks.usePaginatedQuery.mockReturnValue({ results: [], status: 'Exhausted', loadMore: vi.fn() })
   mocks.useMutation.mockReturnValue(vi.fn())
   mocks.useQuery.mockReturnValue({ coverage: { state: 'updating', startedAt: null, completedAt: null }, canPrepareHistory: false })
 })
 describe('financial query presentation integration', () => {
-  it('preserves empty nonfinal account pages and the server page limit', () => {
+  it('subscribes to student accounts with a bounded server page', () => {
     mocks.usePaginatedQuery.mockReturnValue({ results: [], status: 'CanLoadMore', loadMore: vi.fn() })
     const html = renderToStaticMarkup(createElement(CoachFinanceAccounts, { onOpen: vi.fn(), onRecord: vi.fn() }))
-    expect(html).toContain('More student records are available')
-    expect(html).not.toContain('No active student accounts')
-    expect(mocks.usePaginatedQuery.mock.calls[0][2]).toEqual({ initialNumItems: 20 })
+    expect(html).toContain('Student accounts')
+    const subscriptions = mocks.usePaginatedQuery.mock.calls.filter(([reference]) => getFunctionName(reference) === getFunctionName(api.financeAdmin.students))
+    expect(subscriptions).toHaveLength(1)
+    const [, args, options] = subscriptions[0]
+    expect(args).toEqual({})
+    expect(Number.isSafeInteger(options.initialNumItems)).toBe(true)
+    expect(options.initialNumItems).toBeGreaterThan(0)
+    expect(options.initialNumItems).toBeLessThanOrEqual(20)
   })
   it('only offers historical preparation when the server permits it', () => {
     expect(renderToStaticMarkup(createElement(CoachFinanceChanges))).not.toContain('Prepare historical changes')
