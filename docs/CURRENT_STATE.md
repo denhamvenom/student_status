@@ -1,11 +1,11 @@
 # Current integration handoff
 
-## Student event times and Pay link - October 21, 2026
+## Event schedule and Pay styling release - October 21, 2026
 
-Candidate checkout: student-status-event-display; branch fix/student-event-time-pay, based on released main b15db4e. Diagnose Student Error owns separate test cleanup in student-status-readiness-design; do not mix or overwrite that work.
+Owner approved production release of PR33. Checkout student-status-event-display, branch fix/student-event-time-pay. Student dashboard, event list and detail show Central start/end times with CST/CDT; all-day dates preserve exclusive-end semantics. Pay Now uses the existing readable gold button.
 
-Implemented student/family dashboard, list and detail event schedules with America/Chicago times and explicit CST/CDT. Calendar all-day dates retain exclusive-end semantics. Pay Now uses established gold/dark-text link-button styling.
+Reviewed source 575fe30 passed 630 tests, source lint, types/build, independent Astra review and synthetic phone/dark + desktop/light browser checks. Original reported Pay contrast issue was not reproduced in the harness; candidate appearance was verified. Local preview theme switching was repaired in ignored mocks only; those files never ship.
 
-All 630 tests, source lint, strict types/build, independent Astra review and synthetic browser checks passed. Browser: 390px dark and 1440px light across dashboard/list/timed detail/all-day detail/finances, no overflow/page errors, readable Pay normal/hover/focus. Original reported contrast issue was not reproduced in this harness; root cause remains unconfirmed and affected-device acceptance is pending. See FRONTEND_CONFORMANCE_LOG.md for evidence boundaries.
+Integrated main 267b789, including PR32's approved test cleanup; application source merged without conflicts, documentation reconciled. See test-audit.md for its original evidence. No backend changes, deployment or database migration needed. Release execution and verification: RELEASE_2026-10-21_EVENT_DISPLAY.md; immutable release notes will record final merge and Worker versions.
 
-No backend changes or synchronization; no production deployment or main merge. Production remains v0.1.0-onboarding.12 (PR31). This branch is a development review candidate only. Synthetic preview: http://127.0.0.1:5197/events?theme=dark and /finances?theme=dark. Preview mocks are ignored under tmp and must never ship.
+Production baseline is v0.1.0-onboarding.12. Preserve other worktrees and unrelated temporary evidence. Do not deploy synthetic preview files from tmp.

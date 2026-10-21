@@ -127,7 +127,11 @@ describe("Coach student roster and record",()=>{
   });
   it("matches the finance roster projection and withholds invalid balance data",async()=>{
     const f=await fixture();
-    await f.t.run(async ctx=>{const account=await ensureFinancialAccount(ctx,f.ids.student);await ctx.db.patch(account._id,{state:"ready",allocationSourceVersion:1,personalAppliedCents:0,fundraisingAppliedCents:0})});
+    const summaryId = await f.t.run(async ctx => {
+      const account = await ensureFinancialAccount(ctx, f.ids.student);
+      await ctx.db.patch(account._id, { chargedCents: 1000, personalAvailableCents: 250 });
+      return ctx.db.insert("studentFinanceSummaries", { studentId: f.ids.student, seasonId: f.ids.season, version: 4, financialGeneration: account.generation, financialRevision: account.revision, chargedCents: 1000, paidCents: 0, personalAppliedCents: 0, fundraisingAppliedCents: 0, dueCents: 1000, personalAvailableCents: 250, fundraisingAvailableCents: 0, travelBalanceCents: 0, travelShareCents: 0, transferredInCents: 0, updatedAt: 123 });
+    });
     const roster=(await f.coach.query(list,page)).page[0];
     const source=(await f.coach.query(finance,{paginationOpts:{numItems:20,cursor:null}})).page[0];
     expect(roster.name).toBe("Synthetic Student");
@@ -135,6 +139,14 @@ describe("Coach student roster and record",()=>{
     expect(roster.balance.state).toBe(source.state);
     expect(roster.balance.dueCents).toBe(source.dueCents);
     expect(roster.balance.personalAvailableCents).toBe(source.personalAvailableCents);
+    expect(roster.balance).toEqual({ state: "ready", dueCents: 1000, personalAvailableCents: 250, fundraisingAvailableCents: 0, updatedAt: 123 });
+    // A safe integer can still be invalid evidence: due must equal charged minus paid.
+    await f.t.run(ctx => ctx.db.patch(summaryId, { dueCents: 999 }));
+    const invalidRoster = (await f.coach.query(list, page)).page[0];
+    const invalidSource = (await f.coach.query(finance, { paginationOpts: { numItems: 20, cursor: null } })).page[0];
+    expect(invalidRoster.balance).toEqual({ state: "failed", dueCents: null, personalAvailableCents: null, fundraisingAvailableCents: null, updatedAt: null });
+    expect(invalidSource).toMatchObject({ state: "failed", chargedCents: null, personalAppliedCents: null, fundraisingAppliedCents: null, dueCents: null, personalAvailableCents: null, fundraisingAvailableCents: null, updatedAt: null, canRecord: false });
+    expect((await f.coach.query(detail, { studentId: f.ids.student, asOf: 100 })).balance).toEqual(invalidRoster.balance);
   });
   it("marks pending Whole Team enrollment and truncated event coverage unknown",async()=>{
     const f=await fixture();

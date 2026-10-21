@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { PDFDocument } from 'pdf-lib'
+import { describe, expect, it, vi } from 'vitest'
+import { decodePDFRawStream, PDFArray, PDFDocument, PDFPage, PDFRawStream } from 'pdf-lib'
 import type { ConsentSnapshotV2 } from '../../convex/lib/consentSnapshotV2'
 import { appendFieldTripSignature, renderFieldTripPdf } from './field-trip-pdf'
 import { fieldTripApproved } from './field-trip-approved'
@@ -13,6 +13,54 @@ const synthetic = {
   priorCoverage: [{ eventId: 'event', revision: 1, submissionId: null }], signer: { source: 'electronic', accountId: 'parent', name: 'Test Guardian', email: 'guardian@example.test', recordedBy: 'parent' }, typedName: null, acknowledged: false, signedAt: null, recordedAt: null, paper: null,
 } as unknown as ConsentSnapshotV2
 const approved = { ...synthetic, templateVersion: fieldTripApproved.templateVersion, version: { ...synthetic.version, ...fieldTripApproved }, events: [{ ...synthetic.events[0], sponsorName: fieldTripApproved.sponsorName, sponsorPhone: fieldTripApproved.sponsorPhone }] } as ConsentSnapshotV2
+
+// Observe real drawing calls without replacing PDF output. Metrics check physical
+// page bounds; saved stream checks prove the encoded text survived serialization.
+// This does not establish visual legibility or detect text overlapping other text.
+async function renderWithTextEvidence(snapshot: ConsentSnapshotV2) {
+  const lines: string[] = []
+  const encoded: string[] = []
+  const drawText = PDFPage.prototype.drawText
+  const spy = vi.spyOn(PDFPage.prototype, 'drawText').mockImplementation(function (this: PDFPage, text, options = {}) {
+    const { font, size, x, y } = options
+    expect(font).toBeDefined()
+    expect(size).toBeDefined()
+    expect(x).toBeDefined()
+    expect(y).toBeDefined()
+    if (!font || size === undefined || x === undefined || y === undefined) throw new Error('Missing text metrics')
+    const ascent = font.heightAtSize(size, { descender: false })
+    const descent = font.heightAtSize(size) - ascent
+    expect(x).toBeGreaterThanOrEqual(0)
+    expect(x + font.widthOfTextAtSize(text, size)).toBeLessThanOrEqual(this.getWidth() + 0.01)
+    expect(y - descent).toBeGreaterThanOrEqual(0)
+    expect(y + ascent).toBeLessThanOrEqual(this.getHeight() + 0.01)
+    lines.push(text)
+    encoded.push(font.encodeText(text).toString())
+    return drawText.call(this, text, options)
+  })
+  try {
+    const bytes = await renderFieldTripPdf(snapshot)
+    // Running page headers interrupt continued paragraphs but are not part of
+    // their content. Keep them in encoded evidence; omit them for prose checks.
+    const runningHeaders = new Set(['DENHAM VENOM 8044', 'FIELD TRIP PERMISSION & MEDICAL RELEASE', 'SYNTHETIC DEVELOPMENT FORM - NO REAL CONSENT'])
+    return { bytes, text: lines.filter(line => !runningHeaders.has(line)).join(' ').replace(/\s+/g, ' '), encoded }
+  } finally {
+    spy.mockRestore()
+  }
+}
+
+async function expectSavedText(bytes: Uint8Array, encoded: string[]) {
+  const document = await PDFDocument.load(bytes)
+  const streams = document.getPages().flatMap(page => {
+    const contents = page.node.Contents()
+    const objects = contents instanceof PDFArray ? contents.asArray().map(ref => document.context.lookup(ref)) : [contents]
+    return objects.flatMap(object => object instanceof PDFRawStream
+      ? [new TextDecoder().decode(decodePDFRawStream(object).decode())] : [])
+  })
+    .join('\n')
+  for (const value of encoded) expect(streams).toContain(`${value} Tj`)
+  return document
+}
 
 describe('field trip PDF renderer', () => {
   it('keeps the approved original layout to one reviewed and signed page for ordinary values', async () => {
@@ -34,11 +82,17 @@ describe('field trip PDF renderer', () => {
   })
 
   it('preserves excess events on continuation pages without clipping', async () => {
-    const long = { ...approved, events: Array.from({ length: 8 }, (_, index) => ({ ...approved.events[0], eventId: `event-${index}`, name: `Fictional event ${index + 1}` })) } as ConsentSnapshotV2
-    const reviewed = await renderFieldTripPdf(long)
+    const long = { ...approved, events: Array.from({ length: 8 }, (_, index) => ({ ...approved.events[0], eventId: `event-${index}`, name: `Fictional event ${index + 1}`, destination: `Venue ${index + 1}`, travel: `Bus ${index + 1}`, lodging: `Hotel ${index + 1}`, sponsorName: `Sponsor ${index + 1}`, sponsorPhone: `555-010${index}`, startsAt: approved.events[0].startsAt + index * 86_400_000, endsAt: approved.events[0].endsAt + index * 86_400_000 })) } as ConsentSnapshotV2
+    const { bytes: reviewed, text, encoded } = await renderWithTextEvidence(long)
+    const dates = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', year: 'numeric', month: 'short', day: 'numeric' })
+    for (const event of long.events) {
+      for (const value of [event.name, event.destination, event.travel, event.lodging!, event.sponsorName!, event.sponsorPhone!, dates.format(event.startsAt), dates.format(event.endsAt)]) expect(text).toContain(value)
+    }
     const signed = await appendFieldTripSignature(reviewed, { typedName: 'Test Guardian', signedAt: 1_900_000_000_000, reviewedSha256: 'a'.repeat(64), source: 'electronic', templateVersion: long.templateVersion })
-    expect((await PDFDocument.load(reviewed)).getPageCount()).toBeGreaterThan(1)
-    expect((await PDFDocument.load(signed)).getPageCount()).toBe((await PDFDocument.load(reviewed)).getPageCount())
+    const reviewedDocument = await expectSavedText(reviewed, encoded)
+    const signedDocument = await expectSavedText(signed, encoded)
+    expect(reviewedDocument.getPageCount()).toBeGreaterThan(1)
+    expect(signedDocument.getPageCount()).toBe(reviewedDocument.getPageCount())
   })
 
   it('produces deterministic letter-size reviewed pages and appends signature evidence', async () => {
@@ -56,8 +110,13 @@ describe('field trip PDF renderer', () => {
   })
 
   it('continues long event and health details onto additional pages', async () => {
-    const long = { ...synthetic, events: Array.from({ length: 20 }, (_, index) => ({ ...synthetic.events[0], eventId: `event-${index}`, name: `Synthetic event ${index + 1}` })) } as ConsentSnapshotV2
-    const document = await PDFDocument.load(await renderFieldTripPdf(long))
+    const health = Array.from({ length: 90 }, (_, index) => `Health instruction ${index + 1}: contact guardian and follow the recorded care plan.`).join(' ')
+    const long = { ...synthetic, profile: { ...synthetic.profile, allergies: { state: 'reported', entries: [{ allergen: 'Long health fixture', severity: 'Reported', reaction: health, response: 'Final allergy response retained' }] } }, events: Array.from({ length: 20 }, (_, index) => ({ ...synthetic.events[0], eventId: `event-${index}`, name: `Synthetic event ${index + 1}` })) } as ConsentSnapshotV2
+    const { bytes, text, encoded } = await renderWithTextEvidence(long)
+    for (const event of long.events) expect(text).toContain(event.name)
+    expect(text).toContain(health)
+    expect(text).toContain('Final allergy response retained')
+    const document = await expectSavedText(bytes, encoded)
     expect(document.getPages().length).toBeGreaterThan(2)
   })
 })

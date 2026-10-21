@@ -5,7 +5,16 @@
 - [x] Dashboard, event list and details show Central start/end times; Calendar all-day dates are preserved.
 - [x] Pay Now uses the established gold button with readable dark text and keyboard focus.
 - [x] 630 tests, source lint, types/build, independent Astra review and representative phone/dark + desktop/light browser checks passed.
-- [ ] Owner visual acceptance and release authorization. Original reported Pay contrast issue was not reproduced in the harness; see FRONTEND_CONFORMANCE_LOG.md for evidence and limitations. Production unchanged.
+- [x] Owner approved production release on October 21. See RELEASE_2026-10-21_EVENT_DISPLAY.md for rollout evidence and limitations.
+
+## October 21 - Conservative test cleanup
+
+- [x] Completed only the owner-approved audit subset and two authorization regressions; other missing tests remain deferred.
+- [x] Recorded one full run (628/629), PDF assertion correction and targeted 5/5 pass, source lint/typecheck and independent review in test-audit.md. No runtime, schema, dependency or production changes.
+
+## October 21 - Optimizations released
+
+- [x] PR31 merged, production backend and both websites deployed, live assets verified, and v0.1.0-onboarding.12 published. See RELEASE_2026-10-21_OPTIMIZATIONS.md for execution evidence and limitations. Earlier development-only restrictions for this scope are superseded by owner release approval.
 
 ## October 21 - Calendar cadence and fixed event roster (development only)
 

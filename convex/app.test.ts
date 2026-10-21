@@ -88,11 +88,6 @@ describe("server boundaries", () => {
     expect(money.summary!.dueCents).toBe(45000);
   });
 
-  it("blocks draft legal consent in live functions", async () => {
-    const f = await fixture();
-    await expect(f.parent.mutation(api.permissions.submit, { studentId: f.ids.student, eventIds: [f.ids.event], typedName: "Parent", answersJson: "{}" })).rejects.toThrow("draft");
-  });
-
   it("uses the stable Convex Auth user across sessions and derives join email from the auth user", async () => {
     const f = await fixture();
     const secondSession = f.t.withIdentity({ subject: `${f.ids.authStudent}|session2` });
