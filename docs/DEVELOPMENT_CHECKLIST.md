@@ -1,5 +1,9 @@
 # Student Status Development Checklist
 
+## October 21 - Optimizations released
+
+- [x] PR31 merged, production backend and both websites deployed, live assets verified, and v0.1.0-onboarding.12 published. See RELEASE_2026-10-21_OPTIMIZATIONS.md for execution evidence and limitations. Earlier development-only restrictions for this scope are superseded by owner release approval.
+
 ## October 21 - Calendar cadence and fixed event roster (development only)
 
 - [x] Calendar sync at 6 AM and 3 PM Chicago time, DST-aware, plus authenticated Refresh with pending and recovery states.
