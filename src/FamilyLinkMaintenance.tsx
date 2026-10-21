@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { Component, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
@@ -10,10 +11,10 @@ export function FamilyLinkMaintenance() {
   const [attempt, setAttempt] = useState(0)
   return <MaintenanceBoundary key={attempt} onRetry={() => setAttempt(value => value + 1)}><MaintenanceContent/></MaintenanceBoundary>
 }
-class MaintenanceBoundary extends Component<{ children: ReactNode; onRetry: () => void }, { failed: boolean }> {
-  state = { failed: false }
-  static getDerivedStateFromError() { return { failed: true } }
-  render() { return this.state.failed ? <Card><CardContent><p role="alert">{copy.unavailable}</p><Button type="button" variant="outline" onClick={this.props.onRetry}>{copy.recover}</Button></CardContent></Card> : this.props.children }
+class MaintenanceBoundary extends Component<{ children: ReactNode; onRetry: () => void }, { error: unknown }> {
+  state = { error: null as unknown }
+  static getDerivedStateFromError(error: unknown) { return { error } }
+  render() { return this.state.error !== null ? <Card><CardContent><p role="alert">{userFacingError(this.state.error, copy.unavailable, false)}</p><Button type="button" variant="outline" onClick={this.props.onRetry}>{copy.recover}</Button></CardContent></Card> : this.props.children }
 }
 function MaintenanceContent() {
   const status = useQuery(api.familyLinkSeasonMigration.status, {})
@@ -36,7 +37,7 @@ function MaintenanceContent() {
       if (status?.state === 'failed') await retry({ reason: reason.trim() })
       else await start({})
       if (mounted.current) { setNotice(copy.requested); setReason('') }
-    } catch (error) { if (mounted.current) setError(error instanceof Error ? error.message : copy.error) }
+    } catch (error) { if (mounted.current) setError(userFacingError(error, copy.error)) }
     finally { pending.current = false; if (mounted.current) setBusy(false) }
   }
   return <Card><CardHeader><CardTitle>{copy.title}</CardTitle></CardHeader><CardContent className="flex flex-col gap-3">
@@ -46,7 +47,7 @@ function MaintenanceContent() {
       {status && status.state !== 'complete' && <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1"><dt>{copy.scanned}</dt><dd>{status.scanned}</dd><dt>{copy.unresolved}</dt><dd>{status.unresolved}</dd></dl>}
       {(!status || status.state === 'pending') && <Button className="self-start" type="button" disabled={busy} onClick={() => void request()}>{busy ? copy.starting : copy.start}</Button>}
       {status?.state === 'failed' && <>
-        {status.lastError && <p role="alert">{status.lastError}</p>}
+        {status.lastError && <p role="alert">{userFacingError(new Error(status.lastError), copy.error)}</p>}
         <form className="flex flex-col gap-2" onSubmit={event => void request(event)}>
           <label className="flex flex-col gap-1">{copy.retryReason}<Input value={reason} onChange={event => setReason(event.target.value)} minLength={8} maxLength={500} required disabled={busy}/></label>
           <p className="text-sm text-muted-foreground">{copy.reasonHelp}</p>

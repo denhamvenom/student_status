@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { ParentEmailSignIn } from './ParentInvites'
 import { Component, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { useMutation, usePaginatedQuery } from 'convex/react'
@@ -16,16 +17,16 @@ import styles from './Adults.module.css'
 import { adultInvitationLandingUrl, readAdultInvitationToken, prepareAdultInvitationOAuth, clearAdultInvitationOAuth } from './lib/adult-invitation-token'
 
 const copy = accountCopy.adults
-const message = (error: unknown) => error instanceof Error ? error.message : copy.failed
+const message = (error: unknown) => userFacingError(error, copy.failed)
 const when = (time: number) => new Date(time).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
 type Adult = { userId: Id<'appUsers'>; name: string; email: string; role: 'coach' | 'mentor'; travelLead: boolean; financialEdit: boolean; healthExport: boolean; active: boolean; revision: number }
 type AccessChoice = 'coach' | 'mentor' | 'lead'
 const roleLabel = (adult: {role: 'coach' | 'mentor'; travelLead: boolean}) => adult.role === 'coach' ? copy.coach : adult.travelLead ? copy.mentorLead : copy.mentor
 
-class AccountsBoundary extends Component<{children: ReactNode}, {failed: boolean}> {
-  state = { failed: false }
-  static getDerivedStateFromError() { return { failed: true } }
-  render() { return this.state.failed ? <Card><CardContent><p role="alert">{copy.failed}</p><Button variant="outline" onClick={() => window.location.reload()}>{copy.retry}</Button></CardContent></Card> : this.props.children }
+class AccountsBoundary extends Component<{children: ReactNode}, {error: unknown}> {
+  state = { error: null as unknown }
+  static getDerivedStateFromError(error: unknown) { return { error } }
+  render() { return this.state.error !== null ? <Card><CardContent><p role="alert">{userFacingError(this.state.error, copy.failed, false)}</p><Button variant="outline" onClick={() => window.location.reload()}>{copy.retry}</Button></CardContent></Card> : this.props.children }
 }
 
 function AccessFields({choice, setChoice, finance, setFinance, health, setHealth, busy}: {choice: AccessChoice; setChoice: (value: AccessChoice) => void; finance: boolean; setFinance: (value: boolean) => void; health: boolean; setHealth: (value: boolean) => void; busy: boolean}) {
@@ -97,7 +98,7 @@ function InvitationList() {
   const emailLabels = {not_sent: copy.emailNotSent, queued: copy.emailQueued, sent: copy.emailSent, failed: copy.emailFailed}
   return <Card className={styles.surface}><CardHeader><CardTitle>{copy.pending}</CardTitle></CardHeader><CardContent>{status === 'LoadingFirstPage' ? <p role="status">{copy.loadingInvitations}</p> : results.length === 0 ? <p className="muted">{copy.noInvitations}</p> : <div className={styles.invites}>{results.map(row => {
     const active = row.status === 'pending' && row.expiresAt > now
-    return <div key={row.invitationId}><div><strong>{row.email}</strong><p>{roleLabel(row)}{row.financialEdit && ` · ${copy.finance}`}{row.healthExport && ` · ${copy.health}`}</p><p className="muted tiny">{row.status === 'pending' && !active ? copy.expiredStatus : labels[row.status]}{active && <> · {copy.expires} {when(row.expiresAt)}</>}</p>{active && <><p role="status">{emailLabels[row.emailStatus]}</p>{row.emailError && <p className="open-text">{row.emailError}</p>}{row.resendAvailableAt > now && <p className="muted tiny">{copy.resendAfter} {when(row.resendAvailableAt)}</p>}</>}</div>{row.status === 'pending' && <div className={styles.actions}>{active && <Button variant="outline" disabled={busy !== null || row.emailStatus === 'queued' || row.resendAvailableAt > now} onClick={() => void act(row.invitationId, 'resend')}>{copy.resend}</Button>}<Button variant="outline" disabled={busy !== null} onClick={() => void act(row.invitationId, 'revoke')}>{copy.revoke}</Button></div>}</div>
+    return <div key={row.invitationId}><div><strong>{row.email}</strong><p>{roleLabel(row)}{row.financialEdit && ` · ${copy.finance}`}{row.healthExport && ` · ${copy.health}`}</p><p className="muted tiny">{row.status === 'pending' && !active ? copy.expiredStatus : labels[row.status]}{active && <> · {copy.expires} {when(row.expiresAt)}</>}</p>{active && <><p role="status">{emailLabels[row.emailStatus]}</p>{row.emailError && <p className="open-text">{userFacingError(new Error(row.emailError), copy.failed)}</p>}{row.resendAvailableAt > now && <p className="muted tiny">{copy.resendAfter} {when(row.resendAvailableAt)}</p>}</>}</div>{row.status === 'pending' && <div className={styles.actions}>{active && <Button variant="outline" disabled={busy !== null || row.emailStatus === 'queued' || row.resendAvailableAt > now} onClick={() => void act(row.invitationId, 'resend')}>{copy.resend}</Button>}<Button variant="outline" disabled={busy !== null} onClick={() => void act(row.invitationId, 'revoke')}>{copy.revoke}</Button></div>}</div>
   })}</div>}{status !== 'Exhausted' && status !== 'LoadingFirstPage' && <Button variant="outline" disabled={status === 'LoadingMore'} onClick={() => loadMore(20)}>{status === 'LoadingMore' ? copy.loadingMore : copy.loadMore}</Button>}{error && <p role="alert" className="open-text">{error}</p>}{saved && <p role="status" className="ready-text">{saved}</p>}</CardContent></Card>
 }
 

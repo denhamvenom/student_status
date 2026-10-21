@@ -1,5 +1,7 @@
+import { publicErrorMessage } from './lib/publicErrors';
+import { savedPublicError, publicErrorResult } from './lib/publicErrors';
 import { env, internalMutation, query } from "./_generated/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { activeSeason, viewer } from "./lib/access";
 import { timeclockTransitionLocked } from "./lib/timeclockTransition";
 
@@ -11,7 +13,7 @@ export const begin = internalMutation({
     if (await timeclockTransitionLocked(ctx, (await activeSeason(ctx))._id)) return null;
     const existing = await ctx.db.query("timeclockCalendarSync").withIndex("by_key", q => q.eq("key", "team")).unique();
     if (existing && existing.calendarIdHash !== args.calendarIdHash) {
-      await ctx.db.patch(existing._id, { lastError: "Calendar source changed; review required before synchronization", lastAttemptAt: args.now });
+      await ctx.db.patch(existing._id, { lastError: savedPublicError(null, "Calendar source changed; review required before synchronization"), lastAttemptAt: args.now });
       return null;
     }
     if (existing && existing.lastAttemptAt && args.now - existing.lastAttemptAt < 50_000) return null;
@@ -43,9 +45,9 @@ export const status = query({
   returns: v.object({ configured: v.boolean(), lastSuccessAt: v.union(v.number(), v.null()), lastAttemptAt: v.union(v.number(), v.null()), stale: v.boolean(), error: v.union(v.string(), v.null()) }),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx);
-    if (actor.role !== "coach" && actor.role !== "mentor") throw new Error("Access denied");
+    if (actor.role !== "coach" && actor.role !== "mentor") throw new ConvexError("Access denied");
     const row = await ctx.db.query("timeclockCalendarSync").withIndex("by_key", q => q.eq("key", "team")).unique();
     const configured = !!(env.TIMECLOCK_CALENDAR_ID && env.TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_EMAIL && env.TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_PRIVATE_KEY);
-    return { configured, lastSuccessAt: row?.lastSuccessAt ?? null, lastAttemptAt: row?.lastAttemptAt ?? null, stale: !configured || !!row?.lastError || !row?.lastSuccessAt || args.now - row.lastSuccessAt > 180_000, error: row?.lastError ?? null };
+    return publicErrorResult({ configured, lastSuccessAt: row?.lastSuccessAt ?? null, lastAttemptAt: row?.lastAttemptAt ?? null, stale: !configured || !!row?.lastError || !row?.lastSuccessAt || args.now - row.lastSuccessAt > 180_000, error:publicErrorMessage(row?.lastError) ?? null });
   },
 });

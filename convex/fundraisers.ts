@@ -1,6 +1,7 @@
+import { publicErrorResult } from './lib/publicErrors';
 import { requireSeasonFinanceReady, seasonFinanceControl } from "./lib/seasonFinance";
 import { makeFunctionReference, paginationOptsValidator } from "convex/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
@@ -19,13 +20,13 @@ const previewRow = v.object({ studentId: v.id("students"), grossCents: v.number(
 
 async function authorized(ctx: QueryCtx | MutationCtx) {
   const actor = await viewer(ctx);
-  if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new Error("Fundraising access denied.");
+  if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Fundraising access denied.");
   return actor;
 }
 
 async function currentFundraiser(ctx: QueryCtx | MutationCtx, id: Id<"fundraisers">) {
   const fundraiser = await ctx.db.get(id); const season = await activeSeason(ctx);
-  if (!fundraiser || fundraiser.seasonId !== season._id) throw new Error("Fundraiser is unavailable in the active season.");
+  if (!fundraiser || fundraiser.seasonId !== season._id) throw new ConvexError("Fundraiser is unavailable in the active season.");
   return fundraiser;
 }
 
@@ -34,10 +35,10 @@ export const list = query({
   returns: v.object({ page: v.array(schema.doc("fundraisers")), isDone: v.boolean(), continueCursor: v.string(), capabilities }),
   handler: async (ctx, args) => {
     const actor = await authorized(ctx); const season = await activeSeason(ctx);
-    if (!Number.isSafeInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 30) throw new Error("Request at most 30 fundraisers per page.");
+    if (!Number.isSafeInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 30) throw new ConvexError("Request at most 30 fundraisers per page.");
     const page = await ctx.db.query("fundraisers").withIndex("by_seasonId_and_updatedAt", q => q.eq("seasonId", season._id)).order("desc").paginate({ ...args.paginationOpts, maximumRowsRead: 31 });
-    if (page.page.length > 30) throw new Error("Fundraiser page exceeded its read budget.");
-    return { page: page.page, isDone: page.isDone, continueCursor: page.continueCursor, capabilities: fundraisingCapabilities(actor) };
+    if (page.page.length > 30) throw new ConvexError("Fundraiser page exceeded its read budget.");
+    return publicErrorResult({ page: page.page, isDone: page.isDone, continueCursor: page.continueCursor, capabilities: fundraisingCapabilities(actor) });
   },
 });
 
@@ -46,18 +47,18 @@ export const create = mutation({
   handler: async (ctx, args) => {
     await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const actor = await authorized(ctx);
-    if (!fundraisingCapabilities(actor).canCreate) throw new Error("Only a Coach may create a fundraiser.");
+    if (!fundraisingCapabilities(actor).canCreate) throw new ConvexError("Only a Coach may create a fundraiser.");
     const season = await activeSeason(ctx); const name = args.name.trim();
-    if (!name || name.length > 150 || args.idempotencyKey.length < 8 || args.idempotencyKey.length > 150) throw new Error("Provide a name and unique transaction key.");
+    if (!name || name.length > 150 || args.idempotencyKey.length < 8 || args.idempotencyKey.length > 150) throw new ConvexError("Provide a name and unique transaction key.");
     fundraisingSplit(0, args.studentBps, args.teamBps);
     const hash = await tokenHash(JSON.stringify([season._id, name, args.teamBps, args.studentBps]));
     const existing = await ctx.db.query("fundraisers").withIndex("by_createdBy_and_creationIdempotencyKey", q => q.eq("createdBy", actor._id).eq("creationIdempotencyKey", args.idempotencyKey)).unique();
     if (existing) {
-      if (existing.creationHash !== hash) throw new Error("Transaction key is already used for a different fundraiser.");
+      if (existing.creationHash !== hash) throw new ConvexError("Transaction key is already used for a different fundraiser.");
       return existing._id;
     }
     const nameKey = name.toLocaleLowerCase("en-US");
-    if (await ctx.db.query("fundraisers").withIndex("by_seasonId_and_nameKey", q => q.eq("seasonId", season._id).eq("nameKey", nameKey)).first()) throw new Error("A fundraiser with this name already exists in this season.");
+    if (await ctx.db.query("fundraisers").withIndex("by_seasonId_and_nameKey", q => q.eq("seasonId", season._id).eq("nameKey", nameKey)).first()) throw new ConvexError("A fundraiser with this name already exists in this season.");
     const now = Date.now();
     const id = await ctx.db.insert("fundraisers", { seasonId: season._id, name, nameKey, teamBps: args.teamBps, studentBps: args.studentBps, state: "draft", revision: 0, createdBy: actor._id, createdAt: now, updatedAt: now, creationIdempotencyKey: args.idempotencyKey, creationHash: hash });
     await audit(ctx, actor, "fundraisers", id, "create", null, { name, teamBps: args.teamBps, studentBps: args.studentBps });
@@ -74,7 +75,7 @@ export const workspace = query({
     const maintenance = await seasonFinanceControl(ctx, fundraiser.seasonId);
     const currentCapabilities = fundraisingCapabilities(actor);
     if (maintenance && maintenance.state !== "ready") { currentCapabilities.canCreate = false; currentCapabilities.canPost = false; currentCapabilities.canChangePolicy = false; }
-    return { fundraiser, capabilities: currentCapabilities, totals: await readFundraiserAggregates(ctx, fundraiser._id), job };
+    return publicErrorResult({ fundraiser, capabilities: currentCapabilities, totals: await readFundraiserAggregates(ctx, fundraiser._id), job });
   },
 });
 
@@ -83,9 +84,9 @@ export const students = query({
   returns: v.object({ page: v.array(studentRow), isDone: v.boolean(), continueCursor: v.string() }),
   handler: async (ctx, args) => {
     await authorized(ctx); const fundraiser = await currentFundraiser(ctx, args.fundraiserId);
-    if (!Number.isSafeInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 30) throw new Error("Request at most 30 students per page.");
+    if (!Number.isSafeInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 30) throw new ConvexError("Request at most 30 students per page.");
     const page = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", fundraiser.seasonId)).paginate({ ...args.paginationOpts, maximumRowsRead: 31 });
-    if (page.page.length > 30) throw new Error("Student page exceeded its read budget.");
+    if (page.page.length > 30) throw new ConvexError("Student page exceeded its read budget.");
     const rows = [];
     for (const student of page.page) {
       if (!student.active) continue;
@@ -93,7 +94,7 @@ export const students = query({
       const account = await financialAccount(ctx, student._id);
       rows.push({ studentId: student._id, name: student.legalName || student.preferredName, grossCents: row?.grossCents ?? 0, teamCents: row?.teamCents ?? 0, travelCreditCents: row?.travelCreditCents ?? 0, rowRevision: row?.revision ?? 0, financialRevision: account?.state === "ready" && account.allocationSourceVersion === 1 ? account.revision : null, financialState: account?.state === "ready" && account.allocationSourceVersion === 1 ? "ready" as const : "updating" as const });
     }
-    return { page: rows, isDone: page.isDone, continueCursor: page.continueCursor };
+    return publicErrorResult({ page: rows, isDone: page.isDone, continueCursor: page.continueCursor });
   },
 });
 
@@ -102,14 +103,14 @@ export const preview = query({
   returns: v.object({ fundraiserRevision: v.number(), rows: v.array(previewRow) }),
   handler: async (ctx, args) => {
     const actor = await authorized(ctx);
-    if (!fundraisingCapabilities(actor).canPost) throw new Error("Financial editing is not enabled for this account.");
+    if (!fundraisingCapabilities(actor).canPost) throw new ConvexError("Financial editing is not enabled for this account.");
     const fundraiser = await currentFundraiser(ctx, args.fundraiserId);
-    if (fundraiser.revision !== args.expectedRevision || ["posting", "failed", "held", "closed"].includes(fundraiser.state)) throw new Error("Fundraiser changed or has unfinished posting; refresh before reviewing amounts.");
-    if (!args.rows.length || args.rows.length > 20 || new Set(args.rows.map(r => r.studentId)).size !== args.rows.length) throw new Error("Preview at most 20 unique student rows per page.");
+    if (fundraiser.revision !== args.expectedRevision || ["posting", "failed", "held", "closed"].includes(fundraiser.state)) throw new ConvexError("Fundraiser changed or has unfinished posting; refresh before reviewing amounts.");
+    if (!args.rows.length || args.rows.length > 20 || new Set(args.rows.map(r => r.studentId)).size !== args.rows.length) throw new ConvexError("Preview at most 20 unique student rows per page.");
     const rows = [];
     for (const input of args.rows) {
       const student = await ctx.db.get(input.studentId);
-      if (!student?.active || student.seasonId !== fundraiser.seasonId) throw new Error("Choose an active student in the current season.");
+      if (!student?.active || student.seasonId !== fundraiser.seasonId) throw new ConvexError("Choose an active student in the current season.");
       const split = fundraisingSplit(input.grossCents, fundraiser.studentBps, fundraiser.teamBps);
       const previous = await ctx.db.query("fundraiserStudentTotals").withIndex("by_fundraiserId_and_studentId", q => q.eq("fundraiserId", fundraiser._id).eq("studentId", student._id)).unique();
       const account = await financialAccount(ctx, student._id);
@@ -118,7 +119,7 @@ export const preview = query({
       const state = account?.state !== "ready" || account?.allocationSourceVersion !== 1 ? "updating" as const : required > available ? "hold" as const : "ready" as const;
       rows.push({ studentId: student._id, ...split, grossDeltaCents: split.grossCents - (previous?.grossCents ?? 0), teamDeltaCents: split.teamCents - (previous?.teamCents ?? 0), travelDeltaCents: split.travelCreditCents - (previous?.travelCreditCents ?? 0), expectedRowRevision: previous?.revision ?? 0, expectedFinancialRevision: account?.state === "ready" && account.allocationSourceVersion === 1 ? account.revision : null, availableOriginalCents: available, requiredReductionCents: required, state, message: state === "updating" ? "Financial records must finish updating before posting." : state === "hold" ? "This student's travel credit was already spent or moved, so it can't be lowered yet. Balances have not changed. A Coach must sort it out." : null });
     }
-    return { fundraiserRevision: fundraiser.revision, rows };
+    return publicErrorResult({ fundraiserRevision: fundraiser.revision, rows });
   },
 });
 
@@ -127,20 +128,20 @@ export const post = mutation({
   handler: async (ctx, args) => {
     await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const actor = await authorized(ctx);
-    if (!fundraisingCapabilities(actor).canPost) throw new Error("Financial editing is not enabled for this account.");
+    if (!fundraisingCapabilities(actor).canPost) throw new ConvexError("Financial editing is not enabled for this account.");
     const fundraiser = await currentFundraiser(ctx, args.fundraiserId);
-    if (!args.rows.length || args.rows.length > 500 || new Set(args.rows.map(r => r.studentId)).size !== args.rows.length || args.reason.trim().length < 8 || args.reason.length > 1000 || args.idempotencyKey.length < 8 || args.idempotencyKey.length > 150) throw new Error("Provide unique student amounts, a reason, and a unique transaction key.");
+    if (!args.rows.length || args.rows.length > 500 || new Set(args.rows.map(r => r.studentId)).size !== args.rows.length || args.reason.trim().length < 8 || args.reason.length > 1000 || args.idempotencyKey.length < 8 || args.idempotencyKey.length > 150) throw new ConvexError("Provide unique student amounts, a reason, and a unique transaction key.");
     for (const row of args.rows) {
       fundraisingSplit(row.grossCents, fundraiser.studentBps, fundraiser.teamBps);
-      if (!Number.isSafeInteger(row.expectedRowRevision) || row.expectedRowRevision < 0 || !Number.isSafeInteger(row.expectedFinancialRevision) || row.expectedFinancialRevision < 0) throw new Error("Refresh the preview before posting.");
+      if (!Number.isSafeInteger(row.expectedRowRevision) || row.expectedRowRevision < 0 || !Number.isSafeInteger(row.expectedFinancialRevision) || row.expectedFinancialRevision < 0) throw new ConvexError("Refresh the preview before posting.");
     }
     const hash = await tokenHash(JSON.stringify([args.fundraiserId, args.expectedRevision, args.rows, args.reason.trim()]));
     const existing = await ctx.db.query("fundraiserPostingJobs").withIndex("by_originalActorId_and_idempotencyKey", q => q.eq("originalActorId", actor._id).eq("idempotencyKey", args.idempotencyKey)).unique();
-    if (existing) { if (existing.operationHash !== hash) throw new Error("Transaction key is already used for different fundraiser amounts."); return existing._id; }
-    if (fundraiser.revision !== args.expectedRevision || ["posting", "failed", "held", "closed"].includes(fundraiser.state)) throw new Error("Fundraiser changed or has unfinished posting; refresh before posting.");
+    if (existing) { if (existing.operationHash !== hash) throw new ConvexError("Transaction key is already used for different fundraiser amounts."); return existing._id; }
+    if (fundraiser.revision !== args.expectedRevision || ["posting", "failed", "held", "closed"].includes(fundraiser.state)) throw new ConvexError("Fundraiser changed or has unfinished posting; refresh before posting.");
     for (const input of args.rows) {
       const student = await ctx.db.get(input.studentId);
-      if (!student?.active || student.seasonId !== fundraiser.seasonId) throw new Error("Choose active students in the current season before starting a posting job.");
+      if (!student?.active || student.seasonId !== fundraiser.seasonId) throw new ConvexError("Choose active students in the current season before starting a posting job.");
     }
     const now = Date.now();
     const jobId = await ctx.db.insert("fundraiserPostingJobs", { requiredFinancialProjectionVersion: 4, fundraiserId: fundraiser._id, actorId: actor._id, originalActorId: actor._id, state: "running", cursor: null, processed: 0, committed: 0, held: 0, idempotencyKey: args.idempotencyKey, operationHash: hash, reason: args.reason.trim(), createdAt: now, updatedAt: now });
@@ -157,9 +158,9 @@ export const updatePolicy = mutation({
   handler: async (ctx, args) => {
     await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const actor = await authorized(ctx); const fundraiser = await currentFundraiser(ctx, args.fundraiserId);
-    if (!fundraisingCapabilities(actor).canChangePolicy) throw new Error("Only a Coach may change the fundraiser split.");
-    if (fundraiser.state !== "draft" || fundraiser.revision !== args.expectedRevision || fundraiser.postingJobId) throw new Error("A posted fundraiser split is immutable. Refresh the draft before editing.");
-    if (args.reason.trim().length < 8 || args.reason.length > 1000) throw new Error("Provide a reason of at least eight characters.");
+    if (!fundraisingCapabilities(actor).canChangePolicy) throw new ConvexError("Only a Coach may change the fundraiser split.");
+    if (fundraiser.state !== "draft" || fundraiser.revision !== args.expectedRevision || fundraiser.postingJobId) throw new ConvexError("A posted fundraiser split is immutable. Refresh the draft before editing.");
+    if (args.reason.trim().length < 8 || args.reason.length > 1000) throw new ConvexError("Provide a reason of at least eight characters.");
     fundraisingSplit(0, args.studentBps, args.teamBps);
     await ctx.db.patch(fundraiser._id, { teamBps: args.teamBps, studentBps: args.studentBps, revision: fundraiser.revision + 1, updatedAt: Date.now() });
     await audit(ctx, actor, "fundraisers", fundraiser._id, "updateSplit", { teamBps: fundraiser.teamBps, studentBps: fundraiser.studentBps }, { teamBps: args.teamBps, studentBps: args.studentBps }, args.reason.trim());
@@ -172,9 +173,9 @@ export const close = mutation({
   handler: async (ctx, args) => {
     await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const actor = await authorized(ctx); const fundraiser = await currentFundraiser(ctx, args.fundraiserId);
-    if (!fundraisingCapabilities(actor).canChangePolicy) throw new Error("Only a Coach may close a fundraiser.");
-    if (fundraiser.revision !== args.expectedRevision || ["posting", "failed", "held", "closed"].includes(fundraiser.state)) throw new Error("Fundraiser changed or has unfinished posting; resolve it before closing.");
-    if (args.reason.trim().length < 8 || args.reason.length > 1000) throw new Error("Provide a reason of at least eight characters.");
+    if (!fundraisingCapabilities(actor).canChangePolicy) throw new ConvexError("Only a Coach may close a fundraiser.");
+    if (fundraiser.revision !== args.expectedRevision || ["posting", "failed", "held", "closed"].includes(fundraiser.state)) throw new ConvexError("Fundraiser changed or has unfinished posting; resolve it before closing.");
+    if (args.reason.trim().length < 8 || args.reason.length > 1000) throw new ConvexError("Provide a reason of at least eight characters.");
     await ctx.db.patch(fundraiser._id, { state: "closed", revision: fundraiser.revision + 1, updatedAt: Date.now() });
     await audit(ctx, actor, "fundraisers", fundraiser._id, "close", { state: fundraiser.state }, { state: "closed" }, args.reason.trim());
     return null;
@@ -187,17 +188,17 @@ export const history = query({
   handler: async (ctx, args) => {
     await authorized(ctx); const fundraiser = await currentFundraiser(ctx, args.fundraiserId);
     const student = await ctx.db.get(args.studentId);
-    if (!student || student.seasonId !== fundraiser.seasonId) throw new Error("Student is unavailable in this season.");
-    if (!Number.isSafeInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 30) throw new Error("Request at most 30 history rows per page.");
+    if (!student || student.seasonId !== fundraiser.seasonId) throw new ConvexError("Student is unavailable in this season.");
+    if (!Number.isSafeInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 30) throw new ConvexError("Request at most 30 history rows per page.");
     const page = await ctx.db.query("fundraiserAmountRevisions").withIndex("by_fundraiserId_and_studentId", q => q.eq("fundraiserId", fundraiser._id).eq("studentId", student._id)).order("desc").paginate({ ...args.paginationOpts, maximumRowsRead: 31 });
-    if (page.page.length > 30) throw new Error("History page exceeded its read budget.");
+    if (page.page.length > 30) throw new ConvexError("History page exceeded its read budget.");
     const records = [];
     for (const revision of page.page) {
       const row = await ctx.db.get(revision.rowId); const job = await ctx.db.get(revision.jobId);
       const recordState = row?.state === "committed" && row.revisionId === revision._id ? "committed" as const : job?.state === "failed" ? "failed" as const : row?.state === "held" ? "held" as const : "processing" as const;
       records.push({ ...revision, recordState });
     }
-    return { page: records, isDone: page.isDone, continueCursor: page.continueCursor };
+    return publicErrorResult({ page: records, isDone: page.isDone, continueCursor: page.continueCursor });
   },
 });
 
@@ -206,11 +207,11 @@ export const jobs = query({
   returns: v.object({ page: v.array(schema.doc("fundraiserPostingJobs").extend({ actorName: v.string() })), isDone: v.boolean(), continueCursor: v.string() }),
   handler: async (ctx, args) => {
     await authorized(ctx); const fundraiser = await currentFundraiser(ctx, args.fundraiserId);
-    if (!Number.isSafeInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 30) throw new Error("Request at most 30 posting jobs per page.");
+    if (!Number.isSafeInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 30) throw new ConvexError("Request at most 30 posting jobs per page.");
     const page = await ctx.db.query("fundraiserPostingJobs").withIndex("by_fundraiserId", q => q.eq("fundraiserId", fundraiser._id)).order("desc").paginate({ ...args.paginationOpts, maximumRowsRead: 31 });
-    if (page.page.length > 30) throw new Error("Job page exceeded its read budget.");
+    if (page.page.length > 30) throw new ConvexError("Job page exceeded its read budget.");
     const named = [];
     for (const job of page.page) { const actor = await ctx.db.get(job.actorId); named.push({ ...job, actorName: actor?.name ?? "Unavailable operator" }); }
-    return { page: named, isDone: page.isDone, continueCursor: page.continueCursor };
+    return publicErrorResult({ page: named, isDone: page.isDone, continueCursor: page.continueCursor });
   },
 });

@@ -6,9 +6,9 @@ export const waitingSignups = query({
   args: { eventId: v.id('events') }, returns: v.object({ count: v.number(), more: v.boolean() }),
   handler: async (ctx, { eventId }) => {
     const actor = await viewer(ctx); const season = await activeSeason(ctx);
-    if (actor.role !== 'coach' && !actor.travelLead) throw new Error('Staff access required.');
+    if (actor.role !== 'coach' && !actor.travelLead) throw new ConvexError('Staff access required.');
     const event = await ctx.db.get(eventId);
-    if (!event || event.archived || event.seasonId !== season._id) throw new Error('Event unavailable.');
+    if (!event || event.archived || event.seasonId !== season._id) throw new ConvexError('Event unavailable.');
     const rows = await ctx.db.query('participants').withIndex('by_eventId_and_status', q => q.eq('eventId', eventId).eq('status', 'pending')).take(101);
     return { count: Math.min(rows.length, 100), more: rows.length > 100 };
   },
@@ -29,10 +29,11 @@ export const healthStatus = query({
   handler: async (ctx, { studentId }) => {
     requireRole(await viewer(ctx), 'coach'); const season = await activeSeason(ctx);
     const student = await ctx.db.get(studentId);
-    if (!student || student.seasonId !== season._id) throw new Error('Student unavailable.');
+    if (!student || student.seasonId !== season._id) throw new ConvexError('Student unavailable.');
     if (student.consentProfileV2 && student.consentProfileV2CompletedAt !== undefined && student.consentProfileV2ConfirmedBy !== undefined) return 'confirmed' as const;
     const draft = await ctx.db.query('setupDrafts').withIndex('by_studentId', q => q.eq('studentId', studentId)).unique();
     const draftEntered = draft?.seasonId === season._id && (draft.allergies !== undefined || draft.prescriptions !== undefined || draft.insurance !== undefined || draft.physician !== undefined);
     return draftEntered || student.consentProfileV2 !== undefined || student.allergies.state !== 'unknown' || student.medications.state !== 'unknown' ? 'entered' as const : 'missing' as const;
   },
 });
+import { ConvexError } from "convex/values";

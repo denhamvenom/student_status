@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { useState } from 'react'
 import { useConvex, useMutation, useQuery } from 'convex/react'
 import { CreditCard, Share2 } from 'lucide-react'
@@ -58,7 +59,7 @@ export function FundraiserLinkSettings() {
       if (!exported.length) throw new Error('No active students in this season.')
       downloadInviteCsv('student-fundraiser-links.csv', fundraiserCsv(exported))
       setMessage(`Exported ${exported.length} students. Edit Fundraiser Link, then upload the CSV to review.`)
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not export links.') }
+    } catch (cause) { setError(userFacingError(cause, 'Could not export links.')) }
     finally { setBusy(false) }
   }
   async function review(file: File) {
@@ -68,7 +69,7 @@ export function FundraiserLinkSettings() {
       const parsed = parseFundraiserCsv(await file.text())
       const checked = await convex.query(api.fundraiserLinks.previewImport, args(parsed))
       setRows(parsed); setPreview(checked)
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not review this CSV.') }
+    } catch (cause) { setError(userFacingError(cause, 'Could not review this CSV.')) }
     finally { setBusy(false) }
   }
   async function saveImport() {
@@ -78,7 +79,7 @@ export function FundraiserLinkSettings() {
       setMessage(`Import complete: ${result.updated} updated; ${result.unchanged} unchanged. Download a fresh CSV before your next edit.`)
       setPreview(null); setRows([])
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not import links. No links were changed.')
+      setError(userFacingError(cause, 'Could not import links. No links were changed.'))
       setPreview(null); setRows([])
     } finally { setBusy(false) }
   }

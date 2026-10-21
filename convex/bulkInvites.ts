@@ -1,6 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { RateLimiter } from "@convex-dev/rate-limiter";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { components } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
@@ -19,12 +19,12 @@ type Entry = { firstName: string; lastName: string; resolution: "skip" | "create
 
 function name(value: string) {
   const clean = value.trim().replace(/\s+/g, " ");
-  if (!clean || clean.length > 80 || [...clean].some(character => character.charCodeAt(0) < 32)) throw new Error("Each student needs a first and last name under 80 characters.");
+  if (!clean || clean.length > 80 || [...clean].some(character => character.charCodeAt(0) < 32)) throw new ConvexError("Each student needs a first and last name under 80 characters.");
   return clean;
 }
 function key(first: string, last: string) { return `${first} ${last}`.normalize("NFKC").toLocaleLowerCase("en-US"); }
 function cleanRows<T extends { firstName: string; lastName: string }>(rows: T[]) {
-  if (rows.length < 1 || rows.length > 100) throw new Error("Upload 1 to 100 students at a time.");
+  if (rows.length < 1 || rows.length > 100) throw new ConvexError("Upload 1 to 100 students at a time.");
   return rows.map(row => ({ ...row, firstName: name(row.firstName), lastName: name(row.lastName) }));
 }
 async function newCode(ctx: MutationCtx) {
@@ -39,7 +39,7 @@ async function newCode(ctx: MutationCtx) {
     await ctx.db.insert("bulkInviteCodeReservations", { codeHash });
     return code;
   }
-  throw new Error("Could not allocate an unused invitation code. Try again.");
+  throw new ConvexError("Could not allocate an unused invitation code. Try again.");
 }
 function normalizedCode(value: string) { return value.trim().toUpperCase(); }
 function validCode(value: string) { return /^\d{5}$/.test(value) || /^DV-[0-9A-F]{32}$/.test(value); }
@@ -50,7 +50,7 @@ function effectiveExpiry(inviteExpiry: number | undefined, seasonExpiry: number 
 async function fingerprint(value: unknown) { return tokenHash(JSON.stringify(value)); }
 async function roster(ctx: Ctx, seasonId: Id<"seasons">) {
   const rows = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", seasonId)).take(1001);
-  if (rows.length > 1000) throw new Error("Roster is too large for name matching; ask a Coach to review the roster.");
+  if (rows.length > 1000) throw new ConvexError("Roster is too large for name matching; ask a Coach to review the roster.");
   return rows;
 }
 function matches(rows: Doc<"students">[], first: string, last: string) {
@@ -61,7 +61,7 @@ async function permittedInvite(ctx: Ctx, inviteId: Id<"bulkStudentInvites">) {
   const actor = await viewer(ctx); requireRole(actor, "coach");
   const invite = await ctx.db.get(inviteId);
   const season = await activeSeason(ctx);
-  if (!invite || invite.seasonId !== season._id) throw new Error("Invitation unavailable.");
+  if (!invite || invite.seasonId !== season._id) throw new ConvexError("Invitation unavailable.");
   return { actor, invite, season };
 }
 async function applicant(ctx: MutationCtx) {
@@ -95,7 +95,7 @@ export const preview = query({
       const nameKey = key(row.firstName, row.lastName);
       const duplicateInUpload = seen.has(nameKey); seen.add(nameKey);
       const found = matches(existing, row.firstName, row.lastName);
-      if (found.length > 20) throw new Error("Too many matching records for one name; review the roster first.");
+      if (found.length > 20) throw new ConvexError("Too many matching records for one name; review the roster first.");
       return { firstName: row.firstName, lastName: row.lastName, duplicateInUpload, matches: found.map(student => ({ studentId: student._id, legalName: student.legalName, email: student.email, linked: !!student.userId, active: student.active })) };
     }) };
   },
@@ -109,15 +109,15 @@ export const createBatch = mutation({
     const season = await activeSeason(ctx);
     await requireSeasonProfileWritable(ctx, season._id);
     const entries: Entry[] = cleanRows(args.entries);
-    if (!/^[A-Za-z0-9_-]{8,128}$/.test(args.idempotencyKey)) throw new Error("Use a valid batch submission key.");
+    if (!/^[A-Za-z0-9_-]{8,128}$/.test(args.idempotencyKey)) throw new ConvexError("Use a valid batch submission key.");
     const requestHash = await fingerprint(entries);
     const previous = await ctx.db.query("bulkInviteBatches").withIndex("by_createdBy_and_idempotencyKey", q => q.eq("createdBy", actor._id).eq("idempotencyKey", args.idempotencyKey)).unique();
     if (previous) {
-      if (previous.requestHash !== requestHash) throw new Error("This submission key was already used for a different batch.");
+      if (previous.requestHash !== requestHash) throw new ConvexError("This submission key was already used for a different batch.");
       return { batchId: previous._id, created: previous.createdCount, linked: previous.linkedCount, skipped: previous.skippedCount };
     }
     const now = Date.now();
-    if (season.endsAt !== undefined && season.endsAt <= now) throw new Error("The active season has ended.");
+    if (season.endsAt !== undefined && season.endsAt <= now) throw new ConvexError("The active season has ended.");
     const expiresAt = season.endsAt;
     const existing = await roster(ctx, season._id);
     const chosen = new Set<Id<"students">>();
@@ -129,17 +129,17 @@ export const createBatch = mutation({
       names.add(nameKey);
       if (entry.resolution === "skip") { skipped++; continue; }
       if (entry.resolution === "create") {
-        if (entry.existingStudentId) throw new Error("New records cannot select an existing student.");
-        if (duplicate && !entry.confirmDuplicate) throw new Error(`Confirm the duplicate record for ${entry.firstName} ${entry.lastName}.`);
+        if (entry.existingStudentId) throw new ConvexError("New records cannot select an existing student.");
+        if (duplicate && !entry.confirmDuplicate) throw new ConvexError(`Confirm the duplicate record for ${entry.firstName} ${entry.lastName}.`);
         created++;
       } else {
-        if (!entry.existingStudentId) throw new Error("Choose an unlinked student record.");
+        if (!entry.existingStudentId) throw new ConvexError("Choose an unlinked student record.");
         const student = existing.find(row => row._id === entry.existingStudentId);
-        if (!student || !student.active || student.userId || !matches([student], entry.firstName, entry.lastName).length || chosen.has(student._id)) throw new Error("The selected student is unavailable or does not match this name.");
+        if (!student || !student.active || student.userId || !matches([student], entry.firstName, entry.lastName).length || chosen.has(student._id)) throw new ConvexError("The selected student is unavailable or does not match this name.");
         chosen.add(student._id); linked++;
       }
     }
-    if (!created && !linked) throw new Error("Choose at least one student to invite.");
+    if (!created && !linked) throw new ConvexError("Choose at least one student to invite.");
     const batchId = await ctx.db.insert("bulkInviteBatches", { seasonId: season._id, createdBy: actor._id, createdAt: now, expiresAt, idempotencyKey: args.idempotencyKey, requestHash, inviteCount: created + linked, pendingCount: created + linked, connectedCount: 0, createdCount: created, linkedCount: linked, skippedCount: skipped });
     for (const entry of entries) {
       if (entry.resolution === "skip") continue;
@@ -148,9 +148,9 @@ export const createBatch = mutation({
         studentId = await ctx.db.insert("students", { seasonId: season._id, legalName: `${entry.firstName} ${entry.lastName}`, preferredName: entry.firstName, firstName: entry.firstName, lastName: entry.lastName, structuredNameReviewed: true, email: "", subteam: "", active: true, travelTeam: false, roomCategoryLocked: false, allergies: { state: "unknown" }, medications: { state: "unknown" } });
         await refreshStudentFinance(ctx, studentId);
       }
-      if (!studentId) throw new Error("Student record unavailable.");
+      if (!studentId) throw new ConvexError("Student record unavailable.");
       const previousCodes = await ctx.db.query("bulkStudentInvites").withIndex("by_studentId_and_status", q => q.eq("studentId", studentId).eq("status", "pending")).take(101);
-      if (previousCodes.length > 100) throw new Error("Too many prior codes for this student.");
+      if (previousCodes.length > 100) throw new ConvexError("Too many prior codes for this student.");
       for (const previousCode of previousCodes) {
         await ctx.db.patch(previousCode._id, { status: "replaced", code: "" });
         const oldBatch = await ctx.db.get(previousCode.batchId);
@@ -181,11 +181,11 @@ export const batchDetail = query({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach");
     const season = await activeSeason(ctx);
-    if (!Number.isSafeInteger(args.asOf)) throw new Error("A valid review time is required.");
+    if (!Number.isSafeInteger(args.asOf)) throw new ConvexError("A valid review time is required.");
     const batch = await ctx.db.get(args.batchId);
-    if (!batch || batch.seasonId !== season._id) throw new Error("Batch unavailable.");
+    if (!batch || batch.seasonId !== season._id) throw new ConvexError("Batch unavailable.");
     const rows = await ctx.db.query("bulkStudentInvites").withIndex("by_batchId", q => q.eq("batchId", batch._id)).take(101);
-    if (rows.length > 100) throw new Error("Batch exceeds its invitation limit.");
+    if (rows.length > 100) throw new ConvexError("Batch exceeds its invitation limit.");
     return { batchId: batch._id, createdAt: batch.createdAt, expiresAt: effectiveExpiry(batch.expiresAt, season.endsAt), invites: await Promise.all(rows.map(async row => {
       const student = await ctx.db.get(row.studentId);
       const expiresAt = effectiveExpiry(row.expiresAt, season.endsAt);
@@ -198,8 +198,8 @@ export const revoke = mutation({
   args: { inviteId: v.id("bulkStudentInvites"), expectedCode: v.string() }, returns: v.null(),
   handler: async (ctx, args) => {
     const { actor, invite } = await permittedInvite(ctx, args.inviteId);
-    if (invite.code !== args.expectedCode) throw new Error("Invitation changed. Reload before managing its code.");
-    if (invite.status !== "pending") throw new Error("Pending invitation unavailable.");
+    if (invite.code !== args.expectedCode) throw new ConvexError("Invitation changed. Reload before managing its code.");
+    if (invite.status !== "pending") throw new ConvexError("Pending invitation unavailable.");
     await ctx.db.patch(invite._id, { status: "revoked", code: "" });
     const batch = await ctx.db.get(invite.batchId);
     if (batch) await ctx.db.patch(batch._id, { pendingCount: batch.pendingCount - 1 });
@@ -212,14 +212,14 @@ export const replace = mutation({
   args: { inviteId: v.id("bulkStudentInvites"), expectedCode: v.string() }, returns: v.object({ code: v.string(), inviteId: v.id("bulkStudentInvites"), expiresAt: v.union(v.number(), v.null()) }),
   handler: async (ctx, args) => {
     const { actor, invite, season } = await permittedInvite(ctx, args.inviteId);
-    if (invite.code !== args.expectedCode) throw new Error("Invitation changed. Reload before managing its code.");
+    if (invite.code !== args.expectedCode) throw new ConvexError("Invitation changed. Reload before managing its code.");
     await requireSeasonProfileWritable(ctx, season._id);
     const student = await ctx.db.get(invite.studentId);
-    if (invite.status === "redeemed" || !student || !student.active || student.userId) throw new Error("This student already has an account or is unavailable.");
+    if (invite.status === "redeemed" || !student || !student.active || student.userId) throw new ConvexError("This student already has an account or is unavailable.");
     const now = Date.now();
-    if (season.endsAt !== undefined && season.endsAt <= now) throw new Error("The active season has ended.");
+    if (season.endsAt !== undefined && season.endsAt <= now) throw new ConvexError("The active season has ended.");
     const otherCodes = await ctx.db.query("bulkStudentInvites").withIndex("by_studentId_and_status", q => q.eq("studentId", student._id).eq("status", "pending")).take(101);
-    if (otherCodes.length > 100) throw new Error("Invitation history requires Coach review.");
+    if (otherCodes.length > 100) throw new ConvexError("Invitation history requires Coach review.");
     for (const other of otherCodes) if (other._id !== invite._id) {
       await ctx.db.patch(other._id, { status: "replaced", code: "" });
       const otherBatch = await ctx.db.get(other.batchId);
@@ -330,10 +330,10 @@ export const decideConnection = mutation({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach");
     const request = await ctx.db.get(args.requestId);
-    if (!request) throw new Error("Connection request unavailable.");
+    if (!request) throw new ConvexError("Connection request unavailable.");
     if (request.status !== "pending") {
       if (request.status === (args.approve ? "approved" : "declined")) return null;
-      throw new Error("This connection request has already been decided.");
+      throw new ConvexError("This connection request has already been decided.");
     }
     const now = Date.now();
     if (!args.approve) {
@@ -343,23 +343,23 @@ export const decideConnection = mutation({
     }
     const adultEmailIdentity = await ctx.db.query("adultEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", request.authUserId)).unique();
     const parentEmailIdentity = await ctx.db.query("parentEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", request.authUserId)).unique();
-    if (adultEmailIdentity || parentEmailIdentity) throw new Error("Email sign-in identities cannot be approved as student accounts. Ask a Coach to review the adult invitation instead.");
+    if (adultEmailIdentity || parentEmailIdentity) throw new ConvexError("Email sign-in identities cannot be approved as student accounts. Ask a Coach to review the adult invitation instead.");
     const row = await ctx.db.get(request.inviteId);
     const student = await ctx.db.get(request.studentId);
     const season = await activeSeason(ctx);
     if (!row || row.codeHash !== request.codeHash || row.status !== "pending" || row.studentId !== request.studentId || row.seasonId !== request.seasonId ||
         season._id !== request.seasonId || (season.endsAt !== undefined && season.endsAt <= now) || (row.expiresAt !== undefined && row.expiresAt <= now) ||
         !student || !student.active || student.userId || student.seasonId !== season._id) {
-      throw new Error("This request is stale. Decline it and ask the student to use a current invitation.");
+      throw new ConvexError("This request is stale. Decline it and ask the student to use a current invitation.");
     }
     await requireSeasonProfileWritable(ctx, season._id);
     const authUser = await ctx.db.get(request.authUserId);
     const googleAccounts = await ctx.db.query("authAccounts").withIndex("userIdAndProvider", q => q.eq("userId", request.authUserId).eq("provider", "google")).take(2);
     if (!authUser?.emailVerificationTime || authUser.isAnonymous || !authUser.email || emailKey(authUser.email) !== request.googleEmail ||
         !googleAccounts.some(account => account.emailVerified && emailKey(account.emailVerified) === request.googleEmail)) {
-      throw new Error("The verified Google identity has changed. Decline this request and issue a new invitation.");
+      throw new ConvexError("The verified Google identity has changed. Decline this request and issue a new invitation.");
     }
-    if (await accountConflict(ctx, request.authUserId, request.googleEmail, student)) throw new Error("This Google account or email is already connected. Decline this request.");
+    if (await accountConflict(ctx, request.authUserId, request.googleEmail, student)) throw new ConvexError("This Google account or email is already connected. Decline this request.");
     const userId = await ctx.db.insert("appUsers", { authUserId: request.authUserId, email: request.googleEmail, name: request.googleName, role: "student", travelLead: false, financialEdit: false, active: true });
     await ctx.db.patch(student._id, { userId, email: request.googleEmail });
     await ctx.db.patch(row._id, { status: "redeemed", code: "", redeemedBy: userId, redeemedAt: now });
@@ -367,7 +367,7 @@ export const decideConnection = mutation({
     const batch = await ctx.db.get(row.batchId);
     if (batch) await ctx.db.patch(batch._id, { pendingCount: batch.pendingCount - 1, connectedCount: batch.connectedCount + 1 });
     const requests = await ctx.db.query("joinRequests").withIndex("by_authUserId", q => q.eq("authUserId", request.authUserId)).take(21);
-    if (requests.length > 20) throw new Error("Join request history requires Coach review.");
+    if (requests.length > 20) throw new ConvexError("Join request history requires Coach review.");
     for (const pending of requests) if (pending.status === "pending" && pending.seasonId === student.seasonId) await ctx.db.patch(pending._id, { status: "approved", decidedAt: now, decidedBy: actor._id });
     await audit(ctx, actor, "bulkInviteConnectionRequests", request._id, "approve", "pending", { studentId: student._id, userId });
     return null;

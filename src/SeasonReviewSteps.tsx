@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { ConfirmAction } from './ConfirmAction'
 import { HistoricalAttendance } from './HistoricalAttendance'
 import { useState } from 'react'
@@ -10,7 +11,7 @@ import styles from './SeasonAdministration.module.css'
 import { seasonAdminCopy as copy } from './lib/season-admin-copy'
 type Plan = { id: Id<'seasonTransitionPlans'>; revision:number; targetName:string; state:string }
 const money=(c:number)=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(c/100)
-const errorText=(e:unknown)=>e instanceof Error?e.message:'Please refresh and try again.'
+const errorText=(e:unknown)=>userFacingError(e, 'Please refresh and try again.')
 const decisionLabels: Readonly<Record<string, string>> = { return: copy.returning, depart: copy.departing, keepActive: copy.keepAccountActive, archive: copy.archiveStudentAccount, carry: copy.carryForward, writeOff: copy.writeOff, hold: copy.holdHistorical, team: copy.moveToTeam, Undecided: copy.undecided, 'Account review missing': copy.accountReviewMissing }
 const decisionText = (value: string) => value.split(';').map(choice => decisionLabels[choice.trim()] ?? copy.decisionUnavailable).join(' · ')
 const transitionStateLabel = (state: string | undefined) => ({ draft: 'Reviewing decisions', draining: 'Closing the old season', applying: 'Preparing the new season', verifying: 'Checking the new season', failed: 'Needs your review', complete: 'Complete' } as Record<string, string>)[state ?? ''] ?? 'Loading transition'

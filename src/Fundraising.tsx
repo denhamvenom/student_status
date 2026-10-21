@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { Component, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { useConvex, useMutation, usePaginatedQuery, useQuery } from 'convex/react'
 import type { FunctionArgs, FunctionReturnType } from 'convex/server'
@@ -43,7 +44,7 @@ export function FundraiserCreationForm({ pending, onCreate }: {
       await onCreate({ name: name.trim(), teamBps, studentBps })
       setName('')
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : copy.failed)
+      setError(userFacingError(failure, copy.failed))
     }
   }
   return <Card className={styles.card}>
@@ -94,11 +95,11 @@ export function Fundraising() {
   return <FundraisingBoundary key={attempt} retry={() => setAttempt(value => value + 1)}><FundraisingContent /></FundraisingBoundary>
 }
 
-class FundraisingBoundary extends Component<{ children: ReactNode; retry: () => void }, { failed: boolean }> {
-  state = { failed: false }
-  static getDerivedStateFromError() { return { failed: true } }
+class FundraisingBoundary extends Component<{ children: ReactNode; retry: () => void }, { error: unknown }> {
+  state = { error: null as unknown }
+  static getDerivedStateFromError(error: unknown) { return { error } }
   render() {
-    return this.state.failed ? <section className={styles.root}><div className="page-head"><h1>{copy.title}</h1></div><p role="alert" className={styles.error}>{copy.failed}</p><Button variant="outline" onClick={this.props.retry}>Try again</Button></section> : this.props.children
+    return this.state.error !== null ? <section className={styles.root}><div className="page-head"><h1>{copy.title}</h1></div><p role="alert" className={styles.error}>{userFacingError(this.state.error, copy.failed, false)}</p><Button variant="outline" onClick={this.props.retry}>Try again</Button></section> : this.props.children
   }
 }
 
@@ -175,7 +176,7 @@ function FundraiserWorkspace({ fundraiserId }: { fundraiserId: Id<'fundraisers'>
     try {
       const preview = await collectFundraisingPreview(args => client.query(api.fundraisers.preview, args), { fundraiserId, expectedRevision: workspace.fundraiser.revision, rows: inputs.map(row => ({ studentId: row.studentId, grossCents: row.grossCents! })) }, () => !mounted.current)
       if (mounted.current) setReviewed(preview)
-    } catch (cause) { if (mounted.current) setError(cause instanceof Error ? cause.message : copy.failed) }
+    } catch (cause) { if (mounted.current) setError(userFacingError(cause, copy.failed)) }
     finally { busyGuard.current = false; if (mounted.current) setBusy(false) }
   }
   async function submit(event: FormEvent) {
@@ -187,7 +188,7 @@ function FundraiserWorkspace({ fundraiserId }: { fundraiserId: Id<'fundraisers'>
     command.idempotencyKey = pendingIntent.current.key
     busyGuard.current = true; setBusy(true); setError('')
     try { await post(command); setDrafts({}); setReviewed(null); setReason(''); pendingIntent.current = null }
-    catch (cause) { setError(cause instanceof Error ? cause.message : copy.failed) }
+    catch (cause) { setError(userFacingError(cause, copy.failed)) }
     finally { busyGuard.current = false; setBusy(false) }
   }
   const input = (row: (typeof students.results)[number]) => editable ? <Input aria-label={`${row.name} · ${copy.raised}`} inputMode="decimal" maxLength={24} value={drafts[row.studentId] ?? fundraisingDecimalValue(row.grossCents)} disabled={busy || row.financialState !== 'ready'} onChange={event => changed(row.studentId, event.target.value)} aria-invalid={drafts[row.studentId] !== undefined && parseFundraisingDecimal(drafts[row.studentId]) === null} /> : <span>{usd(row.grossCents)}</span>
@@ -252,7 +253,7 @@ function FundraiserPolicy({ workspace }: { workspace: FunctionReturnType<typeof 
       const args = { fundraiserId: workspace.fundraiser._id, expectedRevision: workspace.fundraiser.revision, reason: reason.trim() }
       if (kind === 'split' && valid && teamBps !== null && studentBps !== null) await changePolicy({ ...args, teamBps, studentBps })
       else if (kind === 'close') await close(args)
-    } catch (cause) { setError(cause instanceof Error ? cause.message : copy.failed) }
+    } catch (cause) { setError(userFacingError(cause, copy.failed)) }
     finally { setBusy(false) }
   }
   if (!allowed) return <p className={styles.muted}>{workspace.fundraiser.state === 'closed' ? 'This fundraiser is closed.' : 'Resolve unfinished posting before changing or closing this fundraiser.'}</p>
@@ -275,8 +276,8 @@ function FundraiserPosting({ job, coach }: { job: NonNullable<FunctionReturnType
       const result = await client.query(api.fundraiserPosting.retryPreview, { jobId: job._id, studentIds: [studentId] })
       if (result.length !== 1 || result[0].studentId !== studentId) throw new Error('The retry preview changed. Review this row again.')
       setReviewed(previous => [...previous.filter(row => row.studentId !== studentId), ...result])
-    } catch (cause) { setError(cause instanceof Error ? cause.message : copy.failed) }
+    } catch (cause) { setError(userFacingError(cause, copy.failed)) }
     finally { setBusy(false) }
   }
-  return <Card className={styles.card}><CardTitle>{copy.posting} · {postingStatus(job.state)}</CardTitle><p role="status">{job.committed} saved · {job.held} need review · {job.processed} checked in this pass.</p><p className={styles.muted}>{job.state === 'complete' ? copy.complete : copy.partial}</p>{job.lastError && <p role="alert" className={styles.error}>{job.lastError}</p>}{rows.results.map(row => <div className={styles.historyRow} key={row._id}><strong>{row.name} · {usd(row.grossCents)} · {postedRowStatus(row.state)}</strong>{(row.reversedCents ?? 0)>0&&<p className={styles.notice}>{copy.committedReversal} {usd(row.reversedCents!)}. {copy.reversalTargetPending}</p>}{row.message && <p className={styles.notice}>{row.message}</p>}{coach && ['failed', 'held'].includes(job.state) && row.state === 'held' && !row.pendingRevisionId && <Button variant="outline" disabled={busy} onClick={() => void reviewRow(row.studentId)}>{copy.reviewHeld}</Button>}</div>)}{rows.status === 'CanLoadMore' && <Button variant="outline" onClick={() => rows.loadMore(20)}>{copy.loadMore}</Button>}{['LoadingFirstPage', 'LoadingMore'].includes(rows.status) && <p>{copy.loading}</p>}{reviewed.map(row => <div className={styles.studentCard} key={row.studentId}><strong>{row.name} · Retry preview</strong><dl className={styles.details}><dt>Original reviewed amount raised</dt><dd>{usd(row.grossCents)}</dd><dt>Original travel credit available</dt><dd>{usd(row.availableOriginalCents)}</dd><dt>Required reduction</dt><dd>{usd(row.requiredReductionCents)}</dd></dl><p>{row.message ?? 'This reviewed row is ready for retry.'}</p><Button variant="outline" onClick={() => setReviewed(previous => previous.filter(result => result.studentId !== row.studentId))}>Remove from retry review</Button></div>)}{coach && ['failed', 'held'].includes(job.state) && <form className={styles.form} onSubmit={async event => { event.preventDefault(); if (busy || reason.trim().length < 8 || job.state === 'held' && !retryReady || reviewed.length > 0 && !retryReady) return; setBusy(true); setError(''); try { await retry({ jobId: job._id, reason: reason.trim(), rows: reviewed.map(row => ({ studentId: row.studentId, expectedRowRevision: row.expectedRowRevision, expectedFinancialRevision: row.expectedFinancialRevision! })) }); setReason(''); setReviewed([]) } catch (cause) { setError(cause instanceof Error ? cause.message : copy.failed) } finally { setBusy(false) } }}><label className={styles.field}>Reason for retry (at least 8 characters)<Input value={reason} onChange={event => setReason(event.target.value)} minLength={8} maxLength={1000} disabled={busy} /></label><p className={styles.muted}>{job.state === 'failed' && reviewed.length === 0 ? 'Resume the failed job from its saved progress. Already recorded rows will not be posted again.' : 'Only rows you have reviewed are retried. Other rows needing review stay on hold.'}</p><Button type="submit" disabled={busy || reason.trim().length < 8 || job.state === 'held' && !retryReady || reviewed.length > 0 && !retryReady}>{copy.retry}</Button></form>}{job.state === 'held' && <p className={styles.notice}>{copy.hold} Amounts on hold have not changed. Review each row’s reason before retrying.</p>}{error && <p role="alert" className={styles.error}>{error}</p>}</Card>
+  return <Card className={styles.card}><CardTitle>{copy.posting} · {postingStatus(job.state)}</CardTitle><p role="status">{job.committed} saved · {job.held} need review · {job.processed} checked in this pass.</p><p className={styles.muted}>{job.state === 'complete' ? copy.complete : copy.partial}</p>{job.lastError && <p role="alert" className={styles.error}>{userFacingError(new Error(job.lastError), copy.failed)}</p>}{rows.results.map(row => <div className={styles.historyRow} key={row._id}><strong>{row.name} · {usd(row.grossCents)} · {postedRowStatus(row.state)}</strong>{(row.reversedCents ?? 0)>0&&<p className={styles.notice}>{copy.committedReversal} {usd(row.reversedCents!)}. {copy.reversalTargetPending}</p>}{row.message && <p className={styles.notice}>{row.message}</p>}{coach && ['failed', 'held'].includes(job.state) && row.state === 'held' && !row.pendingRevisionId && <Button variant="outline" disabled={busy} onClick={() => void reviewRow(row.studentId)}>{copy.reviewHeld}</Button>}</div>)}{rows.status === 'CanLoadMore' && <Button variant="outline" onClick={() => rows.loadMore(20)}>{copy.loadMore}</Button>}{['LoadingFirstPage', 'LoadingMore'].includes(rows.status) && <p>{copy.loading}</p>}{reviewed.map(row => <div className={styles.studentCard} key={row.studentId}><strong>{row.name} · Retry preview</strong><dl className={styles.details}><dt>Original reviewed amount raised</dt><dd>{usd(row.grossCents)}</dd><dt>Original travel credit available</dt><dd>{usd(row.availableOriginalCents)}</dd><dt>Required reduction</dt><dd>{usd(row.requiredReductionCents)}</dd></dl><p>{row.message ?? 'This reviewed row is ready for retry.'}</p><Button variant="outline" onClick={() => setReviewed(previous => previous.filter(result => result.studentId !== row.studentId))}>Remove from retry review</Button></div>)}{coach && ['failed', 'held'].includes(job.state) && <form className={styles.form} onSubmit={async event => { event.preventDefault(); if (busy || reason.trim().length < 8 || job.state === 'held' && !retryReady || reviewed.length > 0 && !retryReady) return; setBusy(true); setError(''); try { await retry({ jobId: job._id, reason: reason.trim(), rows: reviewed.map(row => ({ studentId: row.studentId, expectedRowRevision: row.expectedRowRevision, expectedFinancialRevision: row.expectedFinancialRevision! })) }); setReason(''); setReviewed([]) } catch (cause) { setError(userFacingError(cause, copy.failed)) } finally { setBusy(false) } }}><label className={styles.field}>Reason for retry (at least 8 characters)<Input value={reason} onChange={event => setReason(event.target.value)} minLength={8} maxLength={1000} disabled={busy} /></label><p className={styles.muted}>{job.state === 'failed' && reviewed.length === 0 ? 'Resume the failed job from its saved progress. Already recorded rows will not be posted again.' : 'Only rows you have reviewed are retried. Other rows needing review stay on hold.'}</p><Button type="submit" disabled={busy || reason.trim().length < 8 || job.state === 'held' && !retryReady || reviewed.length > 0 && !retryReady}>{copy.retry}</Button></form>}{job.state === 'held' && <p className={styles.notice}>{copy.hold} Amounts on hold have not changed. Review each row’s reason before retrying.</p>}{error && <p role="alert" className={styles.error}>{error}</p>}</Card>
 }

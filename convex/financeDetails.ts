@@ -1,5 +1,5 @@
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { query } from "./_generated/server";
 import type { QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
@@ -28,16 +28,16 @@ function familyDescription(kind: string, chargeLabel: string | null, destination
 }
 
 function boundRead(options: { maximumRowsRead?: number }) {
-  if (options.maximumRowsRead !== undefined && (!Number.isSafeInteger(options.maximumRowsRead) || options.maximumRowsRead < 1)) throw new Error("Invalid finance read budget.");
+  if (options.maximumRowsRead !== undefined && (!Number.isSafeInteger(options.maximumRowsRead) || options.maximumRowsRead < 1)) throw new ConvexError("Invalid finance read budget.");
   options.maximumRowsRead = Math.min(options.maximumRowsRead ?? 26, 26);
 }
 
 async function authorize(ctx: QueryCtx, studentId: Id<"students">, size: number) {
-  if (!Number.isSafeInteger(size) || size < 1 || size > 25) throw new Error("Finance pages support 1 to 25 records.");
+  if (!Number.isSafeInteger(size) || size < 1 || size > 25) throw new ConvexError("Finance pages support 1 to 25 records.");
   const actor = await viewer(ctx);
-  if (actor.role === "mentor" && !actor.travelLead) throw new Error("Finance access denied.");
+  if (actor.role === "mentor" && !actor.travelLead) throw new ConvexError("Finance access denied.");
   const student = await studentAccess(ctx, actor, studentId);
-  if (student.seasonId !== (await activeSeason(ctx))._id) throw new Error("Archived finances are unavailable.");
+  if (student.seasonId !== (await activeSeason(ctx))._id) throw new ConvexError("Archived finances are unavailable.");
   return actor;
 }
 
@@ -48,7 +48,7 @@ export const charges = query({
     const actor = await authorize(ctx, args.studentId, args.paginationOpts.numItems);
     boundRead(args.paginationOpts);
     const result = await ctx.db.query("charges").withIndex("by_studentId_and_priority", q => q.eq("studentId", args.studentId)).paginate(args.paginationOpts);
-    if (result.page.length > 25) throw new Error("Charge page expanded beyond 25 records; reload the list.");
+    if (result.page.length > 25) throw new ConvexError("Charge page expanded beyond 25 records; reload the list.");
     if (actor.role === "coach" || actor.role === "mentor" && actor.travelLead) return result;
     return {...result, page: result.page.map(charge => ({_id: charge._id, eventId: charge.eventId, label: charge.label, category: charge.category, cancelledCents: charge.cancelledCents, outstanding: charge.outstanding, adjustedCents: charge.adjustedCents, amountCents: charge.amountCents, appliedCents: charge.appliedCents, priority: charge.priority, createdAt: charge.createdAt}))};
   },
@@ -61,7 +61,7 @@ export const history = query({
     const actor = await authorize(ctx, args.studentId, args.paginationOpts.numItems);
     boundRead(args.paginationOpts);
     const result = await ctx.db.query("ledgerEntries").withIndex("by_studentId_and_recordedAt", q => q.eq("studentId", args.studentId)).order("desc").paginate(args.paginationOpts);
-    if (result.page.length > 25) throw new Error("History page expanded beyond 25 records; reload the list.");
+    if (result.page.length > 25) throw new ConvexError("History page expanded beyond 25 records; reload the list.");
     const page = await Promise.all(result.page.map(async entry => {
       const charge = entry.chargeId ? await ctx.db.get(entry.chargeId) : null;
       const safeDescription = familyDescription(entry.kind, charge?.label ?? null, entry.destination, entry.sourceKind);

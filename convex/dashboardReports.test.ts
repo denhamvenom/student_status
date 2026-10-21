@@ -1,3 +1,5 @@
+import { ConvexError } from 'convex/values';
+import { savedPublicError } from './lib/publicErrors';
 /// <reference types="vite/client" />
 import { describe, expect, it } from "vitest";
 import { createTest } from "../testUtils";
@@ -80,8 +82,10 @@ describe("role-scoped dashboard reports", () => {
     await f.t.run(async ctx=>{const student=await ctx.db.get(f.ids.sid);const state=await ctx.db.query("financeSummaryBackfills").withIndex("by_seasonId",q=>q.eq("seasonId",student!.seasonId)).unique();await ctx.db.patch(state!._id,{state:"running",processed:1})});
     expect(await f.coach.query(teamRef,{})).toMatchObject({state:"updating",activeStudents:1,inactiveStudents:1,travelTeamStudents:1,finance:null,processed:1,rebuildRunning:true,canRebuild:false});
     await f.t.run(async ctx=>{const student=await ctx.db.get(f.ids.sid);const state=await ctx.db.query("financeSummaryBackfills").withIndex("by_seasonId",q=>q.eq("seasonId",student!.seasonId)).unique();await ctx.db.patch(state!._id,{state:"failed",lastError:"Synthetic source review required"})});
-    expect(await f.coach.query(teamRef,{})).toMatchObject({state:"failed",finance:null,canRebuild:true,message:"Synthetic source review required"});
+    expect(await f.coach.query(teamRef,{})).toMatchObject({state:"failed",finance:null,canRebuild:true,message:"Processing stopped. Ask a Coach to review the current status before retrying."});
     expect(await f.lead.query(teamRef,{})).toMatchObject({state:"failed",finance:null,canRebuild:false});
+    await f.t.run(async ctx=>{const student=await ctx.db.get(f.ids.sid);const state=await ctx.db.query("financeSummaryBackfills").withIndex("by_seasonId",q=>q.eq("seasonId",student!.seasonId)).unique();await ctx.db.patch(state!._id,{lastError:savedPublicError(new ConvexError("Review the source entries before rebuilding."))})});
+    expect(await f.coach.query(teamRef,{})).toMatchObject({message:"Review the source entries before rebuilding."});
   });
   it("denies anonymous, ordinary Mentor, unrelated family and revoked links", async () => {
     const f = await fixture();

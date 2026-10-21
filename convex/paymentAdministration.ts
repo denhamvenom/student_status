@@ -1,6 +1,7 @@
-import { normalizeEmail } from "../shared/contact-format";
+import { savedPublicError, publicErrorResult } from './lib/publicErrors';
+import { normalizeEmail } from "./lib/contactValidation";
 import { makeFunctionReference, paginationOptsValidator, paginationResultValidator } from "convex/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -19,7 +20,7 @@ const method = v.union(v.literal("cash"), v.literal("check"), v.literal("other")
 const row = v.object({ studentEmail: v.string(), amountCents: v.number(), method, reference: v.string(), occurredAt: v.number(), rowReference: v.string() });
 function editor(actor: Doc<"appUsers">) { if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead && actor.financialEdit)) throw new Error("Financial editing is not enabled for this account."); }
 function why(value: string) { const text = value.trim(); if (text.length < 8 || text.length > 1000) throw new Error("Provide a reason of 8 to 1000 characters."); return text; }
-function text(value: string, label: string) { const result = value.trim(); if (!result || result.length > 150) throw new Error(`Provide ${label} of 1 to 150 characters.`); return result; }
+function text(value: string, label: string) { const result = value.trim(); if (!result || result.length > 150) throw new ConvexError(`Provide ${label} of 1 to 150 characters.`); return result; }
 function receiptFields(value: { amountCents: number; reference: string; occurredAt: number; rowReference: string }) { if (cents(value.amountCents) === 0 || !Number.isSafeInteger(value.occurredAt) || value.occurredAt < 0 || !Number.isFinite(new Date(value.occurredAt).getTime())) throw new Error("Provide a positive payment and valid receipt date."); text(value.reference, "receipt reference"); text(value.rowReference, "row reference"); }
 async function payment(ctx: Ctx, id: Id<"ledgerEntries">) {
   const actor = await viewer(ctx); if (actor.role !== "coach") throw new Error("Only a Coach may correct payment receipts.");
@@ -44,15 +45,15 @@ export const receipts = query({
   args: { studentId: v.id("students"), paginationOpts: paginationOptsValidator },
   returns: paginationResultValidator(v.object({ sourceEntryId: v.id("ledgerEntries"), originalAmountCents: v.number(), currentAmountCents: v.number(), availableCents: v.number(), reference: v.string(), method: v.union(method, v.null()), occurredAt: v.number(), carried: v.boolean() })),
   handler: async (ctx, args) => {
-    const actor = await viewer(ctx); if (actor.role !== "coach") throw new Error("Only a Coach may review payment corrections.");
+    const actor = await viewer(ctx); if (actor.role !== "coach") throw new ConvexError("Only a Coach may review payment corrections.");
     const student = await ctx.db.get(args.studentId); const season = await activeSeason(ctx);
-    if (!student || student.seasonId !== season._id || !Number.isSafeInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 25) throw new Error("Payment review is unavailable.");
+    if (!student || student.seasonId !== season._id || !Number.isSafeInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 25) throw new ConvexError("Payment review is unavailable.");
     const account = await financialAccount(ctx, student._id);
-    if (!account || account.allocationSourceVersion !== 1) throw new Error("Prepare financial records before reviewing payment receipts.");
+    if (!account || account.allocationSourceVersion !== 1) throw new ConvexError("Prepare financial records before reviewing payment receipts.");
     const page = await ctx.db.query("financialSources").withIndex("by_studentId_and_generation_and_kind_and_status", q => q.eq("studentId", student._id).eq("generation", account.generation).eq("kind", "payment")).paginate({ ...args.paginationOpts, maximumRowsRead: 26 });
-    if (page.page.length > 25) throw new Error("Receipt page exceeded its limit.");
-    const entries = await Promise.all(page.page.map(async source => { const original = await ctx.db.get(source.sourceEntryId); if (!original) throw new Error("Receipt provenance is unavailable."); return { sourceEntryId: source.sourceEntryId, originalAmountCents: original.amountCents, currentAmountCents: source.receivedCents, availableCents: source.availableCents, reference: original.reference ?? original.reason ?? "Original payment", method: original.method ?? null, occurredAt: original.occurredAt ?? original.recordedAt, carried: !!original.originEntryId }; }));
-    return { ...page, page: entries };
+    if (page.page.length > 25) throw new ConvexError("Receipt page exceeded its limit.");
+    const entries = await Promise.all(page.page.map(async source => { const original = await ctx.db.get(source.sourceEntryId); if (!original) throw new ConvexError("Receipt provenance is unavailable."); return { sourceEntryId: source.sourceEntryId, originalAmountCents: original.amountCents, currentAmountCents: source.receivedCents, availableCents: source.availableCents, reference: original.reference ?? original.reason ?? "Original payment", method: original.method ?? null, occurredAt: original.occurredAt ?? original.recordedAt, carried: !!original.originEntryId }; }));
+    return publicErrorResult({ ...page, page: entries });
   },
 });
 export const previewCorrection = query({ args: { sourceEntryId: v.id("ledgerEntries"), targetAmountCents: v.number() }, returns: previewValidator, handler: async (ctx, args) => (await correctionPreview(ctx, args.sourceEntryId, args.targetAmountCents)).preview });
@@ -60,11 +61,11 @@ export const correct = mutation({
   args: { sourceEntryId: v.id("ledgerEntries"), targetAmountCents: v.number(), expectedSourceRevision: v.number(), expectedFinancialRevision: v.number(), reason: v.string(), idempotencyKey: v.string() },
   returns: v.id("financialOperationJobs"),
   handler: async (ctx, args) => {
-    const actor = await viewer(ctx); if (actor.role !== "coach") throw new Error("Only a Coach may correct payment receipts.");
+    const actor = await viewer(ctx); if (actor.role !== "coach") throw new ConvexError("Only a Coach may correct payment receipts.");
     const reason = why(args.reason); const key = text(args.idempotencyKey, "transaction key");
     const hash = await tokenHash(JSON.stringify([args.sourceEntryId, args.targetAmountCents, args.expectedSourceRevision, args.expectedFinancialRevision, reason]));
     const old = await ctx.db.query("financialOperationJobs").withIndex("by_originalActorId_and_idempotencyKey", q => q.eq("originalActorId", actor._id).eq("idempotencyKey", key)).unique();
-    if (old) { if (old.kind !== "paymentCorrection" || old.operationHash !== hash) throw new Error("Transaction key is already used for a different command."); return old._id; }
+    if (old) { if (old.kind !== "paymentCorrection" || old.operationHash !== hash) throw new ConvexError("Transaction key is already used for a different command."); return old._id; }
     const state = await correctionPreview(ctx, args.sourceEntryId, args.targetAmountCents);
     await requireSeasonFinanceReady(ctx, state.student.seasonId);
     const account = await readyFinancialAccount(ctx, state.student._id);
@@ -111,19 +112,19 @@ export const correctionPage = internalMutation({
     await refreshStudentFinance(ctx, student._id); return null;
   },
 });
-export const runCorrection = internalMutation({ args: { jobId: v.id("financialOperationJobs") }, returns: v.null(), handler: async (ctx, args) => { const job = await ctx.db.get(args.jobId); if (!job || job.kind !== "paymentCorrection" || job.state !== "running") return null; try { await ctx.runMutation(pageRef, { jobId: job._id, step: job.step }); } catch (error) { await ctx.db.patch(job._id, { state: "failed", lastError: error instanceof Error ? error.message.slice(0, 500) : "Payment correction failed.", updatedAt: Date.now() }); const account = await financialAccount(ctx, job.studentId); if (account?.operationJobId === job._id) await ctx.db.patch(account._id, { state: "failed", lastError: "Payment correction requires Coach retry.", updatedAt: Date.now() }); } return null; } });
-export const correctionStatus = query({ args: { jobId: v.id("financialOperationJobs") }, returns: schema.doc("financialOperationJobs"), handler: async (ctx, args) => { const actor = await viewer(ctx); if (actor.role !== "coach") throw new Error("Only a Coach may review payment corrections."); const job = await ctx.db.get(args.jobId); const student = job ? await ctx.db.get(job.studentId) : null; if (!job || job.kind !== "paymentCorrection" || student?.seasonId !== (await activeSeason(ctx))._id) throw new Error("Payment correction is unavailable."); return job; } });
-export const retryCorrection = mutation({ args: { jobId: v.id("financialOperationJobs"), reason: v.string() }, returns: v.null(), handler: async (ctx, args) => { const actor = await viewer(ctx); if (actor.role !== "coach") throw new Error("Only a Coach may retry payment corrections."); const job = await ctx.db.get(args.jobId); const account = job ? await financialAccount(ctx, job.studentId) : null; const season = await activeSeason(ctx); if (!job || job.kind !== "paymentCorrection" || job.state !== "failed" || account?.seasonId !== season._id || account.operationJobId !== job._id || account.generation !== job.generation) throw new Error("Payment correction cannot be retried."); await requireSeasonFinancialRetry(ctx, season._id, job._id); await ctx.db.patch(job._id, { actorId: actor._id, state: "running", lastError: undefined, updatedAt: Date.now() }); await ctx.db.patch(account._id, { state: "posting", lastError: undefined, updatedAt: Date.now() }); await audit(ctx, actor, "financialOperationJobs", job._id, "retryPaymentCorrection", null, null, why(args.reason)); await ctx.scheduler.runAfter(0, runRef, { jobId: job._id }); return null; } });
+export const runCorrection = internalMutation({ args: { jobId: v.id("financialOperationJobs") }, returns: v.null(), handler: async (ctx, args) => { const job = await ctx.db.get(args.jobId); if (!job || job.kind !== "paymentCorrection" || job.state !== "running") return null; try { await ctx.runMutation(pageRef, { jobId: job._id, step: job.step }); } catch (error) { await ctx.db.patch(job._id, { state: "failed", lastError: savedPublicError(error, "Payment correction failed."), updatedAt: Date.now() }); const account = await financialAccount(ctx, job.studentId); if (account?.operationJobId === job._id) await ctx.db.patch(account._id, { state: "failed", lastError: savedPublicError(null, "Payment correction requires Coach retry."), updatedAt: Date.now() }); } return null; } });
+export const correctionStatus = query({ args: { jobId: v.id("financialOperationJobs") }, returns: schema.doc("financialOperationJobs"), handler: async (ctx, args) => { const actor = await viewer(ctx); if (actor.role !== "coach") throw new ConvexError("Only a Coach may review payment corrections."); const job = await ctx.db.get(args.jobId); const student = job ? await ctx.db.get(job.studentId) : null; if (!job || job.kind !== "paymentCorrection" || student?.seasonId !== (await activeSeason(ctx))._id) throw new ConvexError("Payment correction is unavailable."); return publicErrorResult(job); } });
+export const retryCorrection = mutation({ args: { jobId: v.id("financialOperationJobs"), reason: v.string() }, returns: v.null(), handler: async (ctx, args) => { const actor = await viewer(ctx); if (actor.role !== "coach") throw new ConvexError("Only a Coach may retry payment corrections."); const job = await ctx.db.get(args.jobId); const account = job ? await financialAccount(ctx, job.studentId) : null; const season = await activeSeason(ctx); if (!job || job.kind !== "paymentCorrection" || job.state !== "failed" || account?.seasonId !== season._id || account.operationJobId !== job._id || account.generation !== job.generation) throw new ConvexError("Payment correction cannot be retried."); await requireSeasonFinancialRetry(ctx, season._id, job._id); await ctx.db.patch(job._id, { actorId: actor._id, state: "running", lastError: undefined, updatedAt: Date.now() }); await ctx.db.patch(account._id, { state: "posting", lastError: undefined, updatedAt: Date.now() }); await audit(ctx, actor, "financialOperationJobs", job._id, "retryPaymentCorrection", null, null, why(args.reason)); await ctx.scheduler.runAfter(0, runRef, { jobId: job._id }); return null; } });
 
 export const previewPayments = query({
   args: { rows: v.array(row) }, returns: v.array(v.object({ studentId: v.union(v.id("students"), v.null()), studentName: v.string(), expectedGeneration: v.union(v.number(), v.null()), error: v.union(v.string(), v.null()) })),
   handler: async (ctx, args) => {
-    editor(await viewer(ctx)); if (!args.rows.length || args.rows.length > 500) throw new Error("Review 1 to 500 payment rows at a time.");
+    editor(await viewer(ctx)); if (!args.rows.length || args.rows.length > 500) throw new ConvexError("Review 1 to 500 payment rows at a time.");
     const season = await activeSeason(ctx); const duplicates = new Set<string>(); const result = [];
     for (const item of args.rows) {
       let error: string | null = null; try { receiptFields(item); } catch (failure) { error = failure instanceof Error ? failure.message : "Invalid receipt."; }
       let email = item.studentEmail.trim().toLowerCase();
-      try { email = normalizeEmail(item.studentEmail, "Student email"); if (!email) throw new Error("Enter a student email."); } catch (failure) { result.push({ studentId: null, studentName: email, expectedGeneration: null, error: failure instanceof Error ? failure.message : "Invalid student email." }); continue; }
+      try { email = normalizeEmail(item.studentEmail, "Student email"); if (!email) throw new ConvexError("Enter a student email."); } catch (failure) { result.push({ studentId: null, studentName: email, expectedGeneration: null, error: failure instanceof Error ? failure.message : "Invalid student email." }); continue; }
       const matches = await ctx.db.query("students").withIndex("by_seasonId_and_email", q => q.eq("seasonId", season._id).eq("email", email)).take(2);
       const student = matches.length === 1 && matches[0].active ? matches[0] : null;
       if (!student) error = "Match one active student's exact email address.";
@@ -133,7 +134,7 @@ export const previewPayments = query({
       if (student && !account) { const history = await ctx.db.query("ledgerEntries").withIndex("by_studentId_and_recordedAt", q => q.eq("studentId", student._id)).first(); const charge = await ctx.db.query("charges").withIndex("by_studentId_and_priority", q => q.eq("studentId", student._id)).first(); if (history || charge) error = "Historical finances require rebuilding."; }
       result.push({ studentId: student?._id ?? null, studentName: student?.legalName || student?.preferredName || email, expectedGeneration: student ? account?.generation ?? 1 : null, error });
     }
-    return result;
+    return publicErrorResult(result);
   },
 });
 export const recordPaymentRow = mutation({
@@ -141,11 +142,11 @@ export const recordPaymentRow = mutation({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); editor(actor); receiptFields(args); const reason = why(args.reason); const batch = text(args.batchReference, "batch reference");
     const season = await activeSeason(ctx); await requireSeasonFinanceReady(ctx, season._id);
-    const student = await ctx.db.get(args.studentId); if (!student?.active || student.seasonId !== season._id) throw new Error("Student is unavailable in the active season.");
+    const student = await ctx.db.get(args.studentId); if (!student?.active || student.seasonId !== season._id) throw new ConvexError("Student is unavailable in the active season.");
     const key = `payment-entry:${actor._id}:${await tokenHash(JSON.stringify([season._id, batch, student._id, args.rowReference.trim()]))}`;
     const old = await ctx.db.query("ledgerEntries").withIndex("by_idempotencyKey", q => q.eq("idempotencyKey", key)).unique();
-    if (old) { if (old.kind !== "payment" || old.studentId !== student._id || old.amountCents !== args.amountCents || old.method !== args.method || old.reference !== args.reference.trim() || old.occurredAt !== args.occurredAt || old.reason !== reason) throw new Error("This batch row already recorded a different receipt. Correct that original payment."); return old._id; }
-    const account = await ensureFinancialAccount(ctx, student._id); if (account.generation !== args.expectedGeneration) throw new Error("Financial preparation changed. Preview the batch again.");
+    if (old) { if (old.kind !== "payment" || old.studentId !== student._id || old.amountCents !== args.amountCents || old.method !== args.method || old.reference !== args.reference.trim() || old.occurredAt !== args.occurredAt || old.reason !== reason) throw new ConvexError("This batch row already recorded a different receipt. Correct that original payment."); return old._id; }
+    const account = await ensureFinancialAccount(ctx, student._id); if (account.generation !== args.expectedGeneration) throw new ConvexError("Financial preparation changed. Preview the batch again.");
     const funds = cents(account.paidCents + account.personalAvailableCents + account.fundraisingAvailableCents);
     const id = await ctx.db.insert("ledgerEntries", { studentId: student._id, kind: "payment", amountCents: args.amountCents, previousCents: funds, newCents: cents(funds + args.amountCents), method: args.method, reference: args.reference.trim(), occurredAt: args.occurredAt, reason, recordedBy: actor._id, recordedAt: Date.now(), idempotencyKey: key });
     await recordProjectedEntry(ctx, id, account); await allocateUnapplied(ctx, actor, student._id, `auto:${key}`); await audit(ctx, actor, "ledgerEntries", id, "recordPayment", null, { batchReference: batch, rowReference: args.rowReference.trim(), amountCents: args.amountCents, method: args.method, reference: args.reference.trim(), occurredAt: args.occurredAt }, reason); return id;

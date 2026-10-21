@@ -1,9 +1,9 @@
 # Current integration handoff
 
-## Contact formatting production release
+## Approved actionable error release
 
-Owner authorized release of fdabbe3. Production Convex amicable-eel-413 deployment succeeded with typecheck/schema validation; no indexes deleted. Website merge/build evidence is recorded on the release PR and release notes. See RELEASE_2026-10-20_CONTACT_FORMATS.md and CONTACT_INPUT_FORMATS.md.
+Owner accepted localhost and authorized production publication on October 20. PR30 on fix/actionable-errors-2026-10-20 contains reviewed implementation 67c2145 and release documentation. Release v0.1.0-onboarding.11; exact merged revision and final deployment evidence are recorded in its GitHub release notes. See RELEASE_2026-10-20_ACTIONABLE_ERRORS.md and ACTIONABLE_ERRORS.md.
 
-Shared phone/email input formatting and backend validation apply throughout contact entry. Optional blanks and unchanged legacy contacts preserved; historical signed snapshots/OAuth identity unchanged. 84 backend/helper tests covered, two CSV tests passed, independent review, browser checks and lint/types/build passed. No real record submits or emails during release.
+Consistent explicit backend errors and shared frontend presentation now cover Student Status, including parent-invite cooldown guidance and private internal diagnostics. Independent review has no blockers; validation and known historical >500-charge test timeout are documented. No real invitations or financial writes were used for verification.
 
-Root owns release integration on feature/parent-email-invitations. Other chat holds shared sync/merges until handoff. Development email stays disabled and Calendar writes production-only. Historical unrelated501-charge fee timeout remains separate.
+Production target is amicable-eel-413; development remains third-bandicoot-18. Preserve sibling worktrees and unrelated local .tmp-adult-tests. Main merges automatically deploy both frontends. Any later production change requires its own user authorization.

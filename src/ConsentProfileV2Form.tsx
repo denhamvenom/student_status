@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
@@ -44,7 +45,7 @@ function ProfileEditor({ profile }: { profile: Profile }) {
     if (!Object.values(chosen).every(Boolean)) { setError('Choose an explicit answer for allergies, prescriptions, insurance, and physician.'); return }
     setBusy(true)
     try { await save({ studentId: profile.studentId, expectedRevision: profile.revision, value }); setSaved(true) }
-    catch (cause) { setError(cause instanceof Error ? cause.message : 'The profile could not be saved. Review the fields and try again.') }
+    catch (cause) { setError(userFacingError(cause, 'The profile could not be saved. Review the fields and try again.')) }
     finally { setBusy(false) }
   }
   return <Card className={styles.card}><CardTitle>Parent health and contact profile</CardTitle><p>Fill this in before you sign the permission form. If you change anything after preparing a form, prepare a new PDF and check it before you sign. Forms already signed keep their old information.</p>{!profile.setupComplete && <p role="status" className={styles.notice}>Your student needs to finish setup (shirt size and rooming category) before you can review the permission form.</p>}{profile.completed && <p role="status" className={styles.ready}>This profile is confirmed.</p>}

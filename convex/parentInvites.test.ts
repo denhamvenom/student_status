@@ -142,7 +142,7 @@ describe("parent invitations", () => {
     await expect(f.coach.mutation(api.parentInvites.resendParentInvite, { inviteId: first.inviteId })).rejects.toThrow("permission");
     await expect(f.otherStudent.mutation(api.parentInvites.resendParentInvite, { inviteId: first.inviteId })).rejects.toThrow("unavailable");
     await expect(f.student.mutation(api.parentInvites.resendParentInvite, { inviteId: first.inviteId })).rejects.toThrow("one hour");
-    await expect(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: " PARENT@example.invalid " })).rejects.toThrow("one hour");
+    await expect(f.student.mutation(api.parentInvites.createParentInvite, { studentId: f.ids.student, parentEmail: " PARENT@example.invalid " })).rejects.toMatchObject({ data: expect.stringMatching(/Wait one hour.*inbox and spam folder/) });
     const now = Date.now();
     await f.t.run(ctx => ctx.db.patch(first.inviteId, { createdAt: now - 60 * 60_000 + 1 }));
     await expect(f.student.mutation(api.parentInvites.resendParentInvite, { inviteId: first.inviteId })).rejects.toThrow("one hour");

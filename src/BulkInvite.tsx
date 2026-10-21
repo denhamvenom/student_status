@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { useEffect, useState, type ChangeEvent } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
@@ -34,7 +35,7 @@ function BatchDetails({ batchId }: { batchId: Id<'bulkInviteBatches'> }) {
     try {
       if (kind === 'revoke') await revoke({ inviteId, expectedCode })
       else await replace({ inviteId, expectedCode })
-    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)) }
+    } catch (cause) { setError(userFacingError(cause)) }
     finally { setBusy(null) }
   }
   return <div className={styles.details}>
@@ -67,7 +68,7 @@ export function BulkInvite() {
       if (file.size > MAX_INVITE_CSV_BYTES) throw new Error('The CSV is too large. Use a file under 128 KB.')
       setRows(parseInviteCsv(await file.text()))
       setIdempotencyKey(crypto.randomUUID())
-    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)) }
+    } catch (cause) { setError(userFacingError(cause)) }
     event.target.value = ''
   }
 
@@ -95,7 +96,7 @@ export function BulkInvite() {
       setRows([])
       setDecisions({})
       setIdempotencyKey(crypto.randomUUID())
-    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)) }
+    } catch (cause) { setError(userFacingError(cause)) }
     finally { setBusy(false) }
   }
 

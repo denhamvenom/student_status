@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { useState, type FormEvent } from 'react'
 import { useAuthActions } from '@convex-dev/auth/react'
 import { useMutation, useQuery } from 'convex/react'
@@ -37,14 +38,14 @@ function SetupForm({ profile }: { profile: Profile }) {
         setPhone(normalizeChangedPhone(phone, profile.guardianPhone))
         setEmail(normalizeChangedEmail(email, profile.guardianEmail))
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : 'Check the contact information.'); return
+        setError(userFacingError(cause, 'Check the contact information.')); return
       }
     }
     if (step < 4) { setStep(step + 1); return }
     if (category !== 'Boys' && category !== 'Girls') return
     setBusy(true); setError('')
     try { await complete({ expectedRevision: profile.revision, preferredName: preferred, shirtSize: shirt, roomCategory: category, guardianName: guardian, guardianRelationship: relationship, guardianPhone: phone, guardianEmail: email }) }
-    catch (cause) { setError(cause instanceof Error ? cause.message : copy.failed) }
+    catch (cause) { setError(userFacingError(cause, copy.failed)) }
     finally { setBusy(false) }
   }
   return <section className="signin-content">

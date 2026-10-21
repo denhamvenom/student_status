@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { driverReconciliationCopy as copy } from './lib/adult-profile-copy'
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery } from 'convex/react'
@@ -22,7 +23,7 @@ function CandidateLink({ candidate }: { candidate: Candidate }) {
     try {
       await link({ driverId: candidate.driverId, mentorId: candidate.mentorId, expectedDriverFingerprint: reviewed.fingerprint, expectedProfileRevision: reviewed.revision, reason })
       setReason('')
-    } catch (cause) { setError(cause instanceof Error ? cause.message : copy.failed) }
+    } catch (cause) { setError(userFacingError(cause, copy.failed)) }
     finally { setBusy(false) }
   }
   return <form className={styles.row} onSubmit={event => void submit(event)}>

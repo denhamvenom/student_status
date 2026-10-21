@@ -1,6 +1,6 @@
-import { normalizeChangedPhone } from "../shared/contact-format";
+import { normalizeChangedPhone } from "./lib/contactValidation";
 import { enrollmentPending } from "./lib/eventEnrollmentState";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { activeSeason, identity, linkedStudents, maybeViewer, mentorEvent, mentorStudent, privateStudent, publicStudent, requireRole, studentAccess, viewer as requireViewer, audit } from "./lib/access";
@@ -55,7 +55,7 @@ export const eventDetail = query({
     const user = await requireViewer(ctx);
     const event = await ctx.db.get(args.eventId);
     const season = await activeSeason(ctx);
-    if (!event || event.seasonId !== season._id || event.archived) throw new Error("Event not found.");
+    if (!event || event.seasonId !== season._id || event.archived) throw new ConvexError("Event not found.");
     if (user.role === "mentor" && !user.travelLead) return { event: mentorEvent(event), participation: null, requirements: [], readiness: null };
     const requirements = await ctx.db.query("requirements").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(100);
     if (!args.studentId) return { event, participation: null, requirements, readiness: null };
@@ -69,10 +69,10 @@ export const studentFinances = query({
   args: { studentId: v.id("students") }, returns: v.any(),
   handler: async (ctx, args) => {
     const user = await requireViewer(ctx);
-    if (user.role === "mentor" && !user.travelLead) throw new Error("Finance access denied.");
+    if (user.role === "mentor" && !user.travelLead) throw new ConvexError("Finance access denied.");
     const student = await studentAccess(ctx, user, args.studentId);
     const season = await activeSeason(ctx);
-    if (student.seasonId !== season._id) throw new Error("Archived finances are unavailable.");
+    if (student.seasonId !== season._id) throw new ConvexError("Archived finances are unavailable.");
     return await financeFor(ctx, student._id);
   },
 });
@@ -83,7 +83,7 @@ export const studentDashboard = query({
     const user = await requireViewer(ctx);
     const student = await studentAccess(ctx, user, args.studentId);
     const season = await activeSeason(ctx);
-    if (student.seasonId !== season._id) throw new Error("Archived students are unavailable.");
+    if (student.seasonId !== season._id) throw new ConvexError("Archived students are unavailable.");
     const finance = await financeFor(ctx, student._id);
     const events = await ctx.db.query("events").withIndex("by_seasonId_and_startsAt", q => q.eq("seasonId", season._id)).take(200);
     const participations = await ctx.db.query("participants").withIndex("by_studentId", q => q.eq("studentId", student._id)).take(200);
@@ -136,7 +136,7 @@ export const teamRoster = query({
   args: {}, returns: v.any(),
   handler: async ctx => {
     const user = await requireViewer(ctx);
-    if (user.role !== "coach" && !user.travelLead) throw new Error("Roster access denied.");
+    if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Roster access denied.");
     const season = await activeSeason(ctx);
     const students = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(500);
     return students.map(student => ({ ...(user.role === "coach" ? privateStudent(student) : publicStudent(student)), fundraiserConnected: !!student.fundraiserUrl }));
@@ -167,9 +167,9 @@ export const eventReadiness = query({
     const user = await requireViewer(ctx);
     const event = await ctx.db.get(args.eventId);
     const season = await activeSeason(ctx);
-    if (!event || event.seasonId !== season._id || event.archived) throw new Error("Event not found.");
+    if (!event || event.seasonId !== season._id || event.archived) throw new ConvexError("Event not found.");
     if (user.role === "student" || user.role === "parent") {
-      if (!args.studentId) throw new Error("Student selection required.");
+      if (!args.studentId) throw new ConvexError("Student selection required.");
       const student = await studentAccess(ctx, user, args.studentId);
       return { event: { _id: event._id, name: event.name }, students: [{ student: publicStudent(student), ...await studentReadiness(ctx, event, student) }], transportation: null, rooming: null, overall: null };
     }
@@ -201,23 +201,23 @@ export const updateStudentProfile = mutation({
   handler: async (ctx, args) => {
     const user = await requireViewer(ctx);
     const student = await studentAccess(ctx, user, args.studentId);
-    if ((student.profileRevision ?? 0) !== args.expectedRevision) throw new Error("Profile changed. Reload before saving.");
+    if ((student.profileRevision ?? 0) !== args.expectedRevision) throw new ConvexError("Profile changed. Reload before saving.");
     const before = privateStudent(student);
     const changes: Partial<Doc<"students">> = {};
     if (args.preferredName !== undefined) {
-      if (user.role === "mentor") throw new Error("Preferred name edit denied.");
+      if (user.role === "mentor") throw new ConvexError("Preferred name edit denied.");
       const name = args.preferredName.trim();
-      if (!name || name.length > 80) throw new Error("Enter a preferred name under 80 characters.");
+      if (!name || name.length > 80) throw new ConvexError("Enter a preferred name under 80 characters.");
       changes.preferredName = name;
     }
     if (args.shirtSize !== undefined) {
-      if (user.role !== "student" && user.role !== "coach" && user.role !== "parent") throw new Error("Shirt size edit denied.");
-      if (!["XS", "S", "M", "L", "XL", "2XL", "3XL"].includes(args.shirtSize.trim())) throw new Error("Choose a valid shirt size.");
+      if (user.role !== "student" && user.role !== "coach" && user.role !== "parent") throw new ConvexError("Shirt size edit denied.");
+      if (!["XS", "S", "M", "L", "XL", "2XL", "3XL"].includes(args.shirtSize.trim())) throw new ConvexError("Choose a valid shirt size.");
       changes.shirtSize = args.shirtSize.trim();
     }
     const privateEdit = args.emergencyName !== undefined || args.emergencyRelationship !== undefined || args.emergencyPhone !== undefined || args.allergies !== undefined || args.medications !== undefined || args.otcAuthorization !== undefined;
-    if (privateEdit && user.role !== "coach" && user.role !== "parent") throw new Error("Health and emergency edits require a linked parent or coach.");
-    if (args.otcAuthorization !== undefined) throw new Error("Medication choices are no longer part of this profile.");
+    if (privateEdit && user.role !== "coach" && user.role !== "parent") throw new ConvexError("Health and emergency edits require a linked parent or coach.");
+    if (args.otcAuthorization !== undefined) throw new ConvexError("Medication choices are no longer part of this profile.");
     if (args.emergencyName !== undefined) changes.emergencyName = args.emergencyName.trim();
     if (args.emergencyRelationship !== undefined) changes.emergencyRelationship = args.emergencyRelationship.trim();
     if (args.emergencyPhone !== undefined) changes.emergencyPhone = normalizeChangedPhone(args.emergencyPhone, student.emergencyPhone, "Emergency contact phone");
@@ -256,8 +256,8 @@ export const requestJoin = mutation({
   args: { code: v.string(), firstName: v.string(), lastName: v.string() }, returns: v.union(v.id("joinRequests"), v.null()),
   handler: async (ctx, args) => {
     const who = await identity(ctx);
-    if (await ctx.db.query("adultEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique()) throw new Error("A Google account is required for student enrollment.");
-    if (await ctx.db.query("parentEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique()) throw new Error("A Google account is required for student enrollment.");
+    if (await ctx.db.query("adultEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique()) throw new ConvexError("A Google account is required for student enrollment.");
+    if (await ctx.db.query("parentEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique()) throw new ConvexError("A Google account is required for student enrollment.");
     const season = await activeSeason(ctx);
     const latest = await ctx.db.query("joinRequests").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).order("desc").first();
     const existing = latest?.seasonId === season._id ? latest : null;
@@ -275,7 +275,7 @@ export const requestJoin = mutation({
     }
     if (attempts) await ctx.db.patch(attempts._id, { failed: 0, lockedUntil: 0 });
     const firstName = args.firstName.trim(); const lastName = args.lastName.trim();
-    if (!firstName || !lastName || firstName.length > 80 || lastName.length > 80) throw new Error("Enter your first and last name.");
+    if (!firstName || !lastName || firstName.length > 80 || lastName.length > 80) throw new ConvexError("Enter your first and last name.");
     if (existing) {
       await ctx.db.patch(existing._id, { email: who.email.toLowerCase(), firstName, lastName, status: "pending", createdAt: now, decidedAt: undefined, decidedBy: undefined });
       return existing._id;

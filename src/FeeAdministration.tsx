@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { Card, CardTitle } from './components/ui/card'
 import { Button } from './components/ui/button'
 import { Checkbox } from './components/ui/checkbox'
@@ -17,11 +18,11 @@ export default function FeeAdministration({ isCoach }: { isCoach: boolean }) {
   return <FeeQueryBoundary key={attempt} onRetry={() => setAttempt(value => value + 1)}><FeeWorkspace isCoach={isCoach} /></FeeQueryBoundary>
 }
 
-class FeeQueryBoundary extends Component<{ children: ReactNode; onRetry: () => void }, { failed: boolean }> {
-  state = { failed: false }
-  static getDerivedStateFromError() { return { failed: true } }
+class FeeQueryBoundary extends Component<{ children: ReactNode; onRetry: () => void }, { error: unknown }> {
+  state = { error: null as unknown }
+  static getDerivedStateFromError(error: unknown) { return { error } }
   render() {
-    if (this.state.failed) return <Card className={styles.card}><p role="alert">{copy.unavailable}</p><Button type="button" variant="outline" onClick={this.props.onRetry}>{copy.reload}</Button></Card>
+    if (this.state.error !== null) return <Card className={styles.card}><p role="alert">{userFacingError(this.state.error, copy.unavailable, false)}</p><Button type="button" variant="outline" onClick={this.props.onRetry}>{copy.reload}</Button></Card>
     return this.props.children
   }
 }
@@ -59,7 +60,7 @@ function FeeWorkspace({ isCoach }: { isCoach: boolean }) {
       if (submittedIntent.current?.fingerprint !== fingerprint) submittedIntent.current = { fingerprint, key: crypto.randomUUID() }
       const id = await move({ feeDefinitionId: review.definition._id, direction: review.direction, expectedOrderRevision: review.orderRevision, expectedDefinitionRevision: review.definition.revision, reason: reason.trim(), idempotencyKey: submittedIntent.current.key })
       setJobId(id); setReview(null)
-    } catch (failure) { setError(failure instanceof Error ? failure.message : copy.unavailable) }
+    } catch (failure) { setError(userFacingError(failure, copy.unavailable)) }
     finally { setPending(false) }
   }
   return <div className={styles.root}>
@@ -134,7 +135,7 @@ function BulkPreparationForm({ kind, definition, disabled, onDismiss, onJob }: {
     const fingerprint=JSON.stringify(input)
     if(intent.current?.fingerprint!==fingerprint)intent.current={fingerprint,key:crypto.randomUUID()}
     try{onJob(await prepare({...input,idempotencyKey:intent.current.key}))}
-    catch(failure){setError(failure instanceof Error?failure.message:copy.unavailable)}
+    catch(failure){setError(userFacingError(failure, copy.unavailable))}
     finally{setPending(false)}
   }
   return <Card className={`${styles.card} ${styles.formCard}`}><CardTitle>{kind==='create'?copy.add:kind==='cancel'?copy.cancel:copy.edit}</CardTitle><p>{copy.prepareBulkNote} {copy.scopeNote}</p>
@@ -187,7 +188,7 @@ export function BulkJobSummary({job,originalActorName,children}:{job:Doc<'feeBul
     <p>{copy.committedRows}: {job.committed} · {copy.heldRows}: {job.held}</p>
     {job.priorHeldJobId&&<><p>{copy.plannedSuperseded}: {job.priorHeldRows??copy.unavailable}</p><p>{copy.committedSuperseded}: {job.supersededRows}</p><p className={styles.muted}>{copy.supersedeFinalOnly}</p></>}
     <p>{copy.requestedBy}: {originalActorName}</p><p>{copy.reason}: {job.reason}</p>
-    {job.lastError&&<p role="alert">{copy.processingFailed}</p>}
+    {job.lastError&&<p role="alert">{userFacingError(new Error(job.lastError), copy.processingFailed)}</p>}
     {children}
   </Card>
 }
@@ -229,7 +230,7 @@ function BulkJobReview({jobId,canCancel,canRetry}:{jobId:Id<'feeBulkJobs'>;canCa
     if(pending||!canRetry||!freshRetry||unfinishedChild||retryReason.trim().length<8||preview?.job.state==='held'&&retryRows.length===0)return
     setPending(true);setError(null)
     try{await retry({jobId,rows:retryRows,reason:retryReason.trim()});setRetryRows([]);setRetryReason('')}
-    catch(failure){setError(failure instanceof Error?failure.message:copy.unavailable)}finally{setPending(false)}
+    catch(failure){setError(userFacingError(failure, copy.unavailable))}finally{setPending(false)}
   }
   async function act(action:'commit'|'cancel'){
     if(pending||action==='commit'&&(!review||!fresh||!allRowsLoaded||review.job.reason.trim().length<8)||action==='cancel'&&(!canCancel||cancelReason.trim().length<8))return
@@ -238,7 +239,7 @@ function BulkJobReview({jobId,canCancel,canRetry}:{jobId:Id<'feeBulkJobs'>;canCa
       if(action==='cancel')await cancel({jobId,reason:cancelReason.trim()})
       else if(review)await commit(bulkCommitArgs(review))
       setReview(null);setCancelReason('')
-    }catch(failure){setError(failure instanceof Error?failure.message:copy.unavailable)}finally{setPending(false)}
+    }catch(failure){setError(userFacingError(failure, copy.unavailable))}finally{setPending(false)}
   }
   return <div className={styles.form}>
     {preview&&<><strong>{preview.definition.label}</strong>{preview.message&&['prepared','preparing','draining'].includes(preview.job.state)&&<p>{preview.message}</p>}</>}
@@ -288,7 +289,7 @@ function BulkChildRetry({row,disabled}:{row:BulkRow;disabled:boolean}){
       if(row.correctionJobId)await retryCorrection({jobId:row.correctionJobId,reason:reason.trim()})
       else if(row.allocationJobId)await retryAllocation({studentId:row.studentId,reason:reason.trim()})
       setReason('')
-    }catch(failure){setError(failure instanceof Error?failure.message:copy.unavailable)}finally{setPending(false)}
+    }catch(failure){setError(userFacingError(failure, copy.unavailable))}finally{setPending(false)}
   }
   return <form className={styles.form} onSubmit={event=>{event.preventDefault();void retry()}}><p>{copy.childRetryNote}</p><label className={styles.field}>{copy.retryReason}<Input value={reason} required maxLength={1000} disabled={disabled||pending} onChange={event=>setReason(event.target.value)}/></label><Button type="submit" disabled={disabled||pending||!row.canRetryChild||reason.trim().length<8}>{pending?copy.submitting:copy.retryChild}</Button>{error&&<p role="alert">{error}</p>}</form>
 }
@@ -328,7 +329,7 @@ function MapHistoricalFees({ control, definitions, moreDefinitions, loadDefiniti
     try {
       onJob(await map({ chargeIds, feeDefinitionId: reviewed.definition._id, expectedOrderRevision: reviewed.orderRevision, reason: reason.trim(), idempotencyKey: intent.current.key }))
       setReviewed(null); setSelected([]); setReason(''); setDefinitionId(null)
-    } catch (failure) { setError(failure instanceof Error ? failure.message : copy.unavailable) }
+    } catch (failure) { setError(userFacingError(failure, copy.unavailable)) }
     finally { setPending(false) }
   }
   return <Card className={styles.card}><CardTitle>{copy.legacy}</CardTitle><p>{copy.legacyNote}</p>
@@ -370,7 +371,7 @@ function CreateMappingDestination({ eventId, orderRevision, disabled, onCreated 
     const fingerprint = JSON.stringify([label.trim(), cents, eventId, orderRevision, reason.trim()])
     if (intent.current?.fingerprint !== fingerprint) intent.current = { fingerprint, key: crypto.randomUUID() }
     try { const id = await create({ label: label.trim(), kind: eventId ? 'eventExtra' : 'custom', eventId, defaultAmountCents: cents, expectedOrderRevision: orderRevision, reason: reason.trim(), idempotencyKey: intent.current.key }); onCreated(id); setCreated(true); setOpen(false) }
-    catch (failure) { setError(failure instanceof Error ? failure.message : copy.unavailable) }
+    catch (failure) { setError(userFacingError(failure, copy.unavailable)) }
     finally { setPending(false) }
   }
   return <div className={styles.form}><Button type="button" variant="outline" disabled={disabled || pending || created} onClick={() => setOpen(value => !value)}>{copy.createMappingDefinition}</Button>
@@ -391,7 +392,7 @@ function PrepareFeeMapping({ onJob }: { onJob: (jobId: Id<'feeMappingJobs'>) => 
     setPending(true); setError(null)
     if (intent.current?.reason !== reason.trim()) intent.current = { reason: reason.trim(), key: crypto.randomUUID() }
     try { const id = await prepare({ reason: reason.trim(), idempotencyKey: intent.current.key }); setJobId(id); onJob(id) }
-    catch (failure) { setError(failure instanceof Error ? failure.message : copy.unavailable) }
+    catch (failure) { setError(userFacingError(failure, copy.unavailable)) }
     finally { setPending(false) }
   }
   return <Card className={styles.card}><CardTitle>{copy.prepareMapping}</CardTitle><p>{copy.proofNote}</p>
@@ -413,7 +414,7 @@ export function LiveMappingReceipt({ jobId }: { jobId: Id<'feeMappingJobs'> }) {
     if (pending || reason.trim().length < 8 || (action === 'cancel' ? !result?.canCancel : !result?.canRetry)) return
     setPending(true); setError(null)
     try { await (action === 'cancel' ? cancel : retry)({ jobId, reason: reason.trim() }); setReason('') }
-    catch (failure) { setError(failure instanceof Error ? failure.message : copy.unavailable) }
+    catch (failure) { setError(userFacingError(failure, copy.unavailable)) }
     finally { setPending(false) }
   }
   if (!result) return <p role="status">{copy.loading}</p>
@@ -421,7 +422,7 @@ export function LiveMappingReceipt({ jobId }: { jobId: Id<'feeMappingJobs'> }) {
     <p role={result.job.state === 'failed' ? 'alert' : 'status'}>{result.job.state === 'cancelled' ? copy.mappingCancelled : result.job.state === 'complete' ? copy.mappingPassComplete : result.job.state === 'failed' ? copy.failed : result.job.state === 'draining' ? copy.draining : copy.applying}</p>
     <p>{copy.recordsProcessed}: {result.job.processed} · {copy.mapped}: {result.job.mapped} · {copy.unmapped}: {result.job.unmapped}</p>
     <p>{copy.requestedBy}: {result.originalActorName} · {copy.processedBy}: {result.processingActorName}</p><p>{copy.reason}: {result.job.reason}</p>
-    {result.job.lastError && <p role="alert">{result.job.lastError}</p>}
+    {result.job.lastError && <p role="alert">{userFacingError(new Error(result.job.lastError), copy.unavailable)}</p>}
     {(result.canRetry || result.canCancel) && <form className={styles.form} onSubmit={event => { event.preventDefault(); void resume() }}><label className={styles.field}>{copy.mappingRecoveryReason}<Input value={reason} maxLength={1000} required disabled={pending} onChange={event => setReason(event.target.value)} /></label><div className={styles.actions}>{result.canRetry && <Button type="submit" disabled={pending || reason.trim().length < 8}>{pending ? copy.submitting : copy.retry}</Button>}{result.canCancel && <Button type="button" variant="outline" disabled={pending || reason.trim().length < 8} onClick={() => void resume('cancel')}>{copy.cancelMapping}</Button>}</div>{result.canCancel && <p>{copy.cancelMappingNote}</p>}</form>}
     {error && <p role="alert">{error}</p>}
   </Card>
@@ -438,7 +439,7 @@ function LivePriorityReceipt({ jobId }: { jobId: Id<'feePriorityJobs'> }) {
     if (pending || reason.trim().length < 8) return
     setPending(true); setError(null)
     try { await retry({ jobId, reason: reason.trim() }); setReason('') }
-    catch (failure) { setError(failure instanceof Error ? failure.message : copy.unavailable) }
+    catch (failure) { setError(userFacingError(failure, copy.unavailable)) }
     finally { setPending(false) }
   }
   return <><FeePriorityReceipt {...result} retryReason={reason} onRetryReasonChange={setReason} onRetry={() => void resume()} submitting={pending} />{error && <p role="alert">{error}</p>}</>
@@ -477,7 +478,7 @@ export function FeeDefinitionDraftForm({ scopeFields, scopeValid, disabled, onPr
     if (pending || disabled || !scopeValid || !label.trim() || cents === null || reason.trim().length < 8) return
     setPending(true); setError(null)
     try { await onPrepare({ label: label.trim(), targetAmountCents: cents, reason: reason.trim() }) }
-    catch (failure) { setError(failure instanceof Error ? failure.message : copy.unavailable) }
+    catch (failure) { setError(userFacingError(failure, copy.unavailable)) }
     finally { setPending(false) }
   }
   return <form className={styles.form} onSubmit={event => { event.preventDefault(); void prepare() }}>
@@ -528,7 +529,7 @@ export function FeePriorityReceipt({ job, originalActorName, processingActorName
     <p>{copy.recordsProcessed}: {job.processed}</p>
     <p className={styles.muted}>{copy.requestedBy}: {originalActorName} · {copy.processedBy}: {processingActorName}</p>
     <p>{copy.reason}: {job.reason}</p>
-    {job.lastError && <p role="alert">{job.lastError}</p>}
+    {job.lastError && <p role="alert">{userFacingError(new Error(job.lastError), copy.unavailable)}</p>}
     {job.state !== 'complete' && <p className={styles.muted}>{copy.futureOnly} {copy.pending}</p>}
     {canRetry && <form className={styles.form} onSubmit={event => { event.preventDefault(); if (!submitting && retryReason.trim().length >= 8) onRetry() }}>
       <label className={styles.field}>{copy.retryReason}<Input value={retryReason} maxLength={1000} disabled={submitting} onChange={event => onRetryReasonChange(event.target.value)} required /></label>

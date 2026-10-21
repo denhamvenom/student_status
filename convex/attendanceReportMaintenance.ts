@@ -1,3 +1,5 @@
+import { ConvexError } from 'convex/values';
+import { savedPublicError, publicErrorResult } from './lib/publicErrors';
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -14,7 +16,7 @@ export const continueSession=internalMutation({
     try{await ctx.runMutation(internal.attendanceReportMaintenance.processSessionPage,args)}catch{
       const state=await ctx.db.query("timeclockSessionReportStates").withIndex("by_sessionId",q=>q.eq("sessionId",args.sessionId)).unique();
       if(state?.state==="rebuilding"&&state.reportGeneration===args.expectedGeneration&&state.sessionRevision===args.expectedSessionRevision&&state.phase===args.expectedPhase&&state.cursor===args.expectedCursor){
-        await ctx.db.patch(state._id,{state:"failed",updatedAt:Date.now(),lastError:"Attendance evidence needs Coach review before reports can be rebuilt."});
+        await ctx.db.patch(state._id,{state:"failed",updatedAt:Date.now(),lastError:savedPublicError(null, "Attendance evidence needs Coach review before reports can be rebuilt.")});
         const failed=await ctx.db.get(state._id);if(failed)await updateSessionAggregate(ctx,state,failed);
       }
     }
@@ -72,7 +74,7 @@ export const continueSeason=internalMutation({
   handler:async(ctx,args):Promise<null>=>{
     try{await ctx.runMutation(internal.attendanceReportMaintenance.processSeasonPage,args)}catch{
       const state=await ctx.db.get(args.backfillId);
-      if(state?.state==="running"&&state.cursor===args.expectedCursor)await ctx.db.patch(state._id,{state:"failed",updatedAt:Date.now(),lastError:"Attendance report coverage needs Coach review."});
+      if(state?.state==="running"&&state.cursor===args.expectedCursor)await ctx.db.patch(state._id,{state:"failed",updatedAt:Date.now(),lastError:savedPublicError(null, "Attendance report coverage needs Coach review.")});
     }
     return null;
   },
@@ -94,12 +96,12 @@ export const rebuildSession=mutation({
   args:{sessionId:v.id("timeclockSessions")},returns:v.null(),
   handler:async(ctx,args)=>{
     requireRole(await viewer(ctx),"coach");const season=await activeSeason(ctx);const session=await ctx.db.get(args.sessionId);
-    if(!session||session.seasonId!==season._id)throw new Error("Session unavailable in the active season.");
+    if(!session||session.seasonId!==season._id)throw new ConvexError("Session unavailable in the active season.");
     await invalidateAttendanceSession(ctx,session._id);return null;
   },
 });
 
 export const status=query({
   args:{},returns:v.object({state:v.union(v.literal("uninitialized"),v.literal("running"),v.literal("failed"),v.literal("complete")),processed:v.number(),lastError:v.union(v.string(),v.null())}),
-  handler:async ctx=>{requireRole(await viewer(ctx),"coach");const season=await activeSeason(ctx);const state=await ctx.db.query("attendanceReportBackfills").withIndex("by_seasonId",q=>q.eq("seasonId",season._id)).unique();return{state:state?.state??"uninitialized" as const,processed:state?.processed??0,lastError:state?.lastError??null}},
+  handler:async ctx=>{requireRole(await viewer(ctx),"coach");const season=await activeSeason(ctx);const state=await ctx.db.query("attendanceReportBackfills").withIndex("by_seasonId",q=>q.eq("seasonId",season._id)).unique();return publicErrorResult({state:state?.state??"uninitialized" as const,processed:state?.processed??0,lastError:state?.lastError??null})},
 });

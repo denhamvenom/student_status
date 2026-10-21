@@ -1,5 +1,5 @@
 import { paginationOptsValidator } from "convex/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { activeSeason, audit, viewer } from "./lib/access";
@@ -15,25 +15,25 @@ type ImportRow = typeof row.type;
 type Ctx = QueryCtx | MutationCtx;
 
 function editor(actor: Doc<"appUsers">) {
-  if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead && actor.financialEdit)) throw new Error("Financial editing is not enabled for this account.");
+  if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead && actor.financialEdit)) throw new ConvexError("Financial editing is not enabled for this account.");
 }
 function token(value: string, label: string) {
   const trimmed = value.trim();
-  if (value !== trimmed || !/^[A-Za-z0-9._:-]{8,100}$/.test(trimmed)) throw new Error(`Provide a stable ${label} of 8 to 100 letters, digits, dots, underscores, colons, or hyphens.`);
+  if (value !== trimmed || !/^[A-Za-z0-9._:-]{8,100}$/.test(trimmed)) throw new ConvexError(`Provide a stable ${label} of 8 to 100 letters, digits, dots, underscores, colons, or hyphens.`);
   return trimmed;
 }
 function receiptMetadata(reference: string, occurredAt: number, exportId: string) {
-  if (reference.trim().length > 150 || !Number.isSafeInteger(occurredAt) || occurredAt < 0 || !Number.isFinite(new Date(occurredAt).getTime())) throw new Error("Provide a valid receipt reference and date.");
+  if (reference.trim().length > 150 || !Number.isSafeInteger(occurredAt) || occurredAt < 0 || !Number.isFinite(new Date(occurredAt).getTime())) throw new ConvexError("Provide a valid receipt reference and date.");
   return reference.trim() || `Fee CSV ${exportId}`;
 }
 function rowShape(item: ImportRow) {
   token(item.rowKey, "row key");
-  if (!Number.isSafeInteger(item.amountCents) || item.amountCents <= 0 || !Number.isSafeInteger(item.expectedChargeRevision) || item.expectedChargeRevision < 0 || !Number.isSafeInteger(item.expectedFinancialGeneration) || item.expectedFinancialGeneration < 1 || !Number.isSafeInteger(item.expectedFinancialRevision) || item.expectedFinancialRevision < 0) throw new Error("A payment row has an invalid amount or version.");
+  if (!Number.isSafeInteger(item.amountCents) || item.amountCents <= 0 || !Number.isSafeInteger(item.expectedChargeRevision) || item.expectedChargeRevision < 0 || !Number.isSafeInteger(item.expectedFinancialGeneration) || item.expectedFinancialGeneration < 1 || !Number.isSafeInteger(item.expectedFinancialRevision) || item.expectedFinancialRevision < 0) throw new ConvexError("A payment row has an invalid amount or version.");
 }
 async function selectedFee(ctx: Ctx, feeDefinitionId: Doc<"feeDefinitions">["_id"]) {
   const season = await activeSeason(ctx);
   const fee = await ctx.db.get(feeDefinitionId);
-  if (!fee || fee.seasonId !== season._id || fee.state !== "active") throw new Error("Choose an active fee in the current season.");
+  if (!fee || fee.seasonId !== season._id || fee.state !== "active") throw new ConvexError("Choose an active fee in the current season.");
   return { season, fee };
 }
 async function rowState(ctx: Ctx, fee: Doc<"feeDefinitions">, item: ImportRow) {
@@ -54,7 +54,7 @@ export const exportPage = query({
   returns: v.object({ feeLabel: v.string(), page: v.array(v.object({ studentId: v.id("students"), chargeId: v.id("charges"), studentName: v.string(), chargedCents: v.number(), appliedCents: v.number(), owedCents: v.number(), chargeRevision: v.number(), financialGeneration: v.number(), financialRevision: v.number() })), isDone: v.boolean(), continueCursor: v.string() }),
   handler: async (ctx, args) => {
     editor(await viewer(ctx));
-    if (args.paginationOpts.numItems > 30 || args.paginationOpts.numItems < 1) throw new Error("Export up to 30 fee charges per page.");
+    if (args.paginationOpts.numItems > 30 || args.paginationOpts.numItems < 1) throw new ConvexError("Export up to 30 fee charges per page.");
     const { fee } = await selectedFee(ctx, args.feeDefinitionId);
     const source = await ctx.db.query("charges").withIndex("by_feeDefinitionId", q => q.eq("feeDefinitionId", fee._id)).paginate(args.paginationOpts);
     const page = [];
@@ -65,7 +65,7 @@ export const exportPage = query({
       const owedCents = chargedCents - charge.appliedCents;
       if (args.filter === "paid" && owedCents !== 0 || args.filter === "unpaid" && owedCents === 0) continue;
       const account = await financialAccount(ctx, student._id);
-      if (!account || account.seasonId !== fee.seasonId || account.state !== "ready" || account.allocationSourceVersion !== 1) throw new Error("Prepare financial records before exporting this fee.");
+      if (!account || account.seasonId !== fee.seasonId || account.state !== "ready" || account.allocationSourceVersion !== 1) throw new ConvexError("Prepare financial records before exporting this fee.");
       page.push({ studentId: student._id, chargeId: charge._id, studentName: student.legalName, chargedCents, appliedCents: charge.appliedCents, owedCents, chargeRevision: charge.revision ?? 0, financialGeneration: account.generation, financialRevision: account.revision });
     }
     return { feeLabel: fee.label, page, isDone: source.isDone, continueCursor: source.continueCursor };
@@ -77,7 +77,7 @@ export const previewRows = query({
   returns: v.array(v.object({ rowKey: v.string(), state: v.union(v.literal("ready"), v.literal("recorded"), v.literal("stale"), v.literal("invalid")), message: v.union(v.string(), v.null()), studentName: v.union(v.string(), v.null()), chargedCents: v.union(v.number(), v.null()), appliedCents: v.union(v.number(), v.null()), owedCents: v.union(v.number(), v.null()) })),
   handler: async (ctx, args) => {
     editor(await viewer(ctx)); token(args.exportId, "export batch ID");
-    if (!args.rows.length || args.rows.length > 20 || new Set(args.rows.map(item => item.rowKey)).size !== args.rows.length) throw new Error("Preview 1 to 20 distinct payment rows.");
+    if (!args.rows.length || args.rows.length > 20 || new Set(args.rows.map(item => item.rowKey)).size !== args.rows.length) throw new ConvexError("Preview 1 to 20 distinct payment rows.");
     const { fee } = await selectedFee(ctx, args.feeDefinitionId);
     const batch = await ctx.db.query("feePaymentBatches").withIndex("by_seasonId_and_exportId", q => q.eq("seasonId", fee.seasonId).eq("exportId", args.exportId.trim())).unique();
     const result = [];
@@ -104,13 +104,13 @@ export const beginBatch = mutation({
     await requireSeasonFinanceReady(ctx, season._id);
     const exportId = token(args.exportId, "export batch ID");
     const reference = receiptMetadata(args.reference, args.occurredAt, exportId);
-    if (!args.rows.length || args.rows.length > 500) throw new Error("Confirm 1 to 500 payment rows per file.");
+    if (!args.rows.length || args.rows.length > 500) throw new ConvexError("Confirm 1 to 500 payment rows per file.");
     for (const item of args.rows) rowShape(item);
-    if (new Set(args.rows.map(item => item.rowKey)).size !== args.rows.length || new Set(args.rows.map(item => item.chargeId)).size !== args.rows.length || new Set(args.rows.map(item => item.studentId)).size !== args.rows.length) throw new Error("A file repeats a row key, student, or fee charge.");
+    if (new Set(args.rows.map(item => item.rowKey)).size !== args.rows.length || new Set(args.rows.map(item => item.chargeId)).size !== args.rows.length || new Set(args.rows.map(item => item.studentId)).size !== args.rows.length) throw new ConvexError("A file repeats a row key, student, or fee charge.");
     const manifestHash = await hash([fee._id, args.method, reference, args.occurredAt, canonical(args.rows)]);
     const existing = await ctx.db.query("feePaymentBatches").withIndex("by_seasonId_and_exportId", q => q.eq("seasonId", season._id).eq("exportId", exportId)).unique();
     if (existing) {
-      if (existing.feeDefinitionId !== fee._id || existing.manifestHash !== manifestHash || existing.rows.length !== args.rows.length) throw new Error("This export batch was already confirmed with different payment rows or receipt details.");
+      if (existing.feeDefinitionId !== fee._id || existing.manifestHash !== manifestHash || existing.rows.length !== args.rows.length) throw new ConvexError("This export batch was already confirmed with different payment rows or receipt details.");
       return { batchId: existing._id, resumed: true };
     }
     const batchId = await ctx.db.insert("feePaymentBatches", { seasonId: season._id, feeDefinitionId: fee._id, exportId, manifestHash, rows: args.rows, method: args.method, reference, occurredAt: args.occurredAt, createdBy: actor._id, createdAt: Date.now() });
@@ -125,14 +125,14 @@ export const recordRow = mutation({
     const actor = await viewer(ctx); editor(actor);
     const batch = await ctx.db.get(args.batchId);
     const season = await activeSeason(ctx);
-    if (!batch || batch.seasonId !== season._id) throw new Error("Fee payment batch is unavailable in the active season.");
+    if (!batch || batch.seasonId !== season._id) throw new ConvexError("Fee payment batch is unavailable in the active season.");
     const item = batch.rows.find(saved => saved.rowKey === args.rowKey);
-    if (!item) throw new Error("This row is not in the confirmed payment file.");
+    if (!item) throw new ConvexError("This row is not in the confirmed payment file.");
     const prior = await ctx.db.query("feePaymentRows").withIndex("by_batchId_and_rowKey", q => q.eq("batchId", batch._id).eq("rowKey", item.rowKey)).unique();
     if (prior) {
       const receipt = await ctx.db.get(prior.receiptId);
       const allocation = await ctx.db.get(prior.allocationId);
-      if (!receipt || receipt.kind !== "payment" || receipt.studentId !== item.studentId || receipt.chargeId !== item.chargeId || receipt.amountCents !== item.amountCents || !allocation || allocation.kind !== "allocation" || allocation.sourceEntryId !== receipt._id || allocation.chargeId !== item.chargeId) throw new Error("This recorded batch row needs a Coach financial review.");
+      if (!receipt || receipt.kind !== "payment" || receipt.studentId !== item.studentId || receipt.chargeId !== item.chargeId || receipt.amountCents !== item.amountCents || !allocation || allocation.kind !== "allocation" || allocation.sourceEntryId !== receipt._id || allocation.chargeId !== item.chargeId) throw new ConvexError("This recorded batch row needs a Coach financial review.");
       return { receiptId: prior.receiptId, replayed: true };
     }
     await requireSeasonFinanceReady(ctx, season._id);
@@ -141,7 +141,7 @@ export const recordRow = mutation({
     if (state.state !== "ready") throw new Error(state.message ?? "Export a fresh fee balance before recording this row.");
     const account = await readyFinancialAccount(ctx, item.studentId);
     const charge = await ctx.db.get(item.chargeId);
-    if (!charge) throw new Error("Fee charge is unavailable.");
+    if (!charge) throw new ConvexError("Fee charge is unavailable.");
     const effective = effectiveChargeCents(charge);
     const previousApplied = charge.appliedCents;
     const now = Date.now();

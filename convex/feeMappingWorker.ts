@@ -1,3 +1,4 @@
+import { savedPublicError } from './lib/publicErrors';
 import { recordChargeRevisionChange } from "./lib/financeChanges";
 import { makeFunctionReference } from "convex/server";
 import { v } from "convex/values";
@@ -127,7 +128,7 @@ export const run = internalMutation({
     const job = await ctx.db.get(args.jobId); if (!job || !["draining", "applying"].includes(job.state)) return null;
     try { await ctx.runMutation(pageRef, { jobId: job._id, step: job.step }); }
     catch (error) {
-      await ctx.db.patch(job._id, { state: "failed", lastError: error instanceof Error ? error.message.slice(0, 500) : "Fee mapping failed.", updatedAt: Date.now() });
+      await ctx.db.patch(job._id, { state: "failed", lastError: savedPublicError(error, "Fee mapping failed."), updatedAt: Date.now() });
       const control = await seasonFinanceControl(ctx, job.seasonId); if (control?.mappingJobId === job._id) await ctx.db.patch(control._id, { state: "failed", updatedAt: Date.now() });
     }
     return null;

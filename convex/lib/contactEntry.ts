@@ -1,5 +1,5 @@
 import type { ConsentProfileV2 } from '../consentProfileV2Schema';
-import { normalizeChangedEmail, normalizeChangedPhone } from '../../shared/contact-format';
+import { normalizeChangedEmail, normalizeChangedPhone } from './contactValidation';
 /** Only editable inputs use these rules; historical signed snapshots are untouched. */
 export function normalizeConsentContacts(value: ConsentProfileV2, previous?: ConsentProfileV2): ConsentProfileV2 {
   return { ...value,

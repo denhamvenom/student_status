@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { useEffect, useRef, useState } from 'react'
 import { useAuthActions } from '@convex-dev/auth/react'
 import { Button } from './components/ui/button'
@@ -17,7 +18,7 @@ export default function SignIn() {
     if (busy) return
     setBusy(true); setError('')
     try { await signIn('google', {redirectTo: `${window.location.origin}/`}) }
-    catch { setError(uiCopy.errors.signIn); setBusy(false) }
+    catch (cause) { setError(userFacingError(cause, uiCopy.errors.signIn)); setBusy(false) }
   }
   return <main className="signin"><div className="signin-brand"><img src="/assets/logos/logo-mark-white-text.png" alt={liveCopy.brand.imageAlt}/></div><div className="signin-content"><p className="eyebrow">{liveCopy.brand.team}</p><h1>{liveCopy.signIn.title}</h1><p>{liveCopy.signIn.description}</p><section className="signin-card" aria-labelledby="signin-heading">
     <h2 id="signin-heading" ref={heading} tabIndex={-1}>{screen==='choose'?'How are you signing in?':screen==='student'?'Student sign-in':screen==='adult'?'Parent or team staff sign-in':'Sign in by email'}</h2>

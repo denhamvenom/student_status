@@ -1,5 +1,13 @@
 # Student Status implementation plan
 
+## October 20 - Approved actionable error production release
+
+Owner accepted the localhost preview and explicitly authorized production release of PR30. Reviewed implementation 67c2145 preserves expected backend validation and recovery errors across Student Status while keeping internal diagnostics private. See [RELEASE_2026-10-20_ACTIONABLE_ERRORS.md](RELEASE_2026-10-20_ACTIONABLE_ERRORS.md) for validation and release boundaries. Earlier development-only restrictions for this change are superseded by this approval.
+
+## October 20 - Actionable errors (development review ready)
+
+Implemented shared user-facing errors across Student Status, explicit backend validation/recovery messages, invitation cooldown guidance, and private fallbacks for internal diagnostics. Independent review has no blockers. Development sync, lint/typecheck/build, focused tests and eight actual-component browser scenarios passed. Broad regression's two failures were corrected and their files rerun successfully; the historical >500-charge fee test remains a documented timeout. See [ACTIONABLE_ERRORS.md](ACTIONABLE_ERRORS.md) for exact evidence and localhost links. Owner localhost acceptance and production authorization remain pending; production unchanged.
+
 ## October 20 - Approved contact formatting production release
 
 Owner authorized publishing reviewed fdabbe3. Production backend amicable-eel-413 deployed successfully with schema/type validation and no index deletion. Phone/email formatting and validation cover live input and backend paths; optional blanks, unchanged legacy values and signed records are preserved. Documentation publishes with source. See RELEASE_2026-10-20_CONTACT_FORMATS.md. Earlier development-only statements for this feature are superseded.

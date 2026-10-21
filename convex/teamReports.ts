@@ -1,5 +1,5 @@
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
@@ -18,7 +18,7 @@ const rowValidator = v.object({studentId:v.id("students"),name:v.string(),subtea
 
 async function requireViewer(ctx: QueryCtx) {
   const actor = await viewer(ctx);
-  if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new Error("Team reports require Coach or Travel Lead access.");
+  if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Team reports require Coach or Travel Lead access.");
   return actor;
 }
 
@@ -54,14 +54,14 @@ async function reportRow(ctx: QueryCtx, student: Doc<"students">, attendance: Aw
 const eventChoice = v.object({eventId:v.id("events"),name:v.string(),startsAt:v.number(),type:v.union(v.literal("Competition"),v.literal("Outreach"),v.literal("Team"))});
 export const context = query({args:{asOf:v.number()},returns:v.object({seasonId:v.id("seasons"),attendance:attendanceGate,eventsCoverage:v.union(v.literal("complete"),v.literal("unknown"))}),handler:async(ctx,args)=>{
   await requireViewer(ctx);
-  if (!Number.isSafeInteger(args.asOf)) throw new Error("A valid report time is required.");
+  if (!Number.isSafeInteger(args.asOf)) throw new ConvexError("A valid report time is required.");
   const season=await activeSeason(ctx);
   const [attendance,eventPage]=await Promise.all([teamReportAttendanceGate(ctx,season._id,season.year),ctx.db.query("events").withIndex("by_seasonId_and_startsAt",q=>q.eq("seasonId",season._id)).take(51)]);
   return {seasonId:season._id,attendance,eventsCoverage:eventPage.length>50?"unknown" as const:"complete" as const};
 }});
 export const events = query({args:{asOf:v.number()},returns:v.object({items:v.array(eventChoice),coverage:v.union(v.literal("complete"),v.literal("unknown"))}),handler:async(ctx,args)=>{
   await requireViewer(ctx);
-  if (!Number.isSafeInteger(args.asOf)) throw new Error("A valid report time is required.");
+  if (!Number.isSafeInteger(args.asOf)) throw new ConvexError("A valid report time is required.");
   const season=await activeSeason(ctx);
   const page=await ctx.db.query("events").withIndex("by_seasonId_and_startsAt",q=>q.eq("seasonId",season._id).gte("startsAt",args.asOf)).take(51);
   return {items:page.slice(0,50).filter(e=>!e.archived).map(e=>({eventId:e._id,name:e.name,startsAt:e.startsAt,type:e.type})),coverage:page.length>50?"unknown" as const:"complete" as const};
@@ -72,16 +72,16 @@ export const list = query({
   returns:paginationResultValidator(rowValidator).extend({seasonId:v.id("seasons"),attendance:attendanceGate,event:v.union(v.null(),eventChoice),eventsCoverage:v.union(v.literal("complete"),v.literal("unknown"))}),
   handler:async(ctx,args)=>{
     await requireViewer(ctx);
-    if (!Number.isSafeInteger(args.asOf) || !Number.isSafeInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems<1 || args.paginationOpts.numItems>10 || args.paginationOpts.maximumRowsRead!==undefined && (!Number.isSafeInteger(args.paginationOpts.maximumRowsRead) || args.paginationOpts.maximumRowsRead<1)) throw new Error("Request between 1 and 10 report rows with a valid report time and row budget.");
+    if (!Number.isSafeInteger(args.asOf) || !Number.isSafeInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems<1 || args.paginationOpts.numItems>10 || args.paginationOpts.maximumRowsRead!==undefined && (!Number.isSafeInteger(args.paginationOpts.maximumRowsRead) || args.paginationOpts.maximumRowsRead<1)) throw new ConvexError("Request between 1 and 10 report rows with a valid report time and row budget.");
     const season=await activeSeason(ctx);
     const event=args.eventId?await ctx.db.get(args.eventId):null;
-    if (args.eventId && (!event || event.seasonId!==season._id || event.archived)) throw new Error("Selected event is unavailable in the current season.");
+    if (args.eventId && (!event || event.seasonId!==season._id || event.archived)) throw new ConvexError("Selected event is unavailable in the current season.");
     const [page,attendance,eventPage]=await Promise.all([
       ctx.db.query("students").withIndex("by_seasonId_and_active",q=>q.eq("seasonId",season._id).eq("active",true)).paginate({...args.paginationOpts,maximumRowsRead:Math.min(args.paginationOpts.maximumRowsRead??11,11)}),
       teamReportAttendanceGate(ctx,season._id,season.year),
       ctx.db.query("events").withIndex("by_seasonId_and_startsAt",q=>q.eq("seasonId",season._id)).take(51),
     ]);
-    if (page.page.length>10) throw new Error("Report page exceeded 10 rows. Reload with a smaller page.");
+    if (page.page.length>10) throw new ConvexError("Report page exceeded 10 rows. Reload with a smaller page.");
     const eventIds=eventPage.length>50?null:new Set(eventPage.filter(e=>!e.archived).map(e=>String(e._id)));
     return {...page,page:await Promise.all(page.page.map(student=>reportRow(ctx,student,attendance,event,eventIds))),seasonId:season._id,attendance,event:event?{eventId:event._id,name:event.name,startsAt:event.startsAt,type:event.type}:null,eventsCoverage:eventIds?"complete" as const:"unknown" as const};
   },

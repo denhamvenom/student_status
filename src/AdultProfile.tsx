@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
@@ -16,7 +17,7 @@ type OwnProfile = {
   driverFingerprint: string | null; canDrive: boolean; vehicleName: string; passengerSeats: number | null; towCapable: boolean; approved: boolean
 }
 const sizeOptions: readonly Size[] = copy.sizes
-const message = (error: unknown) => error instanceof Error ? error.message : copy.failed
+const message = (error: unknown) => userFacingError(error, copy.failed)
 
 function ProfileForm({ profile, saved, onSaved }: { profile: OwnProfile; saved: string; onSaved: (value: string) => void }) {
   const save = useMutation(api.adultProfile.saveOwn)

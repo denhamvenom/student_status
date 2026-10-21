@@ -1,7 +1,7 @@
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
-import { v, type Infer } from "convex/values";
+import { ConvexError, v, type Infer } from "convex/values";
 import { activeSeason, requireRole, viewer, type AppUser } from "./lib/access";
 import { assertIdempotencyKey, assertNoOverlap, assertProfileId, chicagoDateKey, chicagoDayBounds, classifiedTime, HALF_HOUR_MS, MAX_EXTENSION_MS, MAX_GROUP_SIZE } from "./lib/timeclock";
 import { verifyTimeclockPin } from "./lib/timeclockPin";
@@ -271,7 +271,7 @@ export const todayEvents = query({
     const dateKey = chicagoDateKey(args.asOf);
     const allDay = await ctx.db.query("timeclockOccurrences").withIndex("by_seasonId_and_allDayStartDate", q => q.eq("seasonId", season._id).gt("allDayStartDate", "").lte("allDayStartDate", dateKey)).take(501);
     const openSessions = await ctx.db.query("timeclockSessions").withIndex("by_seasonId_and_state", q => q.eq("seasonId", season._id).eq("state", "open")).take(101);
-    if (timed.length > 500 || allDay.length > 500 || openSessions.length > 100) throw new Error("Too many event records for the today view.");
+    if (timed.length > 500 || allDay.length > 500 || openSessions.length > 100) throw new ConvexError("Too many event records for the today view.");
     const byId = new Map<Id<"timeclockOccurrences">, Doc<"timeclockOccurrences">>();
     for (const occurrence of timed) if (!occurrence.allDay && (occurrence.scheduledStart ?? Number.POSITIVE_INFINITY) < day.end) byId.set(occurrence._id, occurrence);
     for (const occurrence of allDay) if (occurrence.allDay && (occurrence.allDayEndDate ?? "") > dateKey) byId.set(occurrence._id, occurrence);
@@ -294,7 +294,7 @@ export const previewGroup = query({
   args: { sessionId, studentIds: v.array(studentId) }, returns: v.union(v.object({ ok: v.literal(false), code: v.string() }), v.object({ ok: v.literal(true), sessionRevision: v.number(), expected: v.array(v.object({ studentId, intervalId: v.union(v.id("timeclockIntervals"), v.null()), sessionId: v.union(sessionId, v.null()) })), conflicts: v.array(v.object({ studentId, sessionId, intervalId: v.optional(v.id("timeclockIntervals")) })) })),
   handler: async (ctx, args) => {
     await operator(ctx);
-    if (args.studentIds.length > MAX_GROUP_SIZE || new Set(args.studentIds).size !== args.studentIds.length) throw new Error("Invalid group size or duplicate student.");
+    if (args.studentIds.length > MAX_GROUP_SIZE || new Set(args.studentIds).size !== args.studentIds.length) throw new ConvexError("Invalid group size or duplicate student.");
     const session = await ctx.db.get(args.sessionId);
     if (!session || session.state !== "open" || session.seasonId !== (await activeSeason(ctx))._id) return { ok: false as const, code: "FINISHED" };
     const locks = await Promise.all(args.studentIds.map(id => ctx.db.query("timeclockStudentLocks").withIndex("by_studentId", q => q.eq("studentId", id)).unique()));
@@ -349,7 +349,7 @@ export const clockGroup = mutation({
         const student = args.expected[i].studentId; const lock = locks[i];
         if (lock?.intervalId) {
           const interval = await ctx.db.get(lock.intervalId);
-          if (!interval || interval.outAt !== undefined) throw new Error("Active interval pointer is inconsistent.");
+          if (!interval || interval.outAt !== undefined) throw new ConvexError("Active interval pointer is inconsistent.");
           await closeInterval(ctx, interval, now, args.mode === "transfer" ? "transfer" : "operator", actor._id);
           changedSessions.add(interval.sessionId);
         }
@@ -410,7 +410,7 @@ type PendingCorrection = { originalIntervalId?: Id<"timeclockIntervals">; target
 async function effectiveIntervals(ctx: QueryCtx | MutationCtx, session: Doc<"timeclockSessions">, student: Id<"students">, asOf: number, pending?: PendingCorrection) {
   const original = await ctx.db.query("timeclockIntervals").withIndex("by_sessionId_and_studentId", q => q.eq("sessionId", session._id).eq("studentId", student)).take(501);
   const corrections = await ctx.db.query("timeclockCorrections").withIndex("by_sessionId_and_studentId", q => q.eq("sessionId", session._id).eq("studentId", student)).take(501);
-  if (original.length > 500 || corrections.length > 500) throw new Error("Attendance history exceeds the review limit.");
+  if (original.length > 500 || corrections.length > 500) throw new ConvexError("Attendance history exceeds the review limit.");
   const latest = new Map<string, Doc<"timeclockCorrections">>();
   const latestAdded = new Map<string, Doc<"timeclockCorrections">>();
   for (const correction of corrections) if (correction.originalIntervalId) latest.set(correction.originalIntervalId, correction);
@@ -450,10 +450,10 @@ export const correctionEvidence = query({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach");
     const session = await ctx.db.get(args.sessionId);
-    if (!session) throw new Error("Event session not found.");
+    if (!session) throw new ConvexError("Event session not found.");
     const originals = await ctx.db.query("timeclockIntervals").withIndex("by_sessionId_and_studentId", q => q.eq("sessionId", args.sessionId).eq("studentId", args.studentId)).take(501);
     const audit = await ctx.db.query("timeclockCorrections").withIndex("by_sessionId_and_studentId", q => q.eq("sessionId", args.sessionId).eq("studentId", args.studentId)).take(501);
-    if (originals.length > 500 || audit.length > 500) throw new Error("Attendance history exceeds the review limit.");
+    if (originals.length > 500 || audit.length > 500) throw new ConvexError("Attendance history exceeds the review limit.");
     return { intervals: originals.map(x => ({ intervalId: x._id, inAt: x.inAt, outAt: x.outAt ?? null, openedBy: x.openedBy, closedBy: x.closedBy ?? null, closeReason: x.closeReason ?? null })), corrections: audit.map(x => ({ correctionId: x._id, originalIntervalId: x.originalIntervalId ?? null, targetCorrectionId: x.targetCorrectionId ?? null, kind: x.kind, inAt: x.inAt ?? null, outAt: x.outAt ?? null, reason: x.reason, actorId: x.actorId, at: x.at })) };
   },
 });

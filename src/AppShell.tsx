@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { observeStickyHeader } from './lib/sticky-header'
 import { phoneLabel, uiCopy } from './lib/ui-copy'
 import { menu, navigationCopy, staysOnCurrentGroup } from './lib/navigation-copy'
@@ -29,11 +30,11 @@ export function AppShell({ children, viewer, familyContext, role = "coach" }: { 
   if (previousPath !== pathname) { setPreviousPath(pathname); setMore(false) }
   const [themeError, setThemeError] = useState('')
   const [signOutError, setSignOutError] = useState('')
-  const exit = async () => { setSignOutError(''); try { await signOut() } catch { setSignOutError(copy.signOutFailed) } }
+  const exit = async () => { setSignOutError(''); try { await signOut() } catch (cause) { setSignOutError(userFacingError(cause, copy.signOutFailed)) } }
   const changeTheme = async () => {
     const next = resolvedTheme === 'dark' ? 'light' : 'dark'
     setTheme(next); setThemeError('')
-    try { await saveTheme({ theme: next }) } catch { setTheme(theme ?? 'system'); setThemeError(copy.themeFailed) }
+    try { await saveTheme({ theme: next }) } catch (cause) { setTheme(theme ?? 'system'); setThemeError(userFacingError(cause, copy.themeFailed)) }
   }
   const nav = navigationCopy.groups
   const groups: Record<string, [string, string][]> = {

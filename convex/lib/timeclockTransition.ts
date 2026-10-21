@@ -1,3 +1,4 @@
+import { ConvexError } from 'convex/values';
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { chicagoDateKey } from "./timeclock";
@@ -10,12 +11,12 @@ export async function timeclockTransitionLocked(ctx: QueryCtx | MutationCtx, sea
 }
 
 export async function requireTimeclockSeasonWritable(ctx: QueryCtx | MutationCtx, seasonId: Id<"seasons">) {
-  if (await timeclockTransitionLocked(ctx, seasonId)) throw new Error("Season transition is in progress. New attendance and calendar changes are paused; clock-out remains available.");
+  if (await timeclockTransitionLocked(ctx, seasonId)) throw new ConvexError("Season transition is in progress. New attendance and calendar changes are paused; clock-out remains available.");
 }
 
 /** Move prefetched future occurrences, never an occurrence with attendance history. */
 export async function advanceTimeclockSeasonBoundary(ctx: MutationCtx, sourceSeasonId: Id<"seasons">, targetSeasonId: Id<"seasons">, cursor: string | null, boundaryAt: number) {
-  if (!Number.isFinite(boundaryAt) || sourceSeasonId === targetSeasonId) throw new Error("Invalid Timeclock season boundary.");
+  if (!Number.isFinite(boundaryAt) || sourceSeasonId === targetSeasonId) throw new ConvexError("Invalid Timeclock season boundary.");
   const page = await ctx.db.query("timeclockOccurrences")
     .withIndex("by_seasonId_and_scheduledStart", q => q.eq("seasonId", sourceSeasonId))
     .paginate({ cursor, numItems: 25 });
@@ -32,7 +33,7 @@ export async function advanceTimeclockSeasonBoundary(ctx: MutationCtx, sourceSea
 /** Call in the same transaction as the final active-season switch. */
 export async function finalizeTimeclockSeasonBoundary(ctx: MutationCtx, sourceSeasonId: Id<"seasons">) {
   const open = await ctx.db.query("timeclockSessions").withIndex("by_seasonId_and_state", q => q.eq("seasonId", sourceSeasonId).eq("state", "open")).first();
-  if (open) throw new Error("Close all source-season Timeclock sessions before activation.");
+  if (open) throw new ConvexError("Close all source-season Timeclock sessions before activation.");
   const sync = await ctx.db.query("timeclockCalendarSync").withIndex("by_key", q => q.eq("key", "team")).unique();
   if (sync) await ctx.db.patch(sync._id, { generation: sync.generation + 1, syncToken: undefined, lastAttemptAt: undefined, lastSuccessAt: undefined, lastError: undefined });
 }

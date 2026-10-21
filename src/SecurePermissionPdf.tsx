@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { useEffect, useState } from 'react'
 import { useAction } from 'convex/react'
 import { api } from '../convex/_generated/api'
@@ -24,7 +25,7 @@ export function SecurePermissionPdf({ draftId, submissionId, rendition, expected
       objectUrl = URL.createObjectURL(new Blob([result.bytes], { type: 'application/pdf' }))
       setUrl(objectUrl)
       onReady?.(true)
-    }).catch(() => { if (alive) { setError('The PDF is unavailable. Retry or prepare a new form.'); onReady?.(false) } })
+    }).catch(cause => { if (alive) { setError(userFacingError(cause, 'The PDF is unavailable. Retry or prepare a new form.')); onReady?.(false) } })
     return () => { alive = false; onReady?.(false); if (objectUrl) URL.revokeObjectURL(objectUrl) }
   }, [draftId, submissionId, rendition, expectedSha256, fetchPdf, onReady])
   return <section className={styles.preview} aria-label={rendition === 'reviewed' ? 'PDF to review' : 'Signed form PDF'}>

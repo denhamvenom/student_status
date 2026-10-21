@@ -1,7 +1,8 @@
+import { savedPublicError } from './lib/publicErrors';
 import { requireSeasonTransitionFinancialAccess } from "./lib/seasonFinance";
 import { seasonFinanceControl } from "./lib/seasonFinance";
 import { makeFunctionReference } from "convex/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { internalMutation, mutation } from "./_generated/server";
@@ -17,27 +18,27 @@ export const rebuild = mutation({
   args: { studentId: v.id("students") }, returns: v.id("financialAccounts"),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx);
-    if (actor.role !== "coach") throw new Error("Only a Coach may rebuild financial records.");
+    if (actor.role !== "coach") throw new ConvexError("Only a Coach may rebuild financial records.");
     await requireSeasonTransitionFinancialAccess(ctx, (await activeSeason(ctx))._id);
     const control = await seasonFinanceControl(ctx, (await activeSeason(ctx))._id);
-    if (control && control.state !== "ready" && control.state !== "failed") throw new Error("Wait for season fee maintenance before starting a financial rebuild.");
+    if (control && control.state !== "ready" && control.state !== "failed") throw new ConvexError("Wait for season fee maintenance before starting a financial rebuild.");
     return startFinancialRebuild(ctx, args.studentId, actor._id);
   },
 });
 
 export async function startFinancialRebuild(ctx: MutationCtx, studentId: Id<"students">, actorId: Id<"appUsers">) {
   const actor = await ctx.db.get(actorId);
-  if (!actor?.active || actor.role !== "coach") throw new Error("Only an active Coach may rebuild financial records.");
+  if (!actor?.active || actor.role !== "coach") throw new ConvexError("Only an active Coach may rebuild financial records.");
   const student = await ctx.db.get(studentId); const season = await activeSeason(ctx);
-  if (!student || student.seasonId !== season._id) throw new Error("Student is unavailable in the active season.");
+  if (!student || student.seasonId !== season._id) throw new ConvexError("Student is unavailable in the active season.");
   await requireSeasonTransitionFinancialAccess(ctx, season._id, true);
   const current = await financialAccount(ctx, student._id);
   if (current) await requireNoFinancialJob(ctx, current);
-  if (current?.state === "allocating") throw new Error("Finish the pending allocation before rebuilding.");
+  if (current?.state === "allocating") throw new ConvexError("Finish the pending allocation before rebuilding.");
   if (current?.state === "rebuilding") return current._id;
   const freshId = await createFinancialAccount(ctx, student._id, "rebuilding", (current?.generation ?? 0) + 1);
   const fresh = await ctx.db.get(freshId);
-  if (!fresh) throw new Error("Financial rebuild could not start.");
+  if (!fresh) throw new ConvexError("Financial rebuild could not start.");
   let accountId = freshId;
   if (current) {
     const { _id, _creationTime, ...fields } = fresh; void _id; void _creationTime;
@@ -125,7 +126,7 @@ export const run = internalMutation({
     try {
       await ctx.runMutation(pageRef, { accountId: account._id, generation: account.generation, phase: account.phase, cursor: account.cursor });
     } catch (error) {
-      await ctx.db.patch(account._id, { state: "failed", updatedAt: Date.now(), lastError: error instanceof Error ? error.message.slice(0, 500) : "Financial rebuild failed; Coach review is required." });
+      await ctx.db.patch(account._id, { state: "failed", updatedAt: Date.now(), lastError: savedPublicError(error, "Financial rebuild failed; Coach review is required.") });
     }
     return null;
   },

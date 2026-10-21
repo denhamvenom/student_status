@@ -1,5 +1,5 @@
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
@@ -23,7 +23,7 @@ export const directory = query({
   returns:paginationResultValidator(directoryRowValidator),
   handler:async(ctx,args)=>{
     requireRole(await viewer(ctx),"coach");
-    if(args.paginationOpts.numItems<1||args.paginationOpts.numItems>100) throw new Error("Directory page size must be between 1 and 100.");
+    if(args.paginationOpts.numItems<1||args.paginationOpts.numItems>100) throw new ConvexError("Directory page size must be between 1 and 100.");
     const season=await activeSeason(ctx);
     const page=await ctx.db.query("students").withIndex("by_seasonId_and_active",q=>q.eq("seasonId",season._id).eq("active",args.active??true)).paginate(args.paginationOpts);
     return {...page,page:await Promise.all(page.page.map(async student=>{
@@ -43,11 +43,11 @@ export const rowsByIds=query({
   args:{studentIds:v.array(v.id("students")),asOf:v.number()},returns:v.array(rowValidator),
   handler:async(ctx,args)=>{
     requireRole(await viewer(ctx),"coach");
-    if(!Number.isFinite(args.asOf)) throw new Error("A valid current time is required.");
-    if(args.studentIds.length>20) throw new Error("At most 20 roster rows may be requested.");
+    if(!Number.isFinite(args.asOf)) throw new ConvexError("A valid current time is required.");
+    if(args.studentIds.length>20) throw new ConvexError("At most 20 roster rows may be requested.");
     const season=await activeSeason(ctx);
     const students=await Promise.all(args.studentIds.map(id=>ctx.db.get(id)));
-    if(students.some(student=>!student||student.seasonId!==season._id)) throw new Error("Student is unavailable in the current season.");
+    if(students.some(student=>!student||student.seasonId!==season._id)) throw new ConvexError("Student is unavailable in the current season.");
     const upcoming=await upcomingEvents(ctx,season._id,args.asOf);
     return await Promise.all((students as Doc<"students">[]).map(student=>rosterRow(ctx,student,upcoming)));
   },
@@ -104,7 +104,7 @@ export const list = query({
   returns: paginationResultValidator(rowValidator).extend({ seasonId: v.id("seasons") }),
   handler: async (ctx, args) => {
     requireRole(await viewer(ctx), "coach");
-    if (!Number.isFinite(args.asOf)) throw new Error("A valid current time is required.");
+    if (!Number.isFinite(args.asOf)) throw new ConvexError("A valid current time is required.");
     const season = await activeSeason(ctx);
     const students = args.connection === "unconnected"
       ? ctx.db.query("students").withIndex("by_seasonId_and_active_and_userId", q => q.eq("seasonId", season._id).eq("active", args.active ?? true).eq("userId", undefined))
@@ -122,10 +122,10 @@ export const detail = query({
   args: { studentId: v.id("students"), asOf: v.number() }, returns: detailValidator,
   handler: async (ctx, args) => {
     requireRole(await viewer(ctx), "coach");
-    if (!Number.isFinite(args.asOf)) throw new Error("A valid current time is required.");
+    if (!Number.isFinite(args.asOf)) throw new ConvexError("A valid current time is required.");
     const season = await activeSeason(ctx);
     const student = await ctx.db.get(args.studentId);
-    if (!student || student.seasonId !== season._id) throw new Error("Student is unavailable in the current season.");
+    if (!student || student.seasonId !== season._id) throw new ConvexError("Student is unavailable in the current season.");
     const row = await rosterRow(ctx, student, await upcomingEvents(ctx, season._id, args.asOf));
     const links = await ctx.db.query("familyLinks").withIndex("by_studentId", q => q.eq("studentId", student._id)).take(21);
     const parents = await Promise.all(links.slice(0,20).filter(link => !link.seasonId || link.seasonId === season._id).map(async link => {

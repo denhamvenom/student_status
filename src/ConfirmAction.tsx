@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { useState, type ReactNode } from 'react'
 import { Button } from './components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from './components/ui/dialog'
@@ -10,7 +11,7 @@ export function ConfirmAction({ children, description, disabled, onConfirm }: { 
   async function confirm() {
     if (!review || busy) return
     setBusy(true); setError('')
-    try { await review.run(); setReview(null) } catch (cause) { setError(cause instanceof Error ? cause.message : 'Please try again.') } finally { setBusy(false) }
+    try { await review.run(); setReview(null) } catch (cause) { setError(userFacingError(cause, 'Please try again.')) } finally { setBusy(false) }
   }
   return <><Button type="button" variant="outline" disabled={disabled} onClick={() => { setError(''); setReview({ description, run: onConfirm }) }}>{children}</Button>
     <Dialog open={!!review} disablePointerDismissal onOpenChange={open => { if (!open && !busy) setReview(null) }}><DialogContent showCloseButton={false}><DialogTitle>Confirm action</DialogTitle><p>{review?.description}</p>{error && <p role="alert">{error}</p>}<div className="flex flex-wrap gap-2"><Button type="button" disabled={busy} onClick={() => void confirm()}>{busy ? 'Saving…' : 'Confirm'}</Button><Button type="button" variant="outline" disabled={busy} onClick={() => setReview(null)}>Cancel</Button></div></DialogContent></Dialog></>

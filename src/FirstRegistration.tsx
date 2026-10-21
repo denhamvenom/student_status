@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
@@ -12,7 +13,7 @@ type Status = 'needsCompletion' | 'awaitingVerification' | 'verified'
 type Invitation = FunctionReturnType<typeof api.firstRegistration.invitationSettings>
 type StudentRegistration = FunctionReturnType<typeof api.firstRegistration.get>
 const officialInstructions = 'https://www.firstinspires.org/programs/youth-registration'
-const failure = (cause: unknown) => cause instanceof Error ? cause.message : 'The change could not be saved. Try again.'
+const failure = (cause: unknown) => userFacingError(cause, 'The change could not be saved. Try again.')
 const when = (at: number) => new Intl.DateTimeFormat('en-US', {dateStyle:'medium',timeStyle:'short',timeZone:'America/Chicago'}).format(at)
 
 export function FirstStudentStatus({state,compact=false}:{state:Status;compact?:boolean}) {

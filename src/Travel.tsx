@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { operationsCopy, operationsText } from './lib/operations-copy'
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery } from 'convex/react'
@@ -12,7 +13,7 @@ import styles from './features/operations/Operations.module.css'
 const eventId = (id: string) => id as Id<'events'>
 const driverId = (id: string) => id as Id<'drivers'>
 const studentId = (id: string) => id as Id<'students'>
-const issue = (error: unknown) => error instanceof Error ? error.message : String(error)
+const issue = (error: unknown) => userFacingError(error)
 
 type Driver = { _id: Id<'drivers'>; name: string; email: string; phone: string; vehicleName?: string; seats: number; approved: boolean; towCapable?: boolean; active?: boolean }
 const blankDriver = { name: '', email: '', phone: '', vehicleName: '', seats: '0', approved: false, towCapable: false, active: true }

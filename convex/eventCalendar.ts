@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { action, env, internalMutation, internalQuery, internalAction, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -60,19 +60,19 @@ function safeDeadlines(event: Doc<"events">, startsAt: number) {
     ...(event.roomDeadline !== undefined && event.roomDeadline > startsAt ? { roomDeadline: startsAt } : {}),
   };
 }
-function requireStaff(actor: Doc<"appUsers">) { if (actor.role !== "coach" && !actor.travelLead) throw new Error("Calendar event management requires a Coach or Travel Lead."); }
+function requireStaff(actor: Doc<"appUsers">) { if (actor.role !== "coach" && !actor.travelLead) throw new ConvexError("Calendar event management requires a Coach or Travel Lead."); }
 async function boundCalendar(ctx: { runQuery: (reference: typeof internal.eventCalendar.sourceBound, args: { calendarIdHash: string }) => Promise<boolean> }) {
   return configured() && await ctx.runQuery(internal.eventCalendar.sourceBound, { calendarIdHash: await hashId(env.TIMECLOCK_CALENDAR_ID!) });
 }
 async function activeEvent(ctx: MutationCtx, eventId: Id<"events">) {
   const actor = await viewer(ctx); requireStaff(actor);
   const event = await ctx.db.get(eventId), season = await activeSeason(ctx);
-  if (!event || event.seasonId !== season._id || event.archived) throw new Error("Active event not found.");
+  if (!event || event.seasonId !== season._id || event.archived) throw new ConvexError("Active event not found.");
   return { actor, event };
 }
 async function invalidatePermissionCoverage(ctx: MutationCtx, event: Doc<"events">, actorId: Id<"appUsers">) {
   const rows = await ctx.db.query("permissionCoverage").withIndex("by_seasonId_and_eventId", q => q.eq("seasonId", event.seasonId).eq("eventId", event._id)).take(501);
-  if (rows.length > 500) throw new Error("Too many permission records to safely update the event schedule.");
+  if (rows.length > 500) throw new ConvexError("Too many permission records to safely update the event schedule.");
   const now = Date.now();
   for (const row of rows) {
     if (row.state === "required" && row.signatureRequestedAt !== undefined) continue;
@@ -85,7 +85,7 @@ export const candidates = action({
   returns: v.object({ items: v.array(v.object({ id: v.string(), title: v.string(), location: v.string(), startsAt: v.number(), endsAt: v.number(), recurring: v.boolean(), allDay: v.boolean() })), error: v.union(v.string(), v.null()) }),
   handler: async (ctx, args) => {
     await ctx.runQuery(internal.eventCalendar.authorize, {});
-    if (!Number.isFinite(args.startsAt) || !Number.isFinite(args.endsAt) || args.endsAt <= args.startsAt || args.endsAt - args.startsAt > 31 * 86_400_000) throw new Error("Select a valid event window of 31 days or less.");
+    if (!Number.isFinite(args.startsAt) || !Number.isFinite(args.endsAt) || args.endsAt <= args.startsAt || args.endsAt - args.startsAt > 31 * 86_400_000) throw new ConvexError("Select a valid event window of 31 days or less.");
     if (!configured()) return { items: [], error: "Shared Calendar is not configured." };
     if (!await boundCalendar(ctx)) return { items: [], error: "Shared Calendar source has changed or has not been verified by synchronization." };
     try {
@@ -122,7 +122,7 @@ export const status = query({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireStaff(actor);
     const event = await ctx.db.get(args.eventId), season = await activeSeason(ctx);
-    if (!event || event.seasonId !== season._id) throw new Error("Event not found.");
+    if (!event || event.seasonId !== season._id) throw new ConvexError("Event not found.");
     const disabled = !!event.calendarChoice && !writeEnabled();
     const state: "unlinked" | "pending" | "synced" | "failed" | "conflict" | "disabled" = !event.calendarChoice ? "unlinked" : disabled ? "disabled" : event.calendarSyncState ?? "pending";
     return { state, error: disabled ? "Calendar writing is disabled in this environment. Student Status Calendar writes require an approved production enablement." : event.calendarSyncError ?? null, calendarEventId: event.calendarEventId ?? null, mediaSupportRequested: event.mediaSupportRequested ?? false, cancelled: event.cancelled ?? false, allDay: !!event.calendarAllDayStartDate, recurring: event.calendarRecurring ?? false, revision: event.calendarRevision ?? 0, canReselect: event.calendarChoice === "link" && event.calendarSyncState === "failed" && !!event.calendarLinkReplaceable && !event.calendarEtag };
@@ -134,16 +134,16 @@ export const connect = mutation({
   handler: async (ctx, args) => {
     const { actor, event } = await activeEvent(ctx, args.eventId);
     const replacing = event.calendarChoice === "link" && event.calendarSyncState === "failed" && !!event.calendarLinkReplaceable && !event.calendarEtag;
-    if (event.calendarChoice && !replacing) throw new Error("This event already has a Calendar connection.");
+    if (event.calendarChoice && !replacing) throw new ConvexError("This event already has a Calendar connection.");
     if (replacing) {
       const oldClaim = await ctx.db.query("eventCalendarClaims").withIndex("by_eventId", q => q.eq("eventId", event._id)).unique();
       if (oldClaim) await ctx.db.delete(oldClaim._id);
     }
-    if (args.calendarChoice.kind === "link" && (!args.calendarChoice.eventId || args.calendarChoice.eventId.length > 512)) throw new Error("Invalid Calendar event selection.");
+    if (args.calendarChoice.kind === "link" && (!args.calendarChoice.eventId || args.calendarChoice.eventId.length > 512)) throw new ConvexError("Invalid Calendar event selection.");
     if (args.calendarChoice.kind === "link") {
       const selectedId = args.calendarChoice.eventId;
       const existing = await ctx.db.query("eventCalendarClaims").withIndex("by_calendarEventId", q => q.eq("calendarEventId", selectedId)).unique();
-      if (existing) throw new Error("This Calendar event is already linked to another Student Status event.");
+      if (existing) throw new ConvexError("This Calendar event is already linked to another Student Status event.");
       await ctx.db.insert("eventCalendarClaims", { calendarEventId: args.calendarChoice.eventId, eventId: event._id });
     }
     const revision = (event.calendarRevision ?? 0) + 1;
@@ -158,12 +158,12 @@ export const update = mutation({
   args: { eventId: v.id("events"), expectedRevision: v.optional(v.number()), name: v.optional(v.string()), destination: v.optional(v.string()), startsAt: v.optional(v.number()), endsAt: v.optional(v.number()), mediaSupportRequested: v.optional(v.boolean()), cancelled: v.optional(v.boolean()) }, returns: v.null(),
   handler: async (ctx, args) => {
     const { actor, event } = await activeEvent(ctx, args.eventId);
-    if (event.calendarChoice && args.expectedRevision !== (event.calendarRevision ?? 0)) throw new Error("Event changed since you opened it. Reload before saving.");
+    if (event.calendarChoice && args.expectedRevision !== (event.calendarRevision ?? 0)) throw new ConvexError("Event changed since you opened it. Reload before saving.");
     const name = args.name?.trim() ?? event.name, destination = args.destination?.trim() ?? event.destination;
     const startsAt = args.startsAt ?? event.startsAt, endsAt = args.endsAt ?? event.endsAt;
-    if (!name || name.length > 250 || destination.length > 500 || !Number.isFinite(startsAt) || !Number.isFinite(endsAt) || endsAt <= startsAt) throw new Error("Invalid event schedule or details.");
-    if (!event.calendarChoice && (args.name !== undefined || args.destination !== undefined || args.startsAt !== undefined || args.endsAt !== undefined)) throw new Error("Connect the event to Calendar before changing Calendar-owned details.");
-    if (event.calendarChoice === "link" && !event.calendarEtag && (args.name !== undefined || args.destination !== undefined || args.startsAt !== undefined || args.endsAt !== undefined)) throw new Error("Finish the initial Calendar link before editing its title, place, or schedule.");
+    if (!name || name.length > 250 || destination.length > 500 || !Number.isFinite(startsAt) || !Number.isFinite(endsAt) || endsAt <= startsAt) throw new ConvexError("Invalid event schedule or details.");
+    if (!event.calendarChoice && (args.name !== undefined || args.destination !== undefined || args.startsAt !== undefined || args.endsAt !== undefined)) throw new ConvexError("Connect the event to Calendar before changing Calendar-owned details.");
+    if (event.calendarChoice === "link" && !event.calendarEtag && (args.name !== undefined || args.destination !== undefined || args.startsAt !== undefined || args.endsAt !== undefined)) throw new ConvexError("Finish the initial Calendar link before editing its title, place, or schedule.");
     const material = name !== event.name || destination !== event.destination || startsAt !== event.startsAt || endsAt !== event.endsAt || (args.cancelled ?? event.cancelled ?? false) !== (event.cancelled ?? false);
     if (material) await invalidatePermissionCoverage(ctx, event, actor._id);
     const revision = (event.calendarRevision ?? 0) + 1;
@@ -177,7 +177,7 @@ export const update = mutation({
 
 export const retry = mutation({ args: { eventId: v.id("events") }, returns: v.null(), handler: async (ctx, args) => {
   const { actor, event } = await activeEvent(ctx, args.eventId);
-  if (!event.calendarChoice) throw new Error("Connect the event to Calendar first.");
+  if (!event.calendarChoice) throw new ConvexError("Connect the event to Calendar first.");
   const revision = (event.calendarRevision ?? 0) + 1;
   await ctx.db.patch(event._id, { calendarRevision: revision, calendarSyncState: "pending", calendarSyncError: undefined, calendarActorId: actor._id, calendarReconcileOnRetry: event.calendarSyncState === "conflict" });
   await ctx.scheduler.runAfter(0, internal.eventCalendar.push, { eventId: event._id, revision });
@@ -201,7 +201,7 @@ export const finishPush = internalMutation({ args: { eventId: v.id("events"), re
     if (observed && (observed.title !== event.name || observed.location !== event.destination || observed.startsAt !== event.startsAt || observed.endsAt !== event.endsAt || observed.cancelled !== (event.cancelled ?? false))) await invalidatePermissionCoverage(ctx, event, event.calendarActorId!);
     if (args.calendarEventId) {
       const claim = await ctx.db.query("eventCalendarClaims").withIndex("by_calendarEventId", q => q.eq("calendarEventId", args.calendarEventId!)).unique();
-      if (claim && claim.eventId !== event._id) throw new Error("Calendar event is already connected to another Student Status event.");
+      if (claim && claim.eventId !== event._id) throw new ConvexError("Calendar event is already connected to another Student Status event.");
       if (!claim) await ctx.db.insert("eventCalendarClaims", { calendarEventId: args.calendarEventId, eventId: event._id });
     }
     await ctx.db.patch(event._id, { calendarEventId: args.calendarEventId ?? event.calendarEventId, calendarEtag: args.etag, calendarProviderUpdatedAt: args.providerUpdatedAt ?? event.calendarProviderUpdatedAt, calendarSyncState: "synced", calendarSyncError: undefined, calendarLinkReplaceable: undefined, calendarReconcileOnRetry: undefined, calendarRevision: args.revision + (observed ? 1 : 0), ...(observed ? { name: observed.title, destination: observed.location, startsAt: observed.startsAt, endsAt: observed.endsAt, ...safeDeadlines(event, observed.startsAt), cancelled: observed.cancelled, mediaSupportRequested: observed.media, calendarAllDayStartDate: observed.startDate, calendarAllDayEndDate: observed.endDate, calendarRecurring: observed.recurring } : {}) });

@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { Component, useRef, useState, type ReactNode } from 'react'
 import { useConvex, useMutation, usePaginatedQuery, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
@@ -14,7 +15,7 @@ import { FeePaymentImport } from './FeePaymentImport'
 import { normalizeEmail } from '../shared/contact-format'
 type PaymentRow = { studentEmail: string; amountCents: number; method: 'cash' | 'check' | 'other'; reference: string; occurredAt: number; rowReference: string }
 type ReviewedRow = PaymentRow & FunctionReturnType<typeof api.paymentAdministration.previewPayments>[number]
-const message = (error: unknown) => error instanceof Error ? error.message : String(error)
+const message = (error: unknown) => userFacingError(error)
 const usd = formatFundraisingCents
 
 /** CSV stays in memory; quoted commas, quotes, CRLF and multiline fields are supported. */
@@ -50,10 +51,10 @@ export function parsePaymentCsv(text: string): PaymentRow[] {
     return { studentEmail, amountCents, method: method as PaymentRow['method'], reference: value('reference'), occurredAt: teamMidnight, rowReference: value('rowreference') }
   })
 }
-class PaymentBoundary extends Component<{ children: ReactNode; retry: () => void }, { failed: boolean }> {
-  state = { failed: false }
-  static getDerivedStateFromError() { return { failed: true } }
-  render() { return this.state.failed ? <Card className={styles.card}><p role="alert">{copy.unavailable}</p><Button variant="outline" onClick={this.props.retry}>{copy.reload}</Button></Card> : this.props.children }
+class PaymentBoundary extends Component<{ children: ReactNode; retry: () => void }, { error: unknown }> {
+  state = { error: null as unknown }
+  static getDerivedStateFromError(error: unknown) { return { error } }
+  render() { return this.state.error !== null ? <Card className={styles.card}><p role="alert">{userFacingError(this.state.error, copy.unavailable, false)}</p><Button variant="outline" onClick={this.props.retry}>{copy.reload}</Button></Card> : this.props.children }
 }
 export function PaymentAdministration({ studentId, mode = 'bulk' }: { studentId?: Id<'students'>; mode?: 'bulk' | 'import' | 'correction' }) {
   const [attempt, setAttempt] = useState(0)
@@ -121,6 +122,6 @@ function CorrectionForm({ sourceEntryId, studentId }: { sourceEntryId: Id<'ledge
     {review && <div className={styles.notice}><p>{copy.original} {usd(review.originalAmountCents)} / {copy.current} {review.currentAmountCents === null ? copy.notAvailable : usd(review.currentAmountCents)} / {copy.corrected} {usd(review.targetAmountCents)}</p><p>{copy.release(review.releaseRequiredCents === null ? copy.notAvailable : usd(review.releaseRequiredCents))}</p>{review.message && <p role="status">{review.message}</p>}</div>}
     {current?.state === 'updating' && <Button variant="outline" disabled={busy} onClick={async () => { setBusy(true); setError(''); try { await rebuild({ studentId }) } catch (failure) { setError(message(failure)) } finally { setBusy(false) } }}>{copy.rebuild}</Button>}
     {!jobId && <Button disabled={!ready || busy || reason.trim().length < 8} onClick={() => void commit()}>{copy.confirm}</Button>}
-    {job && <p role={job.state === 'failed' ? 'alert' : 'status'}>{job.state === 'complete' ? copy.correctionComplete : job.state === 'failed' ? job.lastError ?? copy.correctionFailed : copy.correcting}</p>}{job?.state === 'failed' && <Button disabled={busy} onClick={() => void recover()}>{copy.retryCorrection}</Button>}{error && <p className={styles.error} role="alert">{error}</p>}
+    {job && <p role={job.state === 'failed' ? 'alert' : 'status'}>{job.state === 'complete' ? copy.correctionComplete : job.state === 'failed' ? userFacingError(new Error(job.lastError ?? ''), copy.correctionFailed) : copy.correcting}</p>}{job?.state === 'failed' && <Button disabled={busy} onClick={() => void recover()}>{copy.retryCorrection}</Button>}{error && <p className={styles.error} role="alert">{error}</p>}
   </div>
 }

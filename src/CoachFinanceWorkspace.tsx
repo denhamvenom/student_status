@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { Component, useRef, useState, type ReactNode } from 'react'
 import { useMutation, usePaginatedQuery, useQuery } from 'convex/react'
 import type { Id } from '../convex/_generated/dataModel'
@@ -8,11 +9,11 @@ import { FinanceRecentChanges } from './FinanceRecentChanges'
 import { financeWorkspaceCopy as copy } from './lib/finance-admin-copy'
 import styles from './CoachFinanceTable.module.css'
 
-class FinanceSectionBoundary extends Component<{ children: ReactNode; onRetry: () => void }, { failed: boolean }> {
-  state = { failed: false }
-  static getDerivedStateFromError() { return { failed: true } }
+class FinanceSectionBoundary extends Component<{ children: ReactNode; onRetry: () => void }, { error: unknown }> {
+  state = { error: null as unknown }
+  static getDerivedStateFromError(error: unknown) { return { error } }
   render() {
-    return this.state.failed ? <section className={styles.root}><p role="alert">{copy.unavailable}</p><Button type="button" variant="outline" onClick={this.props.onRetry}>{copy.retry}</Button></section> : this.props.children
+    return this.state.error !== null ? <section className={styles.root}><p role="alert">{userFacingError(this.state.error, copy.unavailable, false)}</p><Button type="button" variant="outline" onClick={this.props.onRetry}>{copy.retry}</Button></section> : this.props.children
   }
 }
 function RecoverableSection({ children }: { children: ReactNode }) {
@@ -32,7 +33,7 @@ function Accounts({ onOpen, onRecord }: { onOpen: (id: string, name: string) => 
     if (pending.current || !row?.canRebuild || row.state === 'ready') return
     pending.current = true; setRebuildingId(id); setError(''); setSaved(false)
     try { await rebuild({ studentId: row.studentId as Id<'students'> }); setSaved(true) }
-    catch (error) { setError(error instanceof Error ? error.message : copy.failed) }
+    catch (error) { setError(userFacingError(error, copy.failed)) }
     finally { pending.current = false; setRebuildingId(null) }
   }
   return <section className={styles.root}>
@@ -56,7 +57,7 @@ function Changes() {
     if (pending.current || !status?.canPrepareHistory) return
     pending.current = true; setBusy(true); setError(''); setSaved(false)
     try { await prepare({}); setSaved(true) }
-    catch (error) { setError(error instanceof Error ? error.message : copy.failed) }
+    catch (error) { setError(userFacingError(error, copy.failed)) }
     finally { pending.current = false; setBusy(false) }
   }
   return <section className={styles.root}>

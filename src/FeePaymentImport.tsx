@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { useRef, useState } from 'react'
 import { useConvex, useMutation, usePaginatedQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
@@ -15,7 +16,7 @@ type Filter = 'all' | 'paid' | 'unpaid'
 type Method = 'cash' | 'check' | 'other'
 type Review = { exportId: string; feeDefinitionId: Id<'feeDefinitions'>; feeLabel: string; rows: FeeCsvRow[]; payments: PaymentManifestRow[]; method: Method; reference: string; occurredAt: number; states: Array<{ rowKey: string; state: 'ready' | 'recorded' | 'stale' | 'invalid'; message: string | null; studentName: string | null; chargedCents: number | null; appliedCents: number | null; owedCents: number | null }> }
 const serverRows = (rows: PaymentManifestRow[]) => rows.map(row => ({ ...row, studentId: row.studentId as Id<'students'>, chargeId: row.chargeId as Id<'charges'> }))
-const errorText = (failure: unknown) => failure instanceof Error ? failure.message : String(failure)
+const errorText = (failure: unknown) => userFacingError(failure)
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
 
 function teamMidnight(date: string): number {

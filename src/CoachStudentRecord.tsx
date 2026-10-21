@@ -1,3 +1,4 @@
+import { userFacingError } from '@/lib/error-message'
 import { FirstStudentVerification } from './FirstRegistration'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
@@ -25,7 +26,7 @@ function RecordContent({studentId}:{studentId:Id<'students'>}){
   const [open,setOpen]=useState(false),[reason,setReason]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState(''),[selectedRevision,setSelectedRevision]=useState<number|null>(null)
   if(!data)return <div className={styles.root}><Link to="/team">← Team</Link><p role="status">Loading student record…</p></div>
   const stale=open&&selectedRevision!==data.profileRevision
-  const submit=async()=>{if(!reason.trim()||busy||stale)return;setBusy(true);setError('');try{await update({studentId,expectedRevision:data.profileRevision,active:!data.active,reason});setSaved(data.active?copy.archiveSaved:copy.reactivateSaved);setOpen(false);setReason('')}catch(e){setError(e instanceof Error?e.message:copy.failed)}finally{setBusy(false)}}
+  const submit=async()=>{if(!reason.trim()||busy||stale)return;setBusy(true);setError('');try{await update({studentId,expectedRevision:data.profileRevision,active:!data.active,reason});setSaved(data.active?copy.archiveSaved:copy.reactivateSaved);setOpen(false);setReason('')}catch(e){setError(userFacingError(e, copy.failed))}finally{setBusy(false)}}
   const balance=data.balance,account=data.account
   const accountText=account.linkage==='unlinked'?'None linked':account.linkage==='unavailable'?'Linked account record unavailable':account.access==='active'?'Can sign in':account.access==='inactive'?'Sign-in turned off':'Linked student account · access unknown'
   const event=data.nextEvent
