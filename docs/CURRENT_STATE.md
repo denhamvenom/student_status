@@ -1,6 +1,14 @@
 # Current integration handoff
 
-## Event schedule and Pay styling release - October 21, 2026
+## Zeffy donation integration candidate - October 21, 2026
+
+Checkout `student-status-zeffy`, branch `feature/zeffy-donation-sync`, based on origin/main `4f4b0f2`. Zeffy credits use the existing student fundraiser links, preserved page/season ownership, ledger source projections and automatic allocation. Coach controls are in Money tools; scheduled checks are 7AM/7PM America/Chicago and default off. See [ZEFFY_SYNC.md](ZEFFY_SYNC.md) for scope, limits and release procedure.
+
+Owner cannot rehearse on development: local synthetic tests and a read-only live source/link/account preflight were used. No real credits or deployment changes. Typecheck/source lint/build, independent review and representative synthetic browser checks passed. Full test run had 635 passes, three unrelated timeouts and a corrected new fixture; all four suites passed 25/25 on targeted single-worker rerun. Real-record evidence is not in Git.
+
+Next: publish candidate branch/PR, then obtain explicit production release/activation approval. Add the key to production securely, deploy initially disabled, review live preview, post first credit and verify duplicate rerun before relying on the schedule. Production balance and scheduled-run verification remain pending. Preserve all sibling worktrees.
+
+## Previous release: event schedule and Pay styling - October 21, 2026
 
 Owner approved production release of PR33. Checkout student-status-event-display, branch fix/student-event-time-pay. Student dashboard, event list and detail show Central start/end times with CST/CDT; all-day dates preserve exclusive-end semantics. Pay Now uses the existing readable gold button.
 
