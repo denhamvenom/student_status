@@ -8,7 +8,7 @@
 - [x] Read-only live source/link/account preflight; no real credits, development rehearsal writes or production deployment.
 - [x] Source/type checks, application build, independent source review and synthetic phone/dark plus desktop/light inspection.
 - [x] Integrated regression evidence: 635 full-run passes; corrected fixture and three timeout suites passed the 25-test targeted rerun, including all nine Zeffy regressions. No test weakening.
-- [ ] Publish the reviewed branch/PR.
+- [x] Published reviewed feature branch and [draft PR34](https://github.com/denhamvenom/student_status/pull/34); implementation checkpoint `c1aef8e` verified on remote.
 - [ ] Owner approval, production configuration/deployment, first credit and duplicate rerun verification, then scheduled execution verification.
 
 See [ZEFFY_SYNC.md](ZEFFY_SYNC.md) for agreed behavior and the release boundary.

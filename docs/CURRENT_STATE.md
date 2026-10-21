@@ -6,7 +6,7 @@ Checkout `student-status-zeffy`, branch `feature/zeffy-donation-sync`, based on 
 
 Owner cannot rehearse on development: local synthetic tests and a read-only live source/link/account preflight were used. No real credits or deployment changes. Typecheck/source lint/build, independent review and representative synthetic browser checks passed. Full test run had 635 passes, three unrelated timeouts and a corrected new fixture; all four suites passed 25/25 on targeted single-worker rerun. Real-record evidence is not in Git.
 
-Next: publish candidate branch/PR, then obtain explicit production release/activation approval. Add the key to production securely, deploy initially disabled, review live preview, post first credit and verify duplicate rerun before relying on the schedule. Production balance and scheduled-run verification remain pending. Preserve all sibling worktrees.
+Published implementation checkpoint `c1aef8e` on the feature branch and [draft PR34](https://github.com/denhamvenom/student_status/pull/34). Next: obtain explicit production release/activation approval. Add the key to production securely, deploy initially disabled, review live preview, post first credit and verify duplicate rerun before relying on the schedule. Production balance and scheduled-run verification remain pending. Preserve all sibling worktrees.
 
 ## Previous release: event schedule and Pay styling - October 21, 2026
 
