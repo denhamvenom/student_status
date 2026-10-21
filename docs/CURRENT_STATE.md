@@ -1,11 +1,11 @@
 # Current integration handoff
 
-## Event schedule and Pay styling release - October 21, 2026
+## Event schedules and Pay styling deployed - October 21, 2026
 
-Owner approved production release of PR33. Checkout student-status-event-display, branch fix/student-event-time-pay. Student dashboard, event list and detail show Central start/end times with CST/CDT; all-day dates preserve exclusive-end semantics. Pay Now uses the existing readable gold button.
+PR33 merged at 4f4b0f2aa1b2bc67163f69456c1be0dbbef5ec41; immutable release v0.1.0-onboarding.13 published. Owner approved release and public-site verification. Student dashboard, event list and detail now show Central start/end times, preserving Calendar all-day dates. Pay Now uses the established gold/dark-text button.
 
-Reviewed source 575fe30 passed 630 tests, source lint, types/build, independent Astra review and synthetic phone/dark + desktop/light browser checks. Original reported Pay contrast issue was not reproduced in the harness; candidate appearance was verified. Local preview theme switching was repaired in ignored mocks only; those files never ship.
+Production https://students.team8044.org verified: root and entry/LiveApp JS/CSS return 200; all four asset hashes match the approved production build. Production backend URL only, both fixes present, no synthetic preview mocks. Worker e4686496-6301-40a7-a065-fd109876c0c4 active at 100%. Automatic build was pending, so the authenticated CLI deployed the identical approved source. No backend deployment, schema/dependency change or real data write.
 
-Integrated main 267b789, including PR32's approved test cleanup; application source merged without conflicts, documentation reconciled. See test-audit.md for its original evidence. No backend changes, deployment or database migration needed. Release execution and verification: RELEASE_2026-10-21_EVENT_DISPLAY.md; immutable release notes will record final merge and Worker versions.
+Validation: candidate 630/630 tests; integrated PR32 run 630/631 with the known intermittent invitation-limit assertion, then complete 26-test file passed on rerun. Source lint/types/build/dry-run, independent Astra review and ten representative synthetic browser checks passed. Original Pay issue not reproduced in harness; updated styling verified. Production check was signed-out rendering and exact served assets, not an authenticated student/payment rehearsal.
 
-Production baseline is v0.1.0-onboarding.12. Preserve other worktrees and unrelated temporary evidence. Do not deploy synthetic preview files from tmp.
+Release evidence and rollback: RELEASE_2026-10-21_EVENT_DISPLAY.md and https://github.com/denhamvenom/student_status/releases/tag/v0.1.0-onboarding.13. This post-release documentation checkpoint does not need another main merge/deployment. Local checkout student-status-event-display, branch fix/student-event-time-pay. Preserve unrelated worktrees. Ignored tmp preview mocks must never ship.

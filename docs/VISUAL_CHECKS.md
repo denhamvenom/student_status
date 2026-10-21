@@ -1,5 +1,9 @@
 # Visual review closed — October 16, 2026
 
+## October 21 - Event display release verified
+
+PR33 released as v0.1.0-onboarding.13. Public production assets match the approved build and Worker rollout is 100%. Earlier pending-release statements for this scope are superseded. See RELEASE_2026-10-21_EVENT_DISPLAY.md for verification limits and rollback.
+
 ## October 21 - Student event times and Pay link (development candidate)
 
 - [x] Dashboard, event list and details show Central start/end times; Calendar all-day dates are preserved.

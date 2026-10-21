@@ -1,5 +1,9 @@
 # Frontend conformance work log
 
+## October 21 - Event display release verified
+
+PR33 released as v0.1.0-onboarding.13. Public production assets match the approved build and Worker rollout is 100%. Earlier pending-release statements for this scope are superseded. See RELEASE_2026-10-21_EVENT_DISPLAY.md for verification limits and rollback.
+
 ## October 21 - Student event times and Pay link (development candidate)
 
 Student dashboard, event list and event details now show start/end times in America/Chicago, including CST/CDT. Calendar all-day events retain date-only labels and exclude the Calendar end date. Pay Now uses the existing gold primary-link button with dark text, hover and keyboard focus styling.
