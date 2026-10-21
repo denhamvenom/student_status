@@ -31,6 +31,19 @@ async function createInvite(f: Awaited<ReturnType<typeof fixture>>) {
 }
 const invite = { email: " Adult@Example.Invalid ", ...access };
 describe("adult accounts", () => {
+  it.each([
+    { role: "mentor" as const, active: true, error: "permission" },
+    { role: "coach" as const, active: false, error: "inactive" },
+  ])("denies $role active=$active adult privilege escalation without writes", async ({ role, active, error }) => {
+    const f = await fixture();
+    const actorId = await f.t.run(ctx => ctx.db.insert("appUsers", { authUserId: f.ids.inviteAuth, email: "adult@example.invalid", name: "Restricted adult", role, active, travelLead: true, financialEdit: true, healthExport: true, accessRevision: 7 }));
+    const snapshot = () => f.t.run(async ctx => ({ users: await ctx.db.query("appUsers").take(10), audit: await ctx.db.query("audit").take(10) }));
+    const before = await snapshot();
+    for (const userId of [actorId, f.ids.coach]) {
+      await expect(f.invited.mutation(api.accounts.updateAdult, { userId, expectedRevision: userId === actorId ? 7 : 0, role: "coach", travelLead: true, financialEdit: true, healthExport: true, active: true, reason: "Attempt privilege escalation" })).rejects.toThrow(error);
+      expect(await snapshot()).toEqual(before);
+    }
+  });
   it("records the latest adult archive transition and audit clocks without changing inactive edits", async () => {
     const f = await fixture();
     const userId = await f.t.run(ctx => ctx.db.insert("appUsers", { authUserId: f.ids.inviteAuth, email: "mentor@example.invalid", name: "Mentor", role: "mentor", travelLead: true, financialEdit: false, healthExport: true, active: true }));

@@ -1,5 +1,11 @@
 # Student Status Development Checklist
 
+## October 21 - Approved conservative test cleanup
+
+- [x] Removed unused roster cancellation case; consolidated legacy consent without losing empty/event input coverage.
+- [x] Strengthened selected UI/query, invalid balance and PDF assertions; added only adult privilege and parent travel ownership denial/no-change coverage; added AGENTS testing rule.
+- [x] Independent review, typecheck and source lint. One full run: 628/629 passed; corrected PDF assertion then 5/5 targeted passed. See test-audit.md; no full rerun or production changes.
+
 ## October 21 - Optimizations released
 
 - [x] PR31 merged, production backend and both websites deployed, live assets verified, and v0.1.0-onboarding.12 published. See RELEASE_2026-10-21_OPTIMIZATIONS.md for execution evidence and limitations. Earlier development-only restrictions for this scope are superseded by owner release approval.

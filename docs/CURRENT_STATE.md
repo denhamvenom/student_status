@@ -1,5 +1,9 @@
 # Current integration handoff
 
+## Conservative test cleanup — October 21, 2026
+
+Development branch: chore/conservative-test-cleanup-2026-10-21. Approved test-only cleanup and adult/parent authorization regressions implemented; application code, dependencies and production unchanged. See test-audit.md for exact scope and evidence. One full run: 628/629 passed in 102.618 seconds; corrected PDF header comparison then passed its targeted 5/5 cases. No second full run. Typecheck/source lint passed; broad lint encounters existing temporary artifacts. Other proposed missing tests remain deferred. Preserve .tmp-adult-tests and unrelated worktrees.
+
 ## Optimization release deployed - October 21, 2026
 
 Active checkout:student-status-readiness-design. Documentation branch:docs/optimization-release-2026-10-21. Preserve unrelated .tmp-adult-tests and sibling worktrees.

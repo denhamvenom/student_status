@@ -17,17 +17,28 @@ async function fixture() {
     const student = await ctx.db.insert("students", { seasonId: season, legalName: "Synthetic Student", preferredName: "Student", email: "student@example.invalid", subteam: "A", active: true, travelTeam: false, roomCategoryLocked: false, allergies: { state: "unknown" }, medications: { state: "unknown" } });
     const other = await ctx.db.insert("students", { seasonId: season, legalName: "Synthetic Other", preferredName: "Other", email: "other@example.invalid", subteam: "B", active: true, travelTeam: false, roomCategoryLocked: false, allergies: { state: "unknown" }, medications: { state: "unknown" } });
     await ctx.db.insert("familyLinks", { parentUserId: parent, studentId: student, active: true, createdBy: coach });
-    return { coachAuth, parentAuth, student, other };
+    const event = await ctx.db.insert("events", { seasonId: season, name: "Synthetic consent trip", type: "Team", startsAt: 100, endsAt: 200, destination: "School", travel: "Bus", overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "assigned", allowWithdrawal: true, permissionRequired: true, firstRequired: false, archived: false });
+    await ctx.db.insert("participants", { eventId: event, studentId: student, status: "confirmed", createdAt: 1, updatedAt: 1 });
+    return { coachAuth, parentAuth, student, other, event };
   });
   return { t, ids, coach: t.withIdentity({ subject: `${ids.coachAuth}|session` }), parent: t.withIdentity({ subject: `${ids.parentAuth}|session` }) };
 }
 
 describe("permission draft gate", () => {
-  it("rejects every submission even when the season version has no draft marker", async () => {
+  it("blocks event-bearing draft legal consent even when the season version has no draft marker, without writes", async () => {
     const f = await fixture();
-    await expect(f.parent.mutation(api.permissions.submit, { studentId: f.ids.student, eventIds: [], typedName: "Parent", answersJson: "{}" })).rejects.toThrow("draft");
-    const submissions = await f.t.run(ctx => ctx.db.query("permissionSubmissions").take(1));
-    expect(submissions).toHaveLength(0);
+    const snapshot = () => f.t.run(async ctx => ({
+      submissions: await ctx.db.query("permissionSubmissions").take(10),
+      coverage: await ctx.db.query("permissionCoverage").take(10),
+      audit: await ctx.db.query("audit").take(10),
+      student: await ctx.db.get(f.ids.student),
+      participants: await ctx.db.query("participants").take(10),
+    }));
+    const before = await snapshot();
+    for (const eventIds of [[], [f.ids.event]]) {
+      await expect(f.parent.mutation(api.permissions.submit, { studentId: f.ids.student, eventIds, typedName: "Parent", answersJson: "{}" })).rejects.toThrow("draft");
+      expect(await snapshot()).toEqual(before);
+    }
   });
 
   it("retains role and student-scope checks while submission is closed", async () => {

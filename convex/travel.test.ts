@@ -41,6 +41,28 @@ async function fixture() {
 }
 
 describe("travel operations", () => {
+  it("restricts parent travel reads and writes to current linked children without rejected writes", async () => {
+    const f = await fixture();
+    const linked = { eventId: f.ids.event, studentId: f.ids.studentId };
+    expect(await f.parent.query(api.travel.ownTravel, linked)).toEqual({ independentTravel: false, eligible: true, transportEnabled: true });
+    await f.parent.mutation(api.travel.setIndependentTravel, { ...linked, independentTravel: true });
+    expect(await f.parent.query(api.travel.ownTravel, linked)).toEqual({ independentTravel: true, eligible: true, transportEnabled: true });
+    expect(await f.t.run(ctx => ctx.db.get(f.ids.participant))).toMatchObject({ independentTravel: true });
+    const snapshot = () => f.t.run(async ctx => ({ participants: await ctx.db.query("participants").take(10), audit: await ctx.db.query("audit").take(10) }));
+    const deny = async (studentId: typeof f.ids.studentId) => {
+      const before = await snapshot();
+      await expect(f.parent.query(api.travel.ownTravel, { eventId: f.ids.event, studentId })).rejects.toThrow("permission");
+      await expect(f.parent.mutation(api.travel.setIndependentTravel, { eventId: f.ids.event, studentId, independentTravel: false })).rejects.toThrow("permission");
+      expect(await snapshot()).toEqual(before);
+    };
+    await deny(f.ids.otherId);
+    await f.t.run(async ctx => {
+      const link = await ctx.db.query("familyLinks").withIndex("by_parentUserId_and_studentId", q => q.eq("parentUserId", f.ids.parent.user).eq("studentId", f.ids.studentId)).unique();
+      if (!link) throw new Error("Missing synthetic family link");
+      await ctx.db.patch(link._id, { active: false });
+    });
+    await deny(f.ids.studentId);
+  });
   it("enforces operator roles, active event and season, and valid seat counts", async () => {
     const f = await fixture();
     const settings = { eventId: f.ids.event, transportEnabled: true, busSeats: 2, additionalAdults: 0, trailerRequired: false };

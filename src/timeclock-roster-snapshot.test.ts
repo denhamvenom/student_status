@@ -96,17 +96,6 @@ describe('Timeclock roster snapshots', () => {
     resolve(['Synthetic']);await request;
     expect(store.getSnapshot()).toMatchObject({scope:'event:a',data:['Synthetic'],pending:false});
   });
-  it('does not publish after its operator view unmounts',async()=>{
-
-    let resolve!:(data:string[])=>void;
-
-    const store=createRosterSnapshot(()=>new Promise<string[]>(done=>{resolve=done}));
-
-    const request=store.load('event:a');store.cancel();resolve(['Synthetic']);await request;
-
-    expect(store.getSnapshot().data).toBeUndefined();
-
-  });
 
 });
 

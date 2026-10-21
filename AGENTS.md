@@ -12,6 +12,8 @@ Convex agent skills for common tasks can be installed by running
 
 <!-- convex-ai-end -->
 
+Tests: Only write tests that protect real app behavior or reproduce a fixed bug. Do not test framework or library behavior, do not write snapshot tests, and do not write tests that just mirror the current code. Prefer table-driven tests over near-duplicates.
+
 ## Application boundaries and handoff
 
 - Start with docs/CURRENT_STATE.md and verify the actual checkout/branch. Read task-relevant linked evidence next. Dated pause/review notes are historical; later user decisions supersede them. Keep the short handoff current at milestones.
