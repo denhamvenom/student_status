@@ -8,6 +8,7 @@ import type { FunctionReturnType } from "convex/server";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { api } from "../../../convex/_generated/api";
 import { hasElapsedSession, startVisibleClock } from "./visibleClock";
+import { eventQueryTime, eventAvailableAt, calendarStaleAt } from "./eventClock";
 import "./theme.css";
 import "./style.css";
 
@@ -102,8 +103,11 @@ function Timeclock({ role }: { role: "coach" | "mentor" }) {
   const { resolvedTheme, setTheme } = useTheme();
   const connection = useConvexConnectionState();
   const { id: profileId, warning } = useProfileId();
-  const events = useQuery(api.timeclock.todayEvents, { asOf: now });
-  const calendar = useQuery(api.calendarState.status, { now });
+  const queryTime = eventQueryTime(now);
+  const eventRows = useQuery(api.timeclock.todayEvents, { asOf: queryTime });
+  const events = eventRows?.map(event => ({ ...event, available: eventAvailableAt(event, now) }));
+  const calendarRow = useQuery(api.calendarState.status, { now: queryTime });
+  const calendar = calendarRow && { ...calendarRow, stale: calendarStaleAt(calendarRow, now) };
   const roster = useQuery(api.timeclockRoster.list, {});
   const consoleState = useQuery(api.timeclock.consoleStatus, profileId ? { profileId } : "skip");
   const sessionId = consoleState?.selectedSessionId ?? null;

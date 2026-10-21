@@ -17,6 +17,7 @@ import styles from './CoachRoster.module.css'
 import { CoachRosterBoundary } from './CoachRosterBoundary'
 import { canonicalSubteam, subteamDisplay, subteamOptions } from './lib/subteams'
 import { gradeLabel, sortRoster, type Direction, type RosterSort } from './lib/rosterSort'
+import { rosterAsOfAtTransition } from './lib/roster-refresh'
 
 type Row = typeof api.coachRoster.list._returnType['page'][number]
 type DirectoryRow = typeof api.coachRoster.directory._returnType['page'][number]
@@ -24,7 +25,27 @@ type Quick = 'all'|'notReady'|'missing'|'balanceDue'
 const access=(row:Row)=>row.account.linkage==='unlinked'?'Not connected':row.account.linkage==='unavailable'?'Student sign-in unavailable':row.account.access==='active'?'Connected':row.account.access==='inactive'?'Connected (sign-in turned off)':'Access unknown'
 const profileItem=(item:string)=>item==='Room category'?'Rooming category':item
 const eventStatus=(row:Row)=>!row.active?'Archived':row.nextEvent?row.nextEvent.state==='ready'?'Ready':row.nextEvent.state==='open'?'Needs attention':'Unknown':row.readinessCoverage==='unknown'?'Upcoming events not fully checked':'No upcoming enrolled event'
-function useAsOf(){const state=useState(()=>Date.now());const setAsOf=state[1];useEffect(()=>{const timer=setInterval(()=>setAsOf(Date.now()),60000);return()=>clearInterval(timer)},[setAsOf]);return state}
+function useAsOf(){
+  const [asOf,setAsOf]=useState(()=>Date.now())
+  const transitionAt=useQuery(api.coachRoster.nextTransition,{asOf})
+  useEffect(()=>{
+    let timer: ReturnType<typeof setTimeout>|undefined
+    const schedule=()=>{
+      if(timer!==undefined)clearTimeout(timer)
+      timer=undefined
+      if(document.visibilityState==='hidden'||transitionAt===undefined||transitionAt===null)return
+      const now=Date.now()
+      const next=rosterAsOfAtTransition(asOf,transitionAt,now,true)
+      if(next!==asOf){setAsOf(next);return}
+      // Browsers cap timeout durations; a distant event needs a timer reset, not a query refresh.
+      timer=setTimeout(schedule,Math.min(transitionAt-now,2_147_483_647))
+    }
+    schedule()
+    document.addEventListener('visibilitychange',schedule)
+    return()=>{if(timer!==undefined)clearTimeout(timer);document.removeEventListener('visibilitychange',schedule)}
+  },[asOf,transitionAt])
+  return asOf
+}
 
 function RosterRow({row,grade}:{row:Row;grade:string|null}){
   const update=useMutation(api.admin.updateRoster),[busy,setBusy]=useState(false),[error,setError]=useState('')
@@ -85,4 +106,4 @@ function RosterPage({active,asOf}:{active:boolean;asOf:number}){
     {complete&&ordered.length>(effectivePageIndex+1)*20&&<Button type="button" variant="outline" onClick={()=>setPageIndex(effectivePageIndex+1)}>Next students</Button>}
   </>
 }
-export function CoachRosterManagement(){const [asOf]=useAsOf(),[showArchived,setShowArchived]=useState(false);return <div className={styles.root}><Button type="button" variant="outline" aria-pressed={showArchived} onClick={()=>setShowArchived(!showArchived)}>{showArchived?copy.showActive:copy.showArchived}</Button><CoachRosterBoundary key={showArchived?'archived':'active'}><RosterPage active={!showArchived} asOf={asOf}/></CoachRosterBoundary></div>}
+export function CoachRosterManagement(){const asOf=useAsOf(),[showArchived,setShowArchived]=useState(false);return <div className={styles.root}><Button type="button" variant="outline" aria-pressed={showArchived} onClick={()=>setShowArchived(!showArchived)}>{showArchived?copy.showActive:copy.showArchived}</Button><CoachRosterBoundary key={showArchived?'archived':'active'}><RosterPage active={!showArchived} asOf={asOf}/></CoachRosterBoundary></div>}

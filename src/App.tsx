@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link as RouterLink, NavLink, useLocation, useNavigate, useSearchParams, type LinkProps } from 'react-router'
 import { events, roleNames, students, tasks, type EventView, type Role, type StudentView } from './fixtures'
-import LiveApp from './LiveApp'
+import LiveApp from './LiveEntry'
 import { ParentInvitationReview } from './ParentInvites'
 import { useTheme } from 'next-themes'
 import { useUiStore } from './uiStore'

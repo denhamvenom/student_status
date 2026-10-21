@@ -122,17 +122,19 @@ export const team = query({
     const students = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(501);
     if (students.length > 500) throw new ConvexError("Dashboard roster limit reached; totals are unavailable.");
     const backfill = await ctx.db.query("financeSummaryBackfills").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).unique();
-    const summaries = await ctx.db.query("studentFinanceSummaries").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(501);
     const readyAccounts = await ctx.db.query("financialAccounts").withIndex("by_seasonId_and_state", q => q.eq("seasonId", season._id).eq("state", "ready")).take(501);
-    const failedAccount = await ctx.db.query("financialAccounts").withIndex("by_seasonId_and_state", q => q.eq("seasonId", season._id).eq("state", "failed")).first();
     const readyIds = new Set(readyAccounts.map(account => account.studentId));
     const maintenance = await feeMaintenanceProjection(ctx, season._id);
     const roster = { maintenance, activeStudents: students.filter(s => s.active).length, inactiveStudents: students.filter(s => !s.active).length, travelTeamStudents: students.filter(s => s.active && s.travelTeam).length };
-    if (readyAccounts.length !== students.length || students.some(student => !readyIds.has(student._id))) return publicErrorResult({
-      state: failedAccount ? "failed" as const : "updating" as const, ...roster, finance: null,
-      processed: backfill?.processed ?? 0, rebuildRunning: backfill?.state === "running", canRebuild: user.role === "coach" && backfill?.state !== "running" && (!maintenance || maintenance.state === "ready" || maintenance.state === "failed"),
-      message: failedAccount ? "A financial operation or rebuild requires Coach review before team totals can be verified." : "Financial records are being prepared or transactions are still processing.",
-    });
+    if (readyAccounts.length !== students.length || students.some(student => !readyIds.has(student._id))) {
+      const failedAccount = await ctx.db.query("financialAccounts").withIndex("by_seasonId_and_state", q => q.eq("seasonId", season._id).eq("state", "failed")).first();
+      return publicErrorResult({
+        state: failedAccount ? "failed" as const : "updating" as const, ...roster, finance: null,
+        processed: backfill?.processed ?? 0, rebuildRunning: backfill?.state === "running", canRebuild: user.role === "coach" && backfill?.state !== "running" && (!maintenance || maintenance.state === "ready" || maintenance.state === "failed"),
+        message: failedAccount ? "A financial operation or rebuild requires Coach review before team totals can be verified." : "Financial records are being prepared or transactions are still processing.",
+      });
+    }
+    const summaries = await ctx.db.query("studentFinanceSummaries").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(501);
     if (backfill?.state !== "complete" || summaries.length > 500 || summaries.length !== students.length || summaries.some(summary => summary.version !== FINANCE_SUMMARY_VERSION || !students.some(student => student._id === summary.studentId)) || students.some(student => !summaries.some(summary => summary.studentId === student._id))) return publicErrorResult({ state: backfill?.state === "failed" ? "failed" as const : "updating" as const, ...roster, finance: null, processed: backfill?.processed ?? 0, rebuildRunning: backfill?.state === "running", canRebuild: user.role === "coach" && backfill?.state !== "running" && (!maintenance || maintenance.state === "ready" || maintenance.state === "failed"), message:publicErrorMessage(backfill?.lastError) ?? "Financial reports are updating; rebuild reports before viewing totals." });
     // Finance includes inactive current-season accounts: archiving never erases debt or credit.
     const metrics = ["chargedCents", "paidCents", "dueCents", "travelBalanceCents", "personalAvailableCents", "fundraisingAvailableCents", "travelShareCents", "transferredInCents", "knownRaisedCents"] as const;
