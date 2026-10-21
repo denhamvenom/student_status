@@ -1,12 +1,12 @@
 # Current integration handoff
 
-## Attendance and kiosk optimizations - development review ready
+## Calendar cadence and fixed event roster - development review ready
 
 Active checkout: student-status-readiness-design. Branch perf/reduce-database-reads-2026-10-21; earlier optimization checkpoint de46487 is already published. Preserve sibling worktrees and unrelated untracked .tmp-adult-tests.
 
-Owner authorized audit steps2–3 in development: attendance report refresh/history and kiosk clockStatus reads. Implemented with existing schema/indexes and no new dependencies. Quiet report arguments remain stable; real data updates, active-session timing and cross-event conflicts remain live. Details and measured savings: [USAGE_OPTIMIZATION.md](USAGE_OPTIMIZATION.md).
+Latest owner clarification: roster names stay fixed during an event; only clock-in/out status changes live. Implemented a memory-only roster snapshot daily while idle and once on event selection. Calendar now syncs at 6 AM and 3 PM Chicago time with a manual Refresh button. Device selection stays subscribed for cross-tab changes. Existing attendance/history and kiosk read optimizations remain. No schema/index/dependency changes. Details and measurement limits: [USAGE_OPTIMIZATION.md](USAGE_OPTIMIZATION.md).
 
-Development third-bandicoot-18 synced. Independent Astra review found no blockers. Source lint/typecheck/build passed; integrated regression plus isolated reruns and final focused tests passed. Broad check includes ignored preview artifacts in lint; unrelated timeouts/randomized bulk-invite limiter test are documented rather than concealed. Real signed-in localhost clients verified clock-in/out synchronization, report duration updates and automatic event closure. Phone/dark and desktop/light report layouts checked.
+Development third-bandicoot-18 synced. Final Astra review found no blockers. Source lint, strict types, both builds and all 628 integrated tests passed. Restricted test-module loading failed; full suite passed outside that restriction without assertion changes. Real signed-in localhost verified manual refresh success and cooldown recovery; phone/dark and desktop/light checked. Snapshot tests verify daily reads, event freeze across midnight, switching, retry and late-response fencing. Earlier two-client clock-in/out/report/automatic-close evidence remains; these live hooks are unchanged.
 
 Local apps: localhost:5173 Student Status and localhost:5174 Timeclock. Ignored tmp/attendance-live wrapper displays actual authenticated report components with synthetic development data; account-specific review URL/screenshots remain out of Git. Development season2027–28 lacks a verified kickoff, so existing unavailable season-total state remains; session evidence works.
 

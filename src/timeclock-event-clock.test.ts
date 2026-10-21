@@ -24,9 +24,11 @@ describe('Timeclock stable live-query clock', () => {
     expect(eventAvailableAt({...event, state: 'closed'}, 999)).toBe(false);
     expect(eventAvailableAt({...event, state: 'open', effectiveEnd: 2000}, 1999)).toBe(true);
     expect(eventAvailableAt({...event, state: 'open', effectiveEnd: 2000}, 2000)).toBe(false);
-    const calendar = { configured: true, error: null, lastSuccessAt: 1000 };
-    expect(calendarStaleAt(calendar, 181000)).toBe(false);
-    expect(calendarStaleAt(calendar, 181001)).toBe(true);
-    expect(calendarStaleAt({...calendar, lastSuccessAt: 181001}, 181001)).toBe(false);
+    const success = Date.parse('2026-10-21T11:00:00Z'); // 6 AM CDT
+    const calendar = { configured: true, error: null, lastSuccessAt: success };
+    expect(calendarStaleAt(calendar, Date.parse('2026-10-21T19:59:00Z'))).toBe(false);
+    expect(calendarStaleAt(calendar, Date.parse('2026-10-21T20:05:00Z'))).toBe(true);
+    expect(calendarStaleAt({...calendar,lastSuccessAt:Date.parse('2026-10-21T20:00:00Z')},Date.parse('2026-10-21T20:05:00Z'))).toBe(false);
+    expect(calendarStaleAt({...calendar,error:'sync failed'},success)).toBe(true);
   });
 });

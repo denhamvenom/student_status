@@ -1,3 +1,4 @@
+import { calendarSyncStale } from '../../../convex/lib/calendarSchedule';
 import { chicagoDayBounds } from '../../../convex/lib/timeclock';
 
 /** Stable subscription argument; database changes still update the live query. */
@@ -10,5 +11,5 @@ export function eventAvailableAt(event: { available: boolean; state: string; all
 }
 
 export function calendarStaleAt(calendar: { configured: boolean; error: string | null; lastSuccessAt: number | null }, now: number) {
-  return !calendar.configured || !!calendar.error || !calendar.lastSuccessAt || now - calendar.lastSuccessAt > 180_000;
+  return calendarSyncStale({ ...calendar, now });
 }

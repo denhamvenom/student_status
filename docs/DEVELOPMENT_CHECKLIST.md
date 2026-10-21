@@ -1,5 +1,15 @@
 # Student Status Development Checklist
 
+## October 21 - Calendar cadence and fixed event roster (development only)
+
+- [x] Calendar sync at 6 AM and 3 PM Chicago time, DST-aware, plus authenticated Refresh with pending and recovery states.
+- [x] Roster snapshot daily while idle and once on event selection; names stay fixed throughout the selected event. Clock-in/out and device selection stay live.
+- [x] Snapshot tests cover daily boundaries, event switching, midnight freeze, retry and stale responses; schedule tests cover DST and freshness.
+- [x] Independent Astra review, source lint, strict types, both builds and all 628 integrated tests passed. Development backend synced; localhost manual refresh and cooldown exercised, phone/dark and desktop/light inspected.
+- [ ] Owner localhost review and separate production release authorization.
+
+No schema/index/dependency changes. Schedule attempts fall from 1,440 to two daily, plus manual refreshes; this is not a measured billing reduction. See [USAGE_OPTIMIZATION.md](USAGE_OPTIMIZATION.md).
+
 ## October 21 - Attendance and kiosk read optimization (development only)
 
 - [x] Summary-only reports skip history, and full report pages share one live result.
