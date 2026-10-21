@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+import rateLimiter from "@convex-dev/rate-limiter/test";
 import { describe, expect, it } from "vitest";
 import { createTest as convexTest } from "../testUtils";
 import { api } from "./_generated/api";
@@ -7,6 +8,7 @@ import schema from "./schema";
 const modules = import.meta.glob("./**/*.ts");
 async function fixture() {
   const t = convexTest(schema, modules);
+  rateLimiter.register(t, "rateLimiter");
   const ids = await t.run(async ctx => {
     async function user(role: "coach" | "mentor" | "student" | "parent", active = true) {
       const auth = await ctx.db.insert("users", { email: `${role}-${active}@example.invalid` });
@@ -110,6 +112,15 @@ describe("Timeclock roster and attendance boundary", () => {
     expect(await row()).toMatchObject({ status: "out", activeSessionId: null, activeIntervalId: null, hasConflict: false });
     expect((await f.coach.mutation(api.timeclock.clockGroup, { sessionId: sessions.b, mode: "in", expectedRevision: 1, expected: [{ studentId: f.ids.z, intervalId: null }], key: "roster-other-in-001" })).ok).toBe(true);
     expect(await row()).toMatchObject({ status: "out", activeSessionId: sessions.b, hasConflict: true });
+    const conflict = await row();
+    const oldPin = process.env.TIMECLOCK_OPERATOR_PIN;
+    process.env.TIMECLOCK_OPERATOR_PIN = "synthetic-roster-pin";
+    try {
+      expect((await f.coach.mutation(api.timeclock.clockGroup, { sessionId: sessions.a, mode: "transfer", expectedRevision: 1, expected: [{ studentId: f.ids.z, intervalId: conflict.activeIntervalId }], pin: "synthetic-roster-pin", key: "roster-transfer-01" })).ok).toBe(true);
+    } finally { if (oldPin === undefined) delete process.env.TIMECLOCK_OPERATOR_PIN; else process.env.TIMECLOCK_OPERATOR_PIN = oldPin; }
+    expect(await row()).toMatchObject({ status: "in", activeSessionId: sessions.a, hasConflict: false });
+    const other = await f.coach.query(api.timeclockRoster.clockStatus, { sessionId: sessions.b });
+    expect(other.students.find(s => s.studentId === f.ids.z)).toMatchObject({ status: "out", activeSessionId: sessions.a, hasConflict: true });
   });
 
   it("ignores stale pointers and closed sessions as active conflicts", async () => {
@@ -126,6 +137,26 @@ describe("Timeclock roster and attendance boundary", () => {
     expect(await row()).toMatchObject({ status: "out", activeSessionId: null, activeIntervalId: null, hasConflict: false });
   });
 
+  it("refreshes eligibility and rejects locks pointing at another student's visit", async () => {
+    const f = await fixture();
+    const sessions = await sessionFixture(f);
+    const rows = async () => (await f.coach.query(api.timeclockRoster.clockStatus, { sessionId: sessions.a })).students;
+    const other = (await rows()).find(s => s.studentId !== f.ids.z)!.studentId;
+    await f.t.run(async ctx => {
+      const intervalId = await ctx.db.insert("timeclockIntervals", { sessionId: sessions.a, studentId: other, inAt: 10, openedBy: f.ids.coach.id, openCommandKey: "wrong-owner", scheduleRevision: 1 });
+      await ctx.db.insert("timeclockStudentLocks", { studentId: f.ids.z, sessionId: sessions.a, intervalId });
+    });
+    expect((await rows()).find(s => s.studentId === f.ids.z)).toMatchObject({ status: "no_activity", activeSessionId: null, activeIntervalId: null, hasConflict: false });
+    await f.t.run(ctx => ctx.db.patch(f.ids.z, { active: false }));
+    expect((await rows()).find(s => s.studentId === f.ids.z)).toBeUndefined();
+    await f.t.run(ctx => ctx.db.patch(f.ids.z, { active: true, structuredNameReviewed: false }));
+    expect((await rows()).find(s => s.studentId === f.ids.z)).toBeUndefined();
+    await f.coach.mutation(api.timeclockRoster.reviewNames, { studentId: f.ids.z, firstName: "Zoe", lastName: "Zebra", reason: "Synthetic review" });
+    expect((await rows()).find(s => s.studentId === f.ids.z)?.status).toBe("no_activity");
+    await f.t.run(ctx => ctx.db.patch(f.ids.z, { seasonId: f.ids.archived }));
+    expect((await rows()).find(s => s.studentId === f.ids.z)).toBeUndefined();
+  });
+
   it("keeps corrected attendance separate from operational clock status", async () => {
     const f = await fixture();
     const sessions = await sessionFixture(f);
@@ -137,3 +168,51 @@ describe("Timeclock roster and attendance boundary", () => {
     expect(row).toMatchObject({ status: "no_activity", activeSessionId: null, activeIntervalId: null, hasConflict: false });
   });
 });
+
+it.each([
+  { size: 12, history: 0, mode: "selected" },
+  { size: 100, history: 50, mode: "selected" },
+  { size: 100, history: 50, mode: "other" },
+  { size: 100, history: 0, mode: "cold" },
+])("measures bounded clock status reads: $size students / $history visits / $mode", async ({ size, history, mode }) => {
+  const f = await fixture();
+  const sessions = await sessionFixture(f);
+  await f.t.run(async ctx => {
+    const template = (await ctx.db.get(f.ids.z))!;
+    const { _id: ignoredId, _creationTime: ignoredTime, ...fields } = template;
+    void ignoredId; void ignoredTime;
+    const students = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", f.ids.season)).take(501);
+    for (const s of students) await ctx.db.patch(s._id, { active: false });
+    for (let i = 0; i < size; i++) {
+      const studentId = await ctx.db.insert("students", fields);
+      for (let j = 0; j < history; j++) await ctx.db.insert("timeclockIntervals", { studentId, sessionId: sessions.a, inAt: j * 100, outAt: j * 100 + 50, openedBy: f.ids.coach.id, openCommandKey: `past-${i}-${j}`, scheduleRevision: 1 });
+      if (mode !== "cold") {
+        const sessionId = mode === "other" ? sessions.b : sessions.a;
+        const intervalId = await ctx.db.insert("timeclockIntervals", { studentId, sessionId, inAt: 100000, openedBy: f.ids.coach.id, openCommandKey: `active-${i}`, scheduleRevision: 1 });
+        await ctx.db.insert("timeclockStudentLocks", { studentId, sessionId, intervalId });
+      }
+    }
+  });
+  const sample = await f.coach.run(async ctx => {
+    const result = await ctx.runQuery(api.timeclockRoster.clockStatus, { sessionId: sessions.a });
+    const metrics = await ctx.meta.getTransactionMetrics();
+    return { count: result.students.length, documentsRead: metrics.documentsRead.used, bytesRead: metrics.bytesRead.used, databaseQueries: metrics.databaseQueries.used };
+  });
+  expect(sample.count).toBe(size);
+  expect(sample.documentsRead).toBeLessThanOrEqual(4 * size + 12);
+  expect(sample.databaseQueries).toBeLessThanOrEqual(3 * size + 8);
+  console.info("clockStatus synthetic", { size, history, mode, ...sample });
+  await f.t.run(async ctx => {
+    const locks = await ctx.db.query("timeclockStudentLocks").withIndex("by_sessionId", q => q.eq("sessionId", mode === "other" ? sessions.b : sessions.a)).take(501);
+    for (const lock of locks) await ctx.db.patch(lock._id, { intervalId: undefined, sessionId: undefined });
+  });
+  const checkedOut = await f.coach.run(async ctx => {
+    const result = await ctx.runQuery(api.timeclockRoster.clockStatus, { sessionId: sessions.a });
+    const metrics = await ctx.meta.getTransactionMetrics();
+    return { allExpected: result.students.every(s => s.status === (mode === "cold" ? "no_activity" : "out")), documentsRead: metrics.documentsRead.used, bytesRead: metrics.bytesRead.used, databaseQueries: metrics.databaseQueries.used };
+  });
+  expect(checkedOut.allExpected).toBe(true);
+  expect(checkedOut.documentsRead).toBeLessThanOrEqual(4 * size + 12);
+  expect(checkedOut.databaseQueries).toBeLessThanOrEqual(3 * size + 8);
+  console.info("clockStatus checked out synthetic", { size, history, mode, ...checkedOut });
+}, 20_000);

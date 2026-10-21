@@ -64,9 +64,9 @@ async function phaseCounts(ctx: QueryCtx, seasonId: Id<"seasons">, studentId: Id
   ]);
   return {sessionsHeld,sessionsAttended,tuesdayHeld,tuesdayAttended,tuesdayPercent:tuesdayHeld?Math.round(100*tuesdayAttended/tuesdayHeld):null,thursdayAttended,outreachAttended,buildWeekdayHeld,buildWeekdayAttended,buildSaturdayHeld,buildSaturdayAttended,buildSundayHeld,updatedAt};
 }
-const sharedAttendanceFields={phaseBoundary:phaseBoundaryValidator,phases:phasesValidator,sessions:v.array(sessionValidator),isDone:v.boolean(),continueCursor:v.string(),splitCursor:v.optional(v.union(v.string(),v.null())),pageStatus:v.optional(v.union(v.literal("SplitRequired"),v.literal("SplitRecommended"),v.null())),legacy:legacyValidator,totalsScope:v.literal("currentFinalized")};
+const sharedAttendanceFields={nextRefreshAt:nullableNumber,phaseBoundary:phaseBoundaryValidator,phases:phasesValidator,sessions:v.array(sessionValidator),isDone:v.boolean(),continueCursor:v.string(),splitCursor:v.optional(v.union(v.string(),v.null())),pageStatus:v.optional(v.union(v.literal("SplitRequired"),v.literal("SplitRecommended"),v.null())),legacy:legacyValidator,totalsScope:v.literal("currentFinalized")};
 export const familyAttendance=query({
-  args:{studentId:v.id("students"),asOf:v.number(),paginationOpts:v.optional(paginationOptsValidator)},
+  args:{studentId:v.id("students"),asOf:v.number(),includeHistory:v.optional(v.boolean()),paginationOpts:v.optional(paginationOptsValidator)},
   returns:v.union(v.object({...sharedAttendanceFields,state:v.literal("ready"),verified:verifiedValidator}),v.object({...sharedAttendanceFields,state:v.union(v.literal("updating"),v.literal("failed")),verified:v.null(),canRebuild:v.boolean(),rebuildRunning:v.boolean(),processed:v.number(),message:v.string()})),
   handler:async(ctx,args)=>{
     if(!Number.isFinite(args.asOf))throw new ConvexError("Invalid report time.");
@@ -83,10 +83,19 @@ export const familyAttendance=query({
     // Keep native endCursor/id/byte budgets; enforce a server row budget even when
     // an adaptive native page grows past its originally requested numItems.
     const paginationOpts=args.paginationOpts??{numItems:10,cursor:null};
-    const stored=await ctx.db.query("timeclockSessions").withIndex("by_seasonId_and_scheduledStart",q=>q.eq("seasonId",student.seasonId).lte("scheduledStart",args.asOf)).order("desc").paginate({...paginationOpts,maximumRowsRead:Math.min(paginationOpts.maximumRowsRead??11,11)});
+    const stored=args.includeHistory===false?{page:[],isDone:true,continueCursor:""}:await ctx.db.query("timeclockSessions").withIndex("by_seasonId_and_scheduledStart",q=>q.eq("seasonId",student.seasonId).lte("scheduledStart",args.asOf)).order("desc").paginate({...paginationOpts,maximumRowsRead:Math.min(paginationOpts.maximumRowsRead??11,11)});
     if(stored.page.length>10)throw new ConvexError("Attendance page expanded beyond 10 sessions. Reload the session list to continue; no session cards were skipped.");
+    const boundaries:number[]=[];
+    if(kickoff.state==="verified"&&kickoff.kickoffAt>args.asOf)boundaries.push(kickoff.kickoffAt);
+    if(args.includeHistory!==false){
+      const nextSession=await ctx.db.query("timeclockSessions").withIndex("by_seasonId_and_scheduledStart",q=>q.eq("seasonId",student.seasonId).gt("scheduledStart",args.asOf)).first();
+      const nextMeeting=await ctx.db.query("attendanceMeetings").withIndex("by_seasonId_and_startsAt",q=>q.eq("seasonId",student.seasonId).gt("startsAt",args.asOf)).first();
+      if(nextSession)boundaries.push(nextSession.scheduledStart);
+      if(nextMeeting)boundaries.push(nextMeeting.startsAt);
+    }
     const sessions=[];let pageStale=false;
     for(const session of stored.page){
+      if(session.state==="open"&&session.effectiveEnd>args.asOf)boundaries.push(Math.min(args.asOf+30000,session.effectiveEnd),...[session.scheduledEnd].filter(at=>at>args.asOf));
       const occurrence=await ctx.db.get(session.occurrenceId);
       const report=await ctx.db.query("timeclockSessionReportStates").withIndex("by_sessionId",q=>q.eq("sessionId",session._id)).unique();
       const row=await ctx.db.query("timeclockAttendanceSummaries").withIndex("by_sessionId_and_studentId",q=>q.eq("sessionId",session._id).eq("studentId",student._id)).unique();
@@ -95,12 +104,12 @@ export const familyAttendance=query({
       const math=session.state==="open"?await attendanceEvidence(ctx,session,student._id,args.asOf):fresh?row??{totalMs:0,earlyMs:0,scheduledMs:0,extendedMs:0,longestScheduledMs:0,qualifies:false}:null;
       sessions.push({sessionId:session._id,title:occurrence?.title??"Unavailable event",scheduledStart:session.scheduledStart,state:session.state,totalMs:math?.totalMs??null,scheduledMs:math?.scheduledMs??null,earlyMs:math?.earlyMs??null,extendedMs:math?.extendedMs??null,longestScheduledMs:math?.longestScheduledMs??null,qualifies:math?.qualifies??null,needsReview:session.needsReview,provisional:session.state==="open",reportState:session.state==="open"||fresh?"ready" as const:report?.state==="failed"?"failed" as const:"updating" as const});
     }
-    const meetings=await ctx.db.query("attendanceMeetings").withIndex("by_seasonId_and_startsAt",q=>q.eq("seasonId",student.seasonId).lte("startsAt",args.asOf)).take(501);
-    const records=await ctx.db.query("attendanceRecords").withIndex("by_studentId",q=>q.eq("studentId",student._id)).take(501);
+    const meetings=args.includeHistory===false?[]:await ctx.db.query("attendanceMeetings").withIndex("by_seasonId_and_startsAt",q=>q.eq("seasonId",student.seasonId).lte("startsAt",args.asOf)).take(501);
+    const records=args.includeHistory===false?[]:await ctx.db.query("attendanceRecords").withIndex("by_studentId",q=>q.eq("studentId",student._id)).take(501);
     if(meetings.length>500||records.length>500)throw new ConvexError("Legacy attendance limit reached; totals are unavailable.");
     const present=new Set(records.filter(r=>r.present).map(r=>r.meetingId));const held=meetings.filter(m=>!m.cancelled);const tuesdays=held.filter(m=>m.kind==="Tuesday");const attended=tuesdays.filter(m=>present.has(m._id)).length;
     const legacy={tuesdayHeld:tuesdays.length,tuesdayAttended:attended,tuesdayPercent:tuesdays.length?Math.round(100*attended/tuesdays.length):null,thursdayAttended:held.filter(m=>m.kind==="Thursday"&&present.has(m._id)).length,outreachAttended:held.filter(m=>m.kind==="Outreach"&&present.has(m._id)).length};
-    const shared={phaseBoundary,phases:null,sessions,isDone:stored.isDone,continueCursor:stored.continueCursor,...(stored.splitCursor!==undefined?{splitCursor:stored.splitCursor}:{}),...(stored.pageStatus!==undefined?{pageStatus:stored.pageStatus}:{}),legacy,totalsScope:"currentFinalized" as const};
+    const shared={nextRefreshAt:boundaries.length?Math.min(...boundaries):null,phaseBoundary,phases:null,sessions,isDone:stored.isDone,continueCursor:stored.continueCursor,...(stored.splitCursor!==undefined?{splitCursor:stored.splitCursor}:{}),...(stored.pageStatus!==undefined?{pageStatus:stored.pageStatus}:{}),legacy,totalsScope:"currentFinalized" as const};
     if(backfill?.state!=="complete"||pending>0||failed>0||pageStale||!!unclassified||!!unclassifiedBuild)return publicErrorResult({...shared,state:backfill?.state==="failed"||failed>0?"failed" as const:"updating" as const,verified:null,canRebuild:user.role==="coach"&&backfill?.state!=="running",rebuildRunning:backfill?.state==="running"||pending>0,processed:backfill?.processed??0,message:publicErrorMessage(backfill?.lastError)??(failed>0?"Attendance evidence needs Coach review.":"Attendance reports are updating. Verified totals will appear when rebuilding completes.")});
     const [sessionsHeld,sessionsAttended,tuesdayHeld,tuesdayAttended,thursdayAttended,outreachAttended]=await Promise.all([reportAggregate.count(ctx,{namespace:attendanceNamespace(student.seasonId,"held")}),reportAggregate.count(ctx,{namespace:studentAttendanceNamespace(student.seasonId,student._id)}),reportAggregate.count(ctx,{namespace:attendanceNamespace(student.seasonId,"held","Tuesday")}),reportAggregate.count(ctx,{namespace:studentAttendanceNamespace(student.seasonId,student._id,"Tuesday")}),reportAggregate.count(ctx,{namespace:studentAttendanceNamespace(student.seasonId,student._id,"Thursday")}),reportAggregate.count(ctx,{namespace:studentAttendanceNamespace(student.seasonId,student._id,"Outreach")})]);
     const latest=await ctx.db.query("timeclockSessionReportStates").withIndex("by_seasonId_and_updatedAt",q=>q.eq("seasonId",student.seasonId)).order("desc").first();

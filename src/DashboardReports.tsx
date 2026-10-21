@@ -29,15 +29,27 @@ export function FinancialMaintenanceNotice({maintenance}:{maintenance?:{state:'r
   if(!maintenance||maintenance.state==='ready')return null
   return <p className={styles.note} role={maintenance.state==='failed'?'alert':'status'}>{maintenance.state==='failed'?copy.financialMaintenanceFailed:copy.financialMaintenancePending} {copy.committedTotals}</p>
 }
-function useReportTime(){
+function useReportTime(nextRefreshAt:number|null|undefined){
   const [asOf,setAsOf]=useState(()=>Date.now())
   useEffect(()=>{
-    const refresh=()=>{if(!document.hidden)setAsOf(Date.now())}
-    const timer=window.setInterval(refresh,30000)
+    const refresh=()=>{if(!document.hidden&&nextRefreshAt!=null&&Date.now()>=nextRefreshAt)setAsOf(Date.now())}
+    let timer:number|undefined
+    const schedule=()=>{
+      if(nextRefreshAt==null)return
+      timer=window.setTimeout(()=>{refresh();if(Date.now()<nextRefreshAt)schedule()},Math.min(2147483647,Math.max(0,nextRefreshAt-Date.now())))
+    }
+    schedule()
     document.addEventListener('visibilitychange',refresh)
-    return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',refresh)}
-  },[])
+    return()=>{if(timer!==undefined)window.clearTimeout(timer);document.removeEventListener('visibilitychange',refresh)}
+  },[nextRefreshAt,asOf])
   return asOf
+}
+function useAttendanceReport(studentId:Id<'students'>,includeHistory:boolean,cursor:string|null=null){
+  const [nextRefreshAt,setNextRefreshAt]=useState<number|null>()
+  const asOf=useReportTime(nextRefreshAt)
+  const data=useQuery(api.dashboardReports.familyAttendance,{studentId,asOf,includeHistory,...(includeHistory?{paginationOpts:{numItems:10,cursor}}:{})})
+  useEffect(()=>setNextRefreshAt(data?.nextRefreshAt),[data?.nextRefreshAt])
+  return data
 }
 
 export function FamilyFunding({studentId,compact=false}:{studentId:Id<'students'>;compact?:boolean}){
@@ -64,7 +76,10 @@ function AttendancePhaseCards({label,totals,build=false}:{label:string;totals:Ph
   </div>{build&&totals.buildSundayHeld>0&&<p className={styles.note}>{copy.buildSundaySeparate(totals.buildSundayHeld)}</p>}</section>
 }
 export function FamilyAttendanceSummary({studentId,compact=false,showDetailsBelow=false,headingLabel=copy.verified}:{studentId:Id<'students'>;compact?:boolean;showDetailsBelow?:boolean;headingLabel?:string}){
-  const asOf=useReportTime();const data=useQuery(api.dashboardReports.familyAttendance,{studentId,asOf})
+  const data=useAttendanceReport(studentId,false)
+  return <AttendanceSummary data={data} compact={compact} showDetailsBelow={showDetailsBelow} headingLabel={headingLabel}/>
+}
+function AttendanceSummary({data,compact=false,showDetailsBelow=false,headingLabel=copy.verified}:{data:ReturnType<typeof useAttendanceReport>;compact?:boolean;showDetailsBelow?:boolean;headingLabel?:string}){
   const heading=<div className={styles.header}>{compact?<CardTitle>{copy.attendance}</CardTitle>:<h2 className={styles.sectionTitle}>{headingLabel}</h2>}{compact&&<Link to="/attendance">{copy.details}</Link>}</div>
   let content
   if(!data)content=<p role="status">{copy.loading}</p>
@@ -76,8 +91,8 @@ export function FamilyAttendanceSummary({studentId,compact=false,showDetailsBelo
 }
 
 export function FamilyAttendancePage({studentId}:{studentId:Id<'students'>}){
-  const asOf=useReportTime();const [cursor,setCursor]=useState<string|null>(null);const data=useQuery(api.dashboardReports.familyAttendance,{studentId,asOf,paginationOpts:{numItems:10,cursor}})
-  return <div className={styles.root}><FamilyAttendanceSummary studentId={studentId} showDetailsBelow/><Card className={styles.card}><CardTitle>{copy.legacy}</CardTitle><p className={styles.note}>{copy.legacyNote}</p>{!data?<p role="status">{copy.loading}</p>:<div className={styles.metrics}><Metric label={copy.tuesday} value={data.legacy.tuesdayPercent===null?copy.unavailable:`${data.legacy.tuesdayPercent}% (${data.legacy.tuesdayAttended}/${data.legacy.tuesdayHeld})`}/><Metric label={copy.thursday} value={data.legacy.thursdayAttended}/><Metric label={copy.outreach} value={data.legacy.outreachAttended}/></div>}</Card><h2 className={styles.sectionTitle}>{copy.sessions}</h2><p className={styles.note}>{copy.timezone} {copy.finalizedScope}</p>{!data?<p role="status">{copy.loading}</p>:!data.sessions.length?<Card className={styles.card}><p>{copy.noSessions}</p></Card>:<div className={styles.sessionGrid}>{data.sessions.map(session=><Card key={session.sessionId} className={styles.card}><h3 className={styles.sessionTitle}>{session.title}</h3><p className={styles.note}>{when(session.scheduledStart)}</p><div className={styles.statuses}><span className="badge badge-pending">{copy[session.state]}</span>{session.provisional&&<span className="badge badge-pending">{copy.provisional}</span>}{session.needsReview&&<span className="badge badge-todo">{copy.review}</span>}</div>{session.reportState!=='ready'?<p role="status">{session.reportState==='failed'?copy.attendanceFailed:copy.attendanceUpdating}</p>:<><dl className={styles.sessionMetrics}><div><dt>{copy.total}</dt><dd>{session.totalMs===null?copy.unavailable:attendanceDuration(session.totalMs)}</dd></div></dl><details><summary>{copy.timeDetails}</summary><dl className={styles.sessionMetrics}>{[[copy.scheduled,session.scheduledMs],[copy.early,session.earlyMs],[copy.extended,session.extendedMs],[copy.longest,session.longestScheduledMs]].map(([label,ms])=><div key={label}><dt>{label}</dt><dd>{ms===null?copy.unavailable:attendanceDuration(Number(ms))}</dd></div>)}</dl></details><strong className={session.state==='closed'&&!session.needsReview&&session.qualifies?'ready-text':'muted'}>{attendanceEligibilityText(session)}</strong></>}</Card>)}</div>}{data&&<div className="action-row">{cursor!==null&&<Button variant="outline" onClick={()=>setCursor(null)}>{copy.latestSessions}</Button>}{!data.isDone&&<Button variant="outline" onClick={()=>setCursor(data.continueCursor)}>{copy.olderSessions}</Button>}</div>}</div>
+  const [cursor,setCursor]=useState<string|null>(null);const data=useAttendanceReport(studentId,true,cursor)
+  return <div className={styles.root}><AttendanceSummary data={data} showDetailsBelow/><Card className={styles.card}><CardTitle>{copy.legacy}</CardTitle><p className={styles.note}>{copy.legacyNote}</p>{!data?<p role="status">{copy.loading}</p>:<div className={styles.metrics}><Metric label={copy.tuesday} value={data.legacy.tuesdayPercent===null?copy.unavailable:`${data.legacy.tuesdayPercent}% (${data.legacy.tuesdayAttended}/${data.legacy.tuesdayHeld})`}/><Metric label={copy.thursday} value={data.legacy.thursdayAttended}/><Metric label={copy.outreach} value={data.legacy.outreachAttended}/></div>}</Card><h2 className={styles.sectionTitle}>{copy.sessions}</h2><p className={styles.note}>{copy.timezone} {copy.finalizedScope}</p>{!data?<p role="status">{copy.loading}</p>:!data.sessions.length?<Card className={styles.card}><p>{copy.noSessions}</p></Card>:<div className={styles.sessionGrid}>{data.sessions.map(session=><Card key={session.sessionId} className={styles.card}><h3 className={styles.sessionTitle}>{session.title}</h3><p className={styles.note}>{when(session.scheduledStart)}</p><div className={styles.statuses}><span className="badge badge-pending">{copy[session.state]}</span>{session.provisional&&<span className="badge badge-pending">{copy.provisional}</span>}{session.needsReview&&<span className="badge badge-todo">{copy.review}</span>}</div>{session.reportState!=='ready'?<p role="status">{session.reportState==='failed'?copy.attendanceFailed:copy.attendanceUpdating}</p>:<><dl className={styles.sessionMetrics}><div><dt>{copy.total}</dt><dd>{session.totalMs===null?copy.unavailable:attendanceDuration(session.totalMs)}</dd></div></dl><details><summary>{copy.timeDetails}</summary><dl className={styles.sessionMetrics}>{[[copy.scheduled,session.scheduledMs],[copy.early,session.earlyMs],[copy.extended,session.extendedMs],[copy.longest,session.longestScheduledMs]].map(([label,ms])=><div key={label}><dt>{label}</dt><dd>{ms===null?copy.unavailable:attendanceDuration(Number(ms))}</dd></div>)}</dl></details><strong className={session.state==='closed'&&!session.needsReview&&session.qualifies?'ready-text':'muted'}>{attendanceEligibilityText(session)}</strong></>}</Card>)}</div>}{data&&<div className="action-row">{cursor!==null&&<Button variant="outline" onClick={()=>setCursor(null)}>{copy.latestSessions}</Button>}{!data.isDone&&<Button variant="outline" onClick={()=>setCursor(data.continueCursor)}>{copy.olderSessions}</Button>}</div>}</div>
 }
 
 export function AttendanceReportRebuild(){

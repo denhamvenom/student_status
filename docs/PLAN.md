@@ -1,5 +1,17 @@
 # Student Status implementation plan
 
+## October 21 - Attendance and kiosk read optimization (development only)
+
+- [x] Summary-only reports skip history, and full report pages share one live result.
+- [x] Quiet report timers replaced with relevant boundary refreshes; open-session timing and live updates preserved.
+- [x] Kiosk status reuses session reads and avoids redundant selected-history reads with validated active attendance.
+- [x] Synthetic measured savings: quiet summary121→1 and report page242→1 argument sets/hour;100 active-selected kiosk bytes145,467→83,377 (42.7%).
+- [x] Independent review, source lint, build and targeted/regression verification complete; timed-out suites passed on rerun. Existing randomized limiter test flake documented.
+- [x] Synced only third-bandicoot-18. Real signed-in two-client clock-in/out and report updates/automatic closure verified on localhost; phone/dark and desktop/light checked.
+- [ ] Owner localhost acceptance and separate production release authorization.
+
+No schema/index/dependency changes. See [USAGE_OPTIMIZATION.md](USAGE_OPTIMIZATION.md) for measurement limits and exact evidence.
+
 ## October 21 - Usage optimization (development only)
 
 Boundary-driven roster refresh, stable Timeclock queries with local expiry, redundant backend-read removal and deferred authenticated JS are implemented and verified in development. Actual Timeclock simulation reduced 241 subscription argument sets to 1 per query per quiet hour; synthetic backend read bytes fell 53.0% for unready team reports and 13.5% for competition roster rows; initial sign-in JS fell 51.0%. These are workload measurements, not promised monthly billing savings. All 605 tests passed, source lint/both builds passed, independent review has no blockers, and development sync succeeded. See [USAGE_OPTIMIZATION.md](USAGE_OPTIMIZATION.md). Owner acceptance and production release remain pending.
