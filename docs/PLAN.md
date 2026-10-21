@@ -6,7 +6,7 @@
 - [x] Roster snapshot daily while idle and once on event selection; names stay fixed throughout the selected event. Clock-in/out and device selection stay live.
 - [x] Snapshot tests cover daily boundaries, event switching, midnight freeze, retry and stale responses; schedule tests cover DST and freshness.
 - [x] Independent Astra review, source lint, strict types, both builds and all 628 integrated tests passed. Development backend synced; localhost manual refresh and cooldown exercised, phone/dark and desktop/light inspected.
-- [ ] Owner localhost review and separate production release authorization.
+- [x] Owner accepted development and authorized production release on October21. Execution evidence:RELEASE_2026-10-21_OPTIMIZATIONS.md and GitHub v0.1.0-onboarding.12 release notes.
 
 No schema/index/dependency changes. Schedule attempts fall from 1,440 to two daily, plus manual refreshes; this is not a measured billing reduction. See [USAGE_OPTIMIZATION.md](USAGE_OPTIMIZATION.md).
 
@@ -18,7 +18,7 @@ No schema/index/dependency changes. Schedule attempts fall from 1,440 to two dai
 - [x] Synthetic measured savings: quiet summary121→1 and report page242→1 argument sets/hour;100 active-selected kiosk bytes145,467→83,377 (42.7%).
 - [x] Independent review, source lint, build and targeted/regression verification complete; timed-out suites passed on rerun. Existing randomized limiter test flake documented.
 - [x] Synced only third-bandicoot-18. Real signed-in two-client clock-in/out and report updates/automatic closure verified on localhost; phone/dark and desktop/light checked.
-- [ ] Owner localhost acceptance and separate production release authorization.
+- [x] Owner authorized release of all optimizations on October21; see v0.1.0-onboarding.12 release evidence.
 
 No schema/index/dependency changes. See [USAGE_OPTIMIZATION.md](USAGE_OPTIMIZATION.md) for measurement limits and exact evidence.
 
