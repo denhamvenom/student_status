@@ -1,13 +1,15 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import ReactDOM from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router";
-import { ConvexReactClient, useConvex, useConvexAuth, useConvexConnectionState, useMutation, useQuery } from "convex/react";
+import { ConvexReactClient, useConvex, useConvexAuth, useConvexConnectionState, useMutation, useQuery, useAction } from "convex/react";
 import { ConvexAuthProvider, useAuthActions } from "@convex-dev/auth/react";
 import { ThemeProvider, useTheme } from "next-themes";
 import type { FunctionReturnType } from "convex/server";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { api } from "../../../convex/_generated/api";
 import { hasElapsedSession, startVisibleClock } from "./visibleClock";
+import { eventQueryTime, eventAvailableAt, calendarStaleAt } from "./eventClock";
+import { createRosterSnapshot, rosterSnapshotScope } from "./rosterSnapshot";
 import "./theme.css";
 import "./style.css";
 
@@ -102,11 +104,36 @@ function Timeclock({ role }: { role: "coach" | "mentor" }) {
   const { resolvedTheme, setTheme } = useTheme();
   const connection = useConvexConnectionState();
   const { id: profileId, warning } = useProfileId();
-  const events = useQuery(api.timeclock.todayEvents, { asOf: now });
-  const calendar = useQuery(api.calendarState.status, { now });
-  const roster = useQuery(api.timeclockRoster.list, {});
+  const queryTime = eventQueryTime(now);
+  const eventRows = useQuery(api.timeclock.todayEvents, { asOf: queryTime });
+  const events = eventRows?.map(event => ({ ...event, available: eventAvailableAt(event, now) }));
+  const calendarRow = useQuery(api.calendarState.status, { now: queryTime });
+  const calendar = calendarRow && { ...calendarRow, stale: calendarStaleAt(calendarRow, now) };
   const consoleState = useQuery(api.timeclock.consoleStatus, profileId ? { profileId } : "skip");
   const sessionId = consoleState?.selectedSessionId ?? null;
+  const rosterScope = rosterSnapshotScope(sessionId, now);
+  const rosterStore = useMemo(() => createRosterSnapshot(() => convex.query(api.timeclockRoster.list, {})), [convex]);
+  const rosterSnapshot = useSyncExternalStore(rosterStore.subscribe, rosterStore.getSnapshot);
+  const consoleReady = consoleState !== undefined;
+  useEffect(() => {
+    if (!consoleReady) return;
+    void rosterStore.load(rosterScope);
+  }, [rosterStore, rosterScope, consoleReady]);
+  const roster = rosterSnapshot.scope === rosterScope ? rosterSnapshot.data : undefined;
+  const rosterError = rosterSnapshot.scope === rosterScope && rosterSnapshot.error;
+  const refreshCalendarAction = useAction(api.calendar.refreshNow);
+  const [calendarRefreshing, setCalendarRefreshing] = useState(false);
+  const [calendarMessage, setCalendarMessage] = useState('');
+  const [calendarFailed, setCalendarFailed] = useState(false);
+  const refreshCalendar = async () => {
+    setCalendarRefreshing(true); setCalendarMessage(''); setCalendarFailed(false);
+    try {
+      const result = await refreshCalendarAction({});
+      setCalendarFailed(result.status === 'failed');
+      setCalendarMessage(result.status === 'refreshed' ? 'Calendar refreshed.' : result.status === 'skipped' ? 'Calendar refresh could not start. Wait a minute and try again. If it continues, contact the Coach.' : 'Calendar refresh failed. Check the connection and try again.');
+    } catch { setCalendarFailed(true); setCalendarMessage('Calendar refresh failed. Check the connection and try again.'); }
+    finally { setCalendarRefreshing(false); }
+  };
   const sessionRef = useRef(sessionId);
   sessionRef.current = sessionId;
   const clock = useQuery(api.timeclockRoster.clockStatus, sessionId ? { sessionId } : "skip");
@@ -215,6 +242,9 @@ function Timeclock({ role }: { role: "coach" | "mentor" }) {
   const themeSwitch = <button type="button" className="tc-theme-switch" role="switch" aria-checked={resolvedTheme === "dark"} aria-label="Dark mode" onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z" /></svg><span className="tc-theme-track"><span /></span></button>;
   return <div className={`tc-shell ${active ? "tc-shell-active" : ""}`}>
     {!active && <div className="tc-toolbar"><span className="tc-status">Connected as {role === "coach" ? "Coach" : "Mentor"}</span><div className="tc-actions">{themeSwitch}<Button disabled={commandLocked} onClick={() => { setPin(""); setDialog("signOut"); }}>Sign out</Button></div></div>}
+    <div className="tc-actions"><Button disabled={calendarRefreshing || !connection.isWebSocketConnected} onClick={() => void refreshCalendar()}>{calendarRefreshing ? 'Refreshing Calendar…' : 'Refresh Calendar'}</Button><span className="tc-meta">Calendar updates at 6 AM and 3 PM Chicago time.</span></div>
+    {calendarMessage && <p className="tc-banner" role={calendarFailed ? 'alert' : 'status'}>{calendarMessage}</p>}
+    {rosterError && <div className="tc-banner" role="alert">The student roster could not load. <Button disabled={rosterSnapshot.pending || !connection.isWebSocketConnected} onClick={() => void rosterStore.load(rosterScope)}>Retry roster</Button></div>}
     {warning && <p className="tc-banner" role="alert">{warning}</p>}
     {!connection.isWebSocketConnected && <p className="tc-banner" role="status">Connection interrupted. Clocking is paused until the connection returns. Any submitted request may still be completing.</p>}
     {calendar && (!calendar.configured || calendar.stale || calendar.error) && <p className="tc-banner" role="status">Calendar {calendar.configured ? "updates are delayed" : "is not configured"}. {calendar.lastSuccessAt ? `Last updated ${dateTime(calendar.lastSuccessAt)}.` : "No successful update yet."} Open events may use the last confirmed schedule.</p>}

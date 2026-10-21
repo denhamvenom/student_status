@@ -1,5 +1,13 @@
 # Visual review closed — October 16, 2026
 
+## October 21 - Timeclock calendar controls
+
+Refresh Calendar and its pending/success/cooldown states were exercised on signed-in development localhost. Phone/dark and desktop/light checked without horizontal overflow; existing approved Timeclock styles reused. No new visual defect remains; owner review at localhost:5174 is pending. See FRONTEND_CONFORMANCE_LOG.md and USAGE_OPTIMIZATION.md. Production remains unchanged.
+
+## October 21 - Usage optimization (development only)
+
+Boundary-driven roster refresh, stable Timeclock queries with local expiry, redundant backend-read removal and deferred authenticated JS are implemented and verified in development. Actual Timeclock simulation reduced 241 subscription argument sets to 1 per query per quiet hour; synthetic backend read bytes fell 53.0% for unready team reports and 13.5% for competition roster rows; initial sign-in JS fell 51.0%. These are workload measurements, not promised monthly billing savings. All 605 tests passed, source lint/both builds passed, independent review has no blockers, and development sync succeeded. See [USAGE_OPTIMIZATION.md](USAGE_OPTIMIZATION.md). Owner acceptance and production release remain pending.
+
 ## October 20 - Approved actionable error production release
 
 Owner accepted the localhost preview and explicitly authorized production release of PR30. Reviewed implementation 67c2145 preserves expected backend validation and recovery errors across Student Status while keeping internal diagnostics private. See [RELEASE_2026-10-20_ACTIONABLE_ERRORS.md](RELEASE_2026-10-20_ACTIONABLE_ERRORS.md) for validation and release boundaries. Earlier development-only restrictions for this change are superseded by this approval.

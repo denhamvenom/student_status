@@ -1,5 +1,9 @@
 # Frontend conformance work log
 
+## October 21 - Usage optimization (development only)
+
+Boundary-driven roster refresh, stable Timeclock queries with local expiry, redundant backend-read removal and deferred authenticated JS are implemented and verified in development. Actual Timeclock simulation reduced 241 subscription argument sets to 1 per query per quiet hour; synthetic backend read bytes fell 53.0% for unready team reports and 13.5% for competition roster rows; initial sign-in JS fell 51.0%. These are workload measurements, not promised monthly billing savings. All 605 tests passed, source lint/both builds passed, independent review has no blockers, and development sync succeeded. See [USAGE_OPTIMIZATION.md](USAGE_OPTIMIZATION.md). Owner acceptance and production release remain pending.
+
 ## October 20 - Approved actionable error production release
 
 Owner accepted the localhost preview and explicitly authorized production release of PR30. Reviewed implementation 67c2145 preserves expected backend validation and recovery errors across Student Status while keeping internal diagnostics private. See [RELEASE_2026-10-20_ACTIONABLE_ERRORS.md](RELEASE_2026-10-20_ACTIONABLE_ERRORS.md) for validation and release boundaries. Earlier development-only restrictions for this change are superseded by this approval.
@@ -417,3 +421,6 @@ Actual StaffSetupGate component with synthetic mocked Convex/Auth checked at 144
 Staff setup follow-up: development sync/types/build/lint passed; actual signed-in localhost Step 1 and both skip options observed. No profile or preference saved for the user. Coach review pending. Full-suite fee-history timeout recorded separately in STAFF_SETUP_WIZARD.md.
 
 Staff setup now has an optional Driving step before review, shared contact phone, vehicle/seats/trailer capability and Skip driving step preserving existing driver approval. Requested extra informational paragraph removed. Focused17 tests, source review and desktop/phone synthetic browser checks passed; see STAFF_SETUP_WIZARD.md. Development only.
+# October 21 - Timeclock calendar cadence controls
+
+New Refresh Calendar control reuses the existing Timeclock button, action row, metadata and banner styles. Real signed-in development UI: pending disables the control, success displays confirmation, and an immediate repeated request displays wait/retry guidance. Inspected phone/dark at 390px and desktop/light at 1440px; document width matched viewport with no horizontal overflow. The new row wraps on phone without hiding the control. Existing typography, yellow/purple palette and event cards remain. No prototype screen defines this new control; conformance is to existing approved Timeclock styles and the later explicit request. Screenshots remain in ignored local evidence. Owner acceptance and production authorization remain pending. Roster freeze is behavioral and covered separately in USAGE_OPTIMIZATION.md.

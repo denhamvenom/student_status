@@ -1,4 +1,5 @@
 import { ConvexError, v } from "convex/values";
+import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import { activeSeason, audit, maybeViewer, viewer } from "./lib/access";
 
@@ -64,15 +65,22 @@ export const clockStatus = query({
     const all = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(501);
     if (all.length > 500) throw new ConvexError("Roster exceeds the supported 500-record season; narrow the roster before operating.");
     const reviewed = all.filter(s => s.active && s.structuredNameReviewed && s.firstName?.trim() && s.lastName?.trim());
+    // Share session reads across student locks, including the selected session
+    // already validated above. Keep this cache local to this query transaction.
+    const sessions = new Map<Id<"timeclockSessions">, Promise<Doc<"timeclockSessions"> | null>>([
+      [session._id, Promise.resolve(session)],
+    ]);
+    const readSession = (id: Id<"timeclockSessions">) => {
+      let pending = sessions.get(id);
+      if (!pending) { pending = ctx.db.get(id); sessions.set(id, pending); }
+      return pending;
+    };
     const students = await Promise.all(reviewed.map(async student => {
-      const [lock, selectedHistory] = await Promise.all([
-        ctx.db.query("timeclockStudentLocks").withIndex("by_studentId", q => q.eq("studentId", student._id)).unique(),
-        ctx.db.query("timeclockIntervals").withIndex("by_sessionId_and_studentId", q => q.eq("sessionId", session._id).eq("studentId", student._id)).first(),
-      ]);
+      const lock = await ctx.db.query("timeclockStudentLocks").withIndex("by_studentId", q => q.eq("studentId", student._id)).unique();
       let activeSessionId = null;
       let activeIntervalId = null;
       if (lock?.sessionId && lock.intervalId) {
-        const [activeSession, activeInterval] = await Promise.all([ctx.db.get(lock.sessionId), ctx.db.get(lock.intervalId)]);
+        const [activeSession, activeInterval] = await Promise.all([readSession(lock.sessionId), ctx.db.get(lock.intervalId)]);
         if (activeSession?.state === "open" && activeSession.seasonId === season._id && activeInterval?.outAt === undefined && activeInterval?.studentId === student._id && activeInterval?.sessionId === activeSession._id) {
           activeSessionId = activeSession._id;
           activeIntervalId = activeInterval._id;
@@ -81,6 +89,9 @@ export const clockStatus = query({
       // Console status reflects original operational visits. Corrections affect
       // Coach attendance summaries, not the current clock button state.
       const inSelected = session.state === "open" && activeSessionId === session._id;
+      // A validated active selected visit proves activity. Other states still
+      // need only the first indexed original visit, regardless of history size.
+      const selectedHistory = inSelected ? null : await ctx.db.query("timeclockIntervals").withIndex("by_sessionId_and_studentId", q => q.eq("sessionId", session._id).eq("studentId", student._id)).first();
       return { studentId: student._id, status: inSelected ? "in" as const : selectedHistory ? "out" as const : "no_activity" as const, activeSessionId, activeIntervalId, hasConflict: activeSessionId !== null && activeSessionId !== session._id };
     }));
     return { sessionId: session._id, state: session.state, revision: session.revision, students };

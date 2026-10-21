@@ -10,6 +10,7 @@ const list = makeFunctionReference<"query">("coachRoster:list");
 const detail = makeFunctionReference<"query">("coachRoster:detail");
 const directory = makeFunctionReference<"query">("coachRoster:directory");
 const rowsByIds = makeFunctionReference<"query">("coachRoster:rowsByIds");
+const nextTransition = makeFunctionReference<"query">("coachRoster:nextTransition");
 const finance = makeFunctionReference<"query">("financeAdmin:students");
 async function fixture() {
   const t = createTest(schema, modules);
@@ -24,6 +25,21 @@ async function fixture() {
 }
 const page={paginationOpts:{numItems:20,cursor:null},asOf:100};
 describe("Coach student roster and record",()=>{
+  it("schedules the next indexed event boundary across archived and duplicate times", async () => {
+    const f = await fixture();
+    await expect(f.t.query(nextTransition, { asOf: 100 })).rejects.toThrow();
+    await expect(f.coach.query(nextTransition, { asOf: Number.NaN })).rejects.toThrow();
+    expect(await f.coach.query(nextTransition, { asOf: 100 })).toBeNull();
+    const eventFields = { seasonId: f.ids.season, type: "Team" as const, endsAt: 201, destination: "Synthetic", travel: "None", overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "open" as const, allowWithdrawal: false, permissionRequired: false, firstRequired: false };
+    await f.t.run(async ctx => {
+      await ctx.db.insert("events", { ...eventFields, name: "Archived", startsAt: 100, archived: true });
+      await ctx.db.insert("events", { ...eventFields, name: "Current", startsAt: 100, archived: false });
+      await ctx.db.insert("events", { ...eventFields, name: "Later", startsAt: 140, archived: false });
+    });
+    expect(await f.coach.query(nextTransition, { asOf: 100 })).toBe(101);
+    expect(await f.coach.query(nextTransition, { asOf: 101 })).toBe(141);
+    expect(await f.coach.query(nextTransition, { asOf: 141 })).toBeNull();
+  });
   it("shows fundraiser presence without exposing its URL in roster rows",async()=>{
     const f=await fixture();
     expect((await f.coach.query(rowsByIds,{studentIds:[f.ids.student],asOf:100}))[0].fundraiserConnected).toBe(false);

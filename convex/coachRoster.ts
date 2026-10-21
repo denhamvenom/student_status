@@ -53,6 +53,18 @@ export const rowsByIds=query({
   },
 });
 
+/** Earliest time the indexed upcoming-event window can change. */
+export const nextTransition = query({
+  args: { asOf: v.number() }, returns: v.union(v.number(), v.null()),
+  handler: async (ctx, args) => {
+    requireRole(await viewer(ctx), "coach");
+    if (!Number.isFinite(args.asOf)) throw new ConvexError("A valid current time is required.");
+    const season = await activeSeason(ctx);
+    const event = await ctx.db.query("events").withIndex("by_seasonId_and_startsAt", q => q.eq("seasonId", season._id).gte("startsAt", args.asOf)).first();
+    return event ? event.startsAt + 1 : null;
+  },
+});
+
 function missingInformation(student: Doc<"students">) {
   const missing: string[] = [];
   const confirmed = student.consentProfileV2CompletedAt !== undefined && student.consentProfileV2ConfirmedBy !== undefined && student.consentProfileV2 !== undefined;
@@ -80,22 +92,24 @@ async function upcomingEvents(ctx: QueryCtx, seasonId: Doc<"seasons">["_id"], as
 }
 
 async function nextEvent(ctx: QueryCtx, student: Doc<"students">, upcoming: Upcoming, financeState: string) {
-  if (!student.active) return { nextEvent: null, readinessCoverage: "notApplicable" as const };
+  if (!student.active) return { nextEvent: null, readinessCoverage: "notApplicable" as const, knownFirstStatus: undefined };
   for (const event of upcoming.events) {
     const participant = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
-    if (enrollmentPending(event) && event.assignmentScope === "wholeTeam") return { nextEvent: { eventId: event._id, name: event.name, startsAt: event.startsAt, participation: participant?.status ?? null, state: "unknown" as const, open: ["Whole Team enrollment is not complete"] }, readinessCoverage: "unknown" as const };
+    if (enrollmentPending(event) && event.assignmentScope === "wholeTeam") return { nextEvent: { eventId: event._id, name: event.name, startsAt: event.startsAt, participation: participant?.status ?? null, state: "unknown" as const, open: ["Whole Team enrollment is not complete"] }, readinessCoverage: "unknown" as const, knownFirstStatus: undefined };
     if (!participant || participant.status === "withdrawn") continue;
-    if (participant.status !== "confirmed") return { nextEvent: { eventId: event._id, name: event.name, startsAt: event.startsAt, participation: participant.status, state: "open" as const, open: ["Participation is not confirmed"] }, readinessCoverage: "complete" as const };
+    if (participant.status !== "confirmed") return { nextEvent: { eventId: event._id, name: event.name, startsAt: event.startsAt, participation: participant.status, state: "open" as const, open: ["Participation is not confirmed"] }, readinessCoverage: "complete" as const, knownFirstStatus: undefined };
     const readiness = await studentReadiness(ctx, event, student);
     const state = financeState !== "ready" || readiness.open.includes("Event financial records require review") || readiness.open.includes("Event requirements require review") ? "unknown" as const : readiness.state === "ready" ? "ready" as const : "open" as const;
-    return { nextEvent: { eventId: event._id, name: event.name, startsAt: event.startsAt, participation: participant.status, state, open: readiness.open }, readinessCoverage: "complete" as const };
+    return { nextEvent: { eventId: event._id, name: event.name, startsAt: event.startsAt, participation: participant.status, state, open: readiness.open }, readinessCoverage: "complete" as const, knownFirstStatus: readiness.firstRegistrationState ?? undefined };
   }
-  return { nextEvent: null, readinessCoverage: upcoming.truncated ? "unknown" as const : "complete" as const };
+  return { nextEvent: null, readinessCoverage: upcoming.truncated ? "unknown" as const : "complete" as const, knownFirstStatus: undefined };
 }
 
 async function rosterRow(ctx: QueryCtx, student: Doc<"students">, upcoming: Upcoming) {
-  const [finance, account, firstRegistrationState] = await Promise.all([financeRow(ctx, student._id), accountStatus(ctx, student), firstStatus(ctx, student._id)]);
-  const event = await nextEvent(ctx, student, upcoming, finance.state);
+  const firstStatusPromise = upcoming.events.some(event => !event.archived && event.type === "Competition") ? null : firstStatus(ctx, student._id);
+  const [finance, account] = await Promise.all([financeRow(ctx, student._id), accountStatus(ctx, student)]);
+  const { knownFirstStatus, ...event } = await nextEvent(ctx, student, upcoming, finance.state);
+  const firstRegistrationState = knownFirstStatus ?? await (firstStatusPromise ?? firstStatus(ctx, student._id));
   return { studentId: student._id, name: student.legalName || student.preferredName, subteam: student.subteam, travelTeam: student.travelTeam, active: student.active, profileRevision: student.profileRevision ?? 0, fundraiserConnected: !!student.fundraiserUrl, firstRegistrationState, account, balance: { state: finance.state, dueCents: finance.dueCents, personalAvailableCents: finance.personalAvailableCents, fundraisingAvailableCents: finance.fundraisingAvailableCents, updatedAt: finance.updatedAt }, ...event, missingSummary: missingInformation(student) };
 }
 

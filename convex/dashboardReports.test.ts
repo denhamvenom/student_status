@@ -177,3 +177,36 @@ describe("role-scoped dashboard reports", () => {
     }
   });
 });
+
+
+describe("attendance subscription work",()=>{
+  it("skips history for summary callers and measures saved reads",async()=>{
+    const f=await fixture();
+    async function measure(includeHistory:boolean){return f.parent.run(async ctx=>{
+      const result=await ctx.runQuery(attendanceRef,{studentId:f.ids.sid,asOf:start+4*hour,includeHistory});
+      const metrics=await ctx.meta.getTransactionMetrics();
+      return {result,documentsRead:metrics.documentsRead.used,bytesRead:metrics.bytesRead.used,databaseQueries:metrics.databaseQueries.used};
+    })}
+    const full=await measure(true),summary=await measure(false);
+    expect(summary.result.state).toBe("ready");
+    expect(summary.result.verified).toEqual(full.result.verified);
+    expect(summary.result.phases).toEqual(full.result.phases);
+    expect(summary.result.sessions).toEqual([]);
+    expect(summary.result.nextRefreshAt).toBeNull();
+    expect(summary.documentsRead).toBeLessThan(full.documentsRead);
+    console.info("attendance synthetic history",{documentsRead:full.documentsRead,bytesRead:full.bytesRead,databaseQueries:full.databaseQueries});
+    console.info("attendance synthetic summary",{documentsRead:summary.documentsRead,bytesRead:summary.bytesRead,databaseQueries:summary.databaseQueries});
+  });
+  it("returns the exact future session boundary and preserves live source changes",async()=>{
+    const f=await fixture();
+    const before=await f.parent.query(attendanceRef,{studentId:f.ids.sid,asOf:start-1});
+    expect(before.sessions).toEqual([]);
+    expect(before.nextRefreshAt).toBe(start);
+    const at=await f.parent.query(attendanceRef,{studentId:f.ids.sid,asOf:start});
+    expect(at.sessions).toHaveLength(1);
+    await f.t.run(ctx=>ctx.db.patch(f.ids.session,{state:"open",closedAt:undefined}));
+    const open=await f.parent.query(attendanceRef,{studentId:f.ids.sid,asOf:start+2*hour-1});
+    expect(open.nextRefreshAt).toBe(start+2*hour);
+    expect(open.sessions[0].provisional).toBe(true);
+  });
+});

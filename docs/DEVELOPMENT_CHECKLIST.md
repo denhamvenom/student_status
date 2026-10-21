@@ -1,5 +1,31 @@
 # Student Status Development Checklist
 
+## October 21 - Calendar cadence and fixed event roster (development only)
+
+- [x] Calendar sync at 6 AM and 3 PM Chicago time, DST-aware, plus authenticated Refresh with pending and recovery states.
+- [x] Roster snapshot daily while idle and once on event selection; names stay fixed throughout the selected event. Clock-in/out and device selection stay live.
+- [x] Snapshot tests cover daily boundaries, event switching, midnight freeze, retry and stale responses; schedule tests cover DST and freshness.
+- [x] Independent Astra review, source lint, strict types, both builds and all 628 integrated tests passed. Development backend synced; localhost manual refresh and cooldown exercised, phone/dark and desktop/light inspected.
+- [x] Owner accepted development and authorized production release on October21. Execution evidence:RELEASE_2026-10-21_OPTIMIZATIONS.md and GitHub v0.1.0-onboarding.12 release notes.
+
+No schema/index/dependency changes. Schedule attempts fall from 1,440 to two daily, plus manual refreshes; this is not a measured billing reduction. See [USAGE_OPTIMIZATION.md](USAGE_OPTIMIZATION.md).
+
+## October 21 - Attendance and kiosk read optimization (development only)
+
+- [x] Summary-only reports skip history, and full report pages share one live result.
+- [x] Quiet report timers replaced with relevant boundary refreshes; open-session timing and live updates preserved.
+- [x] Kiosk status reuses session reads and avoids redundant selected-history reads with validated active attendance.
+- [x] Synthetic measured savings: quiet summary121→1 and report page242→1 argument sets/hour;100 active-selected kiosk bytes145,467→83,377 (42.7%).
+- [x] Independent review, source lint, build and targeted/regression verification complete; timed-out suites passed on rerun. Existing randomized limiter test flake documented.
+- [x] Synced only third-bandicoot-18. Real signed-in two-client clock-in/out and report updates/automatic closure verified on localhost; phone/dark and desktop/light checked.
+- [x] Owner authorized release of all optimizations on October21; see v0.1.0-onboarding.12 release evidence.
+
+No schema/index/dependency changes. See [USAGE_OPTIMIZATION.md](USAGE_OPTIMIZATION.md) for measurement limits and exact evidence.
+
+## October 21 - Usage optimization (development only)
+
+Boundary-driven roster refresh, stable Timeclock queries with local expiry, redundant backend-read removal and deferred authenticated JS are implemented and verified in development. Actual Timeclock simulation reduced 241 subscription argument sets to 1 per query per quiet hour; synthetic backend read bytes fell 53.0% for unready team reports and 13.5% for competition roster rows; initial sign-in JS fell 51.0%. These are workload measurements, not promised monthly billing savings. All 605 tests passed, source lint/both builds passed, independent review has no blockers, and development sync succeeded. See [USAGE_OPTIMIZATION.md](USAGE_OPTIMIZATION.md). Owner acceptance and production release remain pending.
+
 ## October 20 - Approved actionable error production release
 
 Owner accepted the localhost preview and explicitly authorized production release of PR30. Reviewed implementation 67c2145 preserves expected backend validation and recovery errors across Student Status while keeping internal diagnostics private. See [RELEASE_2026-10-20_ACTIONABLE_ERRORS.md](RELEASE_2026-10-20_ACTIONABLE_ERRORS.md) for validation and release boundaries. Earlier development-only restrictions for this change are superseded by this approval.
