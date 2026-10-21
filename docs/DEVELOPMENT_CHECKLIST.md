@@ -1,5 +1,12 @@
 # Student Status Development Checklist
 
+## October 21 - Student event times and Pay link (development candidate)
+
+- [x] Dashboard, event list and details show Central start/end times; Calendar all-day dates are preserved.
+- [x] Pay Now uses the established gold button with readable dark text and keyboard focus.
+- [x] 630 tests, source lint, types/build, independent Astra review and representative phone/dark + desktop/light browser checks passed.
+- [ ] Owner visual acceptance and release authorization. Original reported Pay contrast issue was not reproduced in the harness; see FRONTEND_CONFORMANCE_LOG.md for evidence and limitations. Production unchanged.
+
 ## October 21 - Calendar cadence and fixed event roster (development only)
 
 - [x] Calendar sync at 6 AM and 3 PM Chicago time, DST-aware, plus authenticated Refresh with pending and recovery states.

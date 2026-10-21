@@ -1,13 +1,11 @@
 # Current integration handoff
 
-## Optimization production release approved - October 21
+## Student event times and Pay link - October 21, 2026
 
-Active checkout: student-status-readiness-design. Branch perf/reduce-database-reads-2026-10-21; earlier optimization checkpoint de46487 is already published. Preserve sibling worktrees and unrelated untracked .tmp-adult-tests.
+Candidate checkout: student-status-event-display; branch fix/student-event-time-pay, based on released main b15db4e. Diagnose Student Error owns separate test cleanup in student-status-readiness-design; do not mix or overwrite that work.
 
-Latest owner clarification: roster names stay fixed during an event; only clock-in/out status changes live. Implemented a memory-only roster snapshot daily while idle and once on event selection. Calendar now syncs at 6 AM and 3 PM Chicago time with a manual Refresh button. Device selection stays subscribed for cross-tab changes. Existing attendance/history and kiosk read optimizations remain. No schema/index/dependency changes. Details and measurement limits: [USAGE_OPTIMIZATION.md](USAGE_OPTIMIZATION.md).
+Implemented student/family dashboard, list and detail event schedules with America/Chicago times and explicit CST/CDT. Calendar all-day dates retain exclusive-end semantics. Pay Now uses established gold/dark-text link-button styling.
 
-Development third-bandicoot-18 synced. Final Astra review found no blockers. Source lint, strict types, both builds and all 628 integrated tests passed. Restricted test-module loading failed; full suite passed outside that restriction without assertion changes. Real signed-in localhost verified manual refresh success and cooldown recovery; phone/dark and desktop/light checked. Snapshot tests verify daily reads, event freeze across midnight, switching, retry and late-response fencing. Earlier two-client clock-in/out/report/automatic-close evidence remains; these live hooks are unchanged.
+All 630 tests, source lint, strict types/build, independent Astra review and synthetic browser checks passed. Browser: 390px dark and 1440px light across dashboard/list/timed detail/all-day detail/finances, no overflow/page errors, readable Pay normal/hover/focus. Original reported contrast issue was not reproduced in this harness; root cause remains unconfirmed and affected-device acceptance is pending. See FRONTEND_CONFORMANCE_LOG.md for evidence boundaries.
 
-Local apps: localhost:5173 Student Status and localhost:5174 Timeclock. Ignored tmp/attendance-live wrapper displays actual authenticated report components with synthetic development data; account-specific review URL/screenshots remain out of Git. Development season2027–28 lacks a verified kickoff, so existing unavailable season-total state remains; session evidence works.
-
-Owner explicitly approved normal production release of all optimizations in PR31. Release v0.1.0-onboarding.12 targets amicable-eel-413 and both main-built Cloudflare frontends. Deploy compatible backend first, merge exact approved head, then verify. See RELEASE_2026-10-21_OPTIMIZATIONS.md; final execution evidence belongs in the GitHub release notes. No schema migration or production test-data writes are included. Earlier pending-approval notes are superseded by this authorization.
+No backend changes or synchronization; no production deployment or main merge. Production remains v0.1.0-onboarding.12 (PR31). This branch is a development review candidate only. Synthetic preview: http://127.0.0.1:5197/events?theme=dark and /finances?theme=dark. Preview mocks are ignored under tmp and must never ship.

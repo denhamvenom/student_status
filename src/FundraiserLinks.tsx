@@ -4,7 +4,7 @@ import { useConvex, useMutation, useQuery } from 'convex/react'
 import { CreditCard, Share2 } from 'lucide-react'
 import { api } from '../convex/_generated/api'
 import type { Id } from '../convex/_generated/dataModel'
-import { Button, buttonVariants } from './components/ui/button'
+import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
 import { shareFundraiser } from './lib/share-fundraiser'
@@ -32,7 +32,7 @@ export function FundraiserActions({ url }: { url: string }) {
   }
   return <Card><CardHeader><CardTitle>Your fundraiser</CardTitle></CardHeader><CardContent className={styles.content}>
     <div className={styles.actions}>
-      <a className={buttonVariants({ size: 'lg' })} href={url} target="_blank" rel="noopener noreferrer"><CreditCard size={24} aria-hidden="true" />Pay Now</a>
+      <a className="button button-primary" href={url} target="_blank" rel="noopener noreferrer"><CreditCard size={24} aria-hidden="true" />Pay Now</a>
       <Button type="button" variant="outline" disabled={busy} onClick={() => void share()}><Share2 size={20} aria-hidden="true" />Share fundraiser</Button>
     </div>
     <p className={styles.note}>Pay Now opens your fundraiser on Zeffy.</p>

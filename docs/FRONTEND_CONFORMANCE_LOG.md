@@ -1,5 +1,14 @@
 # Frontend conformance work log
 
+## October 21 - Student event times and Pay link (development candidate)
+
+Student dashboard, event list and event details now show start/end times in America/Chicago, including CST/CDT. Calendar all-day events retain date-only labels and exclude the Calendar end date. Pay Now uses the existing gold primary-link button with dark text, hover and keyboard focus styling.
+
+All 630 tests, source lint, strict types/build and independent Astra review passed. The first suite attempt hit sandbox temporary-module ENOENT errors; the unsandboxed run passed. Actual LiveApp components with synthetic query responses were inspected at 390px dark and 1440px light: five routes per viewport, no horizontal overflow or page errors, visible times and all-day labels. The browser timezone was America/Los_Angeles, confirming team-time presentation. Pay text was #222 on #fdd023 (hover #e6bc0f), with visible focus; destination and safe new-tab attributes retained. Compared with the hosted prototype's typography/cards/gold controls. Local evidence is ignored under test-results/display.
+
+The reported original Pay contrast defect was not reproduced in this synthetic harness; its root cause is unconfirmed. This candidate standardizes that link on the app's established primary-button style. Owner acceptance on the affected device remains pending. No real payment click, authenticated data write, backend synchronization, main merge or production deployment performed. The separate test-cleanup chat remains isolated.
+
+
 ## October 21 - Usage optimization (development only)
 
 Boundary-driven roster refresh, stable Timeclock queries with local expiry, redundant backend-read removal and deferred authenticated JS are implemented and verified in development. Actual Timeclock simulation reduced 241 subscription argument sets to 1 per query per quiet hour; synthetic backend read bytes fell 53.0% for unready team reports and 13.5% for competition roster rows; initial sign-in JS fell 51.0%. These are workload measurements, not promised monthly billing savings. All 605 tests passed, source lint/both builds passed, independent review has no blockers, and development sync succeeded. See [USAGE_OPTIMIZATION.md](USAGE_OPTIMIZATION.md). Owner acceptance and production release remain pending.
