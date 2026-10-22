@@ -23,6 +23,7 @@ const app = defineApp({ env: {
   PARENT_INVITE_EMAIL_FROM: v.optional(v.string()),
   PARENT_INVITE_EMAIL_REPLY_TO: v.optional(v.string()),
   PARENT_INVITE_APP_ORIGIN: v.optional(v.string()),
+  ZEFFY_API_KEY: v.optional(v.string()),
 } });
 app.use(rateLimiter);
 app.use(aggregate, { name: "reportAggregates" });

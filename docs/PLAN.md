@@ -1,5 +1,11 @@
 # Student Status implementation plan
 
+## October 21 - Zeffy donation import
+
+Implement the approved [Zeffy connection](ZEFFY_SYNC.md) using existing student fundraiser links as the source of truth, dollar-for-dollar fundraising credits and 7 AM/7 PM America/Chicago checks. Do not require a donation to occur after the active season's start date: preseason fundraising is valid. Preserve historical page ownership, transaction deduplication and existing financial allocation/projections. Automatic checks begin disabled.
+
+The owner cannot test this workflow on the development deployment. Use local synthetic verification and read-only live matching/account preflight; request production release/activation approval after the candidate is reviewable. No live balance changes are authorized by this implementation checkpoint.
+
 ## October 21 - Student event times and Pay link (development candidate)
 
 - [x] Dashboard, event list and details show Central start/end times; Calendar all-day dates are preserved.

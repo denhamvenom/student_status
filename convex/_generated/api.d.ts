@@ -101,6 +101,7 @@ import type * as lib_timeclock from "../lib/timeclock.js";
 import type * as lib_timeclockPin from "../lib/timeclockPin.js";
 import type * as lib_timeclockTransition from "../lib/timeclockTransition.js";
 import type * as lib_wholeTeam from "../lib/wholeTeam.js";
+import type * as lib_zeffy from "../lib/zeffy.js";
 import type * as parentEmailAuth from "../parentEmailAuth.js";
 import type * as parentInviteEmail from "../parentInviteEmail.js";
 import type * as parentInvites from "../parentInvites.js";
@@ -131,6 +132,8 @@ import type * as timeclockRoster from "../timeclockRoster.js";
 import type * as travel from "../travel.js";
 import type * as withdrawals from "../withdrawals.js";
 import type * as workflowSummaries from "../workflowSummaries.js";
+import type * as zeffy from "../zeffy.js";
+import type * as zeffyActions from "../zeffyActions.js";
 
 import type {
   ApiFromModules,
@@ -232,6 +235,7 @@ declare const fullApi: ApiFromModules<{
   "lib/timeclockPin": typeof lib_timeclockPin;
   "lib/timeclockTransition": typeof lib_timeclockTransition;
   "lib/wholeTeam": typeof lib_wholeTeam;
+  "lib/zeffy": typeof lib_zeffy;
   parentEmailAuth: typeof parentEmailAuth;
   parentInviteEmail: typeof parentInviteEmail;
   parentInvites: typeof parentInvites;
@@ -262,6 +266,8 @@ declare const fullApi: ApiFromModules<{
   travel: typeof travel;
   withdrawals: typeof withdrawals;
   workflowSummaries: typeof workflowSummaries;
+  zeffy: typeof zeffy;
+  zeffyActions: typeof zeffyActions;
 }>;
 
 /**

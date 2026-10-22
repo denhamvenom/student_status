@@ -27,6 +27,7 @@ import financeLayoutStyles from './CoachFinanceTable.module.css'
 import { financeWorkspaceCopy } from './lib/finance-admin-copy'
 import { AdultProfile } from './AdultProfile'
 import { FamilyFundraiserLink, FundraiserLinkSettings } from './FundraiserLinks'
+import { ZeffySync } from './ZeffySync'
 import { DriverOwnerReconciliation } from './DriverOwnerReconciliation'
 import FeeAdministration from './FeeAdministration'
 import { RetentionReview } from './RetentionReview'
@@ -247,7 +248,7 @@ function AdminFinance({viewer}:{viewer:Viewer}) {
     </Dialog>
   </>
 }
-function MoneyTools({viewer}:{viewer:Viewer}) {const canEdit=viewer.user?.role==='coach'||!!viewer.user?.financialEdit;return <><Heading title="Money tools" description="Manage fees, match earlier charges, import payments and review exports and changes."/><Link to="/finances">← Money</Link>{viewer.user?.role==='coach'&&<FundraiserLinkSettings/>}<FeeAdministration isCoach={viewer.user?.role==='coach'}/>{canEdit&&<PaymentAdministration mode="bulk"/>}<FinanceExport/><CoachFinanceChanges/></>}
+function MoneyTools({viewer}:{viewer:Viewer}) {const canEdit=viewer.user?.role==='coach'||!!viewer.user?.financialEdit;return <><Heading title="Money tools" description="Manage fees, match earlier charges, import payments and review exports and changes."/><Link to="/finances">← Money</Link>{viewer.user?.role==='coach'&&<><FundraiserLinkSettings/><ZeffySync/></>}<FeeAdministration isCoach={viewer.user?.role==='coach'}/>{canEdit&&<PaymentAdministration mode="bulk"/>}<FinanceExport/><CoachFinanceChanges/></>}
 function WaitingSignups({eventId}:{eventId:Id<'events'>}) {const data=useQuery(api.workflowSummaries.waitingSignups,{eventId});return data&&data.count>0?<p>{data.count}{data.more?'+':''} waiting</p>:null}
 function CorrectionNotice(){const data=useQuery(api.workflowSummaries.profileCorrections,{});return data&&data.count>0?<p><Link to="/adults">{data.count}{data.more?'+':''} profile corrections waiting</Link></p>:null}
 function ProfileEditor({studentId,student}:{studentId:string;student:Student}){

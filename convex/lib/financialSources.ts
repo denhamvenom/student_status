@@ -78,6 +78,10 @@ export async function projectSource(ctx: MutationCtx, account: FinancialAccount,
     const revision = entry.fundraiserRevisionId ? await ctx.db.get(entry.fundraiserRevisionId) : null;
     if (entry.kind !== "fundraiser" || entry.originEntryId || !revision || revision.fundraiserId !== entry.fundraiserId || revision.studentId !== entry.studentId || revision.seasonId !== account.seasonId || revision.awardSourceEntryId !== entry._id || revision.travelCreditCents - revision.previousTravelCreditCents !== entry.amountCents) throw new Error("Fundraiser source provenance is inconsistent; Coach review is required.");
   }
+  if (entry.zeffyPaymentId) {
+    const payment = await ctx.db.query("zeffyPayments").withIndex("by_paymentId", q => q.eq("paymentId", entry.zeffyPaymentId!)).unique();
+    if (entry.kind !== "fundraiser" || entry.originEntryId || entry.fundraiserId || !payment || payment.ledgerEntryId !== entry._id || payment.studentId !== entry.studentId || payment.seasonId !== account.seasonId || payment.amountCents !== entry.amountCents) throw new Error("Zeffy gross fundraising provenance is inconsistent; Coach review is required.");
+  }
   const existing = await ctx.db.query("financialSources").withIndex("by_studentId_and_generation_and_sourceEntryId", q => q.eq("studentId", account.studentId).eq("generation", account.generation).eq("sourceEntryId", entry._id)).unique();
   if (existing) throw new Error("Financial source was projected twice.");
   const sourceId = await ctx.db.insert("financialSources", {
@@ -97,7 +101,8 @@ export async function projectSource(ctx: MutationCtx, account: FinancialAccount,
     if (entry.originEntryId) account.transferredInCents = cents(account.transferredInCents + entry.amountCents);
     else {
       account.travelShareCents = cents(account.travelShareCents + entry.amountCents);
-      if (!entry.fundraiserId) account.unknownGrossSourceCount++;
+      if (entry.zeffyPaymentId) account.knownRaisedCents = cents(account.knownRaisedCents + entry.amountCents);
+      else if (!entry.fundraiserId) account.unknownGrossSourceCount++;
     }
   }
 }
