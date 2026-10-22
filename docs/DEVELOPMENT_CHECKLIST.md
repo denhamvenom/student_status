@@ -1,5 +1,14 @@
 # Student Status Development Checklist
 
+## October 22 - Historical Timeclock import
+
+- [x] Inspect CSV and production name/calendar/session matches through read-only queries.
+- [x] Owner resolved historical timing policy: Calendar start to final OUT continuously; full scheduled outreach; Central time.
+- [x] Prepare private preview and source fingerprint outside version control.
+- [x] Verify and review Coach-authorized atomic historical import with replay protection and outreach classification; 23 focused regression tests and source lint passed.
+- [ ] Deploy, run live dry-run, import approved attendance, verify report totals and no-op replay.
+
+
 ## October 21 - Zeffy donation connection (released)
 
 - [x] Match existing student fundraiser links to Zeffy campaigns, including locale/query variations; preserve campaign/student/season history across annual link changes.

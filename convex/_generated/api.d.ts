@@ -127,6 +127,7 @@ import type * as subteamMigration from "../subteamMigration.js";
 import type * as syntheticRehearsalCleanup from "../syntheticRehearsalCleanup.js";
 import type * as teamReports from "../teamReports.js";
 import type * as timeclock from "../timeclock.js";
+import type * as timeclockHistoryImport from "../timeclockHistoryImport.js";
 import type * as timeclockPinControl from "../timeclockPinControl.js";
 import type * as timeclockRoster from "../timeclockRoster.js";
 import type * as travel from "../travel.js";
@@ -261,6 +262,7 @@ declare const fullApi: ApiFromModules<{
   syntheticRehearsalCleanup: typeof syntheticRehearsalCleanup;
   teamReports: typeof teamReports;
   timeclock: typeof timeclock;
+  timeclockHistoryImport: typeof timeclockHistoryImport;
   timeclockPinControl: typeof timeclockPinControl;
   timeclockRoster: typeof timeclockRoster;
   travel: typeof travel;

@@ -9,7 +9,7 @@ import type { QueryCtx } from "./_generated/server";
 import { activeSeason, requireRole, studentAccess, viewer } from "./lib/access";
 import { calculateStudentFinance, FINANCE_SUMMARY_VERSION } from "./lib/financeSummaries";
 import { financialAccount } from "./lib/financialSources";
-import { attendanceEvidence, outreachFromTitle, buildDayFromTitle } from "./lib/attendanceReports";
+import { attendanceEvidence, outreachForSession, buildDayFromTitle } from "./lib/attendanceReports";
 import { attendanceNamespace, studentAttendanceNamespace, reportAggregate } from "./lib/reportAggregates";
 import { kickoffBoundaryForCompetitionYear } from "./lib/seasonCalendar";
 export { correctedIntervals } from "./lib/attendanceReports";
@@ -99,7 +99,7 @@ export const familyAttendance=query({
       const occurrence=await ctx.db.get(session.occurrenceId);
       const report=await ctx.db.query("timeclockSessionReportStates").withIndex("by_sessionId",q=>q.eq("sessionId",session._id)).unique();
       const row=await ctx.db.query("timeclockAttendanceSummaries").withIndex("by_sessionId_and_studentId",q=>q.eq("sessionId",session._id).eq("studentId",student._id)).unique();
-      const fresh=report?.state==="ready"&&report.occurrenceTitle===occurrence?.title&&report.outreach===outreachFromTitle(occurrence?.title??"")&&report.buildDay===buildDayFromTitle(occurrence?.title??"",session.scheduledStart)&&report.sessionRevision===session.revision&&report.sessionState===session.state&&report.needsReview===session.needsReview&&(!row||row.sessionRevision===session.revision&&row.reportGeneration===report.reportGeneration&&row.outreach===report.outreach&&row.occurrenceTitle===report.occurrenceTitle&&row.buildDay===report.buildDay);
+      const fresh=report?.state==="ready"&&report.occurrenceTitle===occurrence?.title&&report.outreach===outreachForSession(session,occurrence?.title??"")&&report.buildDay===buildDayFromTitle(occurrence?.title??"",session.scheduledStart)&&report.sessionRevision===session.revision&&report.sessionState===session.state&&report.needsReview===session.needsReview&&(!row||row.sessionRevision===session.revision&&row.reportGeneration===report.reportGeneration&&row.outreach===report.outreach&&row.occurrenceTitle===report.occurrenceTitle&&row.buildDay===report.buildDay);
       if(session.state!=="open"&&!fresh)pageStale=true;
       const math=session.state==="open"?await attendanceEvidence(ctx,session,student._id,args.asOf):fresh?row??{totalMs:0,earlyMs:0,scheduledMs:0,extendedMs:0,longestScheduledMs:0,qualifies:false}:null;
       sessions.push({sessionId:session._id,title:occurrence?.title??"Unavailable event",scheduledStart:session.scheduledStart,state:session.state,totalMs:math?.totalMs??null,scheduledMs:math?.scheduledMs??null,earlyMs:math?.earlyMs??null,extendedMs:math?.extendedMs??null,longestScheduledMs:math?.longestScheduledMs??null,qualifies:math?.qualifies??null,needsReview:session.needsReview,provisional:session.state==="open",reportState:session.state==="open"||fresh?"ready" as const:report?.state==="failed"?"failed" as const:"updating" as const});
