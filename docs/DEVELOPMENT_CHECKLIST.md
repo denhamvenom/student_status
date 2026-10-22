@@ -6,7 +6,7 @@
 - [x] Owner resolved historical timing policy: Calendar start to final OUT continuously; full scheduled outreach; Central time.
 - [x] Prepare private preview and source fingerprint outside version control.
 - [x] Verify and review Coach-authorized atomic historical import with replay protection and outreach classification; 23 focused regression tests and source lint passed.
-- [ ] Deploy, run live dry-run, import approved attendance, verify report totals and no-op replay.
+- [x] Deploy, run live dry-run, import approved attendance, verify every interval/report and no-op replay. All imported reports ready.
 
 
 ## October 21 - Zeffy donation connection (released)

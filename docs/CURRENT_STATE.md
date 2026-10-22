@@ -4,7 +4,7 @@
 
 Branch `feature/timeclock-history-import` in checkout `student-status-zeffy`, based on production main `07d3223`. Owner approved historical CSV attendance: match current students by first/preferred name and last initial, discard unmatched names, use Calendar start through final valid clock-out continuously for Team Meetings, and full scheduled time for the two identified outreach occurrences. Exclude clock-outs before the meeting start. All timestamps are Central. This supersedes the original proposal to preserve individual IN times and breaks.
 
-Local private preview is prepared in ignored `tmp/timeclock-import/`; no real records enter Git. Backend import passed independent review, source lint and 23 focused regression tests; no historical attendance has been posted yet. See [TIMECLOCK_HISTORY_IMPORT.md](TIMECLOCK_HISTORY_IMPORT.md).
+Local private preview is prepared in ignored `tmp/timeclock-import/`; no real records enter Git. Backend import passed source review, lint, types and 23 focused regression tests. Production deployment, live preview, approved attendance posting, complete interval/report comparison and no-op replay are verified. All imported reports are ready; no pending import work. See [TIMECLOCK_HISTORY_IMPORT.md](TIMECLOCK_HISTORY_IMPORT.md).
 
 ## Zeffy donation integration released - October 21, 2026
 
