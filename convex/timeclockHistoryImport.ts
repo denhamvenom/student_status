@@ -1,5 +1,5 @@
 import { ConvexError, v } from "convex/values";
-import { internalMutation } from "./_generated/server";
+import { mutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { activeSeason, requireRole, viewer } from "./lib/access";
 import { correctedIntervals, invalidateAttendanceSession } from "./lib/attendanceReports";
@@ -21,7 +21,7 @@ const args = {
 const result = v.object({ status: v.union(v.literal("ready"), v.literal("imported"), v.literal("unchanged")), sessionId: v.union(v.id("timeclockSessions"), v.null()), rowCount: v.number() });
 
 /** A single occurrence is the transaction boundary. CLI callers use --identity for a Coach account. */
-export const importOccurrence = internalMutation({
+export const importOccurrence = mutation({
   args, returns: result,
   handler: async (ctx, input) => {
     const actor = await viewer(ctx);
