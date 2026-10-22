@@ -1,12 +1,12 @@
 # Current integration handoff
 
-## Zeffy donation integration candidate - October 21, 2026
+## Zeffy donation integration released - October 21, 2026
 
-Checkout `student-status-zeffy`, branch `feature/zeffy-donation-sync`, based on origin/main `4f4b0f2`. Zeffy credits use the existing student fundraiser links, preserved page/season ownership, ledger source projections and automatic allocation. Coach controls are in Money tools; scheduled checks are 7AM/7PM America/Chicago and default off. See [ZEFFY_SYNC.md](ZEFFY_SYNC.md) for scope, limits and release procedure.
+Owner approved production release and activation. PR34 merged as `07d3223fb1e159cbba19783b206f12db551fc2c4`; release `v0.1.0-onboarding.14`. Convex production `amicable-eel-413` is deployed and configured. Student Status Worker version `1d345faa-8a8a-49ec-96ac-695a21e64100` serves the new controls; HTTPS assets were verified.
 
-Owner cannot rehearse on development: local synthetic tests and a read-only live source/link/account preflight were used. No real credits or deployment changes. Typecheck/source lint/build, independent review and representative synthetic browser checks passed. Full test run had 635 passes, three unrelated timeouts and a corrected new fixture; all four suites passed 25/25 on targeted single-worker rerun. Real-record evidence is not in Git.
+Live preview passed, the first import credited one eligible donation with no review items, and a second run credited zero and skipped the existing payment. Ledger provenance and account allocation were verified privately. Checks are enabled for 7 AM/7 PM America/Chicago; actual scheduled execution remains unobserved. See [ZEFFY_SYNC.md](ZEFFY_SYNC.md) for behavior, limits and validation.
 
-Published implementation checkpoint `c1aef8e` on the feature branch and [draft PR34](https://github.com/denhamvenom/student_status/pull/34). Next: obtain explicit production release/activation approval. Add the key to production securely, deploy initially disabled, review live preview, post first credit and verify duplicate rerun before relying on the schedule. Production balance and scheduled-run verification remain pending. Preserve all sibling worktrees.
+Checkpoint checkout `student-status-zeffy`, branch `feature/zeffy-donation-sync`. Release evidence is published on this branch without a documentation-only merge that would redeploy main. Preserve sibling worktrees and keep real records out of Git. Next operational check: inspect the first scheduled result after 7 AM Central October 22. No further code work is required for activation.
 
 ## Previous release: event schedule and Pay styling - October 21, 2026
 
