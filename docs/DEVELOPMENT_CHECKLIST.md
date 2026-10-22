@@ -1,15 +1,25 @@
 # Student Status Development Checklist
 
-## October 21 - Zeffy donation connection (release candidate)
+## October 22 - Historical Timeclock import
+
+- [x] Inspect CSV and production name/calendar/session matches through read-only queries.
+- [x] Owner resolved historical timing policy: Calendar start to final OUT continuously; full scheduled outreach; Central time.
+- [x] Prepare private preview and source fingerprint outside version control.
+- [x] Verify and review Coach-authorized atomic historical import with replay protection and outreach classification; 23 focused regression tests and source lint passed.
+- [x] Deploy, run live dry-run, import approved attendance, verify every interval/report and no-op replay. All imported reports ready.
+
+
+## October 21 - Zeffy donation connection (released)
 
 - [x] Match existing student fundraiser links to Zeffy campaigns, including locale/query variations; preserve campaign/student/season history across annual link changes.
 - [x] Credit eligible donations through the existing financial ledger and allocation flow, with duplicate protection, zero-floor owed amounts and available surplus.
 - [x] Coach-only preview, enable/disable, manual check, last result/error and paginated exception review. Scheduled checks are 7 AM/7 PM America/Chicago and initially disabled.
-- [x] Read-only live source/link/account preflight; no real credits, development rehearsal writes or production deployment.
+- [x] Read-only live source/link/account preflight completed before approved activation; no development rehearsal writes.
 - [x] Source/type checks, application build, independent source review and synthetic phone/dark plus desktop/light inspection.
 - [x] Integrated regression evidence: 635 full-run passes; corrected fixture and three timeout suites passed the 25-test targeted rerun, including all nine Zeffy regressions. No test weakening.
-- [x] Published reviewed feature branch and [draft PR34](https://github.com/denhamvenom/student_status/pull/34); implementation checkpoint `c1aef8e` verified on remote.
-- [ ] Owner approval, production configuration/deployment, first credit and duplicate rerun verification, then scheduled execution verification.
+- [x] Published reviewed feature branch and [PR34](https://github.com/denhamvenom/student_status/pull/34); implementation checkpoint `c1aef8e` verified on remote.
+- [x] Owner approval, production configuration/deployment, first credit and duplicate rerun verification. PR34 merged; production checks enabled.
+- [ ] Observe the first scheduled execution after activation; manual production runs passed.
 
 See [ZEFFY_SYNC.md](ZEFFY_SYNC.md) for agreed behavior and the release boundary.
 

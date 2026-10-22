@@ -5,6 +5,7 @@ import { assertNoOverlap, classifiedTime } from "./timeclock";
 import { updateSessionAggregate, updateStudentAttendanceAggregate, type AttendanceWeekday } from "./reportAggregates";
 
 export const outreachFromTitle = (title: string) => /outreach/i.test(title);
+export const outreachForSession = (session: Doc<"timeclockSessions">, title: string) => session.outreachOverride ?? outreachFromTitle(title);
 
 export function buildDayFromTitle(title: string, scheduledStart: number): "weekday" | "saturday" | "sunday" | null {
   if (!/build/i.test(title)) return null;
@@ -40,7 +41,7 @@ export async function invalidateAttendanceSession(ctx: MutationCtx, sessionId: I
   const previous=await ctx.db.query("timeclockSessionReportStates").withIndex("by_sessionId",q=>q.eq("sessionId",sessionId)).unique();
   const reportGeneration=(previous?.reportGeneration??0)+1;
   const occurrence=await ctx.db.get(session.occurrenceId);if(!occurrence)throw new Error("Attendance source event is unavailable.");
-  const fields={buildDay:buildDayFromTitle(occurrence.title,session.scheduledStart),outreach:outreachFromTitle(occurrence.title),occurrenceTitle:occurrence.title,sessionId,seasonId:session.seasonId,scheduledStart:session.scheduledStart,weekday:attendanceWeekday(session.scheduledStart),sessionState:session.state,needsReview:session.needsReview,sessionRevision:session.revision,reportGeneration,state:session.state === "open" ? "ready" as const : "rebuilding" as const,phase:"originals" as const,cursor:null,processed:0,updatedAt:Date.now(),lastError:undefined};
+  const fields={buildDay:buildDayFromTitle(occurrence.title,session.scheduledStart),outreach:outreachForSession(session,occurrence.title),occurrenceTitle:occurrence.title,sessionId,seasonId:session.seasonId,scheduledStart:session.scheduledStart,weekday:attendanceWeekday(session.scheduledStart),sessionState:session.state,needsReview:session.needsReview,sessionRevision:session.revision,reportGeneration,state:session.state === "open" ? "ready" as const : "rebuilding" as const,phase:"originals" as const,cursor:null,processed:0,updatedAt:Date.now(),lastError:undefined};
   const id=previous?previous._id:await ctx.db.insert("timeclockSessionReportStates",fields);
   if(previous) await ctx.db.patch(id,fields);
   const next=await ctx.db.get(id);if(!next) throw new Error("Attendance report state unavailable.");
@@ -60,7 +61,7 @@ export async function projectAttendanceMember(ctx:MutationCtx,session:Doc<"timec
   const evidence=await attendanceEvidence(ctx,session,studentId,Number.MAX_SAFE_INTEGER);
   const previous=await ctx.db.query("timeclockAttendanceSummaries").withIndex("by_sessionId_and_studentId",q=>q.eq("sessionId",session._id).eq("studentId",studentId)).unique();
   const occurrence=await ctx.db.get(session.occurrenceId);if(!occurrence)throw new Error("Attendance source event is unavailable.");
-  const fields={buildDay:buildDayFromTitle(occurrence.title,session.scheduledStart),outreach:outreachFromTitle(occurrence.title),occurrenceTitle:occurrence.title,sessionId:session._id,studentId,seasonId:session.seasonId,scheduledStart:session.scheduledStart,weekday:attendanceWeekday(session.scheduledStart),...evidence,sessionRevision:session.revision,reportGeneration:generation,sessionState:session.state,needsReview:session.needsReview,version:1 as const};
+  const fields={buildDay:buildDayFromTitle(occurrence.title,session.scheduledStart),outreach:outreachForSession(session,occurrence.title),occurrenceTitle:occurrence.title,sessionId:session._id,studentId,seasonId:session.seasonId,scheduledStart:session.scheduledStart,weekday:attendanceWeekday(session.scheduledStart),...evidence,sessionRevision:session.revision,reportGeneration:generation,sessionState:session.state,needsReview:session.needsReview,version:1 as const};
   const id=previous?previous._id:await ctx.db.insert("timeclockAttendanceSummaries",fields);
   if(previous)await ctx.db.patch(id,fields);
   const next=await ctx.db.get(id);if(!next)throw new Error("Attendance projection unavailable.");
