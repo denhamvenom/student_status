@@ -1,96 +1,85 @@
-# Student Status architecture and shared contracts
+# Student Status and Timeclock architecture
 
-## Boundaries
+Read [HANDOFF.md](../HANDOFF.md) for current work, known risks and verification limits. This document describes code contracts, not a fresh production inspection.
 
-This is an isolated application. `src` owns React and presentation, shared pure domain code owns deterministic calculations, and the app's `convex` directory owns persistent state and authorization. The handoff is reference material, never runtime HTML. Existing workspace-root Convex files are untouched.
+## Applications and data ownership
 
-Use React Router Data Mode for navigation, nested layouts and route errors. Convex reactive queries own remote data. Zustand contains only ephemeral state such as selected child/event, filters and open sheets; do not use it as a parallel authoritative financial or identity database. next-themes applies the theme class; persisted authenticated preference may synchronize through a user preference mutation. Sonner announces completed actions and actionable failures.
+Student Status lives in root `src/`; Timeclock lives in `apps/timeclock/`. Both are React/Vite SPAs using React Router, strict TypeScript, Tailwind and shadcn Base UI. Root `convex/` is the only domain backend; generated API/types are shared. Shared helpers implement deterministic money, attendance, time and validation rules. Cloudflare serves each frontend independently.
 
-Synthetic development mode must be visibly identified and isolated from authenticated persistence. A development persona is a fixture selector, never an authorization parameter. Missing server configuration must not silently send synthetic records to a real deployment or pretend Google sign-in succeeded.
+Convex queries own remote state. Zustand/menu/selection stores contain ephemeral UI state, not an authoritative account ledger or persisted roster/health/finance cache. Authentication uses the implemented origin-local storage namespaces; a common issuer or hostname never substitutes for server access checks. Development review fixtures are visibly synthetic and cannot authorize live writes.
 
-## Proposed shared domain contract
+## Identity and authorization
 
-Implementation may choose filenames, but frontend and backend should share one vocabulary and avoid independently invented shapes.
+`convex/auth.ts` configures Google and the guarded `parentEmail` credentials provider. Students use verified Google identity; eligible parents and approved staff also have email-code/private-invitation paths. Stable Convex Auth user IDs map to appUsers; server helpers enforce active status, role, season and per-record ownership. Parent/staff email-auth markers are constrained to the appropriate account type and normalized email.
 
-| Entity | Required concepts |
+| Actor | Scope |
 | --- | --- |
-| Viewer | Stable authenticated subject, account email/name, status, base role, travelLead capability, financialEdit capability, linked student IDs, theme |
-| Season | ID, unique name, start/end dates, active/closed state, close transaction ID |
-| Student | ID, season membership, legal/preferred names, Google subject, active status, subteam, Travel Team, shirt, rooming category, setup state |
-| Student private data | Parent contacts, emergency contact, health states/items, seasonal OTC authorization, scoped separately from roster projection |
-| Event | ID/season, title/type, dates/destination, participation mode, capacity/deadline/withdrawal, overnight, requirements with due dates, transport and rooming settings |
-| Participation | Event/student, confirmed/pending/waitlist/withdrawn/declined, ordered waitlist timestamp, independent travel flag |
-| Requirement | Stable key, kind payment/permission/FIRST/custom/room, label/instructions/link, applicability, due date, adult completion evidence |
-| Charge | ID/season, title, optional event, amount in integer cents, recipients, priority, active/void state |
-| Financial entry | Student, type, amount cents, allocated charge amounts, source/ref, actor/time/reason and before/after audit evidence |
-| Permission submission | Immutable student/season/signer identity, signed timestamp, wording version and exact snapshot, covered event IDs, health/contact snapshot; review state kept separately |
-| Room group | Event/category, accepted student IDs, invitation records, finalized flag/room number, needsReview, optional fifth-person authorization note/actor/time |
-| Driver/transport | Active driver with vehicle/seats/tow capability, event assignments and overrides, bus seats, extra adult passengers, trailer requirement/driver |
-| Attendance | Common meeting calendar/cancel state, student observations, import source/matching status, last successful update and last attempt |
-| Audit record | Actor derived from auth, action/entity, timestamp, before/after, reason, season and related student IDs |
+| Student | Own active-season record and permitted event/room/profile actions; no authority supplied by a persona selector |
+| Parent | Exact active family links; structured health/contact confirmation, travel choice and approved consent paths |
+| Coach | Account/role, roster, team, finance, season and controlled historical administration |
+| Mentor | Minimized reports and authorized Timeclock operations; no implicit private finance/health access |
+| Travel Lead | Mentor capability for operational access; finance editing and sensitive exports require their own explicit grants |
 
-Represent money as integer cents. Store timestamps as epoch milliseconds and calendar dates as ISO dates, with explicit America/Chicago presentation rules. Use stable IDs rather than display names for relationships. Health fields use a discriminated state (`unknown`, `none`, `reported`); empty strings never imply medical clearance.
+Public functions derive identity on the server and return minimized projections. Recheck grants when deferred/page-wise operations execute. Archived corrections use warned, scoped, expiring Coach access, reasons and immutable audit. A Timeclock PIN does not limit the broader privileges of a logged-in Coach.
 
-## View models and service boundary
+## Core records and derived state
 
-Queries return the least-privileged projection needed by a screen. Recommended seams:
+Seasons scope student profiles, events, charges, rooms, attendance and reports. Stable IDs link records; legal/preferred/structured names are presentation/matching inputs, not relationship keys. Dates use ISO calendar values or epoch milliseconds as appropriate, with America/Chicago/DST presentation.
 
-- `viewer`: authenticated identity, permitted navigation/capabilities and linked-child summaries.
-- `studentDashboard(studentId)`: finance summary, permitted events with participation/readiness, attendance summary and grouped tasks.
-- `studentProfile(studentId)`: permitted profile/private fields and allowed edit actions.
-- `eventDetail(eventId)`: visible event and viewer-specific participation; adult workspace returns additional scoped operational data.
-- `eventReadiness(eventId)`: category results and adult-only student requirement matrix; family gets their own row; Mentor gets overall result only.
-- `studentFinances(studentId)`: charges, allocations, travel balance and audit projection; no client-side reconstruction from unscoped team ledger.
-- `teamRoster(filters)`, `mentorReport(filters)`: separate schemas; mentor response must not contain hidden finances/health/open-requirement reasons.
+Travel events and participants are distinct from Calendar occurrences, Timeclock sessions and intervals. App events can create or explicitly adopt/link individual Calendar occurrences. Synchronize supported schedule/location/cancellation fields and the Media Support Requested marker; do not publish student identities, fees or private consent information to Calendar. Preserve external description content outside managed markers.
 
-Mutation arguments contain entity IDs and requested changes, not an authoritative role, actor email, calculated readiness or available balance. Every mutation resolves the real viewer and record scope again. Return explicit domain error codes for capacity/deadline/concurrency/permission failures, mapped to useful UI copy. Expected conflicts are not success states.
+Participation and readiness remain separate. Pending reservations consume capacity without confirmed debt; waitlists are chronological and manually promoted. A real reenrollment gets a new queue position. Whole Team and Travel Team rules are server-controlled, not lists invented in the client. Attendance does not gate travel readiness.
 
-Suggested command families: join/code review; student ordinary/private/correction edits; event creation/participation/requirement completion; charge/payment/credit/fundraising; parent invitation and permission submission/review; room invitation/acceptance/adult assignment; driver/event transport; attendance preview/resolve/apply; adult grants and season preview/close. Query before/after summaries should change reactively after successful writes.
+Readiness has student requirements, transportation and adult room placement categories, each ready/open/not applicable. Include every active event-tied charge in payment readiness; standalone charges do not gate an event. Family/Student room selection is distinct from adult final placement. Student groups stop at four; adult fifth-person exceptions need a reason; never mix categories or allow six. After the deadline students cannot change groups/invites; supported adult corrections remain audited. Signup/acceptance/withdrawal changes reconcile capacity and room state transactionally.
 
-## Authorization contract
+## Finance and season integrity
 
-Coach is the only role that manages legal identity, roster archival, subteams, Travel Team, required-event participant removal, team codes, adult grants, fee priority, fundraiser creation, attendance settings and seasons. Travel Lead is a Mentor capability with operational access; financial writes require the additional Coach-controlled grant. Parent access requires an active link to that exact student. Student access resolves to their own student record.
+All money is integer cents. Preserve personal-payment versus fundraising provenance, original receipts, allocations and append-only before/after evidence. Projections/materialized sources and bounded durable workers support long histories; unavailable/unprepared/held data is not zero. Revision checks, idempotency keys and durable recovery guard multi-step financial commands.
 
-Student health/emergency edits and parent signing on unrelated records are denied. A parent cannot enroll or withdraw a child from optional events. Student rooming actions use their own authenticated student ID. Mentor has a dedicated restricted report projection and never receives private data to hide in React.
+Approved withdrawals support full return, partial return, retained payment or denial. Internal returns reverse eligible event allocations and automatically apply to other charges in priority order while excluding the withdrawn event. Cancel unpaid extras automatically; unpaid main fees remain owed unless explicitly cancelled. Approval releases participation/room places while retaining financial evidence.
 
-October 12 planned policy: Coach may export permission/health packets; Travel Lead requires a separate Coach-controlled export grant, proposed default off and independent of financialEdit. Until implemented and tested, retain the restrictive denial. Draft legal wording blocks real signature acceptance. Parent linking follows the approved good-faith process below; it does not claim independent proof of guardianship.
+Cash/check payout recording is separate and reduces held personal-payment funds; the app does not send money. Fundraising credits cannot be paid to a family. Authorized financial staff can transfer available fundraising credits to active same-season students with a reason. Team transfers and season dispositions preserve source lineage; insufficient available original credits hold a fundraiser reduction instead of silently creating debt or clawing funds back.
 
-## October 12 parent invitations and remaining planned changes
+Departing balances are normally nonrefundable, subject to Coach review of a family exception. A Coach-reviewed personal-payment-to-team disposition does not require separate documented family authorization, but does require explicit source/amount/reason/audit review. Archival or season close never silently sweeps balances. Team bank accounting is outside this app.
 
-For subsequent confirmed finance/consent/retention rules, [FINANCE_AND_CONSENT_DECISIONS.md](FINANCE_AND_CONSENT_DECISIONS.md) takes precedence over the earlier planning snapshot below. It adds partial internal returns, fee classification, priority reallocation, source-preserving fundraising transfers, named form organizations, first-aid wording and archival-based retention.
+Season transitions preview returning/departing records and financial dispositions, use durable guarded steps and prevent incompatible writes. Unsupported downstream-linked historical corrections remain held for explicit resolution. Archived-account retention is five years from the most recent archive date after reactivation; holds and download/backup disposal remain operational work. Automatic retention deletion is not authorized.
 
-Parent invitations expire after 7 days. A Coach-only Join Requests toggle blocks creation/replacement but preserves outstanding invitations and established links. Student supplies the parent email; matching Google sign-in, a valid one-time token and explicit relationship/authority attestation establish the link without routine Coach approval. Coach handles problems and may revoke access. Resolve identity on the server, reject self-linking to the student's own account, and log acceptance plus attestation version/time. Do not expose student details on an unauthenticated invitation landing or grant access on email mismatch. Account linking does not itself sign travel or medication consent. Implemented: seven-day one-time hashed tokens, authoritative server-time preview/acceptance, versioned relationship attestation, new parent onboarding, Coach revoke/restore/allow-replacement controls, and current-season child selection. Tokens use URL fragments and temporary same-tab sessionStorage only for the Google round trip; the OAuth redirect URL contains no invitation token. Signed forms and medication consent remain separate and unimplemented. See PARENT_INVITATIONS.md.
+Fee-specific payment CSV review uses stable row/account/charge identities and revisions; new receipts target the selected fee rather than spending existing credit. Fundraiser-link CSV keeps stable identities and distinguishes blanks (clear) from omitted rows (unchanged).
 
-A separate clock application on another subdomain will share the Convex backend. It owns clock-in/out actions; this app reads scoped attendance results. Initial matching uses verified email, with durable internal student IDs thereafter. A shared database does not automatically share browser sessions or authorize clock users to access health/finance functions.
+## Parent linking and approved PDF consent
 
-Withdrawal has four Coach/Travel Lead decisions: approve and return event-applied money to available funds; approve and retain payment on the event with a non-refundable-withdrawal note; approve a partial internal return up to the full eligible paid amount; or deny and preserve participation. An approved internal return reverses the event allocation with an audit trail and prevents that event from immediately reclaiming the credit. It does not reduce money held for the student or create an external refund payable. Approved withdrawal releases participation/room/capacity atomically with its financial disposition; preserve original ledger history and enforce idempotency. Unpaid extras are canceled automatically. Unpaid main event/travel charges remain owed unless explicitly canceled. Paid extras are eligible for return; returned funds automatically apply to other charges in priority order while preserving personal-payment versus fundraising provenance.
+Parent invitations are seven-day single-use private inbox links with explicit relationship attestation; issuance/replacement is Coach-controllable and resend has a one-hour guard. Existing valid invitations and links survive pausing new issuance. Matching email control is not independent proof of guardianship. See [parent invitations](PARENT_INVITATIONS.md).
 
-Actual money returned by check/cash is separately recorded in the finance area by Coach or Travel Lead with the financial-edit grant. This app records the payout, never executes a money transfer. Append an audited payout entry, validate available refundable funds and duplicate submissions, and reduce the funds held for the student. Withdrawal-disposition authority does not grant this external-refund capability. Fundraising-credit cash/check payouts are not authorized. Fundraising transfer authority and recipient restrictions remain unresolved.
+New consent uses the approved original field-trip PDF template, populated from completed Student setup and Parent-confirmed structured health/contact information. Preserve the original logo, ordinary one-page layout and signature slots; genuine overflow continues losslessly. The Parent reviews the exact server-prepared PDF, checks acknowledgment and types the verified signer name. Store immutable reviewed/signed PDF bytes/hashes, covered-event/signer/profile evidence and version; later events or profile changes cannot alter a signed receipt.
 
-Coach manages application accounts; archived records are retained for 5 years. Retention starts when the Coach archives the student account; purge coverage, backups, exports, holds and reactivation still need specification. Medication consent will be categorized; exact products, wording and approval process remain open. See PLAN.md for the source permission slip and confirmed versus proposed details.
+Active Medication Choices/seasonal OTC authorization are superseded; legacy evidence remains intact. Review/correction/re-sign and paper acceptance preserve original submissions rather than editing signatures. Sensitive PDF/export access is checked server-side, including between export pages.
 
-## Derived state invariants
+Signing mode is synthetic only for registered development subjects, real only when the explicit enable flag and matching approved cloud URL both pass, otherwise closed. Source support does not prove production enablement (VERIFY actual settings). Bootstrap and maintenance tools retain exact-target/opt-in safeguards; do not rerun them from old launch instructions.
 
-1. Readiness has three categories: student requirements, transportation, adult rooming. Each is `ready`, `open` with reasons/count, or `notApplicable`. Participation status is independent. Attendance never gates readiness.
-2. Event charge eligibility begins at confirmed participation. Pending counts toward capacity, not debt. Event required payment includes all active charges tied to that event; standalone charges do not gate the event.
-3. Travel credits consume no more than available travel balance, apply in Coach priority order and audit each affected student/charge. No implicit Travel Fee or floating-point currency math.
-4. A student's room selection completes with a roommate, assignment request, or finalized placement. Adult rooming remains open until placement/finalization. Groups have four occupants unless adult-authorized fifth, never six; categories never mix.
-5. Invite acceptance and event signup enforce capacity in one transactional mutation. Concurrent attempts cannot overfill. Removing event participation releases room membership and flags affected room for review.
-6. Signed submissions are append-only snapshots. Review status/correction requests are separate records; later events cannot retroactively enter a signed snapshot.
-7. Season close is one idempotent transaction with explicit monetary dispositions and reasons. Archived queries deny ordinary-user access.
+### PDF evidence and legacy compatibility
 
-## UI and accessibility contract
+Generate prepared/reviewed artifacts on the server from an authoritative bounded snapshot, with pinned template identity, exact bytes and SHA-256. A client-provided hash/PDF is not authority. Recheck Parent link, setup/profile completion, profile/event/wording/coverage revisions, expiry, acknowledgment, signer identity and signing mode on submission. Retries are idempotent; changed mode requires fresh valid preparation, not silent reuse. Disabling signing must preserve readable historical evidence.
 
-Import the handed-off color/type/space/radius tokens; keep gold primary actions, purple navigation, dark header and 1200 px content width. Use the white-text logo on the header. Anton headings/navigation and Segoe UI body match the reference. No prototype black review bar, gradients, emoji, or colored left-border cards.
+Keep structured guardian, emergency, insurance and physician information plus explicit none/unavailable states, bounded allergy entries (allergen/severity/reaction/response) and prescription entries (name/dose/timing/reason/carried-by). Never infer structured medical answers from old free text. Parent confirmation and revisions protect concurrent changes.
 
-Under 1024 px use role-specific bottom navigation and More sheet; under 768 px tables become cards. On desktop, family top navigation and grouped Coach menus match navigation.json. Parent student selector is at least 44 px and always accompanies a Viewing banner. Status chips use text/icons as well as color. Dialog/sheet primitives manage focus, Escape, labels and return focus; busy actions disable duplicate submission. Inputs use appropriate types, 16 px text and inline validation.
+Electronic account signer, named paper signer and Coach recorder remain distinct; paper and electronic paths use the same signing gate. Per-retrieval authorization, memory-only PDF bytes/object URLs with cleanup and per-page export grant rechecks prevent public/persistent health-file exposure. Version-1 validators/hashes/receipts remain readable; new format-2 workflows do not mutate legacy evidence. Existing detailed legacy-consent contracts remain separately retained until their unique compatibility detail is consolidated.
 
-## Verification strategy
+## Timeclock and attendance
 
-Pure-domain checks cover confirmed-only billing, integer-cent allocation, capacity including pending, manual waitlist promotion, room limits/category boundaries, assignment versus adult readiness, and attendance exclusion. Server authorization checks cover wrong-user reads/writes, unlinked parents, Mentor projection, Travel Lead finance disabled, and Coach-only administration. Integration checks prove that a mutation changes every relevant summary and that failed conflicts preserve prior state. Build/typecheck plus focused browser tasks validate route errors, responsive layouts, light/dark, form labels and keyboard dialogs.
+Active authorized Coaches/Mentors operate a minimized reviewed roster; normal shared-device use should use an ordinary Mentor. Server clock commands own session revisions, atomic group/transfer behavior, PIN checks, throttling and idempotent retries. Close/extension settlement is server-owned; stale scheduled jobs cannot close a later extension.
 
-Cloudflare hosts static assets with SPA fallback; Convex supplies the reactive backend. Google OAuth callback/origin and Convex deployment configuration must be explicit. Production deployment and real records remain blocked until the gates in PLAN.md are resolved.
+The selected event uses a memory-only roster snapshot, retained across Chicago midnight; live IN/OUT status remains subscribed. Leaving/reselecting follows the snapshot scope contract. Stable day arguments and local visible clocks avoid frequent query churn. Console profile identity coordinates same-profile tabs without sharing domain data across origins.
 
-## Multi-app foundation
+Qualification requires a single uninterrupted scheduled-hour overlap; separate visits do not combine to qualify. Early/extended time and total time remain distinct. Corrections append evidence; reports use durable summaries/aggregates, with explicit provisional/unknown/rebuild states and minimized paginated cards. Legacy checkmarks never invent clock intervals.
 
-Student Status remains at root; Timeclock has an independent Bun workspace under apps/timeclock. One Convex backend owns identity, roster, event sessions, intervals, corrections and Calendar scheduling. Travel events/participants and timed attendance occurrences are separate models. Cross-tab console selection is server-backed with an opaque profile identifier; no roster/query/health/finance data is persisted in browser UI stores. Read TIMECLOCK_BACKEND_HANDOFF.md for contract and current limits. The Student Status integration owner alone synchronizes shared backend changes.
+Historical import has its own approved interpretation: current roster matching by first/preferred name plus last initial; Calendar start through final valid OUT continuously for selected Team Meetings, full scheduled windows for the two approved outreach occurrences, Central time. Ambiguity/overlap/stale schedules fail; exact replay is a no-op. Do not apply that historical exception to normal live qualification rules.
+
+Calendar scheduled refresh is 6 AM/3 PM Central plus authorized manual refresh, using DST-aware slot guards; the earlier minute-polling contract is historical. See [Timeclock contracts](TIMECLOCK_BACKEND_HANDOFF.md), [attendance reporting](ATTENDANCE_REPORT_IMPLEMENTATION.md), [linked Calendar](EVENT_CALENDAR_SYNC.md) and [historical import](TIMECLOCK_HISTORY_IMPORT.md); their older status paragraphs require the cleanup listed in HANDOFF.md.
+
+## Zeffy and operational boundaries
+
+Zeffy matches supported USD peer-to-peer donations through saved fundraiser campaign links, not donor email/name. Saved campaign/student/season ownership and provider payment IDs prevent double credit and silent reassignment. Preseason donations are allowed; ambiguous, changed, refunded/disputed and historical-season cases require review. Credit through the existing source ledger/allocation/report paths; retain unused surplus. Provider/preview safety bounds fail explicitly rather than truncating silently.
+
+Automatic checks default off for a new deployment and use 7 AM/7 PM Central slot guards when enabled. Repository evidence records an approved activation and idempotent live import, but an actual scheduled execution remains unobserved (VERIFY). See [Zeffy](ZEFFY_SYNC.md).
+
+Auth redirect origins, signing gates, Calendar credentials/PIN, email and Zeffy secrets are server deployment configuration. Frontend VITE variables are public build-time inputs. Main-connected frontend publication and backend deployment are separate; follow [deployment](DEPLOYMENT.md). Backup/restore, security inventory, mounted UI regression and physical-device evidence gaps remain in HANDOFF.md; passing source tests do not close them.

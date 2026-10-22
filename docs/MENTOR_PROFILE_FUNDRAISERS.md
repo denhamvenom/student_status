@@ -1,6 +1,6 @@
 # Mentor Profile and individual fundraiser links
 
-Owner accepted and authorized production release October 20, 2026. Backend f075087 deployed successfully. See RELEASE_2026-10-20_FUNDRAISERS.md and release notes for exact website build evidence. Earlier development-only evidence below is historical.
+Owner accepted and authorized production release October 20, 2026. Backend f075087 deployed successfully. See releases/RELEASE_2026-10-20_FUNDRAISERS.md and release notes for exact website build evidence. Earlier development-only evidence below is historical.
 
 ## Behavior
 

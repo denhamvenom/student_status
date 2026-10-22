@@ -14,4 +14,4 @@ Use the stored lastName when available; for older names without structured parts
 
 
 ## Release status
-Coach accepted and authorized production publication October 20. Production backend sync succeeded; see RELEASE_2026-10-20_GRADES_ROSTER.md and the release notes for frontend build outcomes. This supersedes the development-only status above.
+Coach accepted and authorized production publication October 20. Production backend sync succeeded; see releases/RELEASE_2026-10-20_GRADES_ROSTER.md and the release notes for frontend build outcomes. This supersedes the development-only status above.

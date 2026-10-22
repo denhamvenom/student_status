@@ -1,6 +1,6 @@
 # Accounts and permission implementation contract
 
-**October 14 superseding contract:** [FIELD_TRIP_PDF_PLAN.md](FIELD_TRIP_PDF_PLAN.md) governs the new populated PDF workflow. Medication Choices and OTC authorization below are historical format-1 requirements only. New format-2 preparation/signing requires complete student setup and Parent-confirmed structured profile, exact stored PDF evidence, acknowledgment and typed name. Minor first aid and all privacy/real-signing gates remain. Implementation in progress.
+**October 14 superseding contract:** [ARCHITECTURE.md](ARCHITECTURE.md) governs the new populated PDF workflow. Medication Choices and OTC authorization below are historical format-1 requirements only. New format-2 preparation/signing requires complete student setup and Parent-confirmed structured profile, exact stored PDF evidence, acknowledgment and typed name. Minor first aid and all privacy/real-signing gates remain. Implementation in progress.
 
 Current status, October 13, 2026: accounts/profile workflows and the full synthetic consent backend/UI are implemented and source-reviewed. Root synchronized this permission checkpoint to development at 08:45:38. Backend 169 tests across 28 files and UI five tests in one file passed separately; lint/types/build pass with a roughly 917 KB bundle warning. Commit/push is pending at this update; no new hash is asserted. Live permission journeys and four-combination visual verification remain pending, so G5 and all other numbered goal items remain open.
 
@@ -20,7 +20,7 @@ The following baseline and design sections preserve the rationale and frozen con
 - There is no `convex/userAdmin.ts` or complete general adult invitation/role management module.
 - `appUsers.financialEdit` is distinct from Travel Lead. There is no separate health-export grant yet.
 
-Inspected references: immutable sibling `student-status-operations/design-reference` onboarding, Profile & health, Users & Roles and Permission review copy; existing access, parent invitation, profile, permission and readiness code; `docs/GOAL_ACCEPTANCE.md`, `docs/FINANCE_AND_CONSENT_DECISIONS.md` and `docs/DEVELOPMENT_CHECKLIST.md`. Later user decisions govern when prototype wording differs.
+Inspected references: immutable sibling `student-status-operations/design-reference` onboarding, Profile & health, Users & Roles and Permission review copy; existing access, parent invitation, profile, permission and readiness code; `docs/GOAL_ACCEPTANCE.md`, `docs/DECISIONS.md` and `HANDOFF.md`. Later user decisions govern when prototype wording differs.
 
 ## Settled policy and remaining gates
 

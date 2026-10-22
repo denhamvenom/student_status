@@ -1,6 +1,6 @@
 # Contact input formatting and validation
 
-Owner authorized production release October 20, 2026. Backend source fdabbe3 deployed successfully. See RELEASE_2026-10-20_CONTACT_FORMATS.md and release notes for exact website build evidence.
+Owner authorized production release October 20, 2026. Backend source fdabbe3 deployed successfully. See releases/RELEASE_2026-10-20_CONTACT_FORMATS.md and release notes for exact website build evidence.
 
 ## Policy
 

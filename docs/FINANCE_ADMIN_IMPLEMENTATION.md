@@ -5,7 +5,7 @@ October 13, 2026. Source now includes the financial foundation, fundraiser posti
 ## Historical starting baseline (superseded by checkpoint sections)
 
 - `docs/GOAL_ACCEPTANCE.md`, G4 and G6, require genuine Raised/travel-share metrics, fundraiser creation/allocation, complete financial history, charge corrections/priorities, fundraising transfer to team and source-preserving season transitions.
-- `docs/FINANCE_AND_CONSENT_DECISIONS.md` defines separate personal-payment/fundraising sources, withdrawal cancellation/refund treatment, automatic reallocation, permitted fundraising destinations and the account-based retention clock.
+- `docs/DECISIONS.md` defines separate personal-payment/fundraising sources, withdrawal cancellation/refund treatment, automatic reallocation, permitted fundraising destinations and the account-based retention clock.
 - The immutable prototype `source/UI Copy - Options.md`, Fundraising, calls for Name, Team %, Student travel %, percentages totaling 100%, student Raised/Team/Student credit, Save amounts and New fundraiser. Finances admin includes fee priority order and before/after history. Season transition includes returning students, explicit departure balance choices, unpaid-charge choices and a final review.
 - There is no fundraiser table/API or charge-correction module. `convex/finance.ts:recordFunds` records a positive personal payment or **net fundraising credit**; it cannot establish gross proceeds before a split.
 - `convex/dashboardReports.ts` correctly returns `raisedCents: null`. `convex/lib/financeSummaries.ts`, version 2, calculates net direct travel credits and transferred-in credits, not gross raised. `convex/lib/reportAggregates.ts` maintains eight finance metrics without Raised.

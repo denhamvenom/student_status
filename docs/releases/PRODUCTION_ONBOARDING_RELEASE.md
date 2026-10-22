@@ -53,7 +53,7 @@ Parent accepted the authorized synthetic invitation, but production has never co
 
 Owner approved PR14 candidate4a51b28 and existing Coach family setup on amicable-eel-413. Merge68179f77212aef7c4f177b333271156389868a2d exactly matches approved candidate tree. Student build e76e3ca2-1df0-438d-8c5a-d97a77987b30 succeeded15:25:13Z; Timeclock2a1473df-e475-4c72-ad85-960918b7f662 succeeded15:24:54Z. Release tag v0.1.0-onboarding.3. No backend deploy.
 
-Live error Sign out worked. Actual Coach Google login ran existing maintenance: complete, unresolved0, scanned2 (one link in each pass), correct season unchanged. Parent fresh Google login reached own synthetic child setup then dashboard via Finish later. Personal fields untouched. Mentor Timeclock authenticated footer verified. Private inventory refreshed:38 selected rows, global scan counts<=40/table, permanent migration readiness/audit explicitly preserved. Cleanup remains disabled/unexecuted. Remaining broader rollout items are listed in CURRENT_STATE; do not equate this batch with full team-launch certification.
+Live error Sign out worked. Actual Coach Google login ran existing maintenance: complete, unresolved0, scanned2 (one link in each pass), correct season unchanged. Parent fresh Google login reached own synthetic child setup then dashboard via Finish later. Personal fields untouched. Mentor Timeclock authenticated footer verified. Private inventory refreshed:38 selected rows, global scan counts<=40/table, permanent migration readiness/audit explicitly preserved. Cleanup remains disabled/unexecuted. Remaining broader rollout items are tracked in ../BACKLOG.md; do not equate this batch with full team-launch certification.
 
 
 ## October 18 final configuration and owner deferral

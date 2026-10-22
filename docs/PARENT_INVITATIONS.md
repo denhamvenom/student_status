@@ -1,45 +1,36 @@
-# Parent invitations
+# Parent invitations and sign-in
 
-## October 19 local email/share update
+This is the current source contract for `convex/parentInvites.ts`, `parentInviteEmail.ts`, `parentEmailAuth.ts`, and `src/ParentInvites.tsx`. Production delivery and real-inbox journeys need their own evidence; current configuration was not inspected in this documentation pass (VERIFY).
 
-Automatic email and Share invitation are implemented and tested locally; see [current implementation and verification](PARENT_INVITATION_EMAIL.md). The manual-only statements below describe the earlier deployed milestone. Google login, seven-day lifetime and relationship attestation remain unchanged. No rollout is authorized for the email/share update.
+## Workflow
 
-## Scope
+1. An active student enters the parent's email in Parents or the setup flow. The server validates identity, active season/student and the Coach-controlled invitation setting.
+2. The app creates a single-use invitation valid for seven days and queues a private email when sending is enabled. Student-facing results show delivery status, not the raw link/token; the earlier Share/Copy invitation workflow is superseded.
+3. The recipient opens the inbox link. A supported one-time private email sign-in can establish the invited email identity; Google sign-in and emailed codes remain supported alternatives where eligible. A sign-in code never grants a student role or bypasses invitation/access checks.
+4. The recipient explicitly supplies the relationship and attests parent/legal-guardian authority. Valid acceptance creates the family link atomically. Email control plus good-faith attestation is not independent proof of guardianship.
+5. A parent may link to multiple children and a child may have multiple linked parents. Every read/write rechecks the exact active family link and current-season scope. Revocation removes that access.
 
-This milestone links parent accounts to students. It does not sign permission slips, authorize medication, or independently verify guardianship. The approved process assumes good faith: the recipient verifies control of the invited Google email and explicitly attests that they are the student's parent or legal guardian with authority to provide consent.
+Account linking is separate from travel consent, PDF signing and health-profile confirmation. Completed setup and Parent-confirmed structured profile are prerequisites for the populated PDF workflow; see [architecture](ARCHITECTURE.md).
 
-## Implemented workflow
+## Coach controls and resend
 
-1. An active student opens Parents and enters the parent's Google email.
-2. The app creates a one-time invitation valid for seven days. It gives the student a link to share manually; no email is sent by the app.
-3. The recipient opens the link and signs in with the invited Google account. Before recipient validation, the landing page must not disclose student details.
-4. The recipient states their relationship and affirms their authority. Successful acceptance creates a parent account if needed and links that account to this student.
-5. A parent may link to multiple students; a student may have multiple linked parents. Access is always checked against the selected student's active link on the server.
+The team-wide Allow new parent invitations setting is enabled by default. Turning it off blocks issuance and replacement/resend paths while preserving existing links and valid outstanding invitations.
 
-## Coach controls and exceptions
+Coach resolution supports invitation revocation, family-link revocation/restoration and controlled replacement. Student requests cannot bypass a revoked-link hold. Existing conflicting student/staff/inactive accounts are not silently converted to parents.
 
-Join Requests contains a team-wide Allow new parent invitations control, enabled by default. Turning it off blocks new and replacement invitations. Existing unexpired invitations retain their original expiry, and established links remain active.
+Student resend waits one hour from the applicable last request/sent time, rechecks permission/state, and replaces the invitation through the supported server path. Show the wait and ask the recipient to check inbox/spam; do not expose a share link to work around delivery trouble. Email workers revalidate invitation state and use guarded retries; queued/sent/failed status is not proof that the recipient read or accepted an email.
 
-The Coach can revoke an invitation or family link when there is a problem. A revoked link cannot be restored by a student sending another invitation; Coach resolution is required. Existing student, Coach, Mentor, or inactive accounts must not be silently converted to parent accounts. Those role conflicts require a Coach-supported resolution outside self-service linking.
+## Identity and privacy
 
-## Security and operating boundaries
+- Normalize email by trimming and case normalization; do not equate Gmail dots or plus aliases. Verify the invited identity server-side; a wrong email or role conflict grants no child data.
+- Hash invitation tokens at rest. The private link uses a URL fragment. Never put raw tokens in Git, analytics, logs, screenshots, public response lists or student-visible copy controls.
+- The supported Google round trip may use scoped temporary same-tab sessionStorage for the token, cleared after recovery/completion. It contains no student records; OAuth redirect URLs must not contain invitation tokens.
+- One-time login consumption and invitation acceptance are distinct guarded steps. Login/code throttling, token expiry/replay checks and matching identity remain server-enforced.
+- Preserve exact relationship/attestation version and time plus Coach audit history. Linking never fabricates a signed form or independent guardianship verification.
+- Parent email-auth markers cannot become staff/student authority. Staff email access has its own approved-account restrictions.
 
-- The server derives identity from the authenticated Google account and checks verified-email evidence, exact normalized invited email, student/season availability, token state and expiry.
-- Email normalization is limited to trimming and case normalization; do not treat Gmail dot or plus aliases as interchangeable.
-- Invitation tokens are capabilities: keep them out of request paths, query strings, logs, analytics, Git and screenshots shared externally. Hash tokens at rest; return a newly created raw token only to its authorized creator. During Google sign-in only, a scoped sessionStorage entry carries the token across the same-tab round trip; it is removed after return, success or cancellation. It contains no student data, and the OAuth redirect URL contains no invitation token.
-- Acceptance consumes the invitation and creates the link atomically. No permission, health or financial consent is created by acceptance.
-- Coach changes and acceptance attestation are audited. Sensitive app data remains in Convex, never in GitHub regardless of repository visibility.
-- The Google OAuth project remains in Testing mode. Additional real test identities require Google test-user configuration; synthetic server tests do not prove a real second-account OAuth round trip.
-- Development uses synthetic records. This milestone does not authorize production deployment.
+## Configuration and evidence limits
 
-## Implementation evidence
+Sending uses server-only email configuration and the approved site origin; credentials never enter frontend VITE settings. Release records describe production sending enabled and development sending disabled (VERIFY current deployment). Do not send an email or change configuration merely to inspect documentation.
 
-Lint, typechecking, 19 backend tests and build pass; 13 browser checks pass. The authenticated Coach panel was inspected in development, and Convex sync succeeded on third-bandicoot-18. Astra accepted this milestone for synthetic development. Backend tests cover expiry/replay, wrong/unverified identity, role conflicts, disabled issuance with valid acceptance, replacement/revocation and Coach resolution, exact attestation version, multi-parent/multi-child links, archived child filtering and revoke-one/revoke-all access denial. Browser fixture checks are layout evidence, not live multi-account OAuth proof.
-
-### Development limits
-
-The recent invitation list shows the newest 100 rows plus separately fetched actionable pending/revoked rows, with explicit overflow guards. Family/access lists are bounded at 100. Larger-scale pagination remains future work. A real multi-account OAuth acceptance rehearsal passed as documented below. Production configuration remains outstanding; no production approval is implied.
-
-### Live Google acceptance evidence
-
-A real owner-controlled student/parent Google rehearsal passed: ordinary student onboarding, invitation issuance, wrong-account rejection, Google redirect recovery, attested acceptance while new invitations were paused, replay rejection, and Coach revocation/restoration with reactive profile/finance access changes. The test used a fictional student and left no account emails or tokens in this repository. See REVIEW.md for details. New invitations and the test parent link were restored to enabled/active afterward.
+The [private parent sign-in record](PRIVATE_PARENT_SIGN_IN.md) and [October 19 release receipt](releases/RELEASE_2026-10-19.md) preserve implementation and release evidence. Earlier synthetic and Google rehearsals do not close the later real-inbox end-to-end evidence gap (VERIFY). Confirm only with an authorized recipient and agreed test scope.

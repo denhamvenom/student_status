@@ -33,7 +33,7 @@ Main now automatically deploys both frontends on future changes. Keep progress d
 Intermediate pending statements below are superseded by the completed status above.
 
 
-Owner approved the ordered RELEASE_APPROVAL_PACKET.md batch. This is a partial hosting release, not enrollment or production-login acceptance.
+Owner approved the ordered ../DEPLOYMENT.md batch. This is a partial hosting release, not enrollment or production-login acceptance.
 
 ## Completed
 

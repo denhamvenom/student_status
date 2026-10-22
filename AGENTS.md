@@ -1,62 +1,63 @@
+# Project instructions
+
+## Start and handoff
+
+- At the start of every session, read HANDOFF.md before exploring code. Only open files relevant to the current task.
+- Verify the actual repository, branch and dirty state; preserve unrelated work and stay within this repository unless the user expands scope.
+- HANDOFF.md is the short current status. Dated plans, audits and release receipts are historical; later explicit user decisions take precedence.
+- Read docs/DECISIONS.md before changing anything involving parent linking, consent, finance, rooms, or retention.
+- Read docs/BACKLOG.md only when the user asks for backlog work or the current task relates to an item in it; do not read it at every session start.
+- Do not create new markdown or notes files unless I ask. Progress notes go in HANDOFF.md. New release receipts go in docs/releases/.
+- When I say 'handoff', 'new window', or 'time for a new context window', use the student-status-context-checkpoint skill.
+- Also use that existing skill when the user is ending a session; do not create a replacement skill.
+
+## Stack and commands
+
+- Bun; React Router 7 Data Mode SPA; Vite; strict TypeScript; Tailwind 4; shadcn Base UI. Convex is the only domain backend.
+- Keep the approved architecture; do not add frameworks, databases or infrastructure without a task requirement.
+- Student Status stays at repository root: `bun run dev`; Timeclock: `bun run dev:timeclock`.
+- `bun run check` runs lint, types, tests and Student Status build; `bun run check:timeclock` checks Timeclock.
+- `bun run cloudflare:check` and `bun run cloudflare:timeclock` are packaging dry-runs.
+- `start.ps1 -Mode Dev` and `bun run dev:backend` synchronize Convex; frontend-only work must not start a backend watcher.
+
+## Convex
+
 <!-- convex-ai-start -->
-
 This project uses [Convex](https://convex.dev) as its backend.
-
-When working on Convex code, **always read
-`convex/_generated/ai/guidelines.md` first** for important guidelines on
-how to correctly use Convex APIs and patterns. The file contains rules that
-override what you may have learned about Convex from training data.
-
-Convex agent skills for common tasks can be installed by running
-`npx convex ai-files install`.
-
+Before working on Convex code, always read `convex/_generated/ai/guidelines.md`; its API and pattern rules take precedence over training assumptions.
+Optional vendor guidance can be installed with `npx convex ai-files install`; review resulting instruction edits and keep downloaded bundles out of Git.
 <!-- convex-ai-end -->
 
-Tests: Only write tests that protect real app behavior or reproduce a fixed bug. Do not test framework or library behavior, do not write snapshot tests, and do not write tests that just mirror the current code. Prefer table-driven tests over near-duplicates.
+## Privacy and authorization
 
-## Application boundaries and handoff
+- Never put real student records, health/financial data, signed forms, exports, snapshots, credentials, tokens, PINs or account-specific browser evidence in Git/GitHub, including private repositories, PRs and CI artifacts.
+- Use synthetic data in fixtures, tests and documentation. Keep approved operational records in the backend and private evidence outside version control.
+- Derive identity and enforce role, capability and per-record access on the server. Return minimized projections; hiding a control is not authorization.
+- Keep domain/query/health/finance data out of browser persistence and Zustand; UI stores hold only ephemeral state. Preserve the implemented origin-local authentication storage contract.
+- Secrets belong in server deployment configuration, never frontend VITE variables. Do not print secret values.
+- Announce and verify the exact deployment before any sync. Production actions require explicit user authorization; prior release receipts grant no new authority.
 
-- Start with docs/CURRENT_STATE.md and verify the actual checkout/branch. Read task-relevant linked evidence next. Dated pause/review notes are historical; later user decisions supersede them. Keep the short handoff current at milestones.
+## Timeclock
 
-- Work only in this app unless the user explicitly expands scope. Preserve the sibling design handoff, archives, root npm starter, and unrelated folders.
-- Read `docs/PLAN.md`, `docs/ARCHITECTURE.md`, `docs/REVIEW.md`, and `docs/DEVELOPMENT.md` for current state. Keep implemented, verified, and pending work distinct.
-- Bun; React Router 7 Data Mode SPA; Vite; strict TypeScript; Tailwind 4; shadcn Base UI. Convex is the only domain backend. Do not introduce Next.js, Radix, Docker/Unraid, or a second database.
-- Current user-requested agent arrangement: Astra for project management/final reviews, Sol for parallel implementation. Give file ownership to each implementation agent.
-- Development: team `daniel-eiland`, project `denham-venom-student-status`, `dev:third-bandicoot-18`. Announce/verify the target before syncing. Never deploy production without explicit user authorization.
-- Use synthetic student data only. Enforce roles and field minimization on the server. Never store health/finance/query data in browser persistence or Zustand.
-- `bun run check` validates lint, types, tests, and build. `bun run cloudflare:check` is packaging dry-run only. Google sign-in was verified in development; this is not production readiness.
-- Google OAuth secrets live only in Convex environment settings. Do not print env values, keys, or tokens. Internal bootstrap functions are deliberately tied to the initial development deployment.
-- Full product flows remain incomplete; consult the acceptance matrix and final milestone review before claiming completion.
+- `apps/timeclock/` and Student Status share root `convex/`, authentication, attendance and Calendar contracts.
+- Coordinate shared schema, generated API, auth, Calendar, dependencies and lockfile through one integration owner; do not run competing backend syncs.
+- Frontend-only Timeclock work uses its own Vite app and existing API types. Consult `docs/TIMECLOCK_BACKEND_HANDOFF.md` only for relevant contracts; reconcile its historical notes with current code.
+- Shared-device operators should be ordinary Mentors; a PIN does not remove the backend privileges of a Coach session.
 
-- Student records must never enter Git or GitHub, whether public or private, including issues, pull requests, attachments and CI logs/artifacts. Use synthetic student data only in fixtures, tests and documentation. Repository visibility does not change this rule.
-- Maintain accurate GitHub version history throughout development: follow docs/REPOSITORY.md, commit focused reviewed checkpoints, push and verify development-branch updates, and keep PR descriptions, validation evidence and project documentation current. One integration owner coordinates Git writes for parallel agents. Preserve published history and existing merge/release/production boundaries; never claim a local-only checkpoint is published.
-- Keep docs/DEVELOPMENT_CHECKLIST.md current as the human-readable progress guide. Check off only implemented and verified work, distinguish agreed decisions from built features, and update it with each relevant milestone alongside the technical plan.
+## Delivery, design and testing
 
-## Shared Timeclock workspace ownership
+- Finish usable workflows, including failure/recovery and required access checks. Preserve agreed requirements; record optional refinements once in HANDOFF.md.
+- Reuse approved labels, tokens and Base UI components. Latest user decisions precede the preserved prototype; additions inherit its visual language without losing approved behavior.
+- The owner-selected visual reference is https://denhamvenom.github.io/student_status/; do not assume sibling checkouts or design archives exist or open them without scope authorization.
+- For prototype/visual evidence work, use the existing student-status-prototype-verification skill. Compare representative changed phone/desktop and light/dark states; distinguish observed behavior from source or fixture evidence.
+- Tests: Only write tests that protect real app behavior or reproduce a fixed bug. Do not test framework or library behavior, do not write snapshot tests, and do not write tests that just mirror the current code. Prefer table-driven tests over near-duplicates.
+- Review coherent workflows and concrete blockers; re-review changed areas, and after two correction rounds reassess the smallest resolution rather than repeating whole-app reviews.
+- Target checks to real risks; run integrated checks at coherent milestones and repeat only for relevant changes or unresolved failures. Documentation-only work needs diff and reference review, not application tests.
+- Separate implemented, reviewed, tested, user-accepted, published and production-verified claims. Use `(VERIFY)` only where confirmation of actual production status matters; do not mark ordinary implementation facts, policies or known testing gaps.
 
-Timeclock frontend work is scoped to `apps/timeclock/` in a separate branch/worktree. Student Status remains at root. Read `docs/TIMECLOCK_BACKEND_HANDOFF.md` for implemented contracts and verified baseline. Only this Student Status integration owner edits/synchronizes shared Convex, generated files, root dependency/tooling/lockfile or auth/calendar contracts. Frontend-only chats use `bun run dev:timeclock`, never a Convex watcher. Coordinate root dependency changes. No production or main merge authorization is implied by the development scaffold.
+## Git and releases
 
-## Frontend design conformance
-
-- Follow the immutable design reference: later explicit user decisions, then Flow index v2 changes, prototype screens, shared UI copy/options, and design tokens. The reference is preserved in sibling `student-status-operations/design-reference`; do not edit it.
-- Reuse shared labels, tokens and Base UI components. Added features inherit the prototype typography, spacing, colors and interaction patterns.
-- Compare changed screens with the prototype at phone and desktop widths in light and dark themes. Record observed states and evidence limitations separately from implementation.
-- Never invent domain fields, options, completion values or unsupported actions to imitate a prototype. List missing backend contracts explicitly.
-- Frontend conformance work must not edit backend code, generated API, Timeclock, dependencies or deployment configuration without separate authorization.
-- Keep `docs/FRONTEND_CONFORMANCE_LOG.md` and the checklist current. Screenshots and account-specific browser evidence stay outside Git.
-
-## Project workflow skills
-
-- For resume, milestone handoff or context audit, read `.agents/skills/student-status-context-checkpoint/SKILL.md`.
-- For prototype comparisons or visual evidence review, read `.agents/skills/student-status-prototype-verification/SKILL.md`.
-- `docs/VISUAL_CHECKS.md` is the single current outstanding visual-check table. Older tables are historical evidence. These first-party skills are tracked; downloaded vendor skills remain ignored.
-
-## Completion-first delivery
-
-- Follow `docs/COMPLETION_WORKFLOW.md`: finish usable workflows, batch reviews/tests, and conserve context. This is a direct user-requested working policy.
-- Block on concrete correctness, privacy, data-integrity, required-workflow and material design problems; log optional refinements once for follow-up. Do not pursue perfection or silently reduce G1-G7 acceptance.
-- Keep CURRENT_STATE concise and report completed outcomes. Avoid repeated whole-app reviews, redundant tests/captures and tiny narrative-only checkpoints. Escalate stalled review loops to root/Astra for a direct resolution.
-
-## Hosted visual reference clarification — October 13
-
-The user explicitly selected https://denhamvenom.github.io/student_status/ for visual reference. Use its visual language (typography, colors, spacing, navigation, cards, tables and dialogs). Preserve later-added features and explicit user decisions even when absent from that prototype. Never delete functionality or regress approved behavior to imitate it. Style additions consistently; flag actual conflicts. Known differences from the preserved v2 reference are context, not a blocker to visual work and not permission to undo implemented requirements.
+- Follow the user's requested branch/workflow; otherwise consult `docs/REPOSITORY.md`. One integration owner coordinates Git writes when work is shared.
+- Review staged content for private data and secrets; preserve published history and verify pushes before claiming remote backup.
+- Main is connected to automatic frontend builds. Permission to edit or commit locally is not permission to push main, merge, publish or deploy.
+- Keep release scope, validation limitations and rollback evidence in `docs/releases/`; do not duplicate progress narratives across old trackers.

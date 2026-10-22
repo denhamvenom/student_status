@@ -24,4 +24,4 @@ Five backend tests cover direct allocation, existing other-fee debt, access cont
 
 ## Production publication
 
-Released through PR19 / main c861f1d with the matching backend deployed. Both website builds succeeded. Parent email is enabled in production; development sending stays disabled. Read-only Coach/fee-export checks and Close details passed. No live payment import or real invitation/Google round trip was performed. See [combined release evidence](RELEASE_2026-10-19.md). Earlier pending-production statements above are historical.
+Released through PR19 / main c861f1d with the matching backend deployed. Both website builds succeeded. Parent email is enabled in production; development sending stays disabled. Read-only Coach/fee-export checks and Close details passed. No live payment import or real invitation/Google round trip was performed. See [combined release evidence](releases/RELEASE_2026-10-19.md). Earlier pending-production statements above are historical.

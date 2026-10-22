@@ -4,7 +4,7 @@ Owner accepted the localhost scenarios and authorized normal production release 
 
 Expected failures use explicit public error data and shared frontend formatting across Student Status. Parent invitations explain the one-hour cooldown and inbox/spam checks; answers remain available after failure. Network/session failures have recovery guidance; unexpected failures and legacy internal job diagnostics use safe contextual fallbacks.
 
-Independent review has no blockers. Scoped lint, typecheck/build, development sync and eight phone/desktop browser scenarios passed. Broad regression initially passed 585 of 587; the two failures were corrected and all ten tests in those files passed on rerun. Eight fee-bulk tests passed separately; the historical >500-charge timeout remains unresolved. See ACTIONABLE_ERRORS.md for detailed evidence.
+Independent review has no blockers. Scoped lint, typecheck/build, development sync and eight phone/desktop browser scenarios passed. Broad regression initially passed 585 of 587; the two failures were corrected and all ten tests in those files passed on rerun. Eight fee-bulk tests passed separately; the historical >500-charge timeout remains unresolved. See ../ACTIONABLE_ERRORS.md for detailed evidence.
 
 Production target: amicable-eel-413. No schema change, index deletion, data migration, seed, real invitation or financial write is part of this release. Existing main-only Cloudflare builds deploy Student Status and Timeclock after merge. Exact merged revision and final build/live verification belong in the GitHub release notes.
 

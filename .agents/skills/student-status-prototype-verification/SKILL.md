@@ -1,11 +1,11 @@
 ---
 name: student-status-prototype-verification
-description: Compare Student Status screens with the preserved design prototype and maintain the outstanding visual-check matrix. Use for frontend conformance work and visual evidence review.
+description: Compare Student Status screens with the preserved design prototype and record scoped outstanding visual checks in the existing backlog. Use for frontend conformance work and visual evidence review.
 ---
 
 # Student Status prototype verification
 
-Read applicable AGENTS.md, docs/CURRENT_STATE.md, docs/VISUAL_CHECKS.md and relevant dated entries in docs/FRONTEND_CONFORMANCE_LOG.md. Locate the immutable design reference through those documents. Apply latest explicit user decisions before Flow index v2 changes, prototype screens, shared copy/options and tokens. Added features inherit the prototype's patterns; do not invent missing data or actions to imitate reference fixtures.
+Read HANDOFF.md first, then applicable AGENTS.md and task-relevant visual evidence in CHANGELOG.md or docs/releases/. Read docs/BACKLOG.md only for visual work related to an item there. Locate the immutable design reference through those documents. Apply latest explicit user decisions before Flow index v2 changes, prototype screens, shared copy/options and tokens. Added features inherit the prototype's patterns; do not invent missing data or actions to imitate reference fixtures.
 
 ## Select and compare
 
@@ -21,6 +21,6 @@ Use authorized synthetic states only. Do not grant roles, alter domain records, 
 
 For frontend-only work, flag unsupported contracts separately; do not edit backend, generated files, dependencies or deployment configuration outside authorized scope. Preserve actual values and existing financial/withdrawal/consent semantics. Use shared labels/tokens/Base UI, and route backend review to existing Convex skills when separately authorized.
 
-Maintain docs/VISUAL_CHECKS.md as the single current remaining-work table. Each row needs a stable ID, role/surface/state, existing evidence, precise remaining comparisons and blocker/dependency. Put detailed dated observations in FRONTEND_CONFORMANCE_LOG.md and link them; do not create competing current matrices. Mark a row complete only when its stated scope is verified, retaining the evidence link. Separate unavailable backend states and pending Coach acceptance from completed presentation.
+Maintain task-relevant outstanding visual comparisons in docs/BACKLOG.md; do not recreate a separate visual matrix or notes file. Each unresolved item identifies role/surface/state, existing evidence, precise remaining comparisons and dependencies. Record one concise dated outcome in CHANGELOG.md and task-relevant unresolved detail in docs/BACKLOG.md; do not create competing current matrices. Mark a row complete only when its stated scope is verified, retaining the evidence link. Separate unavailable backend states and pending Coach acceptance from completed presentation.
 
-Keep screenshots, account identities and record-specific evidence outside Git. Commit only sanitized findings, source and documentation under REPOSITORY.md. A visual review never grants production or main-merge permission.
+Keep screenshots, account identities and record-specific evidence outside Git. Commit only sanitized findings, source and documentation under docs/REPOSITORY.md. A visual review never grants production or main-merge permission.
