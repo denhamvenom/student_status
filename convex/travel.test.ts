@@ -59,6 +59,7 @@ describe("travel operations", () => {
     const linked = { eventId: f.ids.event, studentId: f.ids.studentId };
     expect(await f.parent.query(api.travel.ownTravel, linked)).toMatchObject({ transportEnabled: false });
     await expect(f.coach.mutation(api.travel.assignVehicle, { eventId: f.ids.event, driverId: driver, seats: 2 })).rejects.toThrow("does not manage");
+    await expect(f.coach.mutation(api.admin.assignDriver, { eventId: f.ids.event, driverId: driver, seats: 2 })).rejects.toThrow("does not manage");
     await expect(f.coach.mutation(api.travel.removeVehicle, { eventId: f.ids.event, driverId: driver })).rejects.toThrow("does not manage");
     await expect(f.parent.mutation(api.travel.setIndependentTravel, { ...linked, independentTravel: true })).rejects.toThrow("does not manage");
     await expect(f.coach.mutation(api.travel.setEventTransport, settings)).rejects.toThrow("Choose team transportation");
