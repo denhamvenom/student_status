@@ -11,6 +11,7 @@ import { v2SigningAllowed } from "./lib/permissionSigningMode";
 import { transportSummary } from "./travel";
 import { age18, firstStatus } from "./firstRegistration";
 import { studentSetupCompleteFor } from "./setupWizard";
+import { operatingRole } from "./lib/access";
 
 export const viewer = query({
   args: {}, returns: v.any(),
@@ -20,7 +21,9 @@ export const viewer = query({
     const user = await maybeViewer(ctx);
     if (!user) return { status: "pending", user: null, students: [], season: null };
     const season = await ctx.db.query("seasons").withIndex("by_status", q => q.eq("status", "active")).first();
-    return { status: "active", user: { id: user._id, name: user.name, email: user.email, role: user.role, travelLead: user.travelLead, financialEdit: user.financialEdit, healthExport: user.healthExport ?? false, accessRevision: user.accessRevision ?? 0, theme: user.theme ?? "system" }, students: (user.role === "student" ? await linkedStudents(ctx, user) : []).map(student => ({ ...publicStudent(student), profileSetupRequired: student.profileCompletedAt === undefined, profileRevision: student.profileRevision ?? 0 })), season: season ? { _id: season._id, name: season.name, year: season.year } : null };
+    const storedUser = await ctx.db.get(user._id);
+    const selection = await operatingRole(ctx, storedUser!);
+    return { status: "active", availableRoles: selection.roles, operatingRole: selection.role, roleSelectionRequired: selection.roles.length > 1 && !selection.selected, user: { id: user._id, name: user.name, email: user.email, role: user.role, travelLead: user.travelLead, financialEdit: user.financialEdit, healthExport: user.healthExport ?? false, accessRevision: user.accessRevision ?? 0, theme: user.theme ?? "system" }, students: (user.role === "student" ? await linkedStudents(ctx, user) : []).map(student => ({ ...publicStudent(student), profileSetupRequired: student.profileCompletedAt === undefined, profileRevision: student.profileRevision ?? 0 })), season: season ? { _id: season._id, name: season.name, year: season.year } : null };
   },
 });
 

@@ -6,12 +6,58 @@ import { paginationOptsValidator, paginationResultValidator } from "convex/serve
 import { mutation, query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { audit, requireRole, viewer } from "./lib/access";
+import { availableRoles } from "./lib/access";
+import { getAuthSessionId } from "@convex-dev/auth/server";
 import { newToken, tokenHash, verifiedAdult } from "./lib/invitationIdentity";
 
 const RESEND_COOLDOWN_MS = 60 * 60_000;
 const resendAvailableAt = (row: Doc<"adultInvitations">) => Math.max(row.emailQueuedAt ?? row.createdAt, row.emailSentAt ?? row.createdAt) + RESEND_COOLDOWN_MS;
 const emailStatus = v.union(v.literal("queued"), v.literal("sent"), v.literal("failed"), v.literal("not_sent"));
 const adultRole = v.union(v.literal("coach"), v.literal("mentor"));
+const staffAccess = v.union(v.literal("mentor"), v.literal("travelLead"));
+const operatingRoleValidator = v.union(v.literal("parent"), staffAccess);
+
+export const parents = query({
+  args: { paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(v.object({ userId: v.id("appUsers"), name: v.string(), email: v.string(), active: v.boolean(), revision: v.number(), staffAccess: v.union(staffAccess, v.null()) })),
+  handler: async (ctx, args) => {
+    requireRole(await viewer(ctx), "coach");
+    const result = await ctx.db.query("appUsers").withIndex("by_role", q => q.eq("role", "parent")).paginate(args.paginationOpts);
+    return { ...result, page: result.page.map(user => ({ userId: user._id, name: user.name, email: user.email, active: user.active, revision: user.accessRevision ?? 0, staffAccess: user.parentStaffAccess ?? null })) };
+  },
+});
+
+export const updateParentStaffAccess = mutation({
+  args: { userId: v.id("appUsers"), expectedRevision: v.number(), staffAccess: v.union(staffAccess, v.null()), reason: v.string() }, returns: v.null(),
+  handler: async (ctx, args) => {
+    const actor = await viewer(ctx); requireRole(actor, "coach");
+    const user = await ctx.db.get(args.userId);
+    if (!user || user.role !== "parent") throw new ConvexError("Parent account not found.");
+    if ((user.accessRevision ?? 0) !== args.expectedRevision) throw new ConvexError("Account changed. Reload before saving access.");
+    if (!args.reason.trim() || args.reason.trim().length > 1000) throw new ConvexError("A reason under 1000 characters is required.");
+    if (!user.active && args.staffAccess !== null) throw new ConvexError("Reactivate this Parent account before granting staff access.");
+    await ctx.db.patch(user._id, { parentStaffAccess: args.staffAccess ?? undefined, accessRevision: (user.accessRevision ?? 0) + 1 });
+    await audit(ctx, actor, "appUsers", user._id, "updateParentStaffAccess", { staffAccess: user.parentStaffAccess ?? null }, { staffAccess: args.staffAccess }, args.reason.trim());
+    return null;
+  },
+});
+
+export const selectOperatingRole = mutation({
+  args: { role: operatingRoleValidator }, returns: v.null(),
+  handler: async (ctx, args) => {
+    const actor = await viewer(ctx);
+    const user = await ctx.db.get(actor._id);
+    if (!user || !availableRoles(user).includes(args.role)) throw new ConvexError("This role is not available for your account.");
+    const sessionId = await getAuthSessionId(ctx);
+    const session = sessionId ? await ctx.db.get(sessionId) : null;
+    if (!session || session.userId !== user.authUserId || session.expirationTime <= Date.now()) throw new ConvexError("Sign in again to choose your role.");
+    const prior = await ctx.db.query("operatingRoles").withIndex("by_sessionId", q => q.eq("sessionId", session._id)).unique();
+    const selection = { userId: user._id, sessionId: session._id, role: args.role, accessRevision: user.accessRevision ?? 0 };
+    if (prior) await ctx.db.replace(prior._id, selection);
+    else await ctx.db.insert("operatingRoles", selection);
+    return null;
+  },
+});
 const grantFields = { role: adultRole, travelLead: v.boolean(), financialEdit: v.boolean(), healthExport: v.boolean() };
 const adultSummary = v.object({ userId: v.id("appUsers"), name: v.string(), email: v.string(), ...grantFields, active: v.boolean(), revision: v.number() });
 function grants(value: { role: "coach" | "mentor"; travelLead: boolean; financialEdit: boolean; healthExport: boolean }) {

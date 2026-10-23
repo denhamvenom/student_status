@@ -1,12 +1,35 @@
 import { ConvexError } from 'convex/values';
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getAuthUserId, getAuthSessionId } from "@convex-dev/auth/server";
 import { timeclockTransitionLocked } from "./timeclockTransition";
 import { requireMaintenanceAccess } from "./maintenanceAccess";
 
 type Ctx = QueryCtx | MutationCtx;
 export type AppUser = Doc<"appUsers">;
+
+export type OperatingRole = "parent" | "mentor" | "travelLead";
+export function availableRoles(user: AppUser): OperatingRole[] {
+  if (user.role !== "parent") return [];
+  return user.parentStaffAccess === "travelLead" ? ["parent", "mentor", "travelLead"] : user.parentStaffAccess === "mentor" ? ["parent", "mentor"] : ["parent"];
+}
+
+export async function operatingRole(ctx: Ctx, user: AppUser) {
+  const roles = availableRoles(user);
+  const sessionId = await getAuthSessionId(ctx);
+  const selection = user.role === "parent" && user.parentStaffAccess && sessionId
+    ? await ctx.db.query("operatingRoles").withIndex("by_sessionId", q => q.eq("sessionId", sessionId)).unique() : null;
+  const valid = selection?.userId === user._id && selection.accessRevision === (user.accessRevision ?? 0) && roles.includes(selection.role);
+  return { roles, selected: !!valid, role: valid ? selection.role : "parent" as OperatingRole };
+}
+
+async function effectiveViewer(ctx: Ctx, user: AppUser): Promise<AppUser> {
+  if (user.role !== "parent") return user;
+  const selection = await operatingRole(ctx, user);
+  // Keep stored Parent identity and family links. Resolve only the role in this
+  // authenticated session; current Coach grants are checked on every request.
+  return { ...user, role: selection.role === "parent" ? "parent" : "mentor", travelLead: selection.role === "travelLead", financialEdit: false, healthExport: false };
+}
 
 export async function identity(ctx: Ctx) {
   const authUserId = await getAuthUserId(ctx);
@@ -25,7 +48,7 @@ export async function viewer(ctx: Ctx): Promise<AppUser> {
   if (parentEmailIdentity && (user.role !== "parent" || parentEmailIdentity.email !== user.email.trim().toLowerCase())) throw new ConvexError("Parent email sign-in is limited to its parent account.");
   const adultMarker = await ctx.db.query("adultEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique();
   if (adultMarker && (!["coach", "mentor"].includes(user.role) || adultMarker.email !== user.email.trim().toLowerCase())) throw new ConvexError("Adult email sign-in is limited to its approved adult account.");
-  return user;
+  return effectiveViewer(ctx, user);
 }
 
 export async function maybeViewer(ctx: Ctx): Promise<AppUser | null> {
@@ -37,7 +60,7 @@ export async function maybeViewer(ctx: Ctx): Promise<AppUser | null> {
   if (marker && (user.role !== "parent" || marker.email !== user.email.trim().toLowerCase())) return null;
   const adultMarker = user && await ctx.db.query("adultEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", authUserId as Id<"users">)).unique();
   if (adultMarker && (!["coach", "mentor"].includes(user.role) || adultMarker.email !== user.email.trim().toLowerCase())) return null;
-  return user?.active ? user : null;
+  return user?.active ? effectiveViewer(ctx, user) : null;
 }
 
 export function requireRole(user: AppUser, ...roles: AppUser["role"][]) {

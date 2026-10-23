@@ -1,3 +1,4 @@
+import { RoleChoice, RoleSwitchContext, type OperatingRole } from "./RoleChoice"
 import { transportationOptions } from '../convex/lib/transportation'
 import { userFacingError } from '@/lib/error-message'
 import SignIn from './SignIn'
@@ -79,7 +80,7 @@ import { CoachParentAccess, ParentInvitationLanding, StudentParents } from './Pa
 type Student = { _id:string; fundraiserConnected?:boolean; profileRevision?:number; profileSetupRequired?:boolean; preferredName:string; legalName?:string; subteam:string; travelTeam?:boolean; active?:boolean; roomCategory?:string|null; email?:string; shirtSize?:string|null; allergies?:{state:string;text?:string}; medications?:{state:string;text?:string} }
 type Event = { _id:string; name:string; type:string; startsAt:number; endsAt:number; calendarAllDayStartDate?:string; calendarAllDayEndDate?:string; destination:string; travel?:string; overnight?:boolean; roomingEnabled?:boolean; feeCents?:number; signupMode?:string; allowWithdrawal?:boolean; archived?:boolean; cancelled?:boolean; mediaSupportRequested?:boolean; enrollmentState?:"running"|"failed"|"complete"|"cancelled" }
 type CalendarCandidate = { id:string; title:string; location:string; startsAt:number; endsAt:number; recurring:boolean; allDay:boolean }
-type Viewer = { status:'signedOut'|'pending'|'active'; user:{id:string;name:string;email:string;role:'student'|'parent'|'coach'|'mentor';travelLead:boolean;financialEdit:boolean;theme:string}|null; students:Student[]; season:{_id?:string;name:string;year:number}|null }
+type Viewer = { availableRoles?:OperatingRole[]; operatingRole?:OperatingRole; roleSelectionRequired?:boolean; status:'signedOut'|'pending'|'active'; user:{id:string;name:string;email:string;role:'student'|'parent'|'coach'|'mentor';travelLead:boolean;financialEdit:boolean;theme:string}|null; students:Student[]; season:{_id?:string;name:string;year:number}|null }
 const qViewer=api.app.viewer
 const qDashboard=api.app.studentDashboard
 const qEvents=api.app.listEvents
@@ -332,7 +333,46 @@ function Mentor({year}:{year:number|null}){
 }
 
 function Settings({viewer}:{viewer:Viewer}){const saveTheme=useMutation(mSetTheme);const {theme,setTheme}=useTheme();const {signOut}=useAuthActions();const [error,setError]=useState('');const choose=(choice:'light'|'dark'|'system')=>{setError('');void saveTheme({theme:choice}).then(()=>{setTheme(choice);toast.success(liveCopy.settings.saved)}).catch(e=>setError(userFacingError(e)))};return <><Heading title={liveCopy.settings.title}/><Box title={liveCopy.settings.appearance}><div className="action-row" role="group" aria-label={liveCopy.settings.theme}>{(['light','dark','system'] as const).map(choice=><Button key={choice} className={`button ${theme===choice?'button-primary':'button-outline'}`} aria-pressed={theme===choice} onClick={()=>choose(choice)}>{liveCopy.settings.themeLabels[choice]}</Button>)}</div>{error&&<p role="alert" className="open-text">{error}</p>}</Box><Box title={liveCopy.settings.account}><p>{viewer.user?.email}</p><Button className="button button-outline" onClick={()=>void signOut().catch(e=>toast.error(userFacingError(e)))}>{liveCopy.settings.signOut}</Button></Box></>}
-export default function LiveApp(){const viewer=useQuery(qViewer,{}) as Viewer|undefined;const location=useLocation();const {setTheme}=useTheme();useEffect(()=>{if(viewer?.user?.theme)setTheme(viewer.user.theme)},[viewer?.user?.theme,setTheme]);if(location.pathname==='/invite-adult')return <AdultInvitationLanding viewer={viewer}/>;if(location.pathname==='/invite-parent')return <ParentInvitationLanding viewer={viewer}/>;if(!viewer)return <div className="signin-content"><State>{liveCopy.states.connecting}</State></div>;if(viewer.status==='signedOut')return <SignIn/>;if(viewer.status==='pending')return <PendingJoin/>;if(viewer.user?.role==='parent')return <SetupEntryGate key={`${viewer.user.id}:${viewer.season?._id}`}><ParentRosterGate viewer={viewer}/></SetupEntryGate>;if(viewer.user?.role==='student')return <SetupEntryGate key={`${viewer.user.id}:${viewer.season?._id}`}><LiveRoutes viewer={viewer}/></SetupEntryGate>;return <StaffSetupGate key={viewer.user?.id}><LiveRoutes viewer={viewer}/></StaffSetupGate>}
+export default function LiveApp(){
+  const viewer=useQuery(qViewer,{}) as Viewer|undefined
+  const location=useLocation()
+  const {setTheme}=useTheme()
+  useEffect(()=>{if(viewer?.user?.theme)setTheme(viewer.user.theme)},[viewer?.user?.theme,setTheme])
+  if(location.pathname==='/invite-adult')return <AdultInvitationLanding viewer={viewer}/>
+  if(location.pathname==='/invite-parent')return <ParentInvitationLanding viewer={viewer}/>
+  if(!viewer)return <div className="signin-content"><State>{liveCopy.states.connecting}</State></div>
+  if(viewer.status==='signedOut')return <SignIn/>
+  if(viewer.status==='pending')return <PendingJoin/>
+  return <RoleSession key={viewer.user?.id} viewer={viewer}/>
+}
+function RoleSession({viewer}:{viewer:Viewer}) {
+  const choose=useMutation(api.accounts.selectOperatingRole)
+  const {signOut}=useAuthActions()
+  const navigate=useNavigate()
+  const [open,setOpen]=useState(false)
+  const [pendingRole,setPendingRole]=useState<OperatingRole|null>(null)
+  const roles=viewer.availableRoles??[]
+  const required=viewer.roleSelectionRequired===true
+  if(pendingRole!==null && (viewer.operatingRole===pendingRole&&!required || !roles.includes(pendingRole)))setPendingRole(null)
+  const switching=pendingRole!==null && roles.includes(pendingRole) && (viewer.operatingRole!==pendingRole || required)
+  const select=async(next:OperatingRole)=>{
+    setPendingRole(next)
+    try { await choose({role:next}); navigate('/',{replace:true}); setOpen(false) }
+    catch(error){setPendingRole(null);throw error}
+  }
+  let content:React.ReactNode=null
+  if(!required&&!open&&!switching){
+    const key=`${viewer.user?.id}:${role(viewer)}:${viewer.season?._id}`
+    if(viewer.user?.role==='parent')content=<SetupEntryGate key={key}><ParentRosterGate viewer={viewer}/></SetupEntryGate>
+    else if(viewer.user?.role==='student')content=<SetupEntryGate key={key}><LiveRoutes viewer={viewer}/></SetupEntryGate>
+    else content=<StaffSetupGate key={key}><LiveRoutes viewer={viewer}/></StaffSetupGate>
+  }
+  return <RoleSwitchContext.Provider value={roles.length>1?()=>setOpen(true):null}>
+    {content}
+    {switching&&!open&&!required&&<p role="status" className="content">Switching role…</p>}
+    <RoleChoice key={`${roles.join(':')}:${required}`} roles={roles} currentRole={viewer.operatingRole??'parent'} required={required} open={required||open} onClose={()=>setOpen(false)} onChoose={select} onSignOut={signOut}/>
+  </RoleSwitchContext.Provider>
+}
 function SetupEntryGate({children}:{children:React.ReactNode}) {
   const getSummary=useMutation(api.setupWizard.summary)
   const {signOut}=useAuthActions()

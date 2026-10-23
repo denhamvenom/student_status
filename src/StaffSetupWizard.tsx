@@ -1,3 +1,4 @@
+import { RoleSwitchButton } from "./RoleChoice"
 import { Component, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { useAuthActions } from '@convex-dev/auth/react'
 import { useMutation, useQuery } from 'convex/react'
@@ -111,7 +112,7 @@ function StaffWizard({ profile, reload, skip }: { profile: Basics; reload: () =>
     ...(drivingEdited && !driverBlocked && canDrive ? [['Vehicle', vehicleName], ['Passenger seats', passengerSeats], ['Can pull team trailer', towCapable ? 'Yes' : 'No']] : []),
   ]
   return <div className={styles.page}><main className={styles.shell}>
-    <header className={styles.header}><p className={styles.eyebrow}>TEAM 8044</p><h1>Set up your staff profile</h1>
+    <header className={styles.header}><RoleSwitchButton/><p className={styles.eyebrow}>TEAM 8044</p><h1>Set up your staff profile</h1>
       <p className={styles.muted}>Please confirm your basic information. This applies to all Coaches and Mentors.</p>
       <p className={styles.muted}>Every item is optional. Leave anything blank and continue. Finishing saves your answers; skipped items keep any previously saved information. You can update details later in Profile.</p>
     </header>
@@ -173,7 +174,7 @@ function StaffWizard({ profile, reload, skip }: { profile: Basics; reload: () =>
 
 function SetupContent({ children, reload, skip, skipped }: { children: ReactNode; reload: () => void; skip: () => void; skipped: boolean }) {
   const profile = useQuery(api.adultProfile.ownBasics, {})
-  if (profile === undefined) return <div className={styles.page}><main className={styles.card}><p role="status">Loading your staff profile…</p><SignOutButton /></main></div>
+  if (profile === undefined) return <div className={styles.page}><main className={styles.card}><p role="status">Loading your staff profile…</p><RoleSwitchButton/><SignOutButton /></main></div>
   return profile.needsSetup && !skipped ? <StaffWizard profile={profile} reload={reload} skip={skip} /> : children
 }
 
