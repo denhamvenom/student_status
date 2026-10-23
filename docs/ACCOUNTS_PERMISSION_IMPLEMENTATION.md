@@ -1,5 +1,14 @@
 # Accounts and permission implementation contract
 
+## Parent staff roles — October 23, 2026
+
+Coaches can grant or remove Mentor and Travel Lead access for an existing Parent in Adults → Parent staff access. Travel Lead includes the Mentor choice. Changes require an explanation and a current access revision, and record a Coach audit entry. Inactive accounts cannot receive a staff grant. Stored Parent identity and family links remain in place; extra finance editing and health exports remain disabled.
+
+A Parent with a staff grant chooses a role after each new sign-in. The app header and staff setup offer Switch role; phones show an accessible switch icon. The selected role applies to that authenticated session and survives refresh. Other sign-in sessions keep their own choice. Parent mode uses existing linked-child restrictions; Mentor and Travel Lead modes use their existing server permissions. Every server request resolves the current grant. Reducing access invalidates earlier choices and requires a new choice; removing staff access immediately restores Parent mode.
+
+Implemented and synchronized to development `dev:third-bandicoot-18`. Validation: all 654 tests passed with two workers after the default concurrent run hit timeouts; lint, types, Student Status build and Timeclock checks/build passed. Synthetic browser checks exercised role selection, role switching through the actual app, grant removal, switching out of staff setup, checkbox dependencies, save failure/retry and removal. The new picker and access form were inspected at 390px and 1440px in light/dark themes. Browser data and mutation responses were mocked; this is not a real-account sign-in acceptance claim. Production release remains separate.
+
+
 **October 14 superseding contract:** [ARCHITECTURE.md](ARCHITECTURE.md) governs the new populated PDF workflow. Medication Choices and OTC authorization below are historical format-1 requirements only. New format-2 preparation/signing requires complete student setup and Parent-confirmed structured profile, exact stored PDF evidence, acknowledgment and typed name. Minor first aid and all privacy/real-signing gates remain. Implementation in progress.
 
 Current status, October 13, 2026: accounts/profile workflows and the full synthetic consent backend/UI are implemented and source-reviewed. Root synchronized this permission checkpoint to development at 08:45:38. Backend 169 tests across 28 files and UI five tests in one file passed separately; lint/types/build pass with a roughly 917 KB bundle warning. Commit/push is pending at this update; no new hash is asserted. Live permission journeys and four-combination visual verification remain pending, so G5 and all other numbered goal items remain open.

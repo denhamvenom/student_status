@@ -1,3 +1,4 @@
+import { ParentStaffAccess } from "./ParentStaffAccess"
 import { userFacingError } from '@/lib/error-message'
 import { ParentEmailSignIn } from './ParentInvites'
 import { Component, useEffect, useState, type FormEvent, type ReactNode } from 'react'
@@ -102,7 +103,7 @@ function InvitationList() {
   })}</div>}{status !== 'Exhausted' && status !== 'LoadingFirstPage' && <Button variant="outline" disabled={status === 'LoadingMore'} onClick={() => loadMore(20)}>{status === 'LoadingMore' ? copy.loadingMore : copy.loadMore}</Button>}{error && <p role="alert" className="open-text">{error}</p>}{saved && <p role="status" className="ready-text">{saved}</p>}</CardContent></Card>
 }
 
-export default function Adults() {return <div className={styles.page}><div className="page-head"><div><h1>{copy.title}</h1><p className="muted lead">{copy.description}</p></div></div><AccountsBoundary><AdultList/><div className={styles.columns}><InviteAdult/><InvitationList/></div></AccountsBoundary></div>}
+export default function Adults() {return <div className={styles.page}><div className="page-head"><div><h1>{copy.title}</h1><p className="muted lead">{copy.description}</p></div></div><AccountsBoundary><AdultList/><ParentStaffAccess/><div className={styles.columns}><InviteAdult/><InvitationList/></div></AccountsBoundary></div>}
 
 function readToken() {
   return readAdultInvitationToken(window.location.hash, window.sessionStorage)
