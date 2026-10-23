@@ -1,3 +1,4 @@
+import { teamTransportEnabled } from "./transportation";
 import { ConvexError } from 'convex/values';
 import { v, type Infer } from "convex/values";
 import { consentProfileV2Validator, type ConsentProfileV2 } from "../consentProfileV2Schema";
@@ -61,7 +62,7 @@ export async function selectedEventsV2(ctx: Ctx, student: Doc<"students">, event
     requireEnrollmentComplete(event);
     const participant = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", eventId).eq("studentId", student._id)).unique();
     if (participant?.status !== "confirmed") throw new ConvexError("Permission forms cover confirmed event participation only.");
-    result.push({ eventId, name: event.name, type: event.type, startsAt: event.startsAt, endsAt: event.endsAt, destination: event.destination, travel: event.travel, overnight: event.overnight, feeCents: event.feeCents, independentTravel: participant.independentTravel ?? false, transportEnabled: event.transportEnabled ?? event.travel !== "None", busSeats: event.busSeats ?? null, additionalAdults: event.additionalAdults ?? null, trailerRequired: event.trailerRequired ?? false, signupMode: event.signupMode, capacity: event.capacity ?? null, signupClosesAt: event.signupClosesAt ?? null, roomingEnabled: event.roomingEnabled, roomDeadline: event.roomDeadline ?? null, permissionRequired: event.permissionRequired, firstRequired: event.firstRequired, sponsorName: null, sponsorPhone: null, lodging: null });
+    result.push({ eventId, name: event.name, type: event.type, startsAt: event.startsAt, endsAt: event.endsAt, destination: event.destination, travel: event.travel, overnight: event.overnight, feeCents: event.feeCents, independentTravel: participant.independentTravel ?? false, transportEnabled: teamTransportEnabled(event), busSeats: event.busSeats ?? null, additionalAdults: event.additionalAdults ?? null, trailerRequired: event.trailerRequired ?? false, signupMode: event.signupMode, capacity: event.capacity ?? null, signupClosesAt: event.signupClosesAt ?? null, roomingEnabled: event.roomingEnabled, roomDeadline: event.roomDeadline ?? null, permissionRequired: event.permissionRequired, firstRequired: event.firstRequired, sponsorName: null, sponsorPhone: null, lodging: null });
   }
   return result;
 }

@@ -1,3 +1,4 @@
+import { teamTransportEnabled } from "./lib/transportation";
 import { normalizeEmail, normalizePhone } from "./lib/contactValidation";
 import { requireSeasonFinanceReady } from "./lib/seasonFinance";
 import { ConvexError, v } from "convex/values";
@@ -122,7 +123,7 @@ export const createEvent = mutation({
     if (assigned.length > (args.assignmentScope === "wholeTeam" ? 500 : 100)) throw new ConvexError("Assign at most 100 students when creating an event.");
     if (args.capacity !== undefined && assigned.length > args.capacity) throw new ConvexError("Assigned students exceed event capacity.");
     for (const studentId of assigned) { const student = await ctx.db.get(studentId); if (!student || !student.active || student.seasonId !== season._id) throw new ConvexError("Assigned student is unavailable."); }
-    const id = await ctx.db.insert("events", { ...eventFields, name: args.name.trim(), seasonId: season._id, archived: false, ...(calendarChoice ? { calendarChoice: calendarChoice.kind, calendarEventId: calendarChoice.kind === "link" ? calendarChoice.eventId : undefined, calendarSyncState: "pending" as const, calendarRevision: 1, calendarActorId: user._id } : {}), ...(args.assignmentScope === "wholeTeam" ? { wholeTeamParticipantCount: 0, enrollmentState: "running" as const } : {}) });
+    const id = await ctx.db.insert("events", { ...eventFields, transportEnabled: teamTransportEnabled(args), name: args.name.trim(), seasonId: season._id, archived: false, ...(calendarChoice ? { calendarChoice: calendarChoice.kind, calendarEventId: calendarChoice.kind === "link" ? calendarChoice.eventId : undefined, calendarSyncState: "pending" as const, calendarRevision: 1, calendarActorId: user._id } : {}), ...(args.assignmentScope === "wholeTeam" ? { wholeTeamParticipantCount: 0, enrollmentState: "running" as const } : {}) });
     if (calendarChoice?.kind === "link") {
       const claim = await ctx.db.query("eventCalendarClaims").withIndex("by_calendarEventId", q => q.eq("calendarEventId", calendarChoice.eventId)).unique();
       if (claim) throw new ConvexError("This Calendar event is already linked to another Student Status event.");

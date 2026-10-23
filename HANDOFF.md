@@ -32,3 +32,10 @@ Phase 2 cleanup is complete: 50 files removed; two detailed contract documents r
 ## Next development step after cleanup
 
 Prepare a file-inclusive backup and isolated restore plan for owner review.
+
+## Transportation dropdown - October 23
+
+- New events and event transportation settings offer Charter Bus, School Bus, Team Carpool, and Provide your Own.
+- Provide your Own hides driver/seat/rider controls, rejects ride-management mutations, and marks transportation not applicable. Existing assignment records remain preserved; new consent snapshots use the same enabled rule.
+- Verified: lint, TypeScript, production build, 17 targeted transportation/UI/form tests, and development sync to third-bandicoot-18. Full suite: 646 passed with two unrelated failures (parent-invite mock call count and bulk-fee timeout); both suites passed in isolation (35 tests).
+- Branch: fix/transportation-options. Production has not been deployed. Existing local documentation edits are preserved separately.

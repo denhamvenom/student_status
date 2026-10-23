@@ -1,3 +1,4 @@
+import { teamTransportEnabled } from "./transportation";
 import { ConvexError } from 'convex/values';
 import { v, type Infer, type GenericValidator } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
@@ -89,7 +90,7 @@ export async function selectedEvents(ctx: Ctx, student: Doc<"students">, eventId
     requireEnrollmentComplete(event);
     const participant = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", eventId).eq("studentId", student._id)).unique();
     if (participant?.status !== "confirmed") throw new ConvexError("Permission forms cover confirmed event participation only.");
-    result.push({ eventId, name: event.name, type: event.type, startsAt: event.startsAt, endsAt: event.endsAt, destination: event.destination, travel: event.travel, overnight: event.overnight, feeCents: event.feeCents, independentTravel: participant.independentTravel ?? false, transportEnabled: event.transportEnabled ?? event.travel !== "None", busSeats: event.busSeats ?? null, additionalAdults: event.additionalAdults ?? null, trailerRequired: event.trailerRequired ?? false });
+    result.push({ eventId, name: event.name, type: event.type, startsAt: event.startsAt, endsAt: event.endsAt, destination: event.destination, travel: event.travel, overnight: event.overnight, feeCents: event.feeCents, independentTravel: participant.independentTravel ?? false, transportEnabled: teamTransportEnabled(event), busSeats: event.busSeats ?? null, additionalAdults: event.additionalAdults ?? null, trailerRequired: event.trailerRequired ?? false });
   }
   return result;
 }

@@ -1,3 +1,4 @@
+import { teamTransportEnabled } from "./lib/transportation";
 import { normalizeChangedPhone, normalizeChangedEmail } from "./lib/contactValidation";
 import { enrollmentPending, requireEnrollmentComplete } from "./lib/eventEnrollmentState";
 import { ConvexError, v } from "convex/values";
@@ -26,8 +27,8 @@ async function currentEvent(ctx: Ctx, eventId: Id<"events">) {
 }
 
 export async function transportSummary(ctx: Ctx, event: Doc<"events">) {
-  if (enrollmentPending(event)) return { state: "open" as const, seats: 0, demand: 0, ridingStudents: 0, additionalAdults: 0, busSeats: 0, vehicleSeats: 0, open: ["Whole Team enrollment is not complete."] };
-  const enabled = event.transportEnabled ?? event.travel !== "Families provide transportation";
+  if (enrollmentPending(event) && teamTransportEnabled(event)) return { state: "open" as const, seats: 0, demand: 0, ridingStudents: 0, additionalAdults: 0, busSeats: 0, vehicleSeats: 0, open: ["Whole Team enrollment is not complete."] };
+  const enabled = teamTransportEnabled(event);
   if (!enabled) return { state: "notApplicable" as const, seats: 0, demand: 0, ridingStudents: 0, additionalAdults: 0, busSeats: 0, vehicleSeats: 0, open: [] as string[] };
   const participants = await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(MAX_PARTICIPANTS + 1);
   if (participants.length > MAX_PARTICIPANTS) throw new ConvexError("Event participant limit reached.");
@@ -98,6 +99,7 @@ export const eventTransport = query({
   handler: async (ctx, args) => {
     operator(await viewer(ctx));
     const event = await currentEvent(ctx, args.eventId);
+    if (!teamTransportEnabled(event)) return { event: { _id: event._id, name: event.name, travel: event.travel, transportEnabled: false, busSeats: 0, additionalAdults: 0, trailerRequired: false }, drivers: [], assignments: [], riders: [], summary: await transportSummary(ctx, event) };
     const season = await activeSeason(ctx);
     const drivers = await ctx.db.query("drivers").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(MAX_DRIVERS + 1);
     const assignments = await ctx.db.query("eventVehicles").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(MAX_DRIVERS + 1);
@@ -109,19 +111,20 @@ export const eventTransport = query({
       const student = students[i];
       return student?.active && student.seasonId === event.seasonId ? [{ studentId: student._id, name: student.legalName || student.preferredName, independentTravel: p.independentTravel ?? false }] : [];
     });
-    return { event: { _id: event._id, name: event.name, transportEnabled: event.transportEnabled ?? event.travel !== "Families provide transportation", busSeats: event.busSeats ?? 0, additionalAdults: event.additionalAdults ?? 0, trailerRequired: event.trailerRequired ?? false }, drivers, assignments, riders, summary: await transportSummary(ctx, event) };
+    return { event: { _id: event._id, name: event.name, travel: event.travel, transportEnabled: teamTransportEnabled(event), busSeats: event.busSeats ?? 0, additionalAdults: event.additionalAdults ?? 0, trailerRequired: event.trailerRequired ?? false }, drivers, assignments, riders, summary: await transportSummary(ctx, event) };
   },
 });
 
 export const setEventTransport = mutation({
-  args: { eventId: v.id("events"), transportEnabled: v.boolean(), busSeats: v.number(), additionalAdults: v.number(), trailerRequired: v.boolean() }, returns: v.null(),
+  args: { eventId: v.id("events"), travel: v.optional(v.union(v.literal("Charter Bus"), v.literal("School Bus"), v.literal("Team Carpool"), v.literal("Provide your Own"))), transportEnabled: v.boolean(), busSeats: v.number(), additionalAdults: v.number(), trailerRequired: v.boolean() }, returns: v.null(),
   handler: async (ctx, args) => {
     const user = await viewer(ctx); operator(user);
     const event = await currentEvent(ctx, args.eventId);
     whole(args.busSeats, "Bus passenger seats"); whole(args.additionalAdults, "Additional adult passengers");
-    const patch = { transportEnabled: args.transportEnabled, busSeats: args.busSeats, additionalAdults: args.additionalAdults, trailerRequired: args.trailerRequired };
+    if (!args.travel && args.transportEnabled && !teamTransportEnabled({ travel: event.travel })) throw new ConvexError("Choose team transportation before managing rides.");
+    const patch = { ...(args.travel ? { travel: args.travel } : {}), transportEnabled: args.travel ? teamTransportEnabled({ travel: args.travel }) : args.transportEnabled, busSeats: args.busSeats, additionalAdults: args.additionalAdults, trailerRequired: args.trailerRequired };
     await ctx.db.patch(event._id, patch);
-    await audit(ctx, user, "events", event._id, "setTransport", { transportEnabled: event.transportEnabled, busSeats: event.busSeats, additionalAdults: event.additionalAdults, trailerRequired: event.trailerRequired }, patch);
+    await audit(ctx, user, "events", event._id, "setTransport", { travel: event.travel, transportEnabled: event.transportEnabled, busSeats: event.busSeats, additionalAdults: event.additionalAdults, trailerRequired: event.trailerRequired }, patch);
     return null;
   },
 });
@@ -131,6 +134,7 @@ export const assignVehicle = mutation({
   handler: async (ctx, args) => {
     const user = await viewer(ctx); operator(user);
     const event = await currentEvent(ctx, args.eventId);
+    if (!teamTransportEnabled(event)) throw new ConvexError("This event does not manage drivers or student rides.");
     const driver = await ctx.db.get(args.driverId);
     if (!driver || driver.seasonId !== event.seasonId || !driver.approved || driver.active === false) throw new ConvexError("Choose an approved, active driver from this season.");
     whole(args.seats, "Passenger seats", 100);
@@ -154,7 +158,8 @@ export const removeVehicle = mutation({
   args: { eventId: v.id("events"), driverId: v.id("drivers") }, returns: v.null(),
   handler: async (ctx, args) => {
     const user = await viewer(ctx); operator(user);
-    await currentEvent(ctx, args.eventId);
+    const event = await currentEvent(ctx, args.eventId);
+    if (!teamTransportEnabled(event)) throw new ConvexError("This event does not manage drivers or student rides.");
     const prior = await ctx.db.query("eventVehicles").withIndex("by_eventId_and_driverId", q => q.eq("eventId", args.eventId).eq("driverId", args.driverId)).unique();
     if (!prior) throw new ConvexError("Vehicle is not assigned to this event.");
     await ctx.db.delete(prior._id);
@@ -171,7 +176,7 @@ export const ownTravel = query({
     const student = await studentAccess(ctx, user, args.studentId);
     if (student.seasonId !== event.seasonId) throw new ConvexError("Student and event seasons do not match.");
     const participant = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
-    return { independentTravel: participant?.independentTravel ?? false, eligible: participant?.status === "confirmed", transportEnabled: event.transportEnabled ?? event.travel !== "Families provide transportation" };
+    return { independentTravel: participant?.independentTravel ?? false, eligible: participant?.status === "confirmed", transportEnabled: teamTransportEnabled(event) };
   },
 });
 
@@ -184,6 +189,7 @@ export const setIndependentTravel = mutation({
     const student = await studentAccess(ctx, user, args.studentId);
     if (student.seasonId !== event.seasonId) throw new ConvexError("Student and event seasons do not match.");
     const participant = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
+    if (!teamTransportEnabled(event)) throw new ConvexError("This event does not manage drivers or student rides.");
     if (!participant || participant.status !== "confirmed") throw new ConvexError("Only confirmed participants can set independent travel.");
     await ctx.db.patch(participant._id, { independentTravel: args.independentTravel });
     await audit(ctx, user, "participants", participant._id, "setIndependentTravel", { independentTravel: participant.independentTravel ?? false }, { independentTravel: args.independentTravel });
