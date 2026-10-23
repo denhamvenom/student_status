@@ -41,6 +41,37 @@ async function fixture() {
 }
 
 describe("travel operations", () => {
+  it.each(["Charter Bus", "School Bus", "Team Carpool", "Provide your Own"])("creates an event with %s transportation", async travel => {
+    const f = await fixture();
+    const eventId = await f.coach.mutation(api.admin.createEvent, { name: "Synthetic transport event", type: "Team", startsAt: 100, endsAt: 200, destination: "Test venue", travel, overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "open", allowWithdrawal: true, permissionRequired: false, firstRequired: false, requirements: [] });
+    expect(await f.t.run(ctx => ctx.db.get(eventId))).toMatchObject({ travel, transportEnabled: travel !== "Provide your Own" });
+    expect((await f.coach.query(api.travel.eventTransport, { eventId })).summary.state).toBe(travel === "Provide your Own" ? "notApplicable" : "ready");
+  });
+
+  it("disables ride management for own transportation and preserves prior records", async () => {
+    const f = await fixture();
+    const driver = await f.coach.mutation(api.travel.saveDriver, { name: "Test Driver", email: "transport@example.invalid", phone: "(202) 555-0100", vehicleName: "Van", seats: 3, approved: true, towCapable: false, active: true });
+    await f.coach.mutation(api.travel.assignVehicle, { eventId: f.ids.event, driverId: driver, seats: 3 });
+    const settings = { eventId: f.ids.event, transportEnabled: true, busSeats: 0, additionalAdults: 0, trailerRequired: false };
+    await f.coach.mutation(api.travel.setEventTransport, { ...settings, travel: "Provide your Own" });
+    const data = await f.coach.query(api.travel.eventTransport, { eventId: f.ids.event });
+    expect(data).toMatchObject({ event: { travel: "Provide your Own", transportEnabled: false }, drivers: [], assignments: [], riders: [], summary: { state: "notApplicable", demand: 0, open: [] } });
+    const linked = { eventId: f.ids.event, studentId: f.ids.studentId };
+    expect(await f.parent.query(api.travel.ownTravel, linked)).toMatchObject({ transportEnabled: false });
+    await expect(f.coach.mutation(api.travel.assignVehicle, { eventId: f.ids.event, driverId: driver, seats: 2 })).rejects.toThrow("does not manage");
+    await expect(f.coach.mutation(api.admin.assignDriver, { eventId: f.ids.event, driverId: driver, seats: 2 })).rejects.toThrow("does not manage");
+    await expect(f.coach.mutation(api.travel.removeVehicle, { eventId: f.ids.event, driverId: driver })).rejects.toThrow("does not manage");
+    await expect(f.parent.mutation(api.travel.setIndependentTravel, { ...linked, independentTravel: true })).rejects.toThrow("does not manage");
+    await expect(f.coach.mutation(api.travel.setEventTransport, settings)).rejects.toThrow("Choose team transportation");
+    for (const travel of ["Charter Bus", "School Bus", "Team Carpool"] as const) {
+      await f.coach.mutation(api.travel.setEventTransport, { ...settings, travel });
+      const managed = await f.coach.query(api.travel.eventTransport, { eventId: f.ids.event });
+      expect(managed.event.transportEnabled).toBe(true);
+      expect(managed.assignments).toHaveLength(1);
+      expect(managed.riders).toHaveLength(2);
+    }
+  });
+
   it("restricts parent travel reads and writes to current linked children without rejected writes", async () => {
     const f = await fixture();
     const linked = { eventId: f.ids.event, studentId: f.ids.studentId };
