@@ -26,7 +26,7 @@ export function AppShell({ children, viewer, familyContext, role = "coach" }: { 
   const { signOut } = useAuthActions()
   const [more, setMore] = useState(false)
   const { pathname } = useLocation()
-  const activePath = pathname.startsWith('/events/') ? '/events' : role === 'coach' && (pathname === '/team' || pathname.startsWith('/team/')) || role === 'mentor' && pathname === '/myprofile' ? '/' : pathname
+  const activePath = pathname.startsWith('/events/archive') ? '/events/archive' : pathname.startsWith('/events/') ? '/events' : role === 'coach' && (pathname === '/team' || pathname.startsWith('/team/')) || role === 'mentor' && pathname === '/myprofile' ? '/' : pathname
   const [previousPath, setPreviousPath] = useState(pathname)
   if (previousPath !== pathname) { setPreviousPath(pathname); setMore(false) }
   const [themeError, setThemeError] = useState('')
@@ -40,7 +40,7 @@ export function AppShell({ children, viewer, familyContext, role = "coach" }: { 
   const nav = navigationCopy.groups
   const groups: Record<string, [string, string][]> = {
     [nav.team]: [[nav.team, '/'], [nav.joinRequests, '/enroll'], [nav.attendance, '/attendance'], [nav.reports, '/reports']],
-    [nav.events]: [[nav.events, '/events'], [nav.readiness, '/readiness'], [nav.permissionForms, '/permissions'], [nav.drivers, '/drivers'], [nav.withdrawals, '/withdrawals']],
+    [nav.events]: [[nav.events, '/events'], ['Archived events', '/events/archive'], [nav.readiness, '/readiness'], [nav.permissionForms, '/permissions'], [nav.drivers, '/drivers'], [nav.withdrawals, '/withdrawals']],
     [nav.money]: [[nav.money, '/finances'], [nav.fundraising, '/fundraising']],
     [nav.admin]: [[nav.users, '/adults'], [nav.season, '/season'], [nav.archived, '/retention'], ['Money tools', '/money-tools'], [nav.settings, '/settings']],
   }
