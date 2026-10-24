@@ -28,7 +28,7 @@ export const mine = query({
   handler: async (ctx, args) => {
     const user = await viewer(ctx); const student = await ownStudent(ctx, user);
     const season = await activeSeason(ctx); const event = await ctx.db.get(args.eventId);
-    if (!event || event.seasonId !== season._id || student.seasonId !== season._id) throw new ConvexError("Room selection is unavailable.");
+    if (!event || event.archived || event.seasonId !== season._id || student.seasonId !== season._id) throw new ConvexError("Room selection is unavailable.");
     const membership = await ctx.db.query("roomMemberships").withIndex("by_eventId_and_studentId", q => q.eq("eventId", args.eventId).eq("studentId", student._id)).unique();
     const request = await ctx.db.query("roomRequests").withIndex("by_eventId_and_studentId", q => q.eq("eventId", args.eventId).eq("studentId", student._id)).unique();
     const invites = await ctx.db.query("roomInvites").withIndex("by_studentId", q => q.eq("studentId", student._id)).take(101);

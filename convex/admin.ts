@@ -1,3 +1,4 @@
+import { scheduleEventArchive } from "./eventArchive";
 import { teamTransportEnabled } from "./lib/transportation";
 import { normalizeEmail, normalizePhone } from "./lib/contactValidation";
 import { requireSeasonFinanceReady } from "./lib/seasonFinance";
@@ -148,6 +149,7 @@ export const createEvent = mutation({
       await ctx.scheduler.runAfter(0, internal.eventEnrollment.run, { jobId });
     }
     if (calendarChoice) await ctx.scheduler.runAfter(0, internal.eventCalendar.push, { eventId: id, revision: 1 });
+    await scheduleEventArchive(ctx, id);
     await audit(ctx, user, "events", id, "create", null, eventFields);
     return id;
   },

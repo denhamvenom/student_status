@@ -6,6 +6,9 @@ import schema from "./schema";
 import { syncWholeTeamMembership } from "./lib/wholeTeam";
 
 const modules = import.meta.glob("./**/*.ts");
+// Enrollment assertions stay inside the event's active window. Advancing every
+// timer otherwise also runs the independent end-of-event archive callback.
+vi.mock("./eventArchive", () => ({ scheduleEventArchive: async () => {} }));
 async function fixture() {
   const t = convexTest(schema, modules);
   const ids = await t.run(async ctx => {

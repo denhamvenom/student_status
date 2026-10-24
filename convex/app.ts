@@ -40,7 +40,7 @@ export const listEvents = query({
   handler: async ctx => {
     const user = await requireViewer(ctx);
     const season = await activeSeason(ctx);
-    const events = await ctx.db.query("events").withIndex("by_seasonId_and_startsAt", q => q.eq("seasonId", season._id)).take(200);
+    const events = await ctx.db.query("events").withIndex("by_seasonId_and_archived_and_endsAt", q => q.eq("seasonId", season._id).eq("archived", false)).take(200).then(rows => rows.sort((a, b) => a.startsAt - b.startsAt));
     if (user.role === "mentor" && !user.travelLead) return events.filter(x => !x.archived).map(event => ({ event: mentorEvent(event), participation: null }));
     if (user.role === "coach" || user.travelLead) return events.filter(x => !x.archived).map(event => ({ event, participation: null }));
     if (user.role === "parent") return events.filter(x => !x.archived).map(event => ({ event, participation: null }));
@@ -58,7 +58,11 @@ export const eventDetail = query({
     const user = await requireViewer(ctx);
     const event = await ctx.db.get(args.eventId);
     const season = await activeSeason(ctx);
-    if (!event || event.seasonId !== season._id || event.archived) throw new ConvexError("Event not found.");
+    if (!event || event.seasonId !== season._id) throw new ConvexError("Event not found.");
+    if (event.archived) {
+      if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new ConvexError("This event is archived. Any unpaid charges remain in Money.");
+      return { event, participation: null, requirements: [], readiness: null };
+    }
     if (user.role === "mentor" && !user.travelLead) return { event: mentorEvent(event), participation: null, requirements: [], readiness: null };
     const requirements = await ctx.db.query("requirements").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(100);
     if (!args.studentId) return { event, participation: null, requirements, readiness: null };
@@ -88,7 +92,7 @@ export const studentDashboard = query({
     const season = await activeSeason(ctx);
     if (student.seasonId !== season._id) throw new ConvexError("Archived students are unavailable.");
     const finance = await financeFor(ctx, student._id);
-    const events = await ctx.db.query("events").withIndex("by_seasonId_and_startsAt", q => q.eq("seasonId", season._id)).take(200);
+    const events = await ctx.db.query("events").withIndex("by_seasonId_and_archived_and_endsAt", q => q.eq("seasonId", season._id).eq("archived", false)).take(200).then(rows => rows.sort((a, b) => a.startsAt - b.startsAt));
     const participations = await ctx.db.query("participants").withIndex("by_studentId", q => q.eq("studentId", student._id)).take(200);
     const rows = [];
     const todos: { eventId: Doc<"events">["_id"] | null; eventName: string; label: string; dueAt: number | null; href: string | null; responsible: "student" | "parent" | "coach"; blocked: boolean }[] = [];
@@ -153,7 +157,7 @@ export const mentorReport = query({
     requireRole(user, "coach", "mentor");
     const season = await activeSeason(ctx);
     const students = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(500);
-    const events = await ctx.db.query("events").withIndex("by_seasonId_and_startsAt", q => q.eq("seasonId", season._id)).take(200);
+    const events = await ctx.db.query("events").withIndex("by_seasonId_and_archived_and_endsAt", q => q.eq("seasonId", season._id).eq("archived", false)).take(200).then(rows => rows.sort((a, b) => a.startsAt - b.startsAt));
     const meetings = await ctx.db.query("attendanceMeetings").withIndex("by_seasonId_and_startsAt", q => q.eq("seasonId", season._id)).take(500);
     const report = [];
     for (const student of students.filter(x => x.active)) {

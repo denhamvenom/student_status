@@ -1,3 +1,4 @@
+import { requireFamilyEventAccess } from "./lib/archivedEventAccess";
 import { publicErrorResult } from './lib/publicErrors';
 import { requireSeasonFinanceReady } from "./lib/seasonFinance";
 import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
@@ -43,7 +44,7 @@ function revision(data: Awaited<ReturnType<typeof details>>) {
 
 export const withdrawalPreview = query({
   args: { eventId: v.id("events"), studentId: v.id("students") }, returns: previewResult,
-  handler: async (ctx, args) => { const user = await viewer(ctx); await studentAccess(ctx, user, args.studentId); return publicErrorResult(summary(ctx, user, await details(ctx, args.eventId, args.studentId))); },
+  handler: async (ctx, args) => { const user = await viewer(ctx); await studentAccess(ctx, user, args.studentId); await requireFamilyEventAccess(ctx, user, [args.eventId]); return publicErrorResult(summary(ctx, user, await details(ctx, args.eventId, args.studentId))); },
 });
 
 export const pendingWithdrawals = query({

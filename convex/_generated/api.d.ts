@@ -28,6 +28,7 @@ import type * as consentRehearsal from "../consentRehearsal.js";
 import type * as crons from "../crons.js";
 import type * as dashboardReports from "../dashboardReports.js";
 import type * as developmentRehearsal from "../developmentRehearsal.js";
+import type * as eventArchive from "../eventArchive.js";
 import type * as eventCalendar from "../eventCalendar.js";
 import type * as eventEnrollment from "../eventEnrollment.js";
 import type * as eventOperations from "../eventOperations.js";
@@ -58,6 +59,7 @@ import type * as historicalFinancialCorrections from "../historicalFinancialCorr
 import type * as historicalRoster from "../historicalRoster.js";
 import type * as http from "../http.js";
 import type * as lib_access from "../lib/access.js";
+import type * as lib_archivedEventAccess from "../lib/archivedEventAccess.js";
 import type * as lib_attendanceReports from "../lib/attendanceReports.js";
 import type * as lib_authRedirect from "../lib/authRedirect.js";
 import type * as lib_calendarAuth from "../lib/calendarAuth.js";
@@ -164,6 +166,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   dashboardReports: typeof dashboardReports;
   developmentRehearsal: typeof developmentRehearsal;
+  eventArchive: typeof eventArchive;
   eventCalendar: typeof eventCalendar;
   eventEnrollment: typeof eventEnrollment;
   eventOperations: typeof eventOperations;
@@ -194,6 +197,7 @@ declare const fullApi: ApiFromModules<{
   historicalRoster: typeof historicalRoster;
   http: typeof http;
   "lib/access": typeof lib_access;
+  "lib/archivedEventAccess": typeof lib_archivedEventAccess;
   "lib/attendanceReports": typeof lib_attendanceReports;
   "lib/authRedirect": typeof lib_authRedirect;
   "lib/calendarAuth": typeof lib_calendarAuth;

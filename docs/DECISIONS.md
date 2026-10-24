@@ -35,6 +35,8 @@ Read this before changing parent linking, consent/PDF, finance, rooms/waitlists 
 
 ## Events and roster
 
+- October 23 owner decision: past events move into a staff-only archive. Students and Parents lose event access, including old links, room/travel/withdrawal views and permission receipts covering archived events. Event-specific unfinished requirements leave their views. Preserve participation, attendance, signed evidence, charges, payments and balances; archival never cancels money owed. Coaches and Travel Leads can read archived events from current and previous seasons.
+
 - Only a linked Parent or Coach sets independent travel; Students, including adult Students, cannot set it. A Student without a linked Parent asks the Coach. The flag alone does not prove who set it; use available audit evidence.
 - Travel Leads can create events and review join requests. They may set event fees in New event without a finance-edit grant; confirmed participation triggers charges. Team codes, parent invitation control and access revocation remain Coach-only; Travel Lead roster presentation stays read-only.
 - A confirmed Student may leave a Whole Team event immediately after confirmation. Release participation/room placement, preserve a durable in-app Coach notice and keep any nonzero-fee disposition in the normal review path. Coach dismisses notices; Travel Leads may read them. Re-enrollment/reactivation does not silently restore an earlier withdrawal. No email/text notification is implied.
