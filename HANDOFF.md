@@ -16,8 +16,8 @@ Owner confirmed device concurrency/reconnection on October 22. This release's au
 ## In progress
 
 Claude Code is now project lead and integration owner (CLAUDE.md mirrors AGENTS.md); Codex sessions are helpers.
-Developer sign-in (draft PR #39, `feature/developer-sign-in` at `0800a64`): six fictional development-only accounts for testing every role without Google. Synced to development `third-bandicoot-18` with the switch and key set and accounts created; all six signed in at phone/desktop sizes in a headless browser. Not merged; production unchanged. Key is in ignored `private-data/`. See docs/DECISIONS.md and docs/DEVELOPMENT.md.
-Local CHANGELOG.md, HANDOFF.md, docs/BACKLOG.md, AGENTS.md and CLAUDE.md edits and both October 23 release receipts remain uncommitted.
+Developer sign-in (draft PR #39, branch `feature/developer-sign-in`): six fictional development-only accounts for testing every role without Google. Synced to development `third-bandicoot-18` with the switch and key set and accounts created; all six signed in at phone/desktop sizes in a headless browser. Not merged; production unchanged. Key is in ignored `private-data/`. See docs/DECISIONS.md and docs/DEVELOPMENT.md.
+Documentation, both October 23 release receipts and this handoff are committed on `feature/developer-sign-in`; start the next session on that branch until PR #39 merges.
 
 ## Top open risks
 
