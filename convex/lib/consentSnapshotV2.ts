@@ -35,19 +35,19 @@ export function validateConsentProfileV2(profile: ConsentProfileV2): ConsentProf
     guardian: { name: required(profile.guardian.name, 160, "Guardian name"), relationship: required(profile.guardian.relationship, 80, "Guardian relationship"), phone: required(profile.guardian.phone, 40, "Guardian phone"), email: required(profile.guardian.email, 254, "Guardian email").toLowerCase() },
     emergency: { name: required(profile.emergency.name, 160, "Emergency contact name"), relationship: required(profile.emergency.relationship, 80, "Emergency contact relationship"), phone: required(profile.emergency.phone, 40, "Emergency contact phone") },
     allergies: { state: profile.allergies.state, entries: profile.allergies.entries.map(item => ({ allergen: required(item.allergen, 160, "Allergen"), severity: required(item.severity, 120, "Allergy severity"), reaction: required(item.reaction, 500, "Allergy reaction"), response: required(item.response, 500, "Allergy response") })) },
-    prescriptions: { state: profile.prescriptions.state, entries: profile.prescriptions.entries.map(item => ({ name: required(item.name, 160, "Prescription name"), dose: required(item.dose, 120, "Prescription dose"), timing: required(item.timing, 160, "Prescription timing"), reason: required(item.reason, 500, "Prescription reason"), carriedBy: required(item.carriedBy, 160, "Prescription carrier") })) },
+    prescriptions: { state: profile.prescriptions.state, entries: profile.prescriptions.entries.map(item => ({ name: required(item.name, 160, "Medication name"), dose: required(item.dose, 120, "Medication dose"), timing: required(item.timing, 160, "Medication timing"), reason: required(item.reason, 500, "Medication reason"), carriedBy: required(item.carriedBy, 160, "Who carries the medication") })) },
     insurance: { state: profile.insurance.state, provider: profile.insurance.provider?.trim() || null, policy: profile.insurance.policy?.trim() || null },
     physician: { state: profile.physician.state, name: profile.physician.name?.trim() || null, phone: profile.physician.phone?.trim() || null },
   };
   const born = Date.parse(`${normalized.dateOfBirth}T00:00:00Z`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized.dateOfBirth) || !Number.isFinite(born) || new Date(born).toISOString().slice(0, 10) !== normalized.dateOfBirth || born >= Date.UTC(2100, 0, 1)) throw new ConvexError("Enter a valid date of birth.");
   if (!emailPattern.test(normalized.guardian.email)) throw new ConvexError("Enter a valid guardian email.");
-  for (const [label, report] of [["Allergies", normalized.allergies], ["Prescriptions", normalized.prescriptions]] as const) {
-    if (report.entries.length > 20 || report.state === "none" && report.entries.length !== 0 || report.state === "reported" && report.entries.length === 0) throw new ConvexError(`${label} require explicit none or complete entries.`);
+  for (const [label, report] of [["Allergies", normalized.allergies], ["Medications", normalized.prescriptions]] as const) {
+    if (report.entries.length > 20 || report.state === "none" && report.entries.length !== 0 || report.state === "reported" && report.entries.length === 0) throw new ConvexError(`For ${label}, choose None reported, or fill in every entry (up to 20).`);
   }
   for (const [label, pair] of [["Insurance", normalized.insurance], ["Physician", normalized.physician]] as const) {
     const values = label === "Insurance" ? [normalized.insurance.provider, normalized.insurance.policy] : [normalized.physician.name, normalized.physician.phone];
-    if (pair.state === "provided" && values.some(value => !value) || pair.state !== "provided" && values.some(value => value !== null) || values.some(value => (value?.length ?? 0) > 254)) throw new ConvexError(`${label} needs complete details or an explicit none/unavailable choice.`);
+    if (pair.state === "provided" && values.some(value => !value) || pair.state !== "provided" && values.some(value => value !== null) || values.some(value => (value?.length ?? 0) > 254)) throw new ConvexError(`For ${label}, fill in every detail, or choose None reported or Information unavailable.`);
   }
   return normalized;
 }
@@ -66,15 +66,18 @@ export async function selectedEventsV2(ctx: Ctx, student: Doc<"students">, event
   }
   return result;
 }
+/** Who can prepare a PDF-era form again: a Parent signs online; paper forms need a Coach or a Travel Lead with Health export access. */
+export const PREPARE_FORM_AGAIN_V2 = "Prepare the permission form again. A parent prepares their own form; a Coach, or a Travel Lead with Health export access, prepares paper forms.";
+const formMismatch = (what: string) => `${what} ${PREPARE_FORM_AGAIN_V2}`;
 export function validateSnapshotV2(snapshot: ConsentSnapshotV2) {
   validateConsentProfileV2(snapshot.profile);
-  if (snapshot.student.grade !== snapshot.profile.grade || snapshot.student.dateOfBirth !== snapshot.profile.dateOfBirth || !snapshot.events.length || snapshot.events.length > MAX_CONSENT_EVENTS || snapshot.priorCoverage.length !== snapshot.events.length || new Set(snapshot.events.map(event => event.eventId)).size !== snapshot.events.length || snapshot.priorCoverage.some(row => !snapshot.events.some(event => event.eventId === row.eventId))) throw new ConvexError("Permission snapshot evidence is inconsistent.");
+  if (snapshot.student.grade !== snapshot.profile.grade || snapshot.student.dateOfBirth !== snapshot.profile.dateOfBirth || !snapshot.events.length || snapshot.events.length > MAX_CONSENT_EVENTS || snapshot.priorCoverage.length !== snapshot.events.length || new Set(snapshot.events.map(event => event.eventId)).size !== snapshot.events.length || snapshot.priorCoverage.some(row => !snapshot.events.some(event => event.eventId === row.eventId))) throw new ConvexError(formMismatch("The details on this permission form don't match each other."));
   if (snapshot.templateVersion === fieldTripApproved.templateVersion) {
     const version = snapshot.version;
-    if (version.version !== fieldTripApproved.templateVersion || version.title !== fieldTripApproved.title || version.wording !== fieldTripApproved.wording || version.schoolName !== fieldTripApproved.schoolName || version.teamName !== fieldTripApproved.teamName || version.acknowledgmentText !== fieldTripApproved.acknowledgmentText || snapshot.events.some(event => event.sponsorName !== fieldTripApproved.sponsorName || event.sponsorPhone !== fieldTripApproved.sponsorPhone)) throw new ConvexError("Approved field trip template evidence is inconsistent.");
-  } else if (!snapshot.version.wording.toLowerCase().includes("minor first aid") || /medication choices|pain medication|cold medication|allergy medication/i.test(snapshot.version.wording)) throw new ConvexError("New permission wording must include minor first aid and omit OTC choices.");
-  if (snapshot.signedAt !== null && (!snapshot.pdf || !/^[0-9a-f]{64}$/.test(snapshot.pdf.reviewedSha256) || !/^[0-9a-f]{64}$/.test(snapshot.pdf.signedSha256)) || snapshot.signedAt === null && snapshot.pdf !== null) throw new ConvexError("PDF evidence binding is invalid.");
-  if (new TextEncoder().encode(JSON.stringify(snapshot)).byteLength > MAX_SNAPSHOT_BYTES) throw new ConvexError("Permission snapshot is too large.");
+    if (version.version !== fieldTripApproved.templateVersion || version.title !== fieldTripApproved.title || version.wording !== fieldTripApproved.wording || version.schoolName !== fieldTripApproved.schoolName || version.teamName !== fieldTripApproved.teamName || version.acknowledgmentText !== fieldTripApproved.acknowledgmentText || snapshot.events.some(event => event.sponsorName !== fieldTripApproved.sponsorName || event.sponsorPhone !== fieldTripApproved.sponsorPhone)) throw new ConvexError(formMismatch("This permission form doesn't match the approved wording."));
+  } else if (!snapshot.version.wording.toLowerCase().includes("minor first aid") || /medication choices|pain medication|cold medication|allergy medication/i.test(snapshot.version.wording)) throw new ConvexError("Permission form wording must include minor first aid and must not include medication choices.");
+  if (snapshot.signedAt !== null && (!snapshot.pdf || !/^[0-9a-f]{64}$/.test(snapshot.pdf.reviewedSha256) || !/^[0-9a-f]{64}$/.test(snapshot.pdf.signedSha256)) || snapshot.signedAt === null && snapshot.pdf !== null) throw new ConvexError(formMismatch("The saved copy of this permission form is missing or doesn't match."));
+  if (new TextEncoder().encode(JSON.stringify(snapshot)).byteLength > MAX_SNAPSHOT_BYTES) throw new ConvexError("This permission form is too long. Choose fewer events, then prepare it again.");
   return snapshot;
 }
 export async function snapshotHashV2(snapshot: ConsentSnapshotV2) { return tokenHash(JSON.stringify(snapshot)); }
