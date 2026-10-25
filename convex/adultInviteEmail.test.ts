@@ -36,6 +36,19 @@ describe("staff invitation email", () => {
     expect(await f.t.run(ctx => ctx.db.get(f.ids.inviteId))).toMatchObject({ emailStatus: "sent", emailAttempt: 2 });
     const listed = await f.coach.query(api.accounts.invitations, { paginationOpts: { cursor: null, numItems: 10 } }); expect(JSON.stringify(listed)).not.toContain(f.token); expect(listed.page[0]).toMatchObject({ emailStatus: "sent", emailError: null });
   });
+  it.each([
+    { role: "coach" as const, travelLead: false, title: "Coach" },
+    { role: "mentor" as const, travelLead: false, title: "Mentor" },
+    { role: "mentor" as const, travelLead: true, title: "Travel Lead" },
+  ])("names the $title role being offered in the subject and heading", async ({ role, travelLead, title }) => {
+    configure(); const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "synthetic" }))); vi.stubGlobal("fetch", fetcher); const f = await fixture();
+    await f.t.run(ctx => ctx.db.patch(f.ids.inviteId, { role, travelLead }));
+    await f.send();
+    const payload = JSON.parse(fetcher.mock.calls[0][1].body);
+    expect(payload.subject).toBe(`${title} invitation to Denham Venom Student Status`);
+    expect(payload.html).toContain(`<h1>${title} invitation</h1>`);
+    expect(payload.html).not.toContain("Mentor/Staff");
+  });
   it.each(["revoked", "expired", "issuerInactive", "stale"])("does not send %s invitations", async state => {
     configure(); const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher); const f = await fixture();
     await f.t.run(async ctx => { if (state === "revoked") await ctx.db.patch(f.ids.inviteId, { status: "revoked" }); else if (state === "expired") await ctx.db.patch(f.ids.inviteId, { expiresAt: 0 }); else if (state === "issuerInactive") await ctx.db.patch(f.ids.coach, { active: false }); else await ctx.db.patch(f.ids.inviteId, { tokenHash: "new-generation" }); });

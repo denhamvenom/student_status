@@ -29,6 +29,12 @@ describe('account connection approval presentation', () => {
     expect(html).not.toContain('Travel Lead')
     expect(html).not.toContain('<input')
   })
+  it('asks only for the invitation code before the server says which kind it is', () => {
+    const html = renderToStaticMarkup(createElement(PendingJoin))
+    expect(html).toContain('Invitation code')
+    expect(html).not.toContain('First name')
+    expect(html).not.toContain('Last name')
+  })
   it('offers a new-code path after a declined or unavailable request', () => {
     fixture.connections = [{ requestId: 'synthetic-request', status: 'declined', createdAt: 1 }]
     const html = renderToStaticMarkup(createElement(PendingJoin))

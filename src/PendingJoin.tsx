@@ -1,5 +1,5 @@
 import { userFacingError } from '@/lib/error-message'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useAuthActions } from '@convex-dev/auth/react'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
@@ -7,20 +7,37 @@ import { PendingJoinView } from './PendingJoinView'
 import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { liveCopy } from './lib/live-copy'
-import { isIndividualInvitation, isValidIndividualInvitation } from './lib/invitation-code'
+
+const joinCopy = {
+  code: 'Invitation code',
+  intro: 'Enter the invitation code a Coach gave you.',
+  another: 'Have another invitation code?',
+  continue: 'Continue',
+  checking: 'Checking…',
+  nameIntro: 'Code accepted. Enter your first and last name to ask to join the team.',
+  differentCode: 'Use a different code',
+  noMatch: 'That invitation code didn’t work. It may be mistyped, expired or revoked. Check it and try again, or ask a Coach for a new code. After 5 wrong codes, you’ll need to wait 15 minutes.',
+  tooManyAttempts: 'Too many codes were tried. Wait 15 minutes, then try again.',
+  codeStopped: 'That invitation code no longer works. Ask a Coach for a new code.',
+  checkFailed: 'The code couldn’t be checked. Try again, or ask a Coach for help.',
+  connectionTitle: 'Account connection requested',
+  connectionDetail: 'A Coach must approve this Google account before it connects to your student record. You can’t see that record yet.',
+  connectionWaiting: 'Your request is with your Coach. Your account will connect only after Coach approval.',
+  connectionDeclined: 'Your connection request was not approved or is no longer available. Ask your Coach for a new code.',
+  waitingCoach: 'Waiting for Coach approval',
+  waitingCoachOrTravelLead: 'Waiting for Coach or Travel Lead approval',
+} as const
 
 export function PendingJoin() {
   const request = useMutation(api.app.requestJoin)
   const redeem = useMutation(api.bulkInvites.redeem)
-  const previewCode = useMutation(api.bulkInvites.previewCode)
+  const checkCode = useMutation(api.bulkInvites.checkInvitationCode)
   const { signOut } = useAuthActions()
   const [code, setCode] = useState(''), [first, setFirst] = useState(''), [last, setLast] = useState('')
-  const [preview, setPreview] = useState<{ code: string; status: string } | null>(null)
+  // Set only after the server confirms a team code; the name is asked for only then.
+  const [teamCode, setTeamCode] = useState<string | null>(null)
   const [error, setError] = useState(''), [signOutError, setSignOutError] = useState(''), [busy, setBusy] = useState(false)
   const [sentId, setSentId] = useState<string | null>(null)
-  const generation = useRef(0)
-  const individual = isIndividualInvitation(code)
-  const valid = isValidIndividualInvitation(code)
   const [asOf, setAsOf] = useState(() => Date.now())
   useEffect(() => { const timer = window.setInterval(() => setAsOf(Date.now()), 60_000); return () => window.clearInterval(timer) }, [])
   const joinStatus = useQuery(api.app.joinStatus, {})
@@ -30,50 +47,57 @@ export function PendingJoin() {
   const latest = connections?.reduce<(NonNullable<typeof connections>)[number] | undefined>((a, b) => !a || b.createdAt > a.createdAt ? b : a, undefined)
   const submitted = sent || pending || joinStatus?.status === 'pending' || joinStatus?.status === 'approved'
   const declined = !submitted && (latest?.status === 'declined' || joinStatus?.status === 'declined')
-  useEffect(() => {
-    if (!valid || pending || sent) return
-    const current = generation.current
-    let canceled = false
-    const timer = window.setTimeout(() => {
-      void previewCode({ code: code.trim() }).then(result => {
-        if (!canceled && current === generation.current) setPreview({ code, status: result.status })
-      }).catch(cause => { if (!canceled && current === generation.current) { setPreview(null); setError(userFacingError(cause, 'The invitation could not be checked. Try entering the code again or contact a Coach.')) } })
-    }, 350)
-    return () => { canceled = true; window.clearTimeout(timer) }
-  }, [code, valid, pending, sent, previewCode])
-  async function submit(event: FormEvent) {
+
+  async function submitCode(event: FormEvent) {
     event.preventDefault()
-    if (busy || pending || sent) return
+    const entered = code.trim()
+    if (busy || pending || sent || !entered) return
     setBusy(true); setError('')
     try {
-      if (individual) {
-        if (!valid || preview?.code !== code || preview.status !== 'valid') return
-        const result = await redeem({ code: code.trim() })
-        if (!result.requestId) { setError('This invitation code cannot be used. Ask your Coach for a current code.'); return }
-        setSentId(result.requestId)
-      } else {
-        const requestId = await request({ code: code.trim(), firstName: first.trim(), lastName: last.trim() })
-        if (!requestId) { setError(liveCopy.join.invalidCode); return }
-      }
-      setCode(''); setPreview(null)
+      const { kind } = await checkCode({ code: entered })
+      if (kind === 'team') { setTeamCode(entered); return }
+      if (kind === 'tooManyAttempts') { setError(joinCopy.tooManyAttempts); return }
+      if (kind === 'unavailable') { setError(joinCopy.noMatch); return }
+      const result = await redeem({ code: entered })
+      if (!result.requestId) { setError(joinCopy.codeStopped); return }
+      setSentId(result.requestId); setCode('')
+    } catch (cause) { setError(userFacingError(cause, joinCopy.checkFailed)) }
+    finally { setBusy(false) }
+  }
+  async function submitName(event: FormEvent) {
+    event.preventDefault()
+    if (busy || !teamCode) return
+    setBusy(true); setError('')
+    try {
+      const requestId = await request({ code: teamCode, firstName: first.trim(), lastName: last.trim() })
+      if (!requestId) { setTeamCode(null); setError(joinCopy.codeStopped); return }
+      setTeamCode(null); setCode('')
     } catch (cause) { setError(userFacingError(cause)) }
     finally { setBusy(false) }
   }
+  function changeCode() { setTeamCode(null); setError('') }
   async function exit() {
     setBusy(true); setSignOutError('')
     try { await signOut() } catch (cause) { setSignOutError(userFacingError(cause, liveCopy.join.signOutFailed)) } finally { setBusy(false) }
   }
   if (!joinStatus || !connections) return <section className="card"><p>Checking your join request…</p></section>
-  return <PendingJoinView waitingDetail={pending || sent ? "Your request is with your Coach. Your account will connect only after Coach approval." : undefined} declined={declined} submitted={submitted} busy={busy} signOutError={signOutError} onSignOut={() => void exit()}>
-    {pending || sent ? <section className="card"><h2>Account connection requested</h2><p role="status">Your Coach must approve this Google account before it connects to a student record. You do not have access to that record yet.</p></section> : <section className="card">
-      {declined && <p>Your connection request was not approved or is no longer available. Ask your Coach for a new code.</p>}
-      <h2>{submitted || declined ? 'Have an individual invitation?' : liveCopy.join.heading}</h2>
-      <p>Enter the code your Coach gave you. A five-digit individual code requests a connection to an existing student record. A six-digit team code requests team membership. Both require Coach approval.</p>
-      <form className="form-grid" onSubmit={event => void submit(event)}>
-        <label>{liveCopy.join.code} <Input value={code} disabled={busy} onChange={event => { generation.current++; setCode(event.target.value); setPreview(null); setError('') }} autoComplete="off" required /></label>
-        {individual ? <>{preview?.code === code && preview.status === 'valid' && <p role="status">Code accepted. Your Coach will review your account connection request.</p>}{preview?.code === code && preview.status !== 'valid' && <p className="open-text">This individual invitation is unavailable. Ask your Coach for help.</p>}</> : !submitted && !declined ? <><label>{liveCopy.join.first} <Input value={first} disabled={busy} onChange={event => setFirst(event.target.value)} required /></label><label>{liveCopy.join.last} <Input value={last} disabled={busy} onChange={event => setLast(event.target.value)} required /></label><p className="muted">{liveCopy.join.studentNote}</p></> : null}
-        <Button className="button button-primary" type="submit" disabled={busy || individual && (!valid || preview?.code !== code || preview.status !== 'valid') || !individual && (submitted || declined)}>{individual ? 'Request account connection' : liveCopy.join.submit}</Button>
-      </form>
+  const connectionWaiting = pending || sent
+  return <PendingJoinView waitingTitle={connectionWaiting ? joinCopy.waitingCoach : joinCopy.waitingCoachOrTravelLead} waitingDetail={connectionWaiting ? joinCopy.connectionWaiting : undefined} declined={declined} submitted={submitted} busy={busy} signOutError={signOutError} onSignOut={() => void exit()}>
+    {connectionWaiting ? <section className="card"><h2>{joinCopy.connectionTitle}</h2><p role="status">{joinCopy.connectionDetail}</p></section> : <section className="card">
+      {declined && latest?.status === 'declined' && <p>{joinCopy.connectionDeclined}</p>}
+      <h2>{submitted || declined ? joinCopy.another : liveCopy.join.heading}</h2>
+      {teamCode ? <form className="form-grid" onSubmit={event => void submitName(event)}>
+        <p role="status">{joinCopy.nameIntro}</p>
+        <label>{liveCopy.join.first} <Input value={first} disabled={busy} onChange={event => setFirst(event.target.value)} autoComplete="given-name" required /></label>
+        <label>{liveCopy.join.last} <Input value={last} disabled={busy} onChange={event => setLast(event.target.value)} autoComplete="family-name" required /></label>
+        <p className="muted">{liveCopy.join.studentNote}</p>
+        <Button className="button button-primary" type="submit" disabled={busy}>{liveCopy.join.submit}</Button>
+        <Button type="button" variant="outline" disabled={busy} onClick={changeCode}>{joinCopy.differentCode}</Button>
+      </form> : <form className="form-grid" onSubmit={event => void submitCode(event)}>
+        <p>{joinCopy.intro}</p>
+        <label>{joinCopy.code} <Input value={code} disabled={busy} onChange={event => { setCode(event.target.value); setError('') }} autoComplete="off" required /></label>
+        <Button className="button button-primary" type="submit" disabled={busy || !code.trim()}>{busy ? joinCopy.checking : joinCopy.continue}</Button>
+      </form>}
       {error && <p role="alert" className="open-text">{error}</p>}
     </section>}
   </PendingJoinView>
