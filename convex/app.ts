@@ -12,6 +12,7 @@ import { transportSummary } from "./travel";
 import { age18, firstStatus } from "./firstRegistration";
 import { studentSetupCompleteFor } from "./setupWizard";
 import { operatingRole } from "./lib/access";
+import { clearJoinAttempts, googleRequiredForStudents, joinAttemptsLocked, recordFailedJoinAttempt, usableTeamCode } from "./lib/invitationCodes";
 
 export const viewer = query({
   args: {}, returns: v.any(),
@@ -263,26 +264,22 @@ export const requestJoin = mutation({
   args: { code: v.string(), firstName: v.string(), lastName: v.string() }, returns: v.union(v.id("joinRequests"), v.null()),
   handler: async (ctx, args) => {
     const who = await identity(ctx);
-    if (await ctx.db.query("adultEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique()) throw new ConvexError("A Google account is required for student enrollment.");
-    if (await ctx.db.query("parentEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique()) throw new ConvexError("A Google account is required for student enrollment.");
+    if (await ctx.db.query("adultEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique()) throw new ConvexError(googleRequiredForStudents);
+    if (await ctx.db.query("parentEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique()) throw new ConvexError(googleRequiredForStudents);
     const season = await activeSeason(ctx);
     const latest = await ctx.db.query("joinRequests").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).order("desc").first();
     const existing = latest?.seasonId === season._id ? latest : null;
     if (existing?.status === "pending") return existing._id;
     if (existing?.status === "approved") return null;
     const now = Date.now();
-    const attempts = await ctx.db.query("joinAttempts").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique();
-    if (attempts && attempts.lockedUntil > now) return null;
-    const code = await ctx.db.query("joinCodes").withIndex("by_code", q => q.eq("code", args.code.trim().toUpperCase())).unique();
-    if (!code || code.seasonId !== season._id || code.revoked || code.expiresAt < now) {
-      const failed = (attempts?.failed ?? 0) + 1;
-      if (attempts) await ctx.db.patch(attempts._id, { failed: failed >= 5 ? 0 : failed, lockedUntil: failed >= 5 ? now + 15 * 60_000 : 0 });
-      else await ctx.db.insert("joinAttempts", { authUserId: who.authUserId, failed, lockedUntil: failed >= 5 ? now + 15 * 60_000 : 0 });
+    if (await joinAttemptsLocked(ctx, who.authUserId, now)) return null;
+    if (!(await usableTeamCode(ctx, args.code, season._id, now))) {
+      await recordFailedJoinAttempt(ctx, who.authUserId, now);
       return null;
     }
-    if (attempts) await ctx.db.patch(attempts._id, { failed: 0, lockedUntil: 0 });
+    await clearJoinAttempts(ctx, who.authUserId);
     const firstName = args.firstName.trim(); const lastName = args.lastName.trim();
-    if (!firstName || !lastName || firstName.length > 80 || lastName.length > 80) throw new ConvexError("Enter your first and last name.");
+    if (!firstName || !lastName || firstName.length > 80 || lastName.length > 80) throw new ConvexError("Enter your first and last name, each under 80 characters.");
     if (existing) {
       await ctx.db.patch(existing._id, { email: who.email.toLowerCase(), firstName, lastName, status: "pending", createdAt: now, decidedAt: undefined, decidedBy: undefined });
       return existing._id;

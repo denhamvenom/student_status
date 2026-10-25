@@ -13,9 +13,9 @@ export const status = query({
   returns: v.union(v.null(), v.object({ state: v.union(v.literal("running"), v.literal("failed"), v.literal("complete"), v.literal("cancelled")), processed: v.number(), assigned: v.number(), canRetry: v.boolean(), lastError: v.union(v.string(), v.null()) })),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx);
-    if (actor.role !== "coach" && !actor.travelLead) throw new ConvexError("Enrollment status access denied.");
+    if (actor.role !== "coach" && !actor.travelLead) throw new ConvexError("Only a Coach or Travel Lead can see Whole Team signup progress.");
     const event = await ctx.db.get(args.eventId); const season = await activeSeason(ctx);
-    if (!event || event.seasonId !== season._id) throw new ConvexError("Event not found.");
+    if (!event || event.seasonId !== season._id) throw new ConvexError("This event is no longer available. Reload to see the latest.");
     const job = await ctx.db.query("eventEnrollmentJobs").withIndex("by_eventId", q => q.eq("eventId", event._id)).unique();
     return publicErrorResult(job ? { state: job.state, processed: job.processed, assigned: event.wholeTeamParticipantCount ?? 0, canRetry: actor.role === "coach" && job.state === "failed" && !event.archived && !event.cancelled && await seasonFinancialRetryAvailable(ctx, event.seasonId, job._id), lastError: job.lastError ?? null } : null);
   },
@@ -82,11 +82,11 @@ export const retry = mutation({
   args: { eventId: v.id("events") }, returns: v.null(),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx);
-    if (actor.role !== "coach") throw new ConvexError("Only a Coach may retry Whole Team enrollment.");
+    if (actor.role !== "coach") throw new ConvexError("Only a Coach can try Whole Team signups again.");
     const event = await ctx.db.get(args.eventId); const season = await activeSeason(ctx);
-    if (!event || event.archived || event.cancelled || event.seasonId !== season._id) throw new ConvexError("Event is unavailable.");
+    if (!event || event.archived || event.cancelled || event.seasonId !== season._id) throw new ConvexError("This event is unavailable because it was canceled or moved to Past events, so its signups can't be tried again.");
     const job = await ctx.db.query("eventEnrollmentJobs").withIndex("by_eventId", q => q.eq("eventId", event._id)).unique();
-    if (!job || job.state !== "failed") throw new ConvexError("No failed enrollment is available to retry.");
+    if (!job || job.state !== "failed") throw new ConvexError("There are no stopped Whole Team signups to try again. Reload to see the latest.");
     await requireSeasonFinancialRetry(ctx, season._id, job._id);
     await ctx.db.patch(job._id, { actorId: actor._id, state: "running", lastError: undefined, updatedAt: Date.now() });
     await ctx.db.patch(event._id, { enrollmentState: "running" });

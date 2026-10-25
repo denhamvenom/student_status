@@ -125,7 +125,7 @@ describe("server boundaries", () => {
     const asOf = Date.now();
     const list = await f.coach.query(api.admin.activeJoinCodes, { asOf });
     expect(list.items).toEqual([expect.objectContaining({ code: code.code })]);
-    await expect(f.mentor.query(api.admin.activeJoinCodes, { asOf })).rejects.toThrow("coach only");
+    await expect(f.mentor.query(api.admin.activeJoinCodes, { asOf })).rejects.toThrow("Only a Coach");
     await f.coach.mutation(api.admin.revokeJoinCode, { codeId: list.items[0].codeId });
     expect((await f.coach.query(api.admin.activeJoinCodes, { asOf })).items).toEqual([]);
   });
