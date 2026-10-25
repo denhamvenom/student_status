@@ -9,7 +9,7 @@ import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
 
 async function reserved(ctx: MutationCtx, eventId: Id<"events">) {
   const rows = await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", eventId)).take(501);
-  if (rows.length > 500) throw new ConvexError("Event roster limit reached; capacity cannot be checked safely.");
+  if (rows.length > 500) throw new ConvexError("This event has too many signups to check open places. Contact a Coach.");
   return rows.filter(x => x.status === "confirmed" || x.status === "pending").length;
 }
 
@@ -19,14 +19,14 @@ export const signUp = mutation({
     await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const user = await viewer(ctx); const student = await ownStudent(ctx, user);
     const event = await ctx.db.get(args.eventId); const season = await activeSeason(ctx);
-    if (!event || event.seasonId !== season._id || student.seasonId !== season._id || event.archived || event.cancelled || event.signupMode === "assigned") throw new ConvexError("Signup is unavailable.");
-    if (event.signupClosesAt !== undefined && Date.now() > event.signupClosesAt) throw new ConvexError("Signup has closed.");
+    if (!event || event.seasonId !== season._id || student.seasonId !== season._id || event.archived || event.cancelled || event.signupMode === "assigned") throw new ConvexError("You can't sign up for this event. It may be canceled, past, or assigned by a Coach.");
+    if (event.signupClosesAt !== undefined && Date.now() > event.signupClosesAt) throw new ConvexError("Signup for this event has closed. Ask a Coach or Travel Lead if you still need to go.");
     const prior = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
     if (prior && prior.status !== "withdrawn") return prior.status;
     const withdrawal = await ctx.db.query("withdrawalRequests").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(100);
-    if (withdrawal.some(x => x.status === "approved")) throw new ConvexError("A Coach must review reenrollment after an approved withdrawal.");
+    if (withdrawal.some(x => x.status === "approved")) throw new ConvexError("You withdrew from this event. Ask a Coach to sign you up again.");
     const waiting = await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(501);
-    if (waiting.length > 500) throw new ConvexError("Event roster limit reached.");
+    if (waiting.length > 500) throw new ConvexError("This event has too many signups to update here. Contact a Coach.");
     const full = waiting.some(p => p.status === "waitlist") || event.capacity !== undefined && waiting.filter(p => p.status === "confirmed" || p.status === "pending").length >= event.capacity;
     const status = full ? "waitlist" : event.signupMode === "approval" ? "pending" : "confirmed";
     const now = Date.now();
@@ -41,7 +41,7 @@ export const signUp = mutation({
 export const withdraw = mutation({
   args: { eventId: v.id("events") }, returns: v.null(),
   handler: async () => {
-    throw new ConvexError("Submit a withdrawal request for Coach or Travel Lead review.");
+    throw new ConvexError("Send a withdrawal request instead. A Coach or Travel Lead will review it.");
   },
 });
 
@@ -50,36 +50,36 @@ export const setParticipation = mutation({
   handler: async (ctx, args) => {
     await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const user = await viewer(ctx);
-    if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Participation edit denied.");
+    if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Only a Coach or Travel Lead can change signups.");
     const event = await ctx.db.get(args.eventId); const student = await ctx.db.get(args.studentId); const season = await activeSeason(ctx);
-    if (!event || event.archived || event.cancelled || !student || !student.active || event.seasonId !== season._id || student.seasonId !== season._id) throw new ConvexError("Student or event not found.");
+    if (!event || event.archived || event.cancelled || !student || !student.active || event.seasonId !== season._id || student.seasonId !== season._id) throw new ConvexError("This student or event is no longer active in the current season. Reload to see the latest.");
     requireEnrollmentComplete(event);
-    if (event.signupMode === "assigned" && user.role !== "coach") throw new ConvexError("Required-event roster is coach only.");
-    if (event.signupMode === "assigned" && (args.status === "pending" || args.status === "waitlist")) throw new ConvexError("Required events cannot have pending or waitlisted participants.");
+    if (event.signupMode === "assigned" && user.role !== "coach") throw new ConvexError("Only a Coach can change signups for a required event.");
+    if (event.signupMode === "assigned" && (args.status === "pending" || args.status === "waitlist")) throw new ConvexError("Students on a required event can't be Waiting for approval or Waitlisted. Choose Signed up instead.");
     const prior = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
-    if (args.status === "withdrawn") throw new ConvexError("Use a reviewed withdrawal decision to remove participation.");
+    if (args.status === "withdrawn") throw new ConvexError("To take a student off this event, use Withdrawal requests.");
     if (prior?.status === args.status) return null;
     if (args.status === "confirmed" || args.status === "pending" || args.status === "waitlist") {
       const withdrawals = await ctx.db.query("withdrawalRequests").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(100);
-      if (withdrawals.some(x => x.status === "approved")) throw new ConvexError("A Coach must review reenrollment after an approved withdrawal.");
+      if (withdrawals.some(x => x.status === "approved")) throw new ConvexError("This student withdrew from this event. Only a Coach can sign them up again.");
     }
-    if (prior?.status === "confirmed" && (args.status === "pending" || args.status === "waitlist")) throw new ConvexError("Reconcile confirmed participation before changing its status.");
-    if (prior?.status === "waitlist" && args.status !== "waitlist") throw new ConvexError("Use manual waitlist promotion in event operations.");
+    if (prior?.status === "confirmed" && (args.status === "pending" || args.status === "waitlist")) throw new ConvexError("A student who is Signed up can't be moved back to Waiting for approval or Waitlisted.");
+    if (prior?.status === "waitlist" && args.status !== "waitlist") throw new ConvexError("This student is Waitlisted. Use Promote on the event's signups to move them up.");
     if (event.signupMode !== "assigned" && args.status !== "waitlist" && prior?.status !== "confirmed" && prior?.status !== "pending") {
       const queue = await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(501);
-      if (queue.length > 500) throw new ConvexError("Event roster limit reached.");
-      if (queue.some(p => p.status === "waitlist")) throw new ConvexError("Promote the waitlist before adding another reserved place.");
+      if (queue.length > 500) throw new ConvexError("This event has too many signups to update here. Contact a Coach.");
+      if (queue.some(p => p.status === "waitlist")) throw new ConvexError("Students are Waitlisted for this event. Promote them before adding another student.");
     }
     const takesSeat = args.status === "confirmed" || args.status === "pending";
     const alreadyReserved = prior?.status === "confirmed" || prior?.status === "pending";
-    if (takesSeat && !alreadyReserved && event.capacity !== undefined && await reserved(ctx, event._id) >= event.capacity) throw new ConvexError("Event capacity is full.");
+    if (takesSeat && !alreadyReserved && event.capacity !== undefined && await reserved(ctx, event._id) >= event.capacity) throw new ConvexError("This event is full. A Coach can raise its capacity in event settings.");
     const now = Date.now();
     if (prior) await ctx.db.patch(prior._id, { status: args.status, createdAt: prior.status === "withdrawn" ? now : prior.createdAt, updatedAt: now });
     else {
       if (event.assignmentScope === "wholeTeam") {
         const count = event.wholeTeamParticipantCount;
-        if (count === undefined || !Number.isSafeInteger(count) || count < 0) throw new ConvexError("Whole Team enrollment count needs reconciliation before adding members.");
-        if (count >= 500) throw new ConvexError("Whole Team event roster limit reached.");
+        if (count === undefined || !Number.isSafeInteger(count) || count < 0) throw new ConvexError("The signup count for this Whole Team event needs review. Contact a Coach.");
+        if (count >= 500) throw new ConvexError("This Whole Team event has too many students to add more. Contact a Coach.");
         await ctx.db.patch(event._id, { wholeTeamParticipantCount: count + 1 });
       }
       await ctx.db.insert("participants", { eventId: event._id, studentId: student._id, status: args.status, createdAt: now, updatedAt: now });
@@ -94,15 +94,15 @@ export const recordRequirement = mutation({
   args: { eventId: v.id("events"), studentId: v.id("students"), key: v.string(), complete: v.boolean() }, returns: v.null(),
   handler: async (ctx, args) => {
     const user = await viewer(ctx);
-    if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Requirement edit denied.");
+    if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Only a Coach or Travel Lead can update requirements.");
     const event = await ctx.db.get(args.eventId); const student = await ctx.db.get(args.studentId);
     const season = await activeSeason(ctx);
-    if (!event || !student || !student.active || event.seasonId !== season._id || student.seasonId !== season._id || ["pay", "perm", "room"].includes(args.key)) throw new ConvexError("Invalid requirement.");
-    if (event.type === "Competition" && args.key === "first") throw new ConvexError("Competition FIRST verification is managed on the Coach student record.");
+    if (!event || !student || !student.active || event.seasonId !== season._id || student.seasonId !== season._id || ["pay", "perm", "room"].includes(args.key)) throw new ConvexError("This requirement can't be updated here. Fees, permission forms and rooms update on their own pages. Reload and try again.");
+    if (event.type === "Competition" && args.key === "first") throw new ConvexError("For competitions, a Coach verifies FIRST registration on the student record.");
     requireEnrollmentComplete(event);
     if (args.key !== "first") {
       const requirement = await ctx.db.query("requirements").withIndex("by_eventId_and_key", q => q.eq("eventId", event._id).eq("key", args.key)).unique();
-      if (!requirement) throw new ConvexError("Requirement not found.");
+      if (!requirement) throw new ConvexError("This requirement was removed. Reload to see the event's current requirements.");
     }
     const prior = await ctx.db.query("requirementCompletions").withIndex("by_eventId_and_studentId_and_key", q => q.eq("eventId", event._id).eq("studentId", student._id).eq("key", args.key)).unique();
     if (args.complete && !prior) await ctx.db.insert("requirementCompletions", { eventId: event._id, studentId: student._id, key: args.key, completedAt: Date.now(), completedBy: user._id });

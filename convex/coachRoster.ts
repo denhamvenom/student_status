@@ -23,7 +23,7 @@ export const directory = query({
   returns:paginationResultValidator(directoryRowValidator),
   handler:async(ctx,args)=>{
     requireRole(await viewer(ctx),"coach");
-    if(args.paginationOpts.numItems<1||args.paginationOpts.numItems>100) throw new ConvexError("Directory page size must be between 1 and 100.");
+    if(args.paginationOpts.numItems<1||args.paginationOpts.numItems>100) throw new ConvexError("The student list could not load. Reload the page and try again.");
     const season=await activeSeason(ctx);
     const page=await ctx.db.query("students").withIndex("by_seasonId_and_active",q=>q.eq("seasonId",season._id).eq("active",args.active??true)).paginate(args.paginationOpts);
     return {...page,page:await Promise.all(page.page.map(async student=>{
@@ -43,11 +43,11 @@ export const rowsByIds=query({
   args:{studentIds:v.array(v.id("students")),asOf:v.number()},returns:v.array(rowValidator),
   handler:async(ctx,args)=>{
     requireRole(await viewer(ctx),"coach");
-    if(!Number.isFinite(args.asOf)) throw new ConvexError("A valid current time is required.");
-    if(args.studentIds.length>20) throw new ConvexError("At most 20 roster rows may be requested.");
+    if(!Number.isFinite(args.asOf)) throw new ConvexError("The roster could not load. Reload the page and try again.");
+    if(args.studentIds.length>20) throw new ConvexError("Too many students requested at once. Reload the roster and try again.");
     const season=await activeSeason(ctx);
     const students=await Promise.all(args.studentIds.map(id=>ctx.db.get(id)));
-    if(students.some(student=>!student||student.seasonId!==season._id)) throw new ConvexError("Student is unavailable in the current season.");
+    if(students.some(student=>!student||student.seasonId!==season._id)) throw new ConvexError("This student is no longer in the current season. Reload to see the current roster.");
     const upcoming=await upcomingEvents(ctx,season._id,args.asOf);
     return await Promise.all((students as Doc<"students">[]).map(student=>rosterRow(ctx,student,upcoming)));
   },
@@ -58,7 +58,7 @@ export const nextTransition = query({
   args: { asOf: v.number() }, returns: v.union(v.number(), v.null()),
   handler: async (ctx, args) => {
     requireRole(await viewer(ctx), "coach");
-    if (!Number.isFinite(args.asOf)) throw new ConvexError("A valid current time is required.");
+    if (!Number.isFinite(args.asOf)) throw new ConvexError("The roster could not load. Reload the page and try again.");
     const season = await activeSeason(ctx);
     const event = await ctx.db.query("events").withIndex("by_seasonId_and_startsAt", q => q.eq("seasonId", season._id).gte("startsAt", args.asOf)).first();
     return event ? event.startsAt + 1 : null;
@@ -95,9 +95,9 @@ async function nextEvent(ctx: QueryCtx, student: Doc<"students">, upcoming: Upco
   if (!student.active) return { nextEvent: null, readinessCoverage: "notApplicable" as const, knownFirstStatus: undefined };
   for (const event of upcoming.events) {
     const participant = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
-    if (enrollmentPending(event) && event.assignmentScope === "wholeTeam") return { nextEvent: { eventId: event._id, name: event.name, startsAt: event.startsAt, participation: participant?.status ?? null, state: "unknown" as const, open: ["Whole Team enrollment is not complete"] }, readinessCoverage: "unknown" as const, knownFirstStatus: undefined };
+    if (enrollmentPending(event) && event.assignmentScope === "wholeTeam") return { nextEvent: { eventId: event._id, name: event.name, startsAt: event.startsAt, participation: participant?.status ?? null, state: "unknown" as const, open: ["Whole Team signups are not finished yet"] }, readinessCoverage: "unknown" as const, knownFirstStatus: undefined };
     if (!participant || participant.status === "withdrawn") continue;
-    if (participant.status !== "confirmed") return { nextEvent: { eventId: event._id, name: event.name, startsAt: event.startsAt, participation: participant.status, state: "open" as const, open: ["Participation is not confirmed"] }, readinessCoverage: "complete" as const, knownFirstStatus: undefined };
+    if (participant.status !== "confirmed") return { nextEvent: { eventId: event._id, name: event.name, startsAt: event.startsAt, participation: participant.status, state: "open" as const, open: ["Signup not confirmed yet"] }, readinessCoverage: "complete" as const, knownFirstStatus: undefined };
     const readiness = await studentReadiness(ctx, event, student);
     const state = financeState !== "ready" || readiness.open.includes("Event financial records require review") || readiness.open.includes("Event requirements require review") ? "unknown" as const : readiness.state === "ready" ? "ready" as const : "open" as const;
     return { nextEvent: { eventId: event._id, name: event.name, startsAt: event.startsAt, participation: participant.status, state, open: readiness.open }, readinessCoverage: "complete" as const, knownFirstStatus: readiness.firstRegistrationState ?? undefined };
@@ -118,7 +118,7 @@ export const list = query({
   returns: paginationResultValidator(rowValidator).extend({ seasonId: v.id("seasons") }),
   handler: async (ctx, args) => {
     requireRole(await viewer(ctx), "coach");
-    if (!Number.isFinite(args.asOf)) throw new ConvexError("A valid current time is required.");
+    if (!Number.isFinite(args.asOf)) throw new ConvexError("The roster could not load. Reload the page and try again.");
     const season = await activeSeason(ctx);
     const students = args.connection === "unconnected"
       ? ctx.db.query("students").withIndex("by_seasonId_and_active_and_userId", q => q.eq("seasonId", season._id).eq("active", args.active ?? true).eq("userId", undefined))
@@ -136,10 +136,10 @@ export const detail = query({
   args: { studentId: v.id("students"), asOf: v.number() }, returns: detailValidator,
   handler: async (ctx, args) => {
     requireRole(await viewer(ctx), "coach");
-    if (!Number.isFinite(args.asOf)) throw new ConvexError("A valid current time is required.");
+    if (!Number.isFinite(args.asOf)) throw new ConvexError("The roster could not load. Reload the page and try again.");
     const season = await activeSeason(ctx);
     const student = await ctx.db.get(args.studentId);
-    if (!student || student.seasonId !== season._id) throw new ConvexError("Student is unavailable in the current season.");
+    if (!student || student.seasonId !== season._id) throw new ConvexError("This student is no longer in the current season. Reload to see the current roster.");
     const row = await rosterRow(ctx, student, await upcomingEvents(ctx, season._id, args.asOf));
     const links = await ctx.db.query("familyLinks").withIndex("by_studentId", q => q.eq("studentId", student._id)).take(21);
     const parents = await Promise.all(links.slice(0,20).filter(link => !link.seasonId || link.seasonId === season._id).map(async link => {

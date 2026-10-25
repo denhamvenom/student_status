@@ -166,7 +166,7 @@ describe("server boundaries", () => {
     expect(await f.student.mutation(api.participation.signUp, { eventId: f.ids.event })).toBe("pending");
     await expect(f.coach.mutation(api.participation.setParticipation, { eventId: f.ids.event, studentId: f.ids.other, status: "pending" })).rejects.toThrow("capacity");
     await f.coach.mutation(api.participation.setParticipation, { eventId: f.ids.event, studentId: f.ids.student, status: "confirmed" });
-    await expect(f.coach.mutation(api.participation.setParticipation, { eventId: f.ids.event, studentId: f.ids.student, status: "waitlist" })).rejects.toThrow("Reconcile");
+    await expect(f.coach.mutation(api.participation.setParticipation, { eventId: f.ids.event, studentId: f.ids.student, status: "waitlist" })).rejects.toThrow("can't be moved back");
     const detail = await f.student.query(api.app.eventDetail, { eventId: f.ids.event, studentId: f.ids.student });
     expect(detail.participation).toBe("confirmed");
     expect((await f.student.query(api.app.studentFinances, { studentId: f.ids.student })).summary!.dueCents).toBe(45000);
@@ -238,9 +238,9 @@ describe('Batch 4 workflow summaries and confirmation checks', () => {
       await ctx.db.insert('participants', {eventId:f.ids.event,studentId:f.ids.other,status:'waitlist',createdAt:2,updatedAt:2});
     });
     expect(await f.coach.query(api.workflowSummaries.waitingSignups,{eventId:f.ids.event})).toEqual({count:1,more:false});
-    await expect(f.student.query(api.workflowSummaries.waitingSignups,{eventId:f.ids.event})).rejects.toThrow('Staff access');
+    await expect(f.student.query(api.workflowSummaries.waitingSignups,{eventId:f.ids.event})).rejects.toThrow("Coach or Travel Lead");
     await f.t.run(ctx=>ctx.db.patch(f.ids.event,{archived:true}));
-    await expect(f.coach.query(api.workflowSummaries.waitingSignups,{eventId:f.ids.event})).rejects.toThrow('unavailable');
+    await expect(f.coach.query(api.workflowSummaries.waitingSignups,{eventId:f.ids.event})).rejects.toThrow("no longer active");
   });
   it('distinguishes unconfirmed health entries without exposing them to a student', async () => {
     const f = await fixture();

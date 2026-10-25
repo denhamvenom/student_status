@@ -62,7 +62,7 @@ describe("shared setup and season FIRST registration", () => {
     expect(revision).toBe(1);
     const first=await f.student.mutation(api.firstRegistration.get,{studentId:f.ids.student});
     expect(first).toMatchObject({adultEligible:false,canAccessInvitation:false,canReport:false});
-    await expect(f.student.mutation(api.firstRegistration.report,{studentId:f.ids.student,expectedRevision:0})).rejects.toThrow("linked parent");
+    await expect(f.student.mutation(api.firstRegistration.report,{studentId:f.ids.student,expectedRevision:0})).rejects.toThrow("A parent must report");
     expect((await f.student.query(api.setupWizard.get,{studentId:f.ids.student})).medical).toBeNull();
     const minorTodo=(await f.student.query(api.app.studentDashboard,{studentId:f.ids.student,asOf:Date.parse("2026-10-15T05:00:00Z")})).todos.find(item=>item.eventName==="FIRST registration and Consent & Release");
     expect(minorTodo).toMatchObject({label:"Your parent completes FIRST registration.",href:null,responsible:"parent",blocked:true});

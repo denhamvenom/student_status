@@ -13,7 +13,7 @@ describe('loaded team report CSV',()=>{
     expect(csv).toContain('"Attendance coverage","Updating; verified totals unavailable"')
     expect(csv).toContain('"Event coverage","Limited to first 50 events; counts may be incomplete"')
     expect(csv).toContain('"\'=HYPERLINK(""bad"")"')
-    expect(csv).toContain('"0","Unavailable","Unavailable","Unknown","0"')
+    expect(csv).toContain('"0.00","Unavailable","Unavailable","Unknown","0.00"')
     expect(csv).toContain('"Readiness unavailable","\'+private requirement"')
     expect(csv).toContain('"Build"')
     expect(csv).not.toContain('"Mechanical"')

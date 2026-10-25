@@ -74,7 +74,7 @@ describe("season-indexed family links", () => {
     expect(activeSibling.page.map(row => row._id)).toEqual([f.ids.second]);
     expect(await f.alternate.query(page, { paginationOpts: { numItems: 20, cursor: null } })).toMatchObject({ page: [] });
     await expect(f.coach.query(page, { paginationOpts: { numItems: 20, cursor: null } })).rejects.toThrow("permission");
-    await expect(f.parent.query(page, { paginationOpts: { numItems: 0, cursor: null } })).rejects.toThrow("page size");
+    await expect(f.parent.query(page, { paginationOpts: { numItems: 0, cursor: null } })).rejects.toThrow("Linked students could not load");
   });
 
   it("records a broken source link, retries from the same cursor, and ignores stale scheduled work", async () => {
@@ -111,7 +111,7 @@ describe("season-indexed family links", () => {
     await f.t.mutation(runStep, { generation: before.generation, phase: before.phase, cursor: before.cursor });
     const failed = await f.t.run(ctx => ctx.db.get(before._id));
     expect(failed).toMatchObject({ state: "failed", cursor: null, scanned: 0, unresolved: 0 });
-    expect(failed?.lastError).toContain("Coach access changed");
+    expect(failed?.lastError).toContain("no longer has Coach access");
     const unstamped = await f.t.run(ctx => ctx.db.query("familyLinks").withIndex("by_parentUserId", q => q.eq("parentUserId", f.ids.parent)).first());
     expect(unstamped?.seasonId).toBeUndefined();
     const secondCoachAuth = await f.t.run(async ctx => {
