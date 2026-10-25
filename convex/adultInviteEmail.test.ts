@@ -45,7 +45,7 @@ describe("staff invitation email", () => {
     await f.t.run(ctx => ctx.db.patch(f.ids.inviteId, { role, travelLead }));
     await f.send();
     const payload = JSON.parse(fetcher.mock.calls[0][1].body);
-    expect(payload.subject).toBe(`${title} invitation to Denham Venom Student Status`);
+    expect(payload.subject).toBe(`${title} invitation to Venom Status`);
     expect(payload.html).toContain(`<h1>${title} invitation</h1>`);
     expect(payload.html).not.toContain("Mentor/Staff");
   });

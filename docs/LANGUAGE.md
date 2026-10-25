@@ -6,6 +6,8 @@ Write every new or changed user-facing string to this page. Rewrite screen by sc
 
 ## Writing rules
 
+- The app is **Venom Status** (renamed from Student Status, owner decision October 25). Use "VENOM STATUS" where the design uses capitals. Repository, Convex project, Worker and domain names are unchanged.
+
 - US spelling: canceled, canceling; "cancellation" is also correct.
 - Use the ellipsis character `…`, never three dots, in "Loading…", "Saving…".
 - Role titles are always capitalized: Student, Parent, Coach, Mentor, Travel Lead.

@@ -124,7 +124,7 @@ async function renderOriginalFieldTripPdf(snapshot: ConsentSnapshotV2): Promise<
   page.drawImage(background, { x: 0, y: 0, width: PAGE_WIDTH, height: PAGE_HEIGHT })
   document.setTitle(fieldTripApproved.title)
   document.setSubject(fieldTripApproved.templateVersion)
-  document.setCreator('Denham Venom Student Status')
+  document.setCreator('Denham Venom · Venom Status')
   const extra: Overflow[] = []
   const draw = (label: string, value: string, x: number, y: number, width: number, size?: number, minimum?: number) => fitted(page, body, extra, label, value, x, y, width, size, minimum)
   draw('Student name', snapshot.student.legalName, 55, 153, 255, 8)
@@ -283,7 +283,7 @@ async function renderLegacyFieldTripPdf(snapshot: ConsentSnapshotV2, signature?:
   const heading = await document.embedFont(StandardFonts.HelveticaBold)
   document.setTitle(snapshot.version.title)
   document.setSubject('Field trip permission and medical release')
-  document.setCreator('Denham Venom Student Status')
+  document.setCreator('Denham Venom · Venom Status')
   let page: PDFPage
   let y = TOP
 

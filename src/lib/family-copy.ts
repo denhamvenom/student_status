@@ -74,7 +74,7 @@ export const familyCopy = {
     linkUnavailableDetail: 'This link has expired, was used, or is no longer available. Ask the student for a new invitation or contact a Coach.',
     linkedHeading: "You're linked to", signedInAs: 'Signed in as',
     linkedDescription: "You can now see this student's status, finances, events and requirements.", goToStatus: 'Go to status',
-    switchAccount: 'Switch Google account', returnHome: 'Return to Student Status',
+    switchAccount: 'Switch Google account', returnHome: 'Return to Venom Status',
     syntheticReview: 'Synthetic review', sampleStudent: 'Sample Student', sampleParent: 'Sample Parent',
     sampleExpiry: 'October 19, 2026', pending: 'Pending',
     sampleAttestation: "I confirm that I am this student's parent or legal guardian and have authority to act for this student.",
