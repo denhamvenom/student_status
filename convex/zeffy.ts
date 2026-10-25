@@ -20,7 +20,7 @@ export const status = query({ args: {}, returns: v.object({ enabled: v.boolean()
 
 export const exceptionsPage = query({ args: { paginationOpts: paginationOptsValidator }, returns: paginationResultValidator(exception), handler: async (ctx, args) => {
   requireRole(await viewer(ctx), "coach");
-  if (!Number.isInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 50) throw new ConvexError("Request 1 to 50 exceptions per page.");
+  if (!Number.isInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 50) throw new ConvexError("This list couldn't load. Reload the page to try again.");
   const page = await ctx.db.query("zeffyExceptions").withIndex("by_lastSeenAt").order("desc").paginate(args.paginationOpts);
   return { ...page, page: page.page.map(row => ({ _id: row._id, code: row.code, message: row.message, campaignId: row.campaignId, paymentId: row.paymentId, studentId: row.studentId, createdAt: row.firstSeenAt })) };
 } });
@@ -28,9 +28,9 @@ export const exceptionsPage = query({ args: { paginationOpts: paginationOptsVali
 export const setEnabled = mutation({ args: { enabled: v.boolean(), reason: v.string() }, returns: v.null(), handler: async (ctx, args) => {
   const actor = await viewer(ctx); requireRole(actor, "coach");
   if (args.reason.trim().length < 8 || args.reason.length > 1000) throw new ConvexError("Provide a reason of at least eight characters.");
-  if (args.enabled && !env.ZEFFY_API_KEY) throw new ConvexError("Zeffy API key is not configured.");
+  if (args.enabled && !env.ZEFFY_API_KEY) throw new ConvexError("Zeffy isn't connected yet. Ask whoever manages the app to add the Zeffy API key.");
   const prior = await ctx.db.query("zeffySettings").withIndex("by_key", q => q.eq("key", "team")).unique();
-  if (prior?.runningRunId) throw new ConvexError("A Zeffy sync is running.");
+  if (prior?.runningRunId) throw new ConvexError("A Zeffy check is already running. Wait for it to finish.");
   if (prior) await ctx.db.patch(prior._id, { enabled: args.enabled, actorId: actor._id, updatedAt: Date.now() });
   else await ctx.db.insert("zeffySettings", { key: "team", enabled: args.enabled, actorId: actor._id, updatedAt: Date.now() });
   await audit(ctx, actor, "zeffySettings", "team", "setEnabled", { enabled: prior?.enabled ?? false }, { enabled: args.enabled }, args.reason.trim());
@@ -53,7 +53,7 @@ export const snapshot = internalQuery({ args: {}, returns: v.object({ activeSeas
   const students = await ctx.db.query("students").take(5001);
   const mappings = await ctx.db.query("zeffyCampaignMappings").take(5001);
   const payments = await ctx.db.query("zeffyPayments").take(5001);
-  if (students.length > 5000 || mappings.length > 5000 || payments.length > 5000) throw new Error("Zeffy preview exceeds its safe record limit; review is required.");
+  if (students.length > 5000 || mappings.length > 5000 || payments.length > 5000) throw new Error("Zeffy has more records than one check can handle. Nothing was added. Ask whoever manages the app for help.");
   return { activeSeasonId: season._id, seasonStartsAt: season.startsAt, students: students.map(s => ({ id: s._id, seasonId: s.seasonId, name: s.legalName || s.preferredName, url: s.fundraiserUrl ?? null, revision: s.fundraiserLinkRevision ?? 0, active: s.active })), mappings: mappings.map(m => ({ campaignId: m.campaignId, canonicalUrl: m.canonicalUrl, studentId: m.studentId, seasonId: m.seasonId })), payments: payments.map(p => ({ paymentId: p.paymentId, amountCents: p.amountCents, campaignId: p.campaignId })) };
 } });
 
@@ -64,8 +64,8 @@ export const begin = internalMutation({ args: { actorId: v.id("appUsers") }, ret
   if (settings.runningRunId) {
     const prior = await ctx.db.get(settings.runningRunId);
     if (prior?.state === "running" && Date.now() - prior.startedAt < 30 * 60_000) return null;
-    if (prior?.state === "running") await ctx.db.patch(prior._id, { state: "failed", completedAt: Date.now(), error: "Zeffy sync was interrupted; retry is safe." });
-    await ctx.db.patch(settings._id, { runningRunId: undefined, lastRunStatus: "failed", lastError: "Zeffy sync was interrupted; retry is safe." });
+    if (prior?.state === "running") await ctx.db.patch(prior._id, { state: "failed", completedAt: Date.now(), error: "The Zeffy check stopped before finishing. It's safe to run it again." });
+    await ctx.db.patch(settings._id, { runningRunId: undefined, lastRunStatus: "failed", lastError: "The Zeffy check stopped before finishing. It's safe to run it again." });
   }
   const runId = await ctx.db.insert("zeffyRuns", { actorId: actor._id, state: "running", startedAt: Date.now(), credited: 0, unchanged: 0, review: 0 });
   await ctx.db.patch(settings._id, { runningRunId: runId, lastRunAt: Date.now() });
@@ -77,7 +77,7 @@ export const expire = internalMutation({ args: { runId: v.id("zeffyRuns") }, ret
   const settings = await ctx.db.query("zeffySettings").withIndex("by_key", q => q.eq("key", "team")).unique();
   const run = await ctx.db.get(args.runId);
   if (settings?.runningRunId !== args.runId || run?.state !== "running") return null;
-  const message = "Zeffy sync was interrupted; use Check now to retry.";
+  const message = "The Zeffy check stopped before finishing. Use Check now to run it again.";
   await ctx.db.patch(run._id, { state: "failed", completedAt: Date.now(), error: message });
   await ctx.db.patch(settings._id, { runningRunId: undefined, lastRunStatus: "failed", lastError: message });
   return null;
@@ -116,7 +116,7 @@ export const captureCampaign = internalMutation({ args: { runId: v.id("zeffyRuns
   const mapping = await ctx.db.query("zeffyCampaignMappings").withIndex("by_campaignId", q => q.eq("campaignId", args.campaign.id)).unique();
   const conflicting = await ctx.db.query("zeffyCampaignMappings").withIndex("by_canonicalUrl", q => q.eq("canonicalUrl", canonical)).take(2);
   if (matching.length !== 1 || !matching[0].active || matching[0].seasonId !== season._id || conflicting.some(m => m.campaignId !== args.campaign.id) || mapping && (mapping.canonicalUrl !== canonical || mapping.studentId !== matching[0]._id || mapping.seasonId !== season._id)) {
-    await saveException(ctx, `campaign:${args.campaign.id}`, "linkConflict", "Campaign page has duplicate or conflicting student links; review manually.", args.campaign.id);
+    await saveException(ctx, `campaign:${args.campaign.id}`, "linkConflict", "This fundraising page is linked to more than one student. Fix the fundraiser links.", args.campaign.id);
     return null;
   }
   if (mapping) await ctx.db.patch(mapping._id, { lastSeenAt: Date.now() });
@@ -128,14 +128,14 @@ export const captureCampaign = internalMutation({ args: { runId: v.id("zeffyRuns
 export const missingCampaign = internalMutation({ args: { runId: v.id("zeffyRuns"), campaignId: v.string(), paymentId: v.string() }, returns: v.null(), handler: async (ctx, args) => {
   const settings = await ctx.db.query("zeffySettings").withIndex("by_key", q => q.eq("key", "team")).unique();
   if (settings?.runningRunId !== args.runId) throw new Error("Zeffy run is unavailable.");
-  await saveException(ctx, `payment:${args.paymentId}`, "campaignMissing", "Payment campaign is absent from Zeffy campaign list; review manually.", args.campaignId, args.paymentId);
+  await saveException(ctx, `payment:${args.paymentId}`, "campaignMissing", "This payment's fundraising page isn't in Zeffy's list. Review it in Zeffy.", args.campaignId, args.paymentId);
   return null;
 } });
 
 export const paymentFailure = internalMutation({ args: { runId: v.id("zeffyRuns"), campaignId: v.string(), paymentId: v.string() }, returns: v.null(), handler: async (ctx, args) => {
   const settings = await ctx.db.query("zeffySettings").withIndex("by_key", q => q.eq("key", "team")).unique();
   if (settings?.runningRunId !== args.runId) throw new Error("Zeffy run is unavailable.");
-  await saveException(ctx, `payment:${args.paymentId}`, "processingFailed", "This payment could not be safely posted; Coach financial review is required.", args.campaignId, args.paymentId);
+  await saveException(ctx, `payment:${args.paymentId}`, "processingFailed", "This payment couldn't be added safely. Review it before adding it by hand.", args.campaignId, args.paymentId);
   return null;
 } });
 
@@ -146,11 +146,11 @@ export const applyPayment = internalMutation({ args: { runId: v.id("zeffyRuns"),
   const existing = await ctx.db.query("zeffyPayments").withIndex("by_paymentId", q => q.eq("paymentId", payment.id)).unique();
   const safety = paymentSafety(payment);
   if (existing) {
-    if (safety) { await saveException(ctx, `payment:${payment.id}`, safety, "Previously credited donation needs Zeffy review.", campaign.id, payment.id, existing.studentId); return "review"; }
+    if (safety) { await saveException(ctx, `payment:${payment.id}`, safety, "This donation was already credited and needs review in Zeffy.", campaign.id, payment.id, existing.studentId); return "review"; }
     if (existing.amountCents === payment.amount && existing.campaignId === payment.campaign_id) { await clearExceptionKey(ctx, `payment:${payment.id}`); return "unchanged"; }
-    await saveException(ctx, `payment:${payment.id}`, "paymentChanged", "Previously credited payment details changed; review manually.", campaign.id, payment.id, existing.studentId); return "review";
+    await saveException(ctx, `payment:${payment.id}`, "paymentChanged", "This payment was already credited but its details changed in Zeffy. Review it.", campaign.id, payment.id, existing.studentId); return "review";
   }
-  if (safety) { if (safety !== "notSucceeded") await saveException(ctx, `payment:${payment.id}`, safety, "Payment is not safe to credit; review in Zeffy.", campaign.id, payment.id); return safety === "notSucceeded" ? "unchanged" : "review"; }
+  if (safety) { if (safety !== "notSucceeded") await saveException(ctx, `payment:${payment.id}`, safety, "This payment can't be credited automatically. Review it in Zeffy.", campaign.id, payment.id); return safety === "notSucceeded" ? "unchanged" : "review"; }
   const canonical = canonicalZeffyUrl(campaign.url);
   if (!canonical || campaign.currency.toLowerCase() !== "usd" || campaign.category !== "PeerToPeerCampaign" || campaign.id !== payment.campaign_id) { await saveException(ctx, `payment:${payment.id}`, "campaignInvalid", "Campaign details do not identify a supported fundraising page.", campaign.id, payment.id); return "review"; }
   const season = await activeSeason(ctx);
@@ -159,17 +159,17 @@ export const applyPayment = internalMutation({ args: { runId: v.id("zeffyRuns"),
   const matching = allStudents.filter(s => canonicalZeffyUrl(s.fundraiserUrl ?? "") === canonical);
   const mapping = await ctx.db.query("zeffyCampaignMappings").withIndex("by_campaignId", q => q.eq("campaignId", campaign.id)).unique();
   const conflicting = await ctx.db.query("zeffyCampaignMappings").withIndex("by_canonicalUrl", q => q.eq("canonicalUrl", canonical)).take(2);
-  if (matching.length !== 1 || conflicting.some(m => m.campaignId !== campaign.id) || mapping && (mapping.canonicalUrl !== canonical || mapping.studentId !== matching[0]?._id || mapping.seasonId !== season._id)) { await saveException(ctx, `payment:${payment.id}`, "linkConflict", "Saved student link or historical campaign assignment conflicts; review manually.", campaign.id, payment.id); return "review"; }
+  if (matching.length !== 1 || conflicting.some(m => m.campaignId !== campaign.id) || mapping && (mapping.canonicalUrl !== canonical || mapping.studentId !== matching[0]?._id || mapping.seasonId !== season._id)) { await saveException(ctx, `payment:${payment.id}`, "linkConflict", "This fundraising page's student link doesn't match earlier payments. Fix the fundraiser link.", campaign.id, payment.id); return "review"; }
   const student = matching[0];
-  if (!student.active || student.seasonId !== season._id) { await saveException(ctx, `payment:${payment.id}`, "oldSeason", "Donation belongs to an inactive or prior-season page; review manually.", campaign.id, payment.id, student._id); return "review"; }
+  if (!student.active || student.seasonId !== season._id) { await saveException(ctx, `payment:${payment.id}`, "oldSeason", "This donation is for an old or inactive fundraising page. Review it in Zeffy.", campaign.id, payment.id, student._id); return "review"; }
   const actor = await ctx.db.get(run.actorId);
   if (!actor?.active || actor.role !== "coach") throw new Error("The recorded Coach is unavailable.");
   const account = await ensureFinancialAccount(ctx, student._id);
-  if (account.state !== "ready" || account.allocationSourceVersion !== 1) { await saveException(ctx, `payment:${payment.id}`, "financialUnavailable", "Student financial projection needs Coach review.", campaign.id, payment.id, student._id); return "review"; }
+  if (account.state !== "ready" || account.allocationSourceVersion !== 1) { await saveException(ctx, `payment:${payment.id}`, "financialUnavailable", "This student's money records need review before this payment can be added.", campaign.id, payment.id, student._id); return "review"; }
   const funds = account.paidCents + account.personalAvailableCents + account.fundraisingAvailableCents;
-  if (!Number.isSafeInteger(funds + payment.amount)) { await saveException(ctx, `payment:${payment.id}`, "amountOverflow", "Student balance exceeds the safe exact-cent range.", campaign.id, payment.id, student._id); return "review"; }
+  if (!Number.isSafeInteger(funds + payment.amount)) { await saveException(ctx, `payment:${payment.id}`, "amountOverflow", "This amount is too large to add automatically. Review it in Zeffy.", campaign.id, payment.id, student._id); return "review"; }
   const existingLedger = await ctx.db.query("ledgerEntries").withIndex("by_idempotencyKey", q => q.eq("idempotencyKey", `zeffy:${payment.id}`)).unique();
-  if (existingLedger) { await saveException(ctx, `payment:${payment.id}`, "partialPosting", "An earlier ledger credit lacks its Zeffy payment record; review manually.", campaign.id, payment.id, student._id); return "review"; }
+  if (existingLedger) { await saveException(ctx, `payment:${payment.id}`, "partialPosting", "An earlier credit from Zeffy is missing its payment record. Review it in Zeffy.", campaign.id, payment.id, student._id); return "review"; }
   if (!mapping) await ctx.db.insert("zeffyCampaignMappings", { campaignId: campaign.id, canonicalUrl: canonical, studentId: student._id, seasonId: season._id, linkRevision: student.fundraiserLinkRevision ?? 0, firstSeenAt: Date.now(), lastSeenAt: Date.now() });
   else await ctx.db.patch(mapping._id, { lastSeenAt: Date.now() });
   const entryId = await ctx.db.insert("ledgerEntries", { zeffyPaymentId: payment.id, studentId: student._id, kind: "fundraiser", amountCents: payment.amount, previousCents: funds, newCents: funds + payment.amount, reason: "Zeffy donation", recordedBy: actor._id, recordedAt: Date.now(), occurredAt: payment.created * 1000, idempotencyKey: `zeffy:${payment.id}` });

@@ -49,7 +49,7 @@ export const save = mutation({
     requireRole(actor, "coach");
     const student = await studentAccess(ctx, actor, args.studentId);
     const beforeRevision = student.fundraiserLinkRevision ?? 0;
-    if (!Number.isSafeInteger(args.expectedRevision) || args.expectedRevision < 0 || args.expectedRevision !== beforeRevision) throw new ConvexError("This fundraiser link changed. Reload before saving.");
+    if (!Number.isSafeInteger(args.expectedRevision) || args.expectedRevision < 0 || args.expectedRevision !== beforeRevision) throw new ConvexError("This fundraiser link changed since you opened it. Reload to see the latest, then save again.");
     const url = validatedUrl(args.url);
     const revision = beforeRevision + 1;
     await ctx.db.patch(student._id, { fundraiserUrl: url, fundraiserLinkRevision: revision });
@@ -68,7 +68,7 @@ async function prepareImport(ctx: import("./_generated/server").QueryCtx | impor
   const seen = new Set<string>();
   const prepared = [];
   for (const row of rows) {
-    if (seen.has(row.studentId)) throw new ConvexError("The CSV repeats a Student ID.");
+    if (seen.has(row.studentId)) throw new ConvexError("The CSV lists the same student twice. Remove the extra row, then import again.");
     seen.add(row.studentId);
     const student = await studentAccess(ctx, actor, row.studentId);
     const revision = student.fundraiserLinkRevision ?? 0;

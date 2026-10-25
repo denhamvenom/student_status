@@ -18,7 +18,7 @@ export function parseFundraiserCsv(input: string): FundraiserCsvRow[] {
     if (row.length !== header.length) throw new Error(`Row ${index + 2} has the wrong number of columns.`)
     const [studentId, name, revisionText, url] = row.map(value => value.trim())
     if (!/^[A-Za-z0-9_-]{8,100}$/.test(studentId) || !/^\d+$/.test(revisionText) || !Number.isSafeInteger(Number(revisionText))) throw new Error(`Row ${index + 2} has an invalid Student ID or Link Revision. Download a fresh CSV.`)
-    if (seen.has(studentId)) throw new Error('The CSV repeats a Student ID.')
+    if (seen.has(studentId)) throw new Error('The CSV lists the same student twice. Remove the extra row, then import again.')
     seen.add(studentId)
     if (url.length > 2048) throw new Error(`Row ${index + 2} has a link longer than 2048 characters.`)
     return { studentId, name, revision: Number(revisionText), url: url || null }

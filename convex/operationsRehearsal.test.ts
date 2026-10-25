@@ -88,7 +88,7 @@ describe("fictional multi-role operations rehearsal (mocked Convex identities)",
     const returned = await f.parent.query(api.app.studentFinances, { studentId: f.ids.alice });
     expect(returned.summary).toMatchObject({ dueCents: 0, personalAvailableCents: 4000, fundraisingAvailableCents: 0 });
     expect((await f.parent.query(api.financeDetails.history, { studentId: f.ids.alice, paginationOpts: { cursor: null, numItems: 25 } })).page.filter((entry: { kind: string }) => entry.kind === "deallocation").every(entry => entry.sourceKind === "payment")).toBe(true);
-    await expect(f.travel.mutation(api.financeOperations.recordPayout, { studentId: f.ids.alice, amountCents: 1000, method: "check", reference: "fictional-check", occurredAt: 1, reason: "Check returned to family", idempotencyKey: "rehearsal-payout-denied" })).rejects.toThrow("Financial editing");
+    await expect(f.travel.mutation(api.financeOperations.recordPayout, { studentId: f.ids.alice, amountCents: 1000, method: "check", reference: "fictional-check", occurredAt: 1, reason: "Check returned to family", idempotencyKey: "rehearsal-payout-denied" })).rejects.toThrow("Money editing access");
     await f.financeLead.mutation(api.financeOperations.recordPayout, { studentId: f.ids.alice, amountCents: 1000, method: "check", reference: "fictional-check", occurredAt: 1, reason: "Check returned to family", idempotencyKey: "rehearsal-payout-a" });
     await finishMoney(f);
     expect((await f.parent.query(api.app.studentFinances, { studentId: f.ids.alice })).summary!.personalAvailableCents).toBe(3000);
@@ -96,7 +96,7 @@ describe("fictional multi-role operations rehearsal (mocked Convex identities)",
     expect((await f.coach.query(api.app.studentFinances, { studentId: f.ids.blake })).summary!.dueCents).toBe(6000);
     await f.coach.mutation(api.finance.recordFunds, { studentId: f.ids.alice, kind: "fundraiser", amountCents: 3000, reason: "Second fictional fundraiser", idempotencyKey: "rehearsal-fund-b" });
     await finishMoney(f);
-    await expect(f.travel.mutation(api.financeOperations.transferFundraising, { studentId: f.ids.alice, recipientStudentId: f.ids.blake, amountCents: 2000, reason: "Travel share", idempotencyKey: "rehearsal-transfer-denied" })).rejects.toThrow("Financial editing");
+    await expect(f.travel.mutation(api.financeOperations.transferFundraising, { studentId: f.ids.alice, recipientStudentId: f.ids.blake, amountCents: 2000, reason: "Travel share", idempotencyKey: "rehearsal-transfer-denied" })).rejects.toThrow("Money editing access");
     const transferId = await f.financeLead.mutation(api.financeOperations.transferFundraising, { studentId: f.ids.alice, recipientStudentId: f.ids.blake, amountCents: 2000, reason: "Travel share", idempotencyKey: "rehearsal-transfer-a" });
     await finishMoney(f);
     expect(await f.financeLead.mutation(api.financeOperations.transferFundraising, { studentId: f.ids.alice, recipientStudentId: f.ids.blake, amountCents: 2000, reason: "Travel share", idempotencyKey: "rehearsal-transfer-a" })).toBe(transferId);

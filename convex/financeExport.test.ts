@@ -62,7 +62,7 @@ describe("scoped financial CSV export", () => {
   });
   it("rejects foreign scope, changed financial revisions and revoked permission on the final verification page", async () => {
     const f = await fixture(25); const jobId = await f.coach.mutation(prepare, { scope: "selected", studentIds: f.ids.students.slice(0, 24), idempotencyKey: "selected-export" }) as Id<"financeExportJobs">; await finish(f, jobId);
-    await expect(f.coach.mutation(charges, { jobId, studentId: f.ids.students[24], paginationOpts: { numItems: 20, cursor: null } })).rejects.toThrow("outside");
+    await expect(f.coach.mutation(charges, { jobId, studentId: f.ids.students[24], paginationOpts: { numItems: 20, cursor: null } })).rejects.toThrow("isn't in this export");
     const first = await f.coach.mutation(verify, { jobId, paginationOpts: { numItems: 20, cursor: null } });
     await f.t.run(async ctx => { const account = await ensureFinancialAccount(ctx, f.ids.students[23]); await ctx.db.patch(account._id, { revision: account.revision + 1 }); });
     await expect(f.coach.mutation(verify, { jobId, paginationOpts: { numItems: 20, cursor: first.continueCursor } })).rejects.toThrow("changed after");
@@ -82,8 +82,8 @@ describe("scoped financial CSV export", () => {
     const f = await fixture(); await f.t.run(async ctx => { const actor = await ctx.db.get(f.ids.actor); if (!actor) throw new Error("Actor"); await addCharges(ctx, actor, f.ids.students[0], Array.from({ length: 45 }, (_, i) => ({ label: `Fee ${i}`, amountCents: 1, priority: i, idempotencyKey: `budget:${i}` })), "budget-allocation"); });
     const jobId = await f.coach.mutation(prepare, { scope: "allActive", idempotencyKey: "budget-export" }) as Id<"financeExportJobs">; await finish(f, jobId); const args = { jobId, studentId: f.ids.students[0] };
     const first = await f.coach.mutation(charges, { ...args, paginationOpts: { numItems: 20, cursor: null } }); const second = await f.coach.mutation(charges, { ...args, paginationOpts: { numItems: 20, cursor: first.continueCursor } });
-    await expect(f.coach.mutation(charges, { ...args, paginationOpts: { numItems: 1, cursor: null, endCursor: second.continueCursor, maximumRowsRead: 10000 } })).rejects.toThrow("expanded");
-    await expect(f.coach.mutation(charges, { ...args, paginationOpts: { numItems: 20, cursor: null, maximumRowsRead: Number.NaN } })).rejects.toThrow("budget");
+    await expect(f.coach.mutation(charges, { ...args, paginationOpts: { numItems: 1, cursor: null, endCursor: second.continueCursor, maximumRowsRead: 10000 } })).rejects.toThrow("list couldn't load");
+    await expect(f.coach.mutation(charges, { ...args, paginationOpts: { numItems: 20, cursor: null, maximumRowsRead: Number.NaN } })).rejects.toThrow("list couldn't load");
     const small = await f.coach.mutation(charges, { ...args, paginationOpts: { numItems: 20, cursor: null, maximumRowsRead: 2 } }); expect(small.page.length).toBeLessThanOrEqual(2); expect(small).toHaveProperty("pageStatus"); expect(small).toHaveProperty("splitCursor");
     expect(csvCell(" =1+1")).toBe('"\' =1+1"'); expect(csvCell(-1)).toBe('"-1"'); expect(csvCell('a,"b"\n')).toBe('"a,""b""\n"');
   });
