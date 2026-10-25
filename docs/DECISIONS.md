@@ -8,6 +8,12 @@ Read this before changing parent linking, consent/PDF, finance, rooms/waitlists 
 - Require explicit good-faith parent/legal-guardian relationship and authority attestation. Email control does not independently prove guardianship or sign consent.
 - Preserve inbox privacy, the one-hour resend guard and revocation/access checks.
 
+## Developer sign-in
+
+- October 25 owner decision: the development deployment (`third-bandicoot-18`) offers a developer sign-in so the owner and Claude can test every role without Google. It signs in only to fixed fictional accounts on the reserved `developer.example.invalid` domain: Coach, Mentor, Travel Lead, Parent, Parent with staff access, and Student. It never signs in, creates, links or changes a real account.
+- It works only when all of these hold: the backend is the hard-coded development URL, the server switch `DEVELOPER_SIGN_IN_ENABLED=true` is set, and the request carries the server-held `DEVELOPER_SIGN_IN_KEY`. Reserved-domain sessions are refused whenever those conditions stop holding. The sign-in panel exists only in local development builds; the production build fails if any of it is bundled.
+- Never set the switch or key on production. Fictional accounts and their family links hold synthetic data only. Real Google and parent-email sign-in still need a human check before releases that touch authentication.
+
 ## Consent/PDF
 
 - Require completed Student setup and a Parent-confirmed structured profile before the approved populated PDF workflow.

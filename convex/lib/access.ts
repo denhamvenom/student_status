@@ -4,6 +4,7 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { getAuthUserId, getAuthSessionId } from "@convex-dev/auth/server";
 import { timeclockTransitionLocked } from "./timeclockTransition";
 import { requireMaintenanceAccess } from "./maintenanceAccess";
+import { isDeveloperEmail, requireDeveloperAccountAllowed, developerSignInEnabled } from "./developerSignIn";
 
 type Ctx = QueryCtx | MutationCtx;
 export type AppUser = Doc<"appUsers">;
@@ -37,6 +38,7 @@ export async function identity(ctx: Ctx) {
   const authUser = await ctx.db.get(authUserId as Id<"users">);
   if (!authUser?.email || authUser.isAnonymous) throw new ConvexError("A Google account with an email is required.");
   requireMaintenanceAccess(authUser.email);
+  requireDeveloperAccountAllowed(authUser.email);
   return { authUserId: authUser._id, email: authUser.email, name: authUser.name ?? authUser.email };
 }
 
@@ -56,6 +58,7 @@ export async function maybeViewer(ctx: Ctx): Promise<AppUser | null> {
   if (!authUserId) return null;
   const user = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", authUserId as Id<"users">)).unique();
   if (user) requireMaintenanceAccess(user.email);
+  if (user && isDeveloperEmail(user.email) && !developerSignInEnabled()) return null;
   const marker = user && await ctx.db.query("parentEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", authUserId as Id<"users">)).unique();
   if (marker && (user.role !== "parent" || marker.email !== user.email.trim().toLowerCase())) return null;
   const adultMarker = user && await ctx.db.query("adultEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", authUserId as Id<"users">)).unique();

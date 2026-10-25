@@ -5,6 +5,7 @@ import { internal } from "./_generated/api";
 import { env } from "./_generated/server";
 import { allowedAuthRedirect } from "./lib/authRedirect";
 import { requireMaintenanceAccess } from "./lib/maintenanceAccess";
+import { developerSignInEnabled } from "./lib/developerSignIn";
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [ConvexCredentials({
@@ -19,6 +20,14 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
         return userId ? { userId } : null;
       }
       return null;
+    },
+  }), ConvexCredentials({
+    // Development-only fictional accounts; see docs/DECISIONS.md "Developer sign-in".
+    id: "developer",
+    authorize: async (credentials, ctx) => {
+      if (!developerSignInEnabled() || typeof credentials.persona !== "string" || typeof credentials.key !== "string") return null;
+      const userId = await ctx.runMutation(internal.developerSignIn.consume, { persona: credentials.persona, key: credentials.key });
+      return userId ? { userId } : null;
     },
   }), Google({
     profile(profile) {

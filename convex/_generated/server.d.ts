@@ -50,6 +50,8 @@ type Env = {
   readonly TIMECLOCK_OPERATOR_PIN: string | undefined;
   readonly TIMECLOCK_SITE_URL: string | undefined;
   readonly ZEFFY_API_KEY: string | undefined;
+  readonly DEVELOPER_SIGN_IN_ENABLED: string | undefined;
+  readonly DEVELOPER_SIGN_IN_KEY: string | undefined;
 };
 
 /**
