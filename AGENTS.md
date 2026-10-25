@@ -79,6 +79,7 @@ Optional vendor guidance can be installed with `npx convex ai-files install`; re
 
 ## Git and releases
 
+- As of October 25, 2026, the main Claude Code session (see CLAUDE.md) is the project lead and integration owner. Codex and other sessions are helpers unless I say otherwise.
 - Follow the branch/workflow I request; otherwise consult `docs/REPOSITORY.md`. The integration owner is the current main session; parallel or helper sessions must not sync the backend or write to Git unless I explicitly say so.
 - Review staged content for private data and secrets; preserve published history and verify pushes before claiming remote backup.
 - Main is connected to automatic frontend builds. Permission to edit or commit locally is not permission to push main, merge, publish or deploy.

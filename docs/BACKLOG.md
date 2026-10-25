@@ -14,6 +14,8 @@ Read this only when the owner requests backlog work or the current task relates 
 
 ## Testing
 
+- October 23 transportation release: live synthetic development API checks and component tests passed, including both driver-assignment guards and switching modes. Remaining check: signed-in Coach event creation/settings at phone 390px and desktop 1440px in light/dark, dropdown save/reload and hidden ride controls; requires a development Coach session. Production asset/traffic verification is complete in v0.1.0-onboarding.16; no production test-data writes are needed.
+
 - Remaining regression priorities from the October 21 test audit: multi-page payment correction with failure/duplicate/retry and exact cents; finance component-failure rollback and old-season namespace removal; actual mounted Timeclock midnight/freeze/live-status/stale-response wiring; independent mixed-operation conservation; fundraiser lifecycle, season hold/writeOff, transition/retention role denials, invalid backend amounts/dates, CSV DST/leap/invalid dates, readiness print branches, confirmation/double-submit/retry/dialog/Calendar Refresh interactions. Reconcile source before adding tests; the approved cleanup fixed only its stated subset.
 - Keep the >500-record pagination/cancellation boundaries; do not remove synthetic fixtures just to reduce runtime. Historical suite counts are checkpoint evidence. Live subscription delivery, physical devices and real-inbox acceptance are not established by static rendering, helper tests or source review.
 - Preserve accepted visual evidence; do not reopen completed G1–G7/approved PDF/rollout decisions merely because old tables say pending. Confirm any genuinely remaining Pay-device issue and CSV display deferral with the owner.
