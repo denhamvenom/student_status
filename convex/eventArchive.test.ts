@@ -48,11 +48,11 @@ describe("automatic past-event archive", () => {
       const dashboard = await actor.query(api.app.studentDashboard, { studentId: f.ids.studentId });
       expect(dashboard.events.some(row => row.event._id === f.ids.past)).toBe(false);
       expect(dashboard.todos.some(row => row.eventId === f.ids.past)).toBe(false);
-      await expect(actor.query(api.app.eventDetail, { eventId: f.ids.past })).rejects.toThrow("archived");
+      await expect(actor.query(api.app.eventDetail, { eventId: f.ids.past })).rejects.toThrow("moved to Past events");
       await expect(actor.query(api.app.eventReadiness, { eventId: f.ids.past, studentId: f.ids.studentId })).rejects.toThrow();
-      await expect(actor.query(api.eventArchive.page, { paginationOpts })).rejects.toThrow("Coaches");
-      await expect(actor.query(api.eventArchive.detail, { eventId: f.ids.past, paginationOpts })).rejects.toThrow("Coaches");
-      await expect(actor.query(api.withdrawals.withdrawalPreview, { eventId: f.ids.past, studentId: f.ids.studentId })).rejects.toThrow("archived");
+      await expect(actor.query(api.eventArchive.page, { paginationOpts })).rejects.toThrow("Coach or Travel Lead");
+      await expect(actor.query(api.eventArchive.detail, { eventId: f.ids.past, paginationOpts })).rejects.toThrow("Coach or Travel Lead");
+      await expect(actor.query(api.withdrawals.withdrawalPreview, { eventId: f.ids.past, studentId: f.ids.studentId })).rejects.toThrow("Past events");
       await expect(actor.query(api.travel.ownTravel, { eventId: f.ids.past, studentId: f.ids.studentId })).rejects.toThrow();
       const charges = await actor.query(api.financeDetails.charges, { studentId: f.ids.studentId, paginationOpts });
       expect(JSON.stringify(charges)).toContain("Past outreach fee");
@@ -61,9 +61,9 @@ describe("automatic past-event archive", () => {
     await expect(f.student.mutation(api.participation.signUp, { eventId: f.ids.past })).rejects.toThrow();
     await expect(f.student.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.past, idempotencyKey: "synthetic-archived" })).rejects.toThrow();
     expect(await f.parent.query(api.permissions.listSubmissions, { studentId: f.ids.studentId })).toEqual([]);
-    await expect(f.parent.query(api.permissions.receipt, { submissionId: f.ids.submission })).rejects.toThrow("archived");
-    await expect(f.parent.query(api.permissionsV2.receipt, { submissionId: f.ids.submission })).rejects.toThrow("archived");
-    await expect(f.parent.query(internal.permissionsV2.pdfAccess, { submissionId: f.ids.submission, rendition: "signed", now: Date.now() })).rejects.toThrow("archived");
+    await expect(f.parent.query(api.permissions.receipt, { submissionId: f.ids.submission })).rejects.toThrow("Past events");
+    await expect(f.parent.query(api.permissionsV2.receipt, { submissionId: f.ids.submission })).rejects.toThrow("Past events");
+    await expect(f.parent.query(internal.permissionsV2.pdfAccess, { submissionId: f.ids.submission, rendition: "signed", now: Date.now() })).rejects.toThrow("Past events");
     for (const actor of [f.coach, f.lead]) {
       expect((await actor.query(api.eventArchive.page, { paginationOpts })).page.map(event => event._id)).toEqual([f.ids.past]);
       expect((await actor.query(api.eventArchive.detail, { eventId: f.ids.past, paginationOpts })).participants.page[0]).toMatchObject({ studentId: f.ids.studentId, status: "confirmed" });

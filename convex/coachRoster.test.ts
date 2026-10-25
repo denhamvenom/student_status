@@ -84,7 +84,7 @@ describe("Coach student roster and record",()=>{
     const rows=await f.coach.query(rowsByIds,{studentIds:[ids[21],f.ids.student],asOf:100});
     expect(rows.map((row:{studentId:string})=>row.studentId)).toEqual([ids[21],f.ids.student]);
     await expect(f.coach.query(rowsByIds,{studentIds:[other],asOf:100})).rejects.toThrow("current season");
-    await expect(f.coach.query(rowsByIds,{studentIds:Array(21).fill(f.ids.student),asOf:100})).rejects.toThrow("At most 20");
+    await expect(f.coach.query(rowsByIds,{studentIds:Array(21).fill(f.ids.student),asOf:100})).rejects.toThrow("Too many students requested");
   });
   it("filters connection across pages without restricting Coach access to unconnected students",async()=>{
     const f=await fixture();
@@ -153,7 +153,7 @@ describe("Coach student roster and record",()=>{
     const eventFields={seasonId:f.ids.season,type:"Team" as const,endsAt:202, destination:"Synthetic",travel:"None",overnight:false,roomingEnabled:false,feeCents:0,signupMode:"assigned" as const,assignmentScope:"wholeTeam" as const,wholeTeamParticipantCount:0,enrollmentState:"running" as const,allowWithdrawal:false,permissionRequired:false,firstRequired:false,archived:false};
     await f.t.run(ctx=>ctx.db.insert("events",{...eventFields,name:"Synthetic pending event",startsAt:200}));
     const pending=(await f.coach.query(list,page)).page[0];
-    expect(pending).toMatchObject({nextEvent:{state:"unknown",open:["Whole Team enrollment is not complete"]},readinessCoverage:"unknown"});
+    expect(pending).toMatchObject({nextEvent:{state:"unknown",open:["Whole Team signups are not finished yet"]},readinessCoverage:"unknown"});
     await f.t.run(async ctx=>{for(let i=0;i<11;i++)await ctx.db.insert("events",{...eventFields,name:`Archived ${i}`,startsAt:101+i,endsAt:102+i,archived:true,enrollmentState:"complete"})});
     const truncated=(await f.coach.query(list,page)).page[0];
     expect(truncated).toMatchObject({nextEvent:null,readinessCoverage:"unknown"});

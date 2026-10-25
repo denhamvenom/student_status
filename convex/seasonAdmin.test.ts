@@ -51,7 +51,7 @@ describe("Coach season draft and roster review", () => {
   it("validates dates and revisions, and permits a reasoned discard without deleting decisions", async () => {
     const f = await fixture();
     await expect(f.coach.mutation(create, { ...details, targetStartDate: "2027-02-30", idempotencyKey: "bad-date-1" })).rejects.toThrow("valid calendar date");
-    await expect(f.coach.mutation(create, { ...details, targetEndDate: "2026-01-01", idempotencyKey: "bad-order-1" })).rejects.toThrow("follow start");
+    await expect(f.coach.mutation(create, { ...details, targetEndDate: "2026-01-01", idempotencyKey: "bad-order-1" })).rejects.toThrow("end date after the start date");
     await expect(f.coach.mutation(create, { ...details, targetStartDate: "2027-08-01", targetEndDate: "2028-07-31", idempotencyKey: "bad-kickoff-1" })).rejects.toThrow("kickoff day");
     const id = await f.coach.mutation(create, { ...details, idempotencyKey: "good-draft-1" }) as Id<"seasonTransitionPlans">;
     await expect(f.coach.mutation(update, { planId: id, expectedRevision: 0, ...details })).rejects.toThrow("changed");
@@ -59,7 +59,7 @@ describe("Coach season draft and roster review", () => {
     await expect(f.coach.mutation(discard, { planId: id, expectedRevision: 1, reason: "Coach reviewed replacement draft" })).rejects.toThrow("changed");
     await f.coach.mutation(discard, { planId: id, expectedRevision: 2, reason: "Coach reviewed replacement draft" });
     expect((await f.t.run(ctx => ctx.db.get(id)))?.state).toBe("cancelled");
-    await expect(f.coach.query(roster, { planId: id, paginationOpts: { numItems: 20, cursor: null } })).rejects.toThrow("unavailable");
+    await expect(f.coach.query(roster, { planId: id, paginationOpts: { numItems: 20, cursor: null } })).rejects.toThrow("finished or discarded");
   });
 
   it("pages a large active roster and fences stale student and competing Coach decisions", async () => {
@@ -87,7 +87,7 @@ describe("Coach season draft and roster review", () => {
     await expect(f.otherCoach.mutation(decide, { planId, studentId: row.studentId, choice: "depart", expectedPlanRevision: 1, expectedStudentFingerprint: row.studentFingerprint, expectedDecisionRevision: 1 })).rejects.toThrow("changed");
     await f.t.run(ctx => ctx.db.patch(f.ids.studentIds[1], { profileRevision: 2 }));
     const staleRow = first.page[1];
-    await expect(f.coach.mutation(decide, { planId, studentId: staleRow.studentId, choice: "return", expectedPlanRevision: 3, expectedStudentFingerprint: staleRow.studentFingerprint, expectedDecisionRevision: null })).rejects.toThrow("Student profile changed");
+    await expect(f.coach.mutation(decide, { planId, studentId: staleRow.studentId, choice: "return", expectedPlanRevision: 3, expectedStudentFingerprint: staleRow.studentFingerprint, expectedDecisionRevision: null })).rejects.toThrow("profile changed since you opened it");
     expect(await f.otherCoach.mutation(decide, { planId, studentId: row.studentId, choice: null, expectedPlanRevision: 3, expectedStudentFingerprint: changedRow.studentFingerprint, expectedDecisionRevision: 2 })).toMatchObject({ planRevision: 4, decisionRevision: null });
     expect((await f.t.run(ctx => ctx.db.get(f.ids.studentIds[0])))?.active).toBe(true);
     const audits = await f.t.run(ctx => ctx.db.query("audit").withIndex("by_entity_and_entityId", q => q.eq("entity", "seasonTransitionRosterDecisions").eq("entityId", `${planId}:${row.studentId}`)).take(10));

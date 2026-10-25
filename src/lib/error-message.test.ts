@@ -14,16 +14,16 @@ describe('userFacingError', () => {
 
   it('does not show redacted server errors or stack details', () => {
     expect(userFacingError(new Error('[CONVEX M(app:save)] [Request ID: abc] Server Error\nUncaught Error: private details\n at handler (convex/app.ts:3:1)'), 'Unable to save. Try again.')).toBe('Unable to save. Try again.')
-    expect(userFacingError(new TypeError('Cannot read properties of undefined'))).toBe('Something went wrong. Please try again.')
+    expect(userFacingError(new TypeError('Cannot read properties of undefined'))).toBe('Something went wrong. Please try again. If it keeps happening, contact a Coach.')
   })
 
   it('offers an action for connection and session failures', () => {
-    expect(userFacingError(new Error('Failed to fetch'))).toBe('Could not reach the service. Check your connection and try again.')
-    expect(userFacingError(new Error('Unauthenticated'))).toBe('Your session may have expired. Sign in again, then retry.')
+    expect(userFacingError(new Error('Failed to fetch'))).toBe('Could not reach Student Status. Check your connection and try again.')
+    expect(userFacingError(new Error('Unauthenticated'))).toBe('Your sign-in may have expired. Sign in again, then try again.')
   })
 
   it('preserves short local validation copy', () => {
     expect(userFacingError(new Error('Enter a valid phone number.'))).toBe('Enter a valid phone number.')
-    expect(userFacingError(new Error('Bad value\n at save (src/form.ts:9)'))).toBe('Something went wrong. Please try again.')
+    expect(userFacingError(new Error('Bad value\n at save (src/form.ts:9)'))).toBe('Something went wrong. Please try again. If it keeps happening, contact a Coach.')
   })
 })

@@ -14,7 +14,7 @@ export const workspace = query({
     const season = await activeSeason(ctx);
     const students = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(501);
     const sessions = await ctx.db.query("timeclockSessions").withIndex("by_seasonId_and_state", q => q.eq("seasonId", season._id)).take(501);
-    if (students.length > 500 || sessions.length > 500) throw new ConvexError("Attendance workspace exceeds the supported review size.");
+    if (students.length > 500 || sessions.length > 500) throw new ConvexError("Too many students or meetings this season to list here. Review attendance from each student's record instead.");
     return {
       students: students.map(s => ({ studentId: s._id, name: s.legalName, active: s.active })).sort((a,b) => a.name.localeCompare(b.name)),
       sessions: await Promise.all(sessions.sort((a,b) => b.scheduledStart-a.scheduledStart).map(async s => ({ sessionId: s._id, title: (await ctx.db.get(s.occurrenceId))?.title ?? "Unavailable event", state: s.state, scheduledStart: s.scheduledStart, scheduledEnd: s.scheduledEnd, effectiveEnd: s.effectiveEnd, needsReview: s.needsReview }))),

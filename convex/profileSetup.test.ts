@@ -35,13 +35,13 @@ describe("profile setup and corrections", () => {
     await expect(f.parent.mutation(api.profileSetup.complete, setup)).rejects.toThrow("permission");
     await f.student.mutation(api.profileSetup.complete, { ...setup, preferredName: " ", guardianName: "Guardian", guardianEmail: " GUARDIAN@EXAMPLE.INVALID " });
     expect(await f.student.query(api.profileSetup.get, {})).toMatchObject({ setupRequired: false, preferredName: "Student", revision: 1, roomCategoryLocked: true, guardianEmail: "guardian@example.invalid" });
-    await expect(f.student.mutation(api.profileSetup.complete, setup)).rejects.toThrow("already complete");
+    await expect(f.student.mutation(api.profileSetup.complete, setup)).rejects.toThrow("already done");
   });
 
   it("preserves an existing legacy locked category during first setup", async () => {
     const f = await fixture();
     await f.t.run(ctx => ctx.db.patch(f.ids.student, { roomCategory: "Girls", roomCategoryLocked: true }));
-    await expect(f.student.mutation(api.profileSetup.complete, setup)).rejects.toThrow("locked room");
+    await expect(f.student.mutation(api.profileSetup.complete, setup)).rejects.toThrow("Room type is locked");
     await f.student.mutation(api.profileSetup.complete, { ...setup, roomCategory: "Girls" });
     expect(await f.student.query(api.profileSetup.get, {})).toMatchObject({ roomCategory: "Girls", roomCategoryLocked: true, setupRequired: false });
   });
@@ -56,7 +56,7 @@ describe("profile setup and corrections", () => {
     expect(await f.t.run(ctx => ctx.db.get(f.ids.group))).toMatchObject({ needsReview: true });
     expect(await f.t.run(ctx => ctx.db.get(requestId))).toMatchObject({ status: "approved", decidedBy: f.ids.coach });
     expect(await f.student.query(api.profileSetup.get, {})).toMatchObject({ revision: 2, roomCategory: "Girls", roomCategoryLocked: true });
-    await expect(f.coach.mutation(api.profileSetup.correct, { studentId: f.ids.student, expectedRevision: 2, roomCategory: "Boys", reason: "Replay", requestId })).rejects.toThrow("unavailable");
+    await expect(f.coach.mutation(api.profileSetup.correct, { studentId: f.ids.student, expectedRevision: 2, roomCategory: "Boys", reason: "Replay", requestId })).rejects.toThrow("already reviewed");
     await f.t.run(ctx => ctx.db.patch(f.ids.link, { active: false }));
     await expect(f.parent.mutation(api.profileSetup.requestCorrection, { studentId: f.ids.student, expectedRevision: 2, field: "legalName", note: "Change" })).rejects.toThrow("permission");
   });
@@ -116,15 +116,15 @@ describe("profile setup and corrections", () => {
 
   it("retains revisioned roster room corrections and placement review", async () => {
     const f = await fixture();
-    await expect(f.coach.mutation(api.admin.updateRoster, { studentId: f.ids.student, roomCategory: "Girls" })).rejects.toThrow("revision and reason");
+    await expect(f.coach.mutation(api.admin.updateRoster, { studentId: f.ids.student, roomCategory: "Girls" })).rejects.toThrow("needs a reason");
     await f.coach.mutation(api.admin.updateRoster, { studentId: f.ids.student, roomCategory: "Girls", expectedRevision: 0, reason: "Confirmed correction" });
     expect(await f.t.run(ctx => ctx.db.get(f.ids.group))).toMatchObject({ needsReview: true });
   });
 
   it("records the latest archive transition and audits preserved clocks", async () => {
     const f = await fixture();
-    await expect(f.coach.mutation(api.admin.updateRoster, { studentId: f.ids.student, roomCategory: "Girls" })).rejects.toThrow("revision and reason");
-    await expect(f.coach.mutation(api.admin.updateRoster, { studentId: f.ids.student, active: false })).rejects.toThrow("revision and reason");
+    await expect(f.coach.mutation(api.admin.updateRoster, { studentId: f.ids.student, roomCategory: "Girls" })).rejects.toThrow("needs a reason");
+    await expect(f.coach.mutation(api.admin.updateRoster, { studentId: f.ids.student, active: false })).rejects.toThrow("needs a reason");
     await expect(f.parent.mutation(api.admin.updateRoster, { studentId: f.ids.student, active: false, expectedRevision: 0, reason: "Denied" })).rejects.toThrow("permission");
     const clock = vi.spyOn(Date, "now");
     try {

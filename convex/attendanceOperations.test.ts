@@ -69,6 +69,6 @@ describe("Coach attendance workspace selectors", () => {
     await f.t.run(async ctx => {
       for (let index = 0; index < 499; index++) await ctx.db.insert("students", { seasonId: f.ids.season, legalName: `Synthetic ${index}`, preferredName: `Synthetic ${index}`, email: `synthetic-${index}@example.invalid`, subteam: "A", active: true, travelTeam: false, roomCategoryLocked: false, allergies: { state: "unknown" }, medications: { state: "unknown" } });
     });
-    await expect(f.coach.query(api.attendanceOperations.workspace, {})).rejects.toThrow("exceeds the supported review size");
+    await expect(f.coach.query(api.attendanceOperations.workspace, {})).rejects.toThrow("Too many students or meetings");
   });
 });

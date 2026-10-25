@@ -55,15 +55,15 @@ describe("retention review", () => {
     const fingerprint = before.candidate.archiveFingerprint!;
     await expect(f.coach.mutation(api.retentionReview.setHold, { subject, expectedArchiveFingerprint: fingerprint, expectedLatestHoldEventId: null, action: "hold", reason: "   " })).rejects.toThrow("reason");
     const hold = await f.coach.mutation(api.retentionReview.setHold, { subject, expectedArchiveFingerprint: fingerprint, expectedLatestHoldEventId: null, action: "hold", reason: " Preserve pending evidence " });
-    await expect(f.coach.mutation(api.retentionReview.setHold, { subject, expectedArchiveFingerprint: fingerprint, expectedLatestHoldEventId: null, action: "release", reason: "Stale tab" })).rejects.toThrow("history changed");
-    await expect(f.coach.mutation(api.retentionReview.setHold, { subject, expectedArchiveFingerprint: fingerprint, expectedLatestHoldEventId: hold, action: "hold", reason: "Repeat" })).rejects.toThrow("already active");
+    await expect(f.coach.mutation(api.retentionReview.setHold, { subject, expectedArchiveFingerprint: fingerprint, expectedLatestHoldEventId: null, action: "release", reason: "Stale tab" })).rejects.toThrow("Hold decisions for this record changed");
+    await expect(f.coach.mutation(api.retentionReview.setHold, { subject, expectedArchiveFingerprint: fingerprint, expectedLatestHoldEventId: hold, action: "hold", reason: "Repeat" })).rejects.toThrow("already on hold");
     const released = await f.coach.mutation(api.retentionReview.setHold, { subject, expectedArchiveFingerprint: fingerprint, expectedLatestHoldEventId: hold, action: "release", reason: "Review complete" });
     const history = await f.coach.query(api.retentionReview.history, { subject, paginationOpts: { cursor: null, numItems: 10 } });
     expect(history.page.map(event => event.id)).toEqual([released, hold]);
     expect(history.page.map(event => event.action)).toEqual(["release", "hold"]);
     expect(history.page[1]).toMatchObject({ reason: "Preserve pending evidence", actorName: "Coach" });
     expect(await f.t.run(ctx => ctx.db.get(hold))).toMatchObject({ action: "hold", reason: "Preserve pending evidence" });
-    await expect(f.coach.mutation(api.retentionReview.setHold, { subject, expectedArchiveFingerprint: fingerprint, expectedLatestHoldEventId: released, action: "release", reason: "Repeat" })).rejects.toThrow("no active hold");
+    await expect(f.coach.mutation(api.retentionReview.setHold, { subject, expectedArchiveFingerprint: fingerprint, expectedLatestHoldEventId: released, action: "release", reason: "Repeat" })).rejects.toThrow("is not on hold");
   });
 
   it("invalidates old student and linked-account archive instances after reactivation and rearchive", async () => {
@@ -75,7 +75,7 @@ describe("retention review", () => {
     const reactivated = (await f.coach.query(api.retentionReview.preview, { subject, asOf: Date.UTC(2026, 0, 1) })).candidate;
     expect(reactivated.status).toBe("linkedAccountActive");
     expect(reactivated.held).toBe(true);
-    await expect(f.coach.mutation(api.retentionReview.setHold, { subject, expectedArchiveFingerprint: initial.archiveFingerprint!, expectedLatestHoldEventId: null, action: "hold", reason: "Stale" })).rejects.toThrow("Archive status changed");
+    await expect(f.coach.mutation(api.retentionReview.setHold, { subject, expectedArchiveFingerprint: initial.archiveFingerprint!, expectedLatestHoldEventId: null, action: "hold", reason: "Stale" })).rejects.toThrow("This record changed since you opened it");
     await f.t.run(ctx => ctx.db.patch(f.ids.linked, { active: false, archivedAt: Date.UTC(2024, 0, 1) }));
     const rearchived = (await f.coach.query(api.retentionReview.preview, { subject, asOf: Date.UTC(2026, 0, 1) })).candidate;
     expect(rearchived.held).toBe(true);
@@ -85,7 +85,7 @@ describe("retention review", () => {
     const active = (await f.coach.query(api.retentionReview.preview, { subject, asOf: Date.UTC(2026, 0, 1) })).candidate;
     expect(active).toMatchObject({ status: "active", held: true, latestHoldEventId: hold, reviewAfter: null });
     expect(active.archiveFingerprint).not.toBe(rearchived.archiveFingerprint);
-    await expect(f.coach.mutation(api.retentionReview.setHold, { subject, expectedArchiveFingerprint: rearchived.archiveFingerprint!, expectedLatestHoldEventId: hold, action: "release", reason: "Stale before reactivation" })).rejects.toThrow("Archive status changed");
+    await expect(f.coach.mutation(api.retentionReview.setHold, { subject, expectedArchiveFingerprint: rearchived.archiveFingerprint!, expectedLatestHoldEventId: hold, action: "release", reason: "Stale before reactivation" })).rejects.toThrow("This record changed since you opened it");
     await f.coach.mutation(api.retentionReview.setHold, { subject, expectedArchiveFingerprint: active.archiveFingerprint!, expectedLatestHoldEventId: hold, action: "release", reason: "Explicit release after reactivation" });
   });
 
@@ -100,7 +100,7 @@ describe("retention review", () => {
     const active = (await f.coach.query(api.retentionReview.preview, { subject, asOf: Date.UTC(2026, 0, 1) })).candidate;
     expect(active).toMatchObject({ status: "active", held: true, reviewAfter: null });
     expect(active.archiveFingerprint).not.toBe(initial.archiveFingerprint);
-    await expect(f.coach.mutation(api.retentionReview.setHold, { subject, expectedArchiveFingerprint: initial.archiveFingerprint!, expectedLatestHoldEventId: hold, action: "release", reason: "Stale active release" })).rejects.toThrow("Archive status changed");
+    await expect(f.coach.mutation(api.retentionReview.setHold, { subject, expectedArchiveFingerprint: initial.archiveFingerprint!, expectedLatestHoldEventId: hold, action: "release", reason: "Stale active release" })).rejects.toThrow("This record changed since you opened it");
     await f.t.run(ctx => ctx.db.patch(f.ids.linked, { active: false, archivedAt: Date.UTC(2025, 0, 1) }));
     const next = (await f.coach.query(api.retentionReview.preview, { subject, asOf: Date.UTC(2026, 0, 1) })).candidate;
     expect(next.held).toBe(true);
@@ -108,7 +108,7 @@ describe("retention review", () => {
     const history = await f.coach.query(api.retentionReview.history, { subject, paginationOpts: { cursor: null, numItems: 10 } });
     expect(history.page).toHaveLength(1);
     expect(history.page[0]).toMatchObject({ action: "hold", archivedAt: archive });
-    await expect(f.coach.mutation(api.retentionReview.setHold, { subject, expectedArchiveFingerprint: next.archiveFingerprint!, expectedLatestHoldEventId: hold, action: "hold", reason: "Duplicate after rearchive" })).rejects.toThrow("already active");
+    await expect(f.coach.mutation(api.retentionReview.setHold, { subject, expectedArchiveFingerprint: next.archiveFingerprint!, expectedLatestHoldEventId: hold, action: "hold", reason: "Duplicate after rearchive" })).rejects.toThrow("already on hold");
     const release = await f.coach.mutation(api.retentionReview.setHold, { subject, expectedArchiveFingerprint: next.archiveFingerprint!, expectedLatestHoldEventId: hold, action: "release", reason: "Explicitly release prior hold" });
     const after = await f.coach.query(api.retentionReview.history, { subject, paginationOpts: { cursor: null, numItems: 10 } });
     expect(after.page.map(event => event.id)).toEqual([release, hold]);
@@ -133,7 +133,7 @@ describe("retention review", () => {
     await f.t.run(ctx => ctx.db.patch(f.ids.student, { archivedAt: Date.UTC(2023, 0, 1) }));
     const changed = (await f.coach.query(api.retentionReview.preview, { subject: student, asOf: Date.UTC(2026, 0, 1) })).candidate;
     expect(changed.reviewAfter).toBe(Date.UTC(2028, 0, 1));
-    await expect(f.coach.mutation(api.retentionReview.setHold, { subject: student, expectedArchiveFingerprint: initial.archiveFingerprint!, expectedLatestHoldEventId: null, action: "hold", reason: "Stale date" })).rejects.toThrow("Archive status changed");
+    await expect(f.coach.mutation(api.retentionReview.setHold, { subject: student, expectedArchiveFingerprint: initial.archiveFingerprint!, expectedLatestHoldEventId: null, action: "hold", reason: "Stale date" })).rejects.toThrow("This record changed since you opened it");
     await f.t.run(ctx => ctx.db.patch(f.ids.student, { archivedAt: undefined }));
     const missing = (await f.coach.query(api.retentionReview.preview, { subject: student, asOf: Date.UTC(2026, 0, 1) })).candidate;
     expect(missing).toMatchObject({ status: "archiveDateMissing", reviewAfter: null });
@@ -143,14 +143,14 @@ describe("retention review", () => {
   it("rejects invalid review times and changed linked-account identity with the same archive values", async () => {
     const f = await fixture();
     const subject = { kind: "student" as const, id: f.ids.student };
-    await expect(f.coach.query(api.retentionReview.students, { paginationOpts: page, asOf: -1 })).rejects.toThrow("Review time is invalid");
-    await expect(f.coach.query(api.retentionReview.preview, { subject, asOf: 1.5 })).rejects.toThrow("Review time is invalid");
+    await expect(f.coach.query(api.retentionReview.students, { paginationOpts: page, asOf: -1 })).rejects.toThrow("Record review could not load");
+    await expect(f.coach.query(api.retentionReview.preview, { subject, asOf: 1.5 })).rejects.toThrow("Record review could not load");
     const before = (await f.coach.query(api.retentionReview.preview, { subject, asOf: Date.UTC(2026, 0, 1) })).candidate;
     const replacement = await f.t.run(ctx => ctx.db.insert("appUsers", { authUserId: f.ids.mentorAuth, email: "replacement@example.invalid", name: "Replacement login", role: "student", active: false, archivedAt: archive, travelLead: false, financialEdit: false }));
     await f.t.run(ctx => ctx.db.patch(f.ids.student, { userId: replacement }));
     const after = (await f.coach.query(api.retentionReview.preview, { subject, asOf: Date.UTC(2026, 0, 1) })).candidate;
     expect(after.archiveFingerprint).not.toBe(before.archiveFingerprint);
-    await expect(f.coach.mutation(api.retentionReview.setHold, { subject, expectedArchiveFingerprint: before.archiveFingerprint!, expectedLatestHoldEventId: null, action: "hold", reason: "Old linked account" })).rejects.toThrow("Archive status changed");
+    await expect(f.coach.mutation(api.retentionReview.setHold, { subject, expectedArchiveFingerprint: before.archiveFingerprint!, expectedLatestHoldEventId: null, action: "hold", reason: "Old linked account" })).rejects.toThrow("This record changed since you opened it");
   });
 
   it("caps expanded native account pages before hydration", async () => {
@@ -166,16 +166,16 @@ describe("retention review", () => {
     expect(expanded.pageStatus).toBe("SplitRecommended");
     expect(expanded.splitCursor).toBeTypeOf("string");
     expect(() => checkHydrationCount(50)).not.toThrow();
-    expect(() => checkHydrationCount(51)).toThrow("too large to review");
+    expect(() => checkHydrationCount(51)).toThrow("Too many records to show at once");
   });
 
   it("rejects malformed native row budgets before clamping", async () => {
     const f = await fixture();
     const subject = { kind: "student" as const, id: f.ids.student };
     for (const maximumRowsRead of [-1, 0, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
-      await expect(f.coach.query(api.retentionReview.students, { paginationOpts: { cursor: null, numItems: 1, maximumRowsRead }, asOf: Date.UTC(2026, 0, 1) })).rejects.toThrow("Maximum rows read");
-      await expect(f.coach.query(api.retentionReview.accounts, { paginationOpts: { cursor: null, numItems: 1, maximumRowsRead }, asOf: Date.UTC(2026, 0, 1) })).rejects.toThrow("Maximum rows read");
-      await expect(f.coach.query(api.retentionReview.history, { subject, paginationOpts: { cursor: null, numItems: 1, maximumRowsRead } })).rejects.toThrow("Maximum rows read");
+      await expect(f.coach.query(api.retentionReview.students, { paginationOpts: { cursor: null, numItems: 1, maximumRowsRead }, asOf: Date.UTC(2026, 0, 1) })).rejects.toThrow("Record review could not load");
+      await expect(f.coach.query(api.retentionReview.accounts, { paginationOpts: { cursor: null, numItems: 1, maximumRowsRead }, asOf: Date.UTC(2026, 0, 1) })).rejects.toThrow("Record review could not load");
+      await expect(f.coach.query(api.retentionReview.history, { subject, paginationOpts: { cursor: null, numItems: 1, maximumRowsRead } })).rejects.toThrow("Record review could not load");
     }
     await expect(f.coach.query(api.retentionReview.students, { paginationOpts: { cursor: null, numItems: 1, maximumRowsRead: Number.NaN }, asOf: Date.UTC(2026, 0, 1) })).rejects.toThrow();
   });
