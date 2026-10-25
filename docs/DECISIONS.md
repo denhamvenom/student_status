@@ -20,6 +20,7 @@ Read this before changing parent linking, consent/PDF, finance, rooms/waitlists 
 - Preserve the exact reviewed/signed artifacts, acknowledgment and typed verified name.
 - Preserve the approved original one-page design, lossless continuation for genuine overflow and all historical receipts.
 - Active OTC/Medication Choices are superseded; do not introduce a new workflow for them.
+- October 25 owner decision: the permission form is not in use yet, so its PDF wording may change. Approved: "Reference code" (not "Reviewed PDF SHA-256"), "TEST SIGNATURE (FICTIONAL)" and "How it was signed" on the signature page, "Medications" (not "Prescriptions"), "Information unavailable", "PERMISSION FORM - CONTINUATION", and a footer showing only the form version (no internal IDs). The title "Field Trip Permission & Medical Release" stays.
 - October 22 owner decision: real PDF signing is deferred until the owner is ready. Do not enable it without a later explicit instruction; preserve approved wording and existing evidence. This decision does not assert or change the current production flag; check that setting when signing work resumes.
 
 ## Finance
