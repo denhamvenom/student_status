@@ -46,7 +46,7 @@ function DeveloperSignInPanel() {
       <label htmlFor="developer-signin-key">Developer key</label>
       <Input id="developer-signin-key" type="password" autoComplete="off" value={key} onChange={e => setKey(e.target.value)} disabled={!!busy}/>
     </div>
-    <div className="review-links" role="group" aria-label="Fictional accounts">
+    <div className="review-links" style={{ marginTop: 12 }} role="group" aria-label="Fictional accounts">
       {personas.map(persona => <Button key={persona.id} type="button" variant="outline" className="button button-outline" title={persona.description} disabled={!!busy || key.trim().length < 32} onClick={() => void choose(persona.id)}>{busy === persona.id ? 'Signing in…' : persona.label}</Button>)}
     </div>
     {error && <p role="alert" className="open-text">{error}</p>}
