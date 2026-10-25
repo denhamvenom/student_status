@@ -43,7 +43,7 @@ async function fixture() {
 describe("travel operations", () => {
   it.each(["Charter Bus", "School Bus", "Team Carpool", "Provide your Own"])("creates an event with %s transportation", async travel => {
     const f = await fixture();
-    const eventId = await f.coach.mutation(api.admin.createEvent, { name: "Synthetic transport event", type: "Team", startsAt: 100, endsAt: 200, destination: "Test venue", travel, overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "open", allowWithdrawal: true, permissionRequired: false, firstRequired: false, requirements: [] });
+    const eventId = await f.coach.mutation(api.admin.createEvent, { name: "Synthetic transport event", type: "Team", startsAt: Date.now() + 86_400_000, endsAt: Date.now() + 2 * 86_400_000, destination: "Test venue", travel, overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "open", allowWithdrawal: true, permissionRequired: false, firstRequired: false, requirements: [] });
     expect(await f.t.run(ctx => ctx.db.get(eventId))).toMatchObject({ travel, transportEnabled: travel !== "Provide your Own" });
     expect((await f.coach.query(api.travel.eventTransport, { eventId })).summary.state).toBe(travel === "Provide your Own" ? "notApplicable" : "ready");
   });
