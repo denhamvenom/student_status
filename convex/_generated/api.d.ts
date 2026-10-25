@@ -10,6 +10,7 @@
 
 import type * as accounts from "../accounts.js";
 import type * as admin from "../admin.js";
+import type * as adminContact from "../adminContact.js";
 import type * as adultInviteEmail from "../adultInviteEmail.js";
 import type * as adultProfile from "../adultProfile.js";
 import type * as app from "../app.js";
@@ -60,6 +61,7 @@ import type * as historicalFinancialCorrections from "../historicalFinancialCorr
 import type * as historicalRoster from "../historicalRoster.js";
 import type * as http from "../http.js";
 import type * as lib_access from "../lib/access.js";
+import type * as lib_adminContact from "../lib/adminContact.js";
 import type * as lib_archivedEventAccess from "../lib/archivedEventAccess.js";
 import type * as lib_attendanceReports from "../lib/attendanceReports.js";
 import type * as lib_authRedirect from "../lib/authRedirect.js";
@@ -151,6 +153,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   accounts: typeof accounts;
   admin: typeof admin;
+  adminContact: typeof adminContact;
   adultInviteEmail: typeof adultInviteEmail;
   adultProfile: typeof adultProfile;
   app: typeof app;
@@ -201,6 +204,7 @@ declare const fullApi: ApiFromModules<{
   historicalRoster: typeof historicalRoster;
   http: typeof http;
   "lib/access": typeof lib_access;
+  "lib/adminContact": typeof lib_adminContact;
   "lib/archivedEventAccess": typeof lib_archivedEventAccess;
   "lib/attendanceReports": typeof lib_attendanceReports;
   "lib/authRedirect": typeof lib_authRedirect;

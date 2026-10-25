@@ -1,6 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import { ConvexError } from 'convex/values'
-import { userFacingError } from './error-message'
+import { adminContactTopic, userFacingError } from './error-message'
+
+describe('adminContactTopic', () => {
+  it.each([
+    ['a known topic', new ConvexError({ message: 'Email is not set up.', contactAdmin: 'inviteEmailNotConfigured' }), 'inviteEmailNotConfigured'],
+    ['another known topic', new ConvexError({ message: 'Too many events.', contactAdmin: 'tooManyEvents' }), 'tooManyEvents'],
+    ['an unknown topic', new ConvexError({ message: 'Hi.', contactAdmin: 'deleteEverything' }), null],
+    ['a non-string topic', new ConvexError({ message: 'Hi.', contactAdmin: { topic: 'tooManyCoaches' } }), null],
+    ['a message without a topic', new ConvexError({ message: 'Hi.' }), null],
+    ['string Convex data', new ConvexError('tooManyCoaches'), null],
+    ['a plain Error', Object.assign(new Error('Hi.'), { data: { contactAdmin: 'tooManyCoaches' } }), null],
+    ['nothing', undefined, null],
+  ])('reads %s safely', (_, error, expected) => {
+    expect(adminContactTopic(error)).toBe(expected)
+  })
+  it('keeps the error message for the alert', () => {
+    expect(userFacingError(new ConvexError({ message: 'Too many Coach accounts. Use Contact admin to let the administrator know.', contactAdmin: 'tooManyCoaches' }))).toBe('Too many Coach accounts. Use Contact admin to let the administrator know.')
+  })
+})
 
 describe('userFacingError', () => {
   it('keeps unexpected rendering errors private while retaining explicit application errors', () => {

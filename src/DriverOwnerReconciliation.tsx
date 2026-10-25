@@ -1,6 +1,7 @@
-import { userFacingError } from '@/lib/error-message'
+import { adminContactTopic, userFacingError } from '@/lib/error-message'
 import { driverReconciliationCopy as copy } from './lib/adult-profile-copy'
-import { useState, type FormEvent } from 'react'
+import { Component, useState, type FormEvent, type ReactNode } from 'react'
+import { ContactAdminFor } from './ContactAdminButton'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
 import { Button } from './components/ui/button'
@@ -37,9 +38,25 @@ function CandidateLink({ candidate }: { candidate: Candidate }) {
   </form>
 }
 
-/** Coach-only server data and action. Root may mount this panel in Drivers. */
-export function DriverOwnerReconciliation() {
+function Candidates() {
   const candidates = useQuery(api.adultProfile.ownerReconciliationCandidates, {})
   if (candidates === undefined) return <p role="status">{copy.loading}</p>
-  return <section className={styles.panel} aria-labelledby="driver-reconciliation-title"><h2 id="driver-reconciliation-title">{copy.title}</h2><p>{copy.description}</p>{candidates.length === 0 ? <p>{copy.empty}</p> : candidates.map(candidate => <CandidateLink key={`${candidate.driverId}:${candidate.mentorId}`} candidate={candidate} />)}</section>
+  return candidates.length === 0 ? <p>{copy.empty}</p> : candidates.map(candidate => <CandidateLink key={`${candidate.driverId}:${candidate.mentorId}`} candidate={candidate} />)
+}
+
+/** Shows Contact admin for the list-too-long limit; every other failure still reaches the page boundary. */
+class CandidatesBoundary extends Component<{ children: ReactNode }, { error: unknown }> {
+  state = { error: null as unknown }
+  static getDerivedStateFromError(error: unknown) { return { error } }
+  render() {
+    const { error } = this.state
+    if (error === null) return this.props.children
+    if (!adminContactTopic(error)) throw error
+    return <><p role="alert">{userFacingError(error, copy.failed, false)}</p><ContactAdminFor error={error} /></>
+  }
+}
+
+/** Coach-only server data and action. Root may mount this panel in Drivers. */
+export function DriverOwnerReconciliation() {
+  return <section className={styles.panel} aria-labelledby="driver-reconciliation-title"><h2 id="driver-reconciliation-title">{copy.title}</h2><p>{copy.description}</p><CandidatesBoundary><Candidates /></CandidatesBoundary></section>
 }
