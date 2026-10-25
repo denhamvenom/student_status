@@ -320,8 +320,10 @@ describe("parent invitation email", () => {
     const row = (await f.student.query(api.parentInvites.listStudentInvites, { studentId: f.ids.student }))[0];
     expect(row.emailStatus).toBe("sent");
     expect(row.emailError).toBeNull();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, request] = fetchMock.mock.calls[0] as [string, RequestInit];
+    // Earlier tests' scheduled sends can reach this global fetch stub under load; check only this invitation's sends.
+    const ours = (fetchMock.mock.calls as [string, RequestInit][]).filter(([, init]) => (init.headers as Record<string, string>)["Idempotency-Key"] === `parent-invite/${invite.inviteId}`);
+    expect(ours).toHaveLength(1);
+    const [url, request] = ours[0];
     const body = JSON.parse(String(request.body));
     expect(url).toBe("https://api.resend.com/emails");
     expect((request.headers as Record<string, string>)["Idempotency-Key"]).toBe(`parent-invite/${invite.inviteId}`);
