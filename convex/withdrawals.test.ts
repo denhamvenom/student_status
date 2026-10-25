@@ -119,7 +119,7 @@ describe("withdrawal decisions", () => {
     expect(await f.student.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.event, idempotencyKey: "request-one" })).toBe(requestId);
     expect((await f.t.run(ctx => ctx.db.get(f.ids.participant)))?.status).toBe("confirmed");
     await expect(f.mentor.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.event, idempotencyKey: "other-key" })).rejects.toThrow();
-    await expect(f.mentor.mutation(api.withdrawals.reviewWithdrawal, { requestId, decision: "full", cancelUnpaidMain: false, reason: "Please release", expectedRevision: revision })).rejects.toThrow("denied");
+    await expect(f.mentor.mutation(api.withdrawals.reviewWithdrawal, { requestId, decision: "full", cancelUnpaidMain: false, reason: "Please release", expectedRevision: revision })).rejects.toThrow("can review withdrawal requests");
     await f.lead.mutation(api.withdrawals.reviewWithdrawal, { requestId, decision: "deny", cancelUnpaidMain: false, reason: "Needs attendance", expectedRevision: revision });
     expect((await f.t.run(ctx => ctx.db.get(f.ids.participant)))?.status).toBe("confirmed");
     const request2 = await f.student.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.event, idempotencyKey: "request-two" });
@@ -147,7 +147,7 @@ describe("withdrawal decisions", () => {
     const f = await fixture(true);
     const requestId = await f.student.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.event, idempotencyKey: "request-ambiguous" });
     const expectedRevision = (await f.coach.query(api.withdrawals.withdrawalPreview, { eventId: f.ids.event, studentId: f.ids.student })).revision;
-    await expect(f.coach.mutation(api.withdrawals.reviewWithdrawal, { requestId, decision: "partial", returnCents: 9001, cancelUnpaidMain: false, reason: "Too many cents", expectedRevision })).rejects.toThrow("eligible paid");
+    await expect(f.coach.mutation(api.withdrawals.reviewWithdrawal, { requestId, decision: "partial", returnCents: 9001, cancelUnpaidMain: false, reason: "Too many cents", expectedRevision })).rejects.toThrow("amount paid for this event");
     await expect(prepare(f.t, f.ids.coach.user, f.ids.student)).rejects.toThrow("ambiguous funding sources");
     await expect(f.coach.mutation(api.withdrawals.reviewWithdrawal, { requestId, decision: "full", cancelUnpaidMain: false, reason: "Unknown source", expectedRevision })).rejects.toThrow("updating");
     expect((await f.t.run(ctx => ctx.db.get(f.ids.participant)))?.status).toBe("confirmed");
@@ -163,7 +163,7 @@ describe("withdrawal decisions", () => {
     const args = { requestId, decision: "retain" as const, cancelUnpaidMain: true, reason: "Nonrefundable travel", expectedRevision };
     await f.lead.mutation(api.withdrawals.reviewWithdrawal, args);
     await f.lead.mutation(api.withdrawals.reviewWithdrawal, args);
-    await expect(f.coach.mutation(api.withdrawals.reviewWithdrawal, { ...args, decision: "full" })).rejects.toThrow("already decided differently");
+    await expect(f.coach.mutation(api.withdrawals.reviewWithdrawal, { ...args, decision: "full" })).rejects.toThrow("already decided");
     await finish(f);
     const charges = await f.t.run(async ctx => ({ main: await ctx.db.get(f.ids.main), extra: await ctx.db.get(f.ids.extra) }));
     expect(charges.main).toMatchObject({ appliedCents: 8000, cancelledCents: 2000 });
@@ -195,7 +195,7 @@ describe("withdrawal decisions", () => {
     const args = { requestId, decision: "full" as const, cancelUnpaidMain: false, reason: "Stale screen approval", expectedRevision };
     await expect(f.coach.mutation(api.withdrawals.reviewWithdrawal, args)).rejects.toThrow("changed");
     await f.t.run(ctx => ctx.db.patch(f.ids.event, { archived: true }));
-    await expect(f.coach.mutation(api.withdrawals.reviewWithdrawal, args)).rejects.toThrow("archived");
+    await expect(f.coach.mutation(api.withdrawals.reviewWithdrawal, args)).rejects.toThrow("Past events");
     expect((await f.t.run(ctx => ctx.db.get(f.ids.participant)))?.status).toBe("confirmed");
     expect((await f.t.run(ctx => ctx.db.get(requestId)))?.status).toBe("pending");
   });

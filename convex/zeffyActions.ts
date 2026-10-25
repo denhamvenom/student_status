@@ -19,49 +19,49 @@ const scheduledActorRef = makeFunctionReference<"query">("zeffy:scheduledActor")
 type Snapshot = { activeSeasonId: Id<"seasons">; seasonStartsAt: number; students: Array<{ id: Id<"students">; seasonId: Id<"seasons">; name: string; url: string | null; revision: number; active: boolean }>; mappings: Array<{ campaignId: string; canonicalUrl: string; studentId: Id<"students">; seasonId: Id<"seasons"> }>; payments: Array<{ paymentId: string; amountCents: number; campaignId: string }> };
 
 function object(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Zeffy response was invalid.");
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Zeffy sent a reply the app couldn't read. Nothing was added. Try Check now again later.");
   return value as Record<string, unknown>;
 }
 
 function parseCampaign(value: unknown): ZeffyCampaign {
   const raw = object(value);
-  if (typeof raw.id !== "string" || typeof raw.url !== "string" || typeof raw.title !== "string" || typeof raw.category !== "string" || typeof raw.currency !== "string") throw new Error("Zeffy campaign was invalid.");
+  if (typeof raw.id !== "string" || typeof raw.url !== "string" || typeof raw.title !== "string" || typeof raw.category !== "string" || typeof raw.currency !== "string") throw new Error("Zeffy sent a fundraising page the app couldn't read. Nothing was added. Try Check now again later.");
   return { id: raw.id, url: raw.url, title: raw.title, category: raw.category, currency: raw.currency };
 }
 
 function parsePayment(value: unknown): ZeffyPayment {
   const raw = object(value);
-  if (typeof raw.id !== "string" || typeof raw.created !== "number" || typeof raw.amount !== "number" || typeof raw.currency !== "string" || typeof raw.status !== "string" || typeof raw.type !== "string" || typeof raw.refund_status !== "string" || !Array.isArray(raw.refunds) || typeof raw.campaign_id !== "string" || typeof raw.campaign_type !== "string" || typeof raw.campaign_category !== "string" || !Array.isArray(raw.items)) throw new Error("Zeffy payment was invalid.");
-  const items = raw.items.map(value => { const item = object(value); if (typeof item.type !== "string" || typeof item.amount !== "number" || typeof item.currency !== "string") throw new Error("Zeffy donation item was invalid."); return { type: item.type, amount: item.amount, currency: item.currency }; });
+  if (typeof raw.id !== "string" || typeof raw.created !== "number" || typeof raw.amount !== "number" || typeof raw.currency !== "string" || typeof raw.status !== "string" || typeof raw.type !== "string" || typeof raw.refund_status !== "string" || !Array.isArray(raw.refunds) || typeof raw.campaign_id !== "string" || typeof raw.campaign_type !== "string" || typeof raw.campaign_category !== "string" || !Array.isArray(raw.items)) throw new Error("Zeffy sent a payment the app couldn't read. Nothing was added. Try Check now again later.");
+  const items = raw.items.map(value => { const item = object(value); if (typeof item.type !== "string" || typeof item.amount !== "number" || typeof item.currency !== "string") throw new Error("Zeffy sent a payment the app couldn't read. Nothing was added. Try Check now again later."); return { type: item.type, amount: item.amount, currency: item.currency }; });
   return { id: raw.id, created: raw.created, amount: raw.amount, currency: raw.currency, status: raw.status, type: raw.type, refund_status: raw.refund_status, refund_count: raw.refunds.length, has_dispute: raw.dispute !== null, campaign_id: raw.campaign_id, campaign_type: raw.campaign_type, campaign_category: raw.campaign_category, items };
 }
 
 async function listAll(path: "campaigns" | "payments"): Promise<unknown[]> {
   const key = env.ZEFFY_API_KEY;
-  if (!key) throw new Error("Zeffy API key is not configured.");
+  if (!key) throw new Error("Zeffy isn't connected yet. Ask whoever manages the app to add the Zeffy API key.");
   const all: unknown[] = []; let cursor: string | null = null; const seen = new Set<string>();
   for (let page = 0; page < MAX_PAGES; page++) {
     const url = new URL(`${API}/${path}`); url.searchParams.set("limit", "100"); if (cursor) url.searchParams.set("starting_after", cursor);
     const response = await fetch(url, { headers: { authorization: `Bearer ${key}`, accept: "application/json" } });
-    if (!response.ok) throw new Error(`Zeffy ${path} request failed (${response.status}).`);
+    if (!response.ok) throw new Error(`Zeffy didn't respond (${response.status}). Nothing was added. Try Check now again later.`);
     const body = object(await response.json());
-    if (body.object !== "list" || !Array.isArray(body.data) || typeof body.has_more !== "boolean" || !(body.next_cursor === null || typeof body.next_cursor === "string")) throw new Error(`Zeffy ${path} pagination was invalid.`);
-    if (all.length + body.data.length > MAX_ITEMS) throw new Error(`Zeffy ${path} exceeds its safe page limit; no truncated import was posted.`);
+    if (body.object !== "list" || !Array.isArray(body.data) || typeof body.has_more !== "boolean" || !(body.next_cursor === null || typeof body.next_cursor === "string")) throw new Error(`Zeffy sent an incomplete list. Nothing was added. Try Check now again later.`);
+    if (all.length + body.data.length > MAX_ITEMS) throw new Error(`Zeffy has more records than one check can handle. Nothing was added. Ask whoever manages the app for help.`);
     all.push(...body.data);
-    if (!body.has_more) { if (body.next_cursor !== null) throw new Error(`Zeffy ${path} pagination was inconsistent.`); return all; }
-    if (!body.next_cursor || seen.has(body.next_cursor)) throw new Error(`Zeffy ${path} pagination did not advance.`);
+    if (!body.has_more) { if (body.next_cursor !== null) throw new Error(`Zeffy sent an incomplete list. Nothing was added. Try Check now again later.`); return all; }
+    if (!body.next_cursor || seen.has(body.next_cursor)) throw new Error(`Zeffy sent an incomplete list. Nothing was added. Try Check now again later.`);
     seen.add(body.next_cursor); cursor = body.next_cursor;
   }
-  throw new Error(`Zeffy ${path} exceeds its safe page limit; no truncated import was posted.`);
+  throw new Error(`Zeffy has more records than one check can handle. Nothing was added. Ask whoever manages the app for help.`);
 }
 
 async function fetchData() {
   const campaigns = (await listAll("campaigns")).map(parseCampaign);
   const payments = (await listAll("payments")).map(parsePayment);
   const ids = new Set<string>();
-  for (const campaign of campaigns) { if (ids.has(campaign.id)) throw new Error("Zeffy returned a duplicate campaign ID."); ids.add(campaign.id); }
+  for (const campaign of campaigns) { if (ids.has(campaign.id)) throw new Error("Zeffy listed the same fundraising page twice. Nothing was added. Try Check now again later."); ids.add(campaign.id); }
   const paymentIds = new Set<string>();
-  for (const payment of payments) { if (paymentIds.has(payment.id)) throw new Error("Zeffy returned a duplicate payment ID."); paymentIds.add(payment.id); }
+  for (const payment of payments) { if (paymentIds.has(payment.id)) throw new Error("Zeffy listed the same payment twice. Nothing was added. Try Check now again later."); paymentIds.add(payment.id); }
   return { campaigns, payments };
 }
 
@@ -82,7 +82,7 @@ export const preview = action({ args: {}, returns: v.object({ safeToRun: v.boole
     const valid = canonical && campaign.category === "PeerToPeerCampaign" && campaign.currency.toLowerCase() === "usd" && matches.length === 1 && matches[0].active && matches[0].seasonId === snapshot.activeSeasonId && !conflict && (!mapping || mapping.studentId === matches[0].id && mapping.seasonId === matches[0].seasonId && mapping.canonicalUrl === canonical);
     const status = valid ? "matched" : "review";
     resolved.set(campaign.id, { status, studentId: valid ? matches[0].id : undefined, studentName: valid ? matches[0].name : undefined });
-    if (!valid && (matches.length || mapping || paymentCampaigns.has(campaign.id))) exceptions.push({ code: "linkConflict", message: "Campaign has no unique current-season student link or conflicts with saved history.", campaignId: campaign.id });
+    if (!valid && (matches.length || mapping || paymentCampaigns.has(campaign.id))) exceptions.push({ code: "linkConflict", message: "This fundraising page isn't linked to exactly one current student. Fix the fundraiser link.", campaignId: campaign.id });
   }
   const rows = payments.map(payment => {
     const campaign = byId.get(payment.campaign_id); const match = resolved.get(payment.campaign_id); const safety = paymentSafety(payment);
@@ -90,7 +90,7 @@ export const preview = action({ args: {}, returns: v.object({ safeToRun: v.boole
     const posted = byPayment.get(payment.id);
     const changed = !!posted && (posted.amountCents !== payment.amount || posted.campaignId !== payment.campaign_id);
     const outcome = posted ? safety || changed ? "review" as const : "unchanged" as const : safety === "notSucceeded" ? "unchanged" as const : !campaign || match?.status !== "matched" || safety || oldSeason ? "review" as const : "eligible" as const;
-    const message = outcome === "review" ? changed ? "Previously credited payment changed; review manually." : oldSeason ? "Prior-season donation needs review." : safety ? "Payment needs review in Zeffy." : "Campaign link needs review." : safety === "notSucceeded" ? "Payment has not succeeded; no credit will be posted." : undefined;
+    const message = outcome === "review" ? changed ? "This payment was already credited but changed in Zeffy. Review it." : oldSeason ? "Prior-season donation needs review." : safety ? "Payment needs review in Zeffy." : "Campaign link needs review." : safety === "notSucceeded" ? "Payment has not succeeded; no credit will be posted." : undefined;
     if (outcome === "review") exceptions.push({ code: changed ? "paymentChanged" : oldSeason ? "oldSeason" : safety ?? "linkConflict", message: message!, campaignId: payment.campaign_id, paymentId: payment.id });
     return { paymentId: payment.id, studentName: match?.studentName, amountCents: payment.amount, outcome, message };
   });
@@ -99,7 +99,7 @@ export const preview = action({ args: {}, returns: v.object({ safeToRun: v.boole
 
 async function sync(ctx: ActionCtx, actorId: Id<"appUsers">): Promise<{ started: boolean; reason?: string }> {
   const runId = await ctx.runMutation(beginRef, { actorId }) as Id<"zeffyRuns"> | null;
-  if (!runId) return { started: false, reason: "Zeffy sync is disabled, unconfigured, or already running." };
+  if (!runId) return { started: false, reason: "Zeffy checks are off, not set up, or already running." };
   const totals = { credited: 0, unchanged: 0, review: 0 };
   try {
     const { campaigns, payments } = await fetchData();
@@ -121,7 +121,7 @@ async function sync(ctx: ActionCtx, actorId: Id<"appUsers">): Promise<{ started:
     await ctx.runMutation(finishRef, { runId, ...totals });
     return { started: true, reason: undefined };
   } catch (error) {
-    const message = error instanceof Error && /^Zeffy /.test(error.message) ? error.message : "Zeffy sync failed; Coach review is required.";
+    const message = error instanceof Error && /^Zeffy /.test(error.message) ? error.message : "The Zeffy check stopped. Review Zeffy settings, then use Check now.";
     await ctx.runMutation(finishRef, { runId, ...totals, error: message });
     return { started: true, reason: message };
   }

@@ -81,7 +81,7 @@ describe("server boundaries", () => {
     expect(await f.student.mutation(api.participation.signUp, { eventId: f.ids.event })).toBe("pending");
     expect(await f.other.mutation(api.participation.signUp, { eventId: f.ids.event })).toBe("waitlist");
     expect((await f.student.query(api.financeDetails.charges, { studentId: f.ids.student, paginationOpts: { cursor: null, numItems: 25 } })).page).toHaveLength(0);
-    await expect(f.mentor.mutation(api.finance.recordFunds, { studentId: f.ids.student, kind: "payment", amountCents: 1000, reason: "Cash", idempotencyKey: "pay-123456" })).rejects.toThrow("Financial editing");
+    await expect(f.mentor.mutation(api.finance.recordFunds, { studentId: f.ids.student, kind: "payment", amountCents: 1000, reason: "Cash", idempotencyKey: "pay-123456" })).rejects.toThrow("Money editing access");
     await f.coach.mutation(api.participation.setParticipation, { eventId: f.ids.event, studentId: f.ids.student, status: "confirmed" });
     const money = await f.student.query(api.app.studentFinances, { studentId: f.ids.student });
     expect(money.summary!.chargedCents).toBe(45000);
@@ -176,7 +176,7 @@ describe("server boundaries", () => {
     const f = await fixture();
     await f.student.mutation(api.participation.signUp, { eventId: f.ids.event });
     await f.t.run(ctx => ctx.db.patch(f.ids.event, { archived: true }));
-    await expect(f.student.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.event, idempotencyKey: "archived-request-test" })).rejects.toThrow("unavailable");
+    await expect(f.student.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.event, idempotencyKey: "archived-request-test" })).rejects.toThrow("can't withdraw");
     const row = await f.t.run(ctx => ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", f.ids.event).eq("studentId", f.ids.student)).unique());
     expect(row?.status).toBe("pending");
   });

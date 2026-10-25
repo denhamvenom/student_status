@@ -84,7 +84,7 @@ describe("charge obligation administration", () => {
     expect(await f.t.run(ctx => ctx.db.query("chargeRevisions").withIndex("by_chargeId_and_recordedAt", q => q.eq("chargeId", f.ids.charge)).first())).toMatchObject({ beforeAppliedCents: 25, afterAppliedCents: 0, releasedCents: 25, createdBy: f.ids.coach.id, processedBy: f.ids.alternate.id });
     await f.t.run(ctx => ctx.db.patch(f.ids.coach.id, { active: true }));
     expect((await f.coach.mutation(correct, args) as { jobId: string }).jobId).toBe(result.jobId);
-    await expect(f.coach.mutation(correct, { ...args, targetEffectiveCents: 1 })).rejects.toThrow("different financial command");
+    await expect(f.coach.mutation(correct, { ...args, targetEffectiveCents: 1 })).rejects.toThrow("already submitted with different details");
   });
 
   it("rejects stale reviewed amounts and cancellation increases before acquiring a lock", async () => {
@@ -136,8 +136,8 @@ describe("charge obligation administration", () => {
     expect(wrapped.continueCursor).toBe(native.continueCursor); expect(wrapped.splitCursor).toBe(native.splitCursor); expect(wrapped.pageStatus).toBe(native.pageStatus);
     const first = await f.student.query(source, { chargeId: f.ids.charge, paginationOpts: { numItems: 20, cursor: null } }) as { continueCursor: string };
     const second = await f.student.query(source, { chargeId: f.ids.charge, paginationOpts: { numItems: 20, cursor: first.continueCursor } }) as { continueCursor: string };
-    await expect(f.student.query(source, { chargeId: f.ids.charge, paginationOpts: { numItems: 1, cursor: null, endCursor: second.continueCursor, maximumRowsRead: 10000 } })).rejects.toThrow("exceeded its read budget");
-    await expect(f.student.query(source, { chargeId: f.ids.charge, paginationOpts: { numItems: 1, cursor: null, maximumRowsRead: Number.NaN } })).rejects.toThrow("Invalid correction read budget");
+    await expect(f.student.query(source, { chargeId: f.ids.charge, paginationOpts: { numItems: 1, cursor: null, endCursor: second.continueCursor, maximumRowsRead: 10000 } })).rejects.toThrow("list couldn't load");
+    await expect(f.student.query(source, { chargeId: f.ids.charge, paginationOpts: { numItems: 1, cursor: null, maximumRowsRead: Number.NaN } })).rejects.toThrow("list couldn't load");
   });
 
   it("denies cross-season charges and concurrent contradictory commands before any extra money movement", async () => {
@@ -160,9 +160,9 @@ describe("charge obligation administration", () => {
   it("holds unrepresentable high-cancellation targets before acquiring a financial lock", async () => {
     const f = await fixture(false, true);
     const result = await f.coach.query(preview, { chargeId: f.ids.charge, targetEffectiveCents: 1, kind: "adjustment" }) as { state: string; message: string };
-    expect(result).toMatchObject({ state: "hold" }); expect(result.message).toContain("exact-cent range");
+    expect(result).toMatchObject({ state: "hold" }); expect(result.message).toContain("too large");
     const before = await f.t.run(ctx => financialAccount(ctx, f.ids.student));
-    await expect(f.coach.mutation(correct, await command(f, 1, "adjustment", "oversized-adjustment"))).rejects.toThrow("exact-cent range");
+    await expect(f.coach.mutation(correct, await command(f, 1, "adjustment", "oversized-adjustment"))).rejects.toThrow("too large");
     expect(await f.t.run(ctx => financialAccount(ctx, f.ids.student))).toEqual(before);
     expect(await f.t.run(ctx => ctx.db.query("financialOperationJobs").withIndex("by_chargeId_and_updatedAt", q => q.eq("chargeId", f.ids.charge)).first())).toBeNull();
   });
@@ -182,8 +182,8 @@ describe("charge obligation administration", () => {
     expect(await f.student.query(makeFunctionReference<"query">("chargeAdmin:status"), { chargeId: f.ids.charge, jobId: result.jobId })).toMatchObject({ financialState: "failed", canRetry: false, job: { state: "failed", committedCents: 20 } });
     expect(await f.coach.query(makeFunctionReference<"query">("financialOperationsWorker:status"), { studentId: f.ids.student })).toMatchObject({ canRetry: false, job: { state: "failed" } });
     expect(await f.coach.query(preview, { chargeId: f.ids.charge, kind: "cancellation", targetEffectiveCents: 0 })).toMatchObject({ state: "hold" });
-    await expect(f.coach.mutation(correct, { ...args, idempotencyKey: "new-archived-correction" })).rejects.toThrow("historical review");
-    await expect(f.coach.mutation(makeFunctionReference<"mutation">("financialOperationsWorker:retry"), { jobId: result.jobId, reason: "Cannot bypass historical review" })).rejects.toThrow("historical review");
+    await expect(f.coach.mutation(correct, { ...args, idempotencyKey: "new-archived-correction" })).rejects.toThrow("past event");
+    await expect(f.coach.mutation(makeFunctionReference<"mutation">("financialOperationsWorker:retry"), { jobId: result.jobId, reason: "Cannot bypass historical review" })).rejects.toThrow("Past events");
     expect(await f.t.run(ctx => financialAccount(ctx, f.ids.student))).toEqual(before);
   });
 

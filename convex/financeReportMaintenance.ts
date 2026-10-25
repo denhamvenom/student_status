@@ -28,7 +28,7 @@ export const start = mutation({
     const actor = await viewer(ctx); requireRole(actor, "coach");
     const season = await activeSeason(ctx);
     const maintenance = await seasonFinanceControl(ctx, season._id);
-    if (maintenance && maintenance.state !== "ready" && maintenance.state !== "failed") throw new ConvexError("Wait for shared fee maintenance before rebuilding reports.");
+    if (maintenance && maintenance.state !== "ready" && maintenance.state !== "failed") throw new ConvexError("Season fees are updating. Wait for that to finish, then rebuild reports.");
     const previous = await ctx.db.query("financeSummaryBackfills").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).unique();
     await requireSeasonTransitionFinancialAccess(ctx, season._id, previous?.state === "failed");
     if (previous?.state === "running") return previous._id;
@@ -94,7 +94,7 @@ export const continueBackfill = internalMutation({
       }
     } catch {
       // Do not expose student details or financial history through maintenance errors.
-      await ctx.db.patch(state._id, { state: "failed", ...(verifyingCoverage ? { cursor: null, processed: 0 } : {}), updatedAt: Date.now(), lastError: savedPublicError(null, "Financial reports require source-data review before rebuilding can continue.") });
+      await ctx.db.patch(state._id, { state: "failed", ...(verifyingCoverage ? { cursor: null, processed: 0 } : {}), updatedAt: Date.now(), lastError: savedPublicError(null, "Money reports need a Coach to review student money records before they can rebuild.") });
     }
     return null;
   },
