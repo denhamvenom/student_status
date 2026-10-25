@@ -49,7 +49,7 @@ describe('bounded authoritative fundraising preview', () => {
   })
   it('stops collecting after the selected workspace is left', async () => {
     let calls = 0
-    await expect(collectFundraisingPreview(async args => { calls++; return page(args.rows) }, input, () => calls > 0)).rejects.toThrow('cancelled')
+    await expect(collectFundraisingPreview(async args => { calls++; return page(args.rows) }, input, () => calls > 0)).rejects.toThrow('canceled')
     expect(calls).toBe(1)
   })
 })

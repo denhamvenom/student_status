@@ -12,7 +12,7 @@ const runRef = makeFunctionReference<"mutation">("financeExport:run");
 const pageRef = makeFunctionReference<"mutation">("financeExport:processPage");
 const nullable = v.union(v.number(), v.null());
 const metadata = { schemaVersion: v.literal(1), scopeHash: v.string(), collectedAt: v.number() };
-export const CSV_COLUMNS = ["Season ID", "Student ID", "Student", "Charge ID", "Charge", "Event", "Original cents", "Adjusted cents", "Cancelled cents", "Effective cents", "Personal applied cents", "Fundraising applied cents", "Due cents", "Personal available cents (non-additive)", "Fundraising available cents (non-additive)", "Financial generation", "Financial revision", "Collected at"];
+export const CSV_COLUMNS = ["Season ID", "Student ID", "Student", "Charge ID", "Charge", "Event", "Original cents", "Adjusted cents", "Canceled cents", "Effective cents", "Personal applied cents", "Fundraising applied cents", "Due cents", "Personal available cents (non-additive)", "Fundraising available cents (non-additive)", "Financial generation", "Financial revision", "Collected at"];
 /** Quote every cell and neutralize spreadsheet formulas in text, preserving numeric cents. */
 export function csvCell(value: string | number) {
   const text = String(value); let start = 0;

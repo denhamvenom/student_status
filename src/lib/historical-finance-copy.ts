@@ -2,7 +2,7 @@ export const historicalFinanceCopy = {
   title: 'Historical charge correction',
   description: 'Review an adjustment or cancellation in this archived season. The original charge remains in history. Each change records your Coach identity, time, reason and correction access.',
   linked: 'Accounts with carried or transferred funds or debt remain held for a dedicated downstream correction review. That propagation is still pending.',
-  loading: 'Loading historical charges...',
+  loading: 'Loading historical charges…',
   noCharges: 'No charges recorded in this archived account.',
   original: 'Original', effective: 'Effective', paid: 'Paid',
   review: 'Review charge', more: 'Load more charges',

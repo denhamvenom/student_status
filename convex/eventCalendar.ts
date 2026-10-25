@@ -260,7 +260,7 @@ export const push = internalAction({ args: { eventId: v.id("events"), revision: 
         if (props?.private?.studentStatusEventId !== snapshot.eventId) { await fail("Calendar event ID collision; contact an administrator.", true); return null; }
         const existing = googleDetails(existingRaw);
         if (!existing.etag) { await fail("Calendar event version was missing.", true); return null; }
-        if (existing.cancelled && !snapshot.cancelled) { await fail("Calendar event was cancelled. Refresh its latest state before editing.", true); return null; }
+        if (existing.cancelled && !snapshot.cancelled) { await fail("Calendar event was canceled. Refresh its latest state before editing.", true); return null; }
         if (existing.cancelled && snapshot.cancelled) { await ctx.runMutation(internal.eventCalendar.finishPush, { ...args, calendarEventId: id, etag: existing.etag, providerUpdatedAt: existing.updatedAt }); return null; }
         const patched = await fetch(eventUrl(id), { method: "PATCH", headers: { authorization: auth, "content-type": "application/json", "if-match": existing.etag }, body: JSON.stringify(snapshot.cancelled ? { status: "cancelled" } : { summary: snapshot.name, location: snapshot.destination, start: { dateTime: new Date(snapshot.startsAt).toISOString() }, end: { dateTime: new Date(snapshot.endsAt).toISOString() }, description: withMediaMarker(existing.description, snapshot.media) }) });
         if (!patched.ok) { await fail(calendarError(patched.status), patched.status === 412); return null; }
@@ -283,7 +283,7 @@ export const push = internalAction({ args: { eventId: v.id("events"), revision: 
     const raw: unknown = await get.json(), current = googleDetails(raw);
     if (current.parentSeries || !current.etag) { await fail("An entire recurring series cannot be edited through Student Status.", true); return null; }
     if (snapshot.etag && current.etag !== snapshot.etag) { await fail(calendarError(412), true); return null; }
-    if (current.cancelled && !snapshot.cancelled) { await fail("Calendar event was cancelled. Refresh its latest state before editing.", true); return null; }
+    if (current.cancelled && !snapshot.cancelled) { await fail("Calendar event was canceled. Refresh its latest state before editing.", true); return null; }
     if (current.cancelled && snapshot.cancelled) { await ctx.runMutation(internal.eventCalendar.finishPush, { ...args, calendarEventId: snapshot.calendarEventId!, etag: current.etag, providerUpdatedAt: current.updatedAt }); return null; }
     let start: { date: string } | { dateTime: string } = { dateTime: new Date(snapshot.startsAt).toISOString() };
     let end: { date: string } | { dateTime: string } = { dateTime: new Date(snapshot.endsAt).toISOString() };

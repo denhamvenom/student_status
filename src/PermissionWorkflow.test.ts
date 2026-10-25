@@ -39,6 +39,6 @@ describe('permission export collection',()=>{
   })
   it('cancels between pages without producing a downloadable packet',async()=>{
     let cancelled=false;const fetch=vi.fn(async()=>page(0));const download=vi.fn()
-    await expect(collectPermissionExport(fetch,{eventId,includeHealth:true},{cancelled:()=>cancelled,progress:()=>{cancelled=true}}).then(download)).rejects.toThrow('cancelled');expect(fetch).toHaveBeenCalledTimes(1);expect(download).not.toHaveBeenCalled()
+    await expect(collectPermissionExport(fetch,{eventId,includeHealth:true},{cancelled:()=>cancelled,progress:()=>{cancelled=true}}).then(download)).rejects.toThrow('canceled');expect(fetch).toHaveBeenCalledTimes(1);expect(download).not.toHaveBeenCalled()
   })
 })

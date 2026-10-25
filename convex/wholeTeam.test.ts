@@ -222,7 +222,7 @@ describe("Whole Team enrollment", () => {
 });
 
 
-describe("cancelled Whole Team events", () => {
+describe("canceled Whole Team events", () => {
   it("stops queued assignment and cannot retry or enroll newly activated students", async () => {
     const f = await fixture();
     vi.useFakeTimers();

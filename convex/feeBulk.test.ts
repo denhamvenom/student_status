@@ -149,7 +149,7 @@ describe("durable prepared custom fees", () => {
     const cancelledDraft = await f.coach.mutation(prepare, { ...input, supersedeHeldJobId: originalId, expectedHeldRows: 1 }) as Id<"feeBulkJobs">;
     await finish(f, cancelledDraft);
     expect(await f.coach.query(makeFunctionReference<"query">("feeDefinitions:priorHeldRows"), { jobId: cancelledDraft, paginationOpts: { numItems: 20, cursor: null } })).toMatchObject({ page: [{ state: "held", targetAmountCents: 100 }] });
-    await f.coach.mutation(makeFunctionReference<"mutation">("feeDefinitions:cancelPrepared"), { jobId: cancelledDraft, reason: "Coach cancelled this zero-money prepared review" });
+    await f.coach.mutation(makeFunctionReference<"mutation">("feeDefinitions:cancelPrepared"), { jobId: cancelledDraft, reason: "Coach canceled this zero-money prepared review" });
     expect(await f.t.run(ctx => ctx.db.get(original!.feeDefinitionId))).toMatchObject({ latestJobId: originalId, revision: original!.expectedDefinitionRevision });
     const cancellation = await f.coach.mutation(prepare, { ...input, idempotencyKey: "confirmed-full-cancel", supersedeHeldJobId: originalId, expectedHeldRows: 1 }) as Id<"feeBulkJobs">;
     const prepared = await finish(f, cancellation);
@@ -233,7 +233,7 @@ describe("durable prepared custom fees", () => {
     const f = await fixture(2);
     const jobId = await f.coach.mutation(prepare, { kind: "create", label: "Never posted", targetAmountCents: 90, scope: "selected", studentIds: f.ids.students, reason: "Prepare explicit two member fee", idempotencyKey: "never-posted-key" }) as Id<"feeBulkJobs">;
     const prepared = await finish(f, jobId);
-    await f.coach.mutation(makeFunctionReference<"mutation">("feeDefinitions:cancelPrepared"), { jobId, reason: "Coach cancelled before monetary confirmation" });
+    await f.coach.mutation(makeFunctionReference<"mutation">("feeDefinitions:cancelPrepared"), { jobId, reason: "Coach canceled before monetary confirmation" });
     expect(await f.t.run(ctx => ctx.db.get(jobId))).toMatchObject({ state: "cancelled", snapshotCount: 2, snapshotHash: prepared!.snapshotHash });
     expect(await f.t.run(ctx => ctx.db.query("feeBulkRows").collect())).toHaveLength(2);
     expect(await f.t.run(ctx => ctx.db.query("ledgerEntries").collect())).toHaveLength(0);

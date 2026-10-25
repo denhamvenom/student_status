@@ -81,9 +81,9 @@ export const cancelPrepared = mutation({
   args: { jobId: v.id("feeBulkJobs"), reason: v.string() }, returns: v.null(),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach"); const season = await activeSeason(ctx); const job = await ctx.db.get(args.jobId);
-    if (!job || job.seasonId !== season._id || !(job.state === "prepared" || job.state === "failed" && !job.snapshotComplete) || job.committed !== 0 || job.processed !== 0 || args.reason.trim().length < 8 || args.reason.length > 1000) throw new ConvexError("Only an untouched prepared scope may be cancelled with a review reason.");
+    if (!job || job.seasonId !== season._id || !(job.state === "prepared" || job.state === "failed" && !job.snapshotComplete) || job.committed !== 0 || job.processed !== 0 || args.reason.trim().length < 8 || args.reason.length > 1000) throw new ConvexError("Only an untouched prepared scope may be canceled with a review reason.");
     const control = await seasonFinanceControl(ctx, season._id);
-    if (control && control.state !== "ready" && !(control.state === "failed" && control.bulkJobId === job._id && !job.snapshotComplete)) throw new ConvexError("Another season maintenance operation blocks cancelling this preparation.");
+    if (control && control.state !== "ready" && !(control.state === "failed" && control.bulkJobId === job._id && !job.snapshotComplete)) throw new ConvexError("Another season maintenance operation blocks canceling this preparation.");
     const waiting = await ctx.db.query("feeBulkRows").withIndex("by_jobId_and_state", q => q.eq("jobId", job._id).eq("state", "waiting")).first();
     if (waiting) throw new ConvexError("A money child exists; preparation cannot be abandoned.");
     const definition = await ctx.db.get(job.feeDefinitionId);

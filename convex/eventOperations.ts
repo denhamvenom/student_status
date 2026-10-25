@@ -48,7 +48,7 @@ export const reviewSignup = mutation({
     await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const user = await viewer(ctx); requireOperations(user);
     const event = await currentEvent(ctx, args.eventId);
-    if (event.cancelled) throw new ConvexError("This event is cancelled. New signups and approvals are unavailable.");
+    if (event.cancelled) throw new ConvexError("This event is canceled. New signups and approvals are unavailable.");
     requireEnrollmentComplete(event);
     if (event.signupMode === "assigned") throw new ConvexError("Required event assignments use the Coach roster.");
     const rows = await roster(ctx, event._id);
