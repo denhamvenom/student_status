@@ -39,6 +39,6 @@ The redesign is next: a simpler bento interface, with a dashboard of each audien
 Owner:
 - Decide on key rotation.
 - Approve one real Contact admin test email, if wanted.
-- Pick a visual direction in Claude Design for the Parent Home dashboard.
+- Pick a visual direction in Claude Design for the Student Home dashboard (owner moved Student first on October 25, since students see it soonest; Parent Home follows). Paste-ready briefs, before screenshots and logos for both are outside Git in `Logistics WorkClaude Design Pack - Student Home` and `...- Parent Home`.
 
 Then start the redesign on a new branch from main.
