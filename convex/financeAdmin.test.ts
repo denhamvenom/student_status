@@ -80,7 +80,7 @@ const rebuildRef = makeFunctionReference<"mutation">("financialSources:rebuild")
     const page = await f.coach.query(rows, { paginationOpts: { numItems: 20, maximumRowsRead: 1, cursor: null } });
     expect(page.page.length).toBeLessThanOrEqual(1);
     expect(page.page[0]).toMatchObject({ state: "uninitialized", chargedCents: null, canRecord: false });
-    await expect(f.coach.query(rows, { paginationOpts: { numItems: 21, cursor: null } })).rejects.toThrow("between 1 and 20");
+    await expect(f.coach.query(rows, { paginationOpts: { numItems: 21, cursor: null } })).rejects.toThrow("list couldn't load");
   });
   it("backfills more than 500 receipt facts in bounded replay-safe pages without inventing historical balances", async () => {
     const f = await fixture();
@@ -150,7 +150,7 @@ await f.t.run(async ctx => { const evidence = await ctx.db.query("financeChangeE
         await ctx.db.insert("appUsers", { authUserId: auth, name: "Viewer", email: `${role}-${travelLead}@example.invalid`, role, travelLead, financialEdit: false, active: true }); return auth;
       });
       const user = f.t.withIdentity({ subject: `${auth}|session` });
-      if (!allowed) { await expect(user.query(rows, { paginationOpts: { numItems: 20, cursor: null } })).rejects.toThrow("viewing"); await expect(user.query(feed, { paginationOpts: { numItems: 20, cursor: null } })).rejects.toThrow("viewing"); }
+      if (!allowed) { await expect(user.query(rows, { paginationOpts: { numItems: 20, cursor: null } })).rejects.toThrow("can see team money"); await expect(user.query(feed, { paginationOpts: { numItems: 20, cursor: null } })).rejects.toThrow("can see team money"); }
       else {
         const result = await user.query(rows, { paginationOpts: { numItems: 20, cursor: null } }); expect(result.page[0]).toMatchObject({ canRecord: false, canRebuild: false });
         expect(await user.query(makeFunctionReference<"query">("financeAdmin:status"), {})).toMatchObject({ canPrepareHistory: false });
@@ -163,8 +163,8 @@ await f.t.run(async ctx => { const evidence = await ctx.db.query("financeChangeE
     await f.t.run(async ctx => { const original = await ctx.db.get(f.ids.student); if (!original) throw new Error("Fixture"); const { _id, _creationTime, ...student } = original; void _id; void _creationTime; for (let i = 0; i < 44; i++) await ctx.db.insert("students", { ...student, legalName: `Row ${i}` }); });
     const first = await f.coach.query(rows, { paginationOpts: { numItems: 20, cursor: null } });
     const second = await f.coach.query(rows, { paginationOpts: { numItems: 20, cursor: first.continueCursor } });
-    await expect(f.coach.query(rows, { paginationOpts: { numItems: 1, cursor: null, endCursor: second.continueCursor, maximumRowsRead: 10000 } })).rejects.toThrow("exceeded");
-    await expect(f.coach.query(rows, { paginationOpts: { numItems: 20, cursor: null, maximumRowsRead: Number.NaN } })).rejects.toThrow("valid row budget");
+    await expect(f.coach.query(rows, { paginationOpts: { numItems: 1, cursor: null, endCursor: second.continueCursor, maximumRowsRead: 10000 } })).rejects.toThrow("list couldn't load");
+    await expect(f.coach.query(rows, { paginationOpts: { numItems: 20, cursor: null, maximumRowsRead: Number.NaN } })).rejects.toThrow("list couldn't load");
     const small = await f.coach.query(rows, { paginationOpts: { numItems: 20, maximumRowsRead: 2, cursor: null } });
     expect(small.page.length).toBeLessThanOrEqual(2); expect(small).toHaveProperty("pageStatus"); expect(small).toHaveProperty("splitCursor");
   });

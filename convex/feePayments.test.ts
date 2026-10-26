@@ -45,13 +45,13 @@ describe("fee-specific CSV payment batches", () => {
     const exported = await f.exportPage();
     expect(exported.page).toHaveLength(2);
     expect(exported.page[0]).toMatchObject({ studentName: "Alex Rivera", chargedCents: 1000, appliedCents: 0, owedCents: 1000 });
-    await expect(f.parent.query(api.feePayments.exportPage, { feeDefinitionId: f.ids.fee, filter: "all", paginationOpts: { cursor: null, numItems: 20 } })).rejects.toThrow("Financial editing");
+    await expect(f.parent.query(api.feePayments.exportPage, { feeDefinitionId: f.ids.fee, filter: "all", paginationOpts: { cursor: null, numItems: 20 } })).rejects.toThrow("Money editing access");
     const rows = await f.rows();
     const preview = await f.coach.query(api.feePayments.previewRows, { feeDefinitionId: f.ids.fee, exportId: "synthetic-export-1", rows });
     expect(preview.map(item => item.state)).toEqual(["ready", "ready"]);
     expect(preview[0].studentName).toBe("Alex Rivera");
     const batch = await f.coach.mutation(api.feePayments.beginBatch, { feeDefinitionId: f.ids.fee, exportId: "synthetic-export-1", rows, ...details });
-    await expect(f.parent.mutation(api.feePayments.recordRow, { batchId: batch.batchId, rowKey: rows[0].rowKey })).rejects.toThrow("Financial editing");
+    await expect(f.parent.mutation(api.feePayments.recordRow, { batchId: batch.batchId, rowKey: rows[0].rowKey })).rejects.toThrow("Money editing access");
     const saved = await f.coach.mutation(api.feePayments.recordRow, { batchId: batch.batchId, rowKey: rows[0].rowKey });
     expect(saved.replayed).toBe(false);
     const state = await f.t.run(async ctx => ({
@@ -74,8 +74,8 @@ describe("fee-specific CSV payment batches", () => {
     const first = await f.coach.mutation(api.feePayments.recordRow, { batchId: batch.batchId, rowKey: rows[0].rowKey });
     expect(await f.secondCoach.mutation(api.feePayments.recordRow, { batchId: batch.batchId, rowKey: rows[0].rowKey })).toEqual({ receiptId: first.receiptId, replayed: true });
     expect(await f.secondCoach.mutation(api.feePayments.beginBatch, { ...start, rows: [...rows].reverse() })).toEqual({ batchId: batch.batchId, resumed: true });
-    await expect(f.coach.mutation(api.feePayments.beginBatch, { ...start, rows: [{ ...rows[0], amountCents: 401 }, rows[1]] })).rejects.toThrow("different payment rows");
-    await expect(f.coach.mutation(api.feePayments.beginBatch, { ...start, reference: "Changed receipt" })).rejects.toThrow("different payment rows");
+    await expect(f.coach.mutation(api.feePayments.beginBatch, { ...start, rows: [{ ...rows[0], amountCents: 401 }, rows[1]] })).rejects.toThrow("already recorded with different payments");
+    await expect(f.coach.mutation(api.feePayments.beginBatch, { ...start, reference: "Changed receipt" })).rejects.toThrow("already recorded with different payments");
     const reorderedFirst = { amountCents: rows[0].amountCents, expectedFinancialRevision: rows[0].expectedFinancialRevision, chargeId: rows[0].chargeId, rowKey: rows[0].rowKey, expectedFinancialGeneration: rows[0].expectedFinancialGeneration, studentId: rows[0].studentId, expectedChargeRevision: rows[0].expectedChargeRevision };
     expect((await f.secondCoach.query(api.feePayments.previewRows, { feeDefinitionId: f.ids.fee, exportId: start.exportId, rows: [reorderedFirst, rows[1]] })).map(item => item.state)).toEqual(["recorded", "ready"]);
     await f.t.run(ctx => ctx.db.patch(rows[1].chargeId, { revision: rows[1].expectedChargeRevision + 1 }));
@@ -119,7 +119,7 @@ describe("fee-specific CSV payment batches", () => {
     await f.t.run(ctx => ctx.db.patch(rows[0].studentId, { active: false }));
     expect((await f.coach.query(api.feePayments.previewRows, { feeDefinitionId: f.ids.fee, exportId: "synthetic-export-4", rows: [rows[0]] }))[0].state).toBe("invalid");
     const batch = await f.coach.mutation(api.feePayments.beginBatch, { feeDefinitionId: f.ids.fee, exportId: "synthetic-export-4", rows: [rows[0]], ...details });
-    await expect(f.coach.mutation(api.feePayments.recordRow, { batchId: batch.batchId, rowKey: rows[0].rowKey })).rejects.toThrow("unavailable");
+    await expect(f.coach.mutation(api.feePayments.recordRow, { batchId: batch.batchId, rowKey: rows[0].rowKey })).rejects.toThrow("no longer available");
     const unrelatedSeason = await f.t.run(ctx => ctx.db.insert("seasons", { name: "Other", year: 2028, status: "archived", startsAt: 0, permissionVersion: "draft", createdBy: f.ids.actor }));
     await f.t.run(ctx => ctx.db.patch(rows[1].studentId, { seasonId: unrelatedSeason }));
     expect((await f.coach.query(api.feePayments.previewRows, { feeDefinitionId: f.ids.fee, exportId: "synthetic-export-5", rows: [rows[1]] }))[0].state).toBe("invalid");

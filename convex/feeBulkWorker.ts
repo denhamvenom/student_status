@@ -19,10 +19,10 @@ async function snapshotRow(ctx: MutationCtx, job: Doc<"feeBulkJobs">, studentId:
   const matches = explicitCharge ? [explicitCharge] : await ctx.db.query("charges").withIndex("by_feeDefinitionId_and_studentId", q => q.eq("feeDefinitionId", job.feeDefinitionId).eq("studentId", studentId)).take(2);
   const charge = matches.length === 1 ? matches[0] : null;
   let message: string | undefined;
-  if (!student || student.seasonId !== job.seasonId || !student.active) message = "Student is inactive or unavailable in this prepared season scope.";
-  else if (!account || account.state !== "ready" || job.requiredFinancialProjectionVersion === 4 && account.allocationSourceVersion !== 1) message = "Financial preparation must be repaired before this row can post.";
-  else if (matches.length > 1) message = "Multiple linked charges require explicit historical review.";
-  else if (job.kind !== "create" && !charge && job.scope === "existingCharges") message = "Original charge evidence is unavailable.";
+  if (!student || student.seasonId !== job.seasonId || !student.active) message = "This student is no longer active in this season.";
+  else if (!account || account.state !== "ready" || job.requiredFinancialProjectionVersion === 4 && account.allocationSourceVersion !== 1) message = "This student's money records need to be rebuilt before this fee can be added.";
+  else if (matches.length > 1) message = "This student has more than one matching earlier charge. Review them before changing this fee.";
+  else if (job.kind !== "create" && !charge && job.scope === "existingCharges") message = "The student's original fee no longer exists.";
   else if (account) message = bulkTargetHold(account, charge, job.targetAmountCents, job.kind) ?? undefined;
   const fields = { chargeId: charge?._id, expectedChargeRevision: charge?.revision ?? (charge ? 0 : undefined), originalExpectedChargeRevision: charge?.revision ?? (charge ? 0 : undefined), expectedFinancialRevision: account?.revision, originalExpectedFinancialRevision: account?.revision, expectedGeneration: account?.generation, beforeEffectiveCents: charge ? effectiveChargeCents(charge) : 0, beforeAppliedCents: charge?.appliedCents ?? 0, state: message ? "held" as const : "pending" as const, message };
   const id = existingRow?._id ?? await ctx.db.insert("feeBulkRows", { jobId: job._id, studentId, targetAmountCents: job.targetAmountCents, ...fields });
@@ -105,13 +105,13 @@ export const processPage = internalMutation({
         } else {
           const charge = row.chargeId ? await ctx.db.get(row.chargeId) : null;
           let message: string | undefined;
-          if (!student?.active || student.seasonId !== job.seasonId) message = "Original prepared student is inactive or unavailable.";
-          else if (!account || account.state !== "ready" || job.requiredFinancialProjectionVersion === 4 && account.allocationSourceVersion !== 1 || !fence || account.generation !== fence.generation || account.revision !== fence.expectedFinancialRevision) message = "Financial state changed after preparation; explicit fresh review is required.";
-          else if (row.chargeId && (!charge || charge.feeDefinitionId !== fee._id || (charge.revision ?? 0) !== row.expectedChargeRevision)) message = "Original prepared charge changed; explicit fresh review is required.";
+          if (!student?.active || student.seasonId !== job.seasonId) message = "This student is no longer active in this season.";
+          else if (!account || account.state !== "ready" || job.requiredFinancialProjectionVersion === 4 && account.allocationSourceVersion !== 1 || !fence || account.generation !== fence.generation || account.revision !== fence.expectedFinancialRevision) message = "This student's money changed. Review this student again.";
+          else if (row.chargeId && (!charge || charge.feeDefinitionId !== fee._id || (charge.revision ?? 0) !== row.expectedChargeRevision)) message = "This student's fee changed. Review this student again.";
           else if (account) message = bulkTargetHold(account, charge, row.targetAmountCents, job.kind) ?? undefined;
           if (fee.eventId) {
             const event = await ctx.db.get(fee.eventId); const participant = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", fee.eventId!).eq("studentId", row.studentId)).unique();
-            if (!event || event.archived || event.seasonId !== job.seasonId || participant?.status !== "confirmed") message = "Prepared event scope is no longer eligible.";
+            if (!event || event.archived || event.seasonId !== job.seasonId || participant?.status !== "confirmed") message = "This student is no longer signed up for the event.";
           }
           if (message) {
             await ctx.db.patch(row._id, { state: "held", message });
@@ -140,7 +140,7 @@ export const processPage = internalMutation({
       const rows = await ctx.db.query("feeBulkRows").withIndex("by_jobId_and_state", q => q.eq("jobId", prior._id).eq("state", "held")).take(20);
       for (const row of rows) {
         if (row.correctionJobId || row.allocationJobId) throw new Error("A prior held row has money child evidence and cannot be superseded.");
-        await ctx.db.patch(row._id, { state: "superseded", message: "Original target was not posted; resolved by the reviewed full fee cancellation." });
+        await ctx.db.patch(row._id, { state: "superseded", message: "Not added; the fee was canceled for this student instead." });
       }
       const count = job.supersededRows + rows.length;
       if (count > (job.priorHeldRows ?? 0)) throw new Error("Prior unposted row count is inconsistent.");
@@ -172,7 +172,7 @@ export const run = internalMutation({
     const job = await ctx.db.get(args.jobId); if (!job || !["draining", "preparing", "applying"].includes(job.state)) return null;
     try { await ctx.runMutation(pageRef, { jobId: job._id, step: job.step }); }
     catch (error) {
-      await ctx.db.patch(job._id, { state: "failed", lastError: savedPublicError(error, "Prepared fee operation failed."), updatedAt: Date.now() });
+      await ctx.db.patch(job._id, { state: "failed", lastError: savedPublicError(error, "The fee change stopped before it finished. Ask a Coach to review it, then try again."), updatedAt: Date.now() });
       const control = await seasonFinanceControl(ctx, job.seasonId); if (control?.bulkJobId === job._id) await ctx.db.patch(control._id, { state: "failed", updatedAt: Date.now() });
     }
     return null;

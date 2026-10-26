@@ -107,7 +107,7 @@ describe("Zeffy donation safety", () => {
     await expect(f.t.withIdentity({ subject: `${f.ids.studentAuth}|session` }).mutation(setEnabled, { enabled: false, reason: "Synthetic access check" })).rejects.toThrow();
     await f.t.mutation(expire, { runId: f.ids.run });
     const state = await f.t.withIdentity({ subject: `${f.ids.auth}|session` }).query(status, {});
-    expect(state).toMatchObject({ running: false, lastRunStatus: "failed", lastError: "Zeffy sync was interrupted; use Check now to retry." });
+    expect(state).toMatchObject({ running: false, lastRunStatus: "failed", lastError: "The Zeffy check stopped before finishing. Use Check now to run it again." });
     await f.t.withIdentity({ subject: `${f.ids.auth}|session` }).mutation(setEnabled, { enabled: false, reason: "Synthetic disable check" });
     expect((await f.t.withIdentity({ subject: `${f.ids.auth}|session` }).query(status, {})).enabled).toBe(false);
   });

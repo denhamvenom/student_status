@@ -53,9 +53,9 @@ export const run = internalMutation({
     if (!job || job.state !== "running") return null;
     try { await ctx.runMutation(pageRef, { jobId: job._id, step: job.step }); }
     catch (error) {
-      await ctx.db.patch(job._id, { state: "failed", lastError: savedPublicError(error, "Allocation failed; Coach review is required."), updatedAt: Date.now() });
+      await ctx.db.patch(job._id, { state: "failed", lastError: savedPublicError(error, "This student's money update stopped. A Coach needs to review it, then retry."), updatedAt: Date.now() });
       const account = await financialAccount(ctx, job.studentId);
-      if (account?.allocationJobId === job._id && account.generation === job.generation) await ctx.db.patch(account._id, { state: "failed", lastError: savedPublicError(null, "Allocation failed; a Coach must retry."), updatedAt: Date.now() });
+      if (account?.allocationJobId === job._id && account.generation === job.generation) await ctx.db.patch(account._id, { state: "failed", lastError: savedPublicError(null, "This student's money update stopped. A Coach needs to retry it."), updatedAt: Date.now() });
     }
     return null;
   },
@@ -65,13 +65,13 @@ export const retry = mutation({
   args: { studentId: v.id("students"), reason: v.string() }, returns: v.null(),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx);
-    if (actor.role !== "coach") throw new ConvexError("Only a Coach may retry allocation.");
+    if (actor.role !== "coach") throw new ConvexError("Only a Coach can retry this money update.");
     if (args.reason.trim().length < 8 || args.reason.length > 1000) throw new ConvexError("Provide a reason of at least eight characters.");
     const season = await activeSeason(ctx); const student = await ctx.db.get(args.studentId);
-    if (!student?.active || student.seasonId !== season._id) throw new ConvexError("Allocation student is unavailable.");
+    if (!student?.active || student.seasonId !== season._id) throw new ConvexError("This student no longer exists. Reload to see the latest.");
     const account = await financialAccount(ctx, args.studentId);
     const job = account?.allocationJobId ? await ctx.db.get(account.allocationJobId) : null;
-    if (!account || !job || account.state !== "failed" || job.state !== "failed" || job.generation !== account.generation) throw new ConvexError("No failed allocation is available to retry.");
+    if (!account || !job || account.state !== "failed" || job.state !== "failed" || job.generation !== account.generation) throw new ConvexError("There is no stopped money update to retry. Reload to see the latest.");
     await requireSeasonFinancialRetry(ctx, season._id, job._id);
     await ctx.db.patch(job._id, { actorId: actor._id, state: "running", lastError: undefined, updatedAt: Date.now() });
     await ctx.db.patch(account._id, { state: "allocating", lastError: undefined, updatedAt: Date.now() });

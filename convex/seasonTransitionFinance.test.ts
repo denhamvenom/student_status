@@ -19,7 +19,7 @@ it("pairs personal/fundraising carry and debt once, preserves roots, and fences 
     const target = await ctx.db.insert("students", { ...profile, seasonId: next });
     const plan = await ctx.db.insert("seasonTransitionPlans", { sourceSeasonId: old, targetSeasonId: next, targetName: "Next", targetCompetitionYear: 2027, targetStartDate: "2027-01-01", targetEndDate: "2027-12-31", state: "draining", open: true, revision: 1, createdBy: coach, updatedBy: coach, createdAt: 0, updatedAt: 0, idempotencyKey: "synthetic-plan", requestHash: "synthetic" });
     await ctx.db.insert("seasonTransitionRosterDecisions", { planId: plan, sourceStudentId: student, targetStudentId: target, choice: "return", studentFingerprint: "synthetic", revision: 1, decidedBy: coach, decidedAt: 0 });
-    await expect(requireSeasonFinanceReady(ctx, old)).rejects.toThrow("transition");
+    await expect(requireSeasonFinanceReady(ctx, old)).rejects.toThrow("season change");
     await requireSeasonTransitionFinancialAccess(ctx, old, true);
     const account = await ensureFinancialAccount(ctx, student);
     const decisions = [];
@@ -35,7 +35,7 @@ it("pairs personal/fundraising carry and debt once, preserves roots, and fences 
     await recordChargeChange(ctx, account, original!, 0, 0, true);
     const debt = await ctx.db.insert("seasonTransitionChargeDecisions", { planId: plan, sourceStudentId: student, chargeId: charge, choice: "carry", outstandingCents: 99, chargeRevision: 1, financialGeneration: account.generation, financialRevision: account.revision, reason: "", revision: 1, decidedBy: coach, decidedAt: 1 });
     await ctx.db.patch(plan, { state: "applying" });
-    await expect(requireSeasonTransitionFinancialAccess(ctx, old, true)).rejects.toThrow("transition");
+    await expect(requireSeasonTransitionFinancialAccess(ctx, old, true)).rejects.toThrow("season change");
     for (const id of decisions) { await applySeasonSourceDecision(ctx, plan, id, target); await applySeasonSourceDecision(ctx, plan, id, target); }
     await applySeasonChargeDecision(ctx, plan, debt, target); await applySeasonChargeDecision(ctx, plan, debt, target);
     const before = await financialAccount(ctx, student); const after = await financialAccount(ctx, target);

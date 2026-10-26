@@ -17,7 +17,7 @@ export async function seasonFinanceControl(ctx: Ctx, seasonId: Id<"seasons">) {
 export async function requireNoUnfinishedFeeScopes(ctx: Ctx, seasonId: Id<"seasons">) {
   for (const state of ["draining", "preparing", "prepared", "applying", "held", "failed"] as const) {
     const job = await ctx.db.query("feeBulkJobs").withIndex("by_seasonId_and_state", q => q.eq("seasonId", seasonId).eq("state", state)).first();
-    if (job) throw new ConvexError("Finish or cancel every prepared or held shared fee scope before remapping the season order.");
+    if (job) throw new ConvexError("Finish or cancel every fee change in progress, then change the fee order.");
   }
 }
 
@@ -26,31 +26,31 @@ export async function requireSeasonTransitionFinancialAccess(ctx: Ctx, seasonId:
   const plan = await ctx.db.query("seasonTransitionPlans").withIndex("by_sourceSeasonId_and_open", q => q.eq("sourceSeasonId", seasonId).eq("open", true)).unique();
   if (!plan || plan.state === "draft" || plan.state === "reviewing") return;
   if (continuation && plan.state === "draining") return;
-  throw new ConvexError("Season transition is locked. Finish or retry the transition before changing financial records.");
+  throw new ConvexError("The season change is still in progress. Finish or retry it before changing money records.");
 }
 
 /** New commands cannot enter while shared definitions are being changed. */
 export async function requireSeasonFinanceReady(ctx: Ctx, seasonId: Id<"seasons">) {
   await requireSeasonTransitionFinancialAccess(ctx, seasonId);
   const control = await seasonFinanceControl(ctx, seasonId);
-  if (control && control.state !== "ready") throw new ConvexError("Season fees are being maintained. Finish or retry that maintenance before starting another financial change.");
+  if (control && control.state !== "ready") throw new ConvexError("Season fees are updating. Wait for that to finish, or retry it, before making another money change.");
 }
 
 /** Indexed upstream checks and the control transition share one transaction/OCC fence. */
 export async function seasonFinancialDrain(ctx: Ctx, seasonId: Id<"seasons">) {
   for (const state of ["rebuilding", "allocating", "posting", "failed"] as const) {
     const account = await ctx.db.query("financialAccounts").withIndex("by_seasonId_and_state", q => q.eq("seasonId", seasonId).eq("state", state)).first();
-    if (account) return { ready: false, blocked: state === "failed", message: state === "failed" ? "A failed student financial job requires Coach resolution." : "Existing student financial work is still finishing." };
+    if (account) return { ready: false, blocked: state === "failed", message: state === "failed" ? "A student's money update stopped. A Coach needs to retry it." : "A student's money is still updating." };
   }
   const enrollment = await ctx.db.query("events").withIndex("by_seasonId_and_enrollmentState", q => q.eq("seasonId", seasonId).eq("enrollmentState", "running")).first();
-  if (enrollment) return { ready: false, blocked: false, message: "Existing Whole Team enrollment is still finishing." };
+  if (enrollment) return { ready: false, blocked: false, message: "Whole Team signups are still updating." };
   const failedEnrollment = await ctx.db.query("events").withIndex("by_seasonId_and_enrollmentState", q => q.eq("seasonId", seasonId).eq("enrollmentState", "failed")).first();
-  if (failedEnrollment) return { ready: false, blocked: true, message: "A failed Whole Team enrollment requires Coach resolution." };
+  if (failedEnrollment) return { ready: false, blocked: true, message: "Whole Team signups stopped before finishing. A Coach needs to retry them." };
   const fundraiser = await ctx.db.query("fundraisers").withIndex("by_seasonId_and_state", q => q.eq("seasonId", seasonId).eq("state", "posting")).first();
-  if (fundraiser) return { ready: false, blocked: false, message: "Existing fundraiser posting is still finishing." };
+  if (fundraiser) return { ready: false, blocked: false, message: "Fundraiser amounts are still posting." };
   const report = await ctx.db.query("financeSummaryBackfills").withIndex("by_seasonId", q => q.eq("seasonId", seasonId)).unique();
-  if (report?.state === "failed") return { ready: false, blocked: true, message: "Failed finance report preparation requires Coach resolution." };
-  if (report?.state === "running") return { ready: false, blocked: false, message: "Existing finance report preparation is still finishing." };
+  if (report?.state === "failed") return { ready: false, blocked: true, message: "Money reports stopped updating. A Coach needs to rebuild them." };
+  if (report?.state === "running") return { ready: false, blocked: false, message: "Money reports are still updating." };
   return { ready: true, blocked: false, message: null };
 }
 
@@ -63,7 +63,7 @@ export async function historicalFinancialContinuation(ctx: Ctx, seasonId: Id<"se
   const actor = await ctx.db.get(origin.actorId);
   const season = await ctx.db.get(seasonId);
   const student = await ctx.db.get(origin.studentId);
-  if (!grant || grant.actorId !== actor?._id || grant.seasonId !== seasonId || grant.closedAt !== undefined || grant.expiresAt <= Date.now() || !actor?.active || actor.role !== "coach" || season?.status !== "archived" || student?.seasonId !== seasonId) throw new ConvexError("Historical financial access has ended. Open correction mode again and retry with the fresh grant.");
+  if (!grant || grant.actorId !== actor?._id || grant.seasonId !== seasonId || grant.closedAt !== undefined || grant.expiresAt <= Date.now() || !actor?.active || actor.role !== "coach" || season?.status !== "archived" || student?.seasonId !== seasonId) throw new ConvexError("Your correction access ended. Open correction mode again, then retry.");
   return true;
 }
 
@@ -116,7 +116,7 @@ export async function requireSeasonFinancialRetry(ctx: Ctx, seasonId: Id<"season
   if ("maintenanceOriginId" in job && job.maintenanceOriginId) {
     await requireSeasonFinancialContinuation(ctx, seasonId, job.maintenanceOriginId); return;
   }
-  throw new ConvexError("Finish active season fee maintenance before restarting this upstream job.");
+  throw new ConvexError("Season fees are updating. Wait for that to finish, then try again.");
 }
 
 export async function seasonFinancialRetryAvailable(ctx: Ctx, seasonId: Id<"seasons">, jobId: FinancialContinuationId | Id<"financialAllocationJobs">) {

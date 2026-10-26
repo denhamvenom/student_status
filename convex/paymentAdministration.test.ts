@@ -52,8 +52,8 @@ it("corrects allocated receipts without payout, preserves originals, reapplies p
 it("matches active-season emails, holds duplicate rows, denies family edits and rejects stale/locked commands", async () => {
   const f = await fixture(); const data = { studentEmail: "synthetic-student@example.invalid", amountCents: 200, method: "cash", reference: "Synthetic cash receipt", occurredAt: 1, rowReference: "1" };
   const matches = await f.actor.query(batchPreview, { rows: [data, data, { ...data, studentEmail: "unknown@example.invalid", rowReference: "2" }] });
-  expect(matches[0]).toMatchObject({ studentId: f.ids.student, error: null }); expect(matches[1].error).toContain("Duplicate"); expect(matches[2].studentId).toBeNull();
-  await expect(f.parent.query(batchPreview, { rows: [data] })).rejects.toThrow("Financial editing");
+  expect(matches[0]).toMatchObject({ studentId: f.ids.student, error: null }); expect(matches[1].error).toContain("appear twice"); expect(matches[2].studentId).toBeNull();
+  await expect(f.parent.query(batchPreview, { rows: [data] })).rejects.toThrow("Money editing access");
   const receipt: Id<"ledgerEntries"> = await f.actor.mutation(post, { amountCents: data.amountCents, method: data.method, reference: data.reference, occurredAt: data.occurredAt, rowReference: data.rowReference, studentId: f.ids.student, batchReference: "permission-batch", reason: "Synthetic authorized entry", expectedGeneration: 1 });
   await expect(f.parent.query(preview, { sourceEntryId: receipt, targetAmountCents: 80 })).rejects.toThrow("Only a Coach");
   const review = await f.actor.query(preview, { sourceEntryId: receipt, targetAmountCents: 80 });
