@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { FunctionArgs, FunctionReturnType } from 'convex/server'
 import { api } from '../convex/_generated/api'
 import type { Id } from '../convex/_generated/dataModel'
-import { collectPermissionExport, emptyChoices, receiptHistoryLabels, eventDateRange } from './PermissionWorkflow'
+import { collectPermissionExport, emptyChoices, pdfReferenceRows, receiptHistoryLabels, eventDateRange } from './PermissionWorkflow'
 type Page=FunctionReturnType<typeof api.permissions.exportPacket>
 const eventId='synthetic-event' as Id<'events'>
 function page(index:number,isDone=false):Page{return{event:{eventId,name:'Synthetic event'},schemaVersion:1,synthetic:false,generatedAt:1000+index,records:Array.from({length:10},(_,offset)=>({studentId:`synthetic-student-${index*10+offset}` as Id<'students'>,studentName:`Synthetic student ${index*10+offset}`,state:'required',revision:0,submissionId:null,signerName:null,signedAt:null,source:null,synthetic:null,collectedAt:1000+index})),isDone,continueCursor:`synthetic-cursor-${index+1}`}}
@@ -13,6 +13,14 @@ describe('permission export collection',()=>{
     const nextDayEnd=Date.parse('2027-05-11T10:00:00-05:00')
     expect(eventDateRange(start,sameDayEnd)).toBe('May 10, 2027')
     expect(eventDateRange(start,nextDayEnd)).toBe('May 10, 2027 – May 11, 2027')
+  })
+  it.each([
+    ['parent',0],['student',0],[undefined,0],['coach',2],['mentor',2],
+  ] as const)('shows signed-form reference codes to %s: %i rows',(role,rows)=>{
+    const codes={reviewedPdfSha256:'a'.repeat(64),signedPdfSha256:'b'.repeat(64)}
+    const result=pdfReferenceRows(role,codes)
+    expect(result).toHaveLength(rows)
+    if(!rows)expect(JSON.stringify(result)).not.toMatch(/a{64}|b{64}/)
   })
   it('labels earlier signed forms without claiming they lost current coverage',()=>{
     expect(receiptHistoryLabels({controlledCoverage:[{eventId,revision:2}]},1)).toEqual(['Earlier signed form'])
@@ -34,8 +42,8 @@ describe('permission export collection',()=>{
   })
   it('rejects a cursor that cannot advance and unexpected event scope',async()=>{
     let index=0
-    await expect(collectPermissionExport(async()=>({...page(index++),continueCursor:'same-cursor'}),{eventId,includeHealth:false})).rejects.toThrow('could not advance')
-    await expect(collectPermissionExport(async()=>({...page(0,true),event:{eventId:'different-event' as Id<'events'>,name:'Different synthetic event'}}),{eventId,includeHealth:false})).rejects.toThrow('scope or records changed')
+    await expect(collectPermissionExport(async()=>({...page(index++),continueCursor:'same-cursor'}),{eventId,includeHealth:false})).rejects.toThrow('stopped partway')
+    await expect(collectPermissionExport(async()=>({...page(0,true),event:{eventId:'different-event' as Id<'events'>,name:'Different synthetic event'}}),{eventId,includeHealth:false})).rejects.toThrow('Records changed during the download')
   })
   it('cancels between pages without producing a downloadable packet',async()=>{
     let cancelled=false;const fetch=vi.fn(async()=>page(0));const download=vi.fn()

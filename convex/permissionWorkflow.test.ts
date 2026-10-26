@@ -92,7 +92,7 @@ describe("synthetic versioned permission workflow", () => {
   it("rejects stale profile, event, version, expired draft and wrong signer", async () => {
     const f = await fixture(); const args = {studentId: f.ids.student, eventIds: [f.ids.events[0]]};
     let draft = await f.parent.mutation(api.permissions.prepare, args);
-    await expect(f.other.mutation(api.permissions.submitDraft, {draftId: draft.draftId, typedName: "Other Parent", acknowledged: true, choices})).rejects.toThrow("this account");
+    await expect(f.other.mutation(api.permissions.submitDraft, {draftId: draft.draftId, typedName: "Other Parent", acknowledged: true, choices})).rejects.toThrow("for your account");
     await expect(f.parent.mutation(api.permissions.submitDraft, {draftId: draft.draftId, typedName: "Not Parent Example", acknowledged: true, choices})).rejects.toThrow("exactly");
     await f.t.run(ctx => ctx.db.patch(f.ids.student, {profileRevision: 1, emergencyPhone: "555-0111"}));
     await expect(f.parent.mutation(api.permissions.submitDraft, {draftId: draft.draftId, typedName: "Parent Example", acknowledged: true, choices})).rejects.toThrow("changed");
@@ -103,12 +103,12 @@ describe("synthetic versioned permission workflow", () => {
     await f.coach.mutation(api.permissionVersions.createVersion, {...wording, version: "SYNTHETIC-DRAFT-2"});
     await expect(f.parent.mutation(api.permissions.submitDraft, {draftId: draft.draftId, typedName: "Parent Example", acknowledged: true, choices})).rejects.toThrow("changed");
     draft = await f.parent.mutation(api.permissions.prepare, args); await f.t.run(ctx => ctx.db.patch(draft.draftId, {expiresAt: 0}));
-    await expect(f.parent.mutation(api.permissions.submitDraft, {draftId: draft.draftId, typedName: "Parent Example", acknowledged: true, choices})).rejects.toThrow("expired");
+    await expect(f.parent.mutation(api.permissions.submitDraft, {draftId: draft.draftId, typedName: "Parent Example", acknowledged: true, choices})).rejects.toThrow("time to sign this permission form ran out");
   });
 
   it("blocks unregistered subjects, wrong deployments, revoked links and ordinary Mentor access", async () => {
     const f = await fixture(); const args = {studentId: f.ids.student, eventIds: [f.ids.events[0]]};
-    await expect(f.mentor.query(api.permissions.workspace, {studentId: f.ids.student})).rejects.toThrow("Form access");
+    await expect(f.mentor.query(api.permissions.workspace, {studentId: f.ids.student})).rejects.toThrow("open to Parents, Coaches and Travel Leads");
     vi.stubEnv("CONVEX_CLOUD_URL", "https://production.example.invalid"); await expect(f.parent.mutation(api.permissions.prepare, args)).rejects.toThrow("Real permission signing");
     vi.stubEnv("CONVEX_CLOUD_URL", "https://third-bandicoot-18.convex.cloud");
     const draft = await f.parent.mutation(api.permissions.prepare, args); await f.t.run(ctx => ctx.db.patch(f.ids.link, {active: false}));
@@ -124,15 +124,15 @@ describe("synthetic versioned permission workflow", () => {
     const args = {...paper, versionId: prepared.versionId, expectedProfileRevision: prepared.expectedProfileRevision, eventFingerprint: prepared.eventFingerprint, expectedCoverage: prepared.expectedCoverage, choices, paperAttested: true, idempotencyKey: "paper-one"};
     const submissionId = await f.coach.mutation(api.permissions.recordPaper, args);
     expect(await f.coach.mutation(api.permissions.recordPaper, args)).toBe(submissionId);
-    await expect(f.coach.mutation(api.permissions.recordPaper, {...args, paperReference: "OTHER"})).rejects.toThrow("different paper");
+    await expect(f.coach.mutation(api.permissions.recordPaper, {...args, paperReference: "OTHER"})).rejects.toThrow("already recorded with different details");
     const doc = await f.t.run(ctx => ctx.db.get(submissionId)); expect(doc?.signedBy).toBeUndefined(); expect(doc).toMatchObject({source: "paper", signerName: "Paper Guardian", recordedBy: f.ids.coach.id, paperAttestation: true});
     await review(f, submissionId);
     const manifest = await f.ungranted.mutation(api.permissions.exportPacket, {eventId: f.ids.events[0], includeHealth: false});
     expect(manifest.records[0]).not.toHaveProperty("snapshot"); expect(JSON.stringify(manifest)).not.toContain("Synthetic prescription");
-    await expect(f.ungranted.mutation(api.permissions.exportPacket, {eventId: f.ids.events[0], includeHealth: true})).rejects.toThrow("health-export");
+    await expect(f.ungranted.mutation(api.permissions.exportPacket, {eventId: f.ids.events[0], includeHealth: true})).rejects.toThrow("Health export access");
     const packet = await f.lead.mutation(api.permissions.exportPacket, {eventId: f.ids.events[0], includeHealth: true}); expect(packet.records[0].snapshot?.signer.name).toBe("Paper Guardian");
     await f.t.run(ctx => ctx.db.patch(f.ids.lead.id, {healthExport: false}));
-    await expect(f.lead.mutation(api.permissions.exportPacket, {eventId: f.ids.events[0], includeHealth: true})).rejects.toThrow("health-export");
+    await expect(f.lead.mutation(api.permissions.exportPacket, {eventId: f.ids.events[0], includeHealth: true})).rejects.toThrow("Health export access");
     await expect(f.mentor.mutation(api.permissions.exportPacket, {eventId: f.ids.events[0], includeHealth: false})).rejects.toThrow("Coach or Travel Lead");
   });
 
@@ -162,7 +162,7 @@ describe("synthetic versioned permission workflow", () => {
     await f.t.run(async ctx => {
       const doc = await ctx.db.get(signed.submissionId); const snapshot = parseSnapshot(ctx, doc!.snapshotJson!);
       snapshot.priorCoverage[1] = {...snapshot.priorCoverage[0]};
-      expect(() => parseSnapshot(ctx, JSON.stringify(snapshot))).toThrow("Duplicate prior coverage");
+      expect(() => parseSnapshot(ctx, JSON.stringify(snapshot))).toThrow("listed twice");
     });
     const paper = {studentId: f.ids.student, eventIds: [f.ids.events[2]], signerName: "Paper Guardian", signerEmail: "guardian@example.invalid", paperReference: "PAPER-SEAL", paperSignedAt: Date.now() - 1000};
     const prepared = await f.coach.mutation(api.permissions.preparePaper, paper);
@@ -185,7 +185,7 @@ describe("synthetic versioned permission workflow", () => {
     await f.t.run(async ctx => {for (const eventId of f.ids.events) await ctx.db.patch(eventId, {destination: "😀".repeat(9000)})});
     let error: unknown;
     try {await f.parent.mutation(api.permissions.prepare, {studentId: f.ids.student, eventIds: f.ids.events})} catch (cause) {error = cause}
-    expect(error).toBeInstanceOf(Error); expect((error as Error).message).toContain("too large");
+    expect(error).toBeInstanceOf(Error); expect((error as Error).message).toContain("too long");
     expect(await f.t.run(ctx => ctx.db.query("permissionDrafts").withIndex("by_studentId_and_parentId", q => q.eq("studentId", f.ids.student).eq("parentId", f.ids.parent.id)).collect())).toHaveLength(0);
   });
 
@@ -219,7 +219,7 @@ describe("synthetic versioned permission workflow", () => {
     expect(count).toBe(500); expect(pages).toBe(50);
     const first = await f.lead.mutation(api.permissions.exportPacket, {eventId: f.ids.events[0], includeHealth: true, paginationOpts: {cursor: null, numItems: 10}});
     await f.t.run(ctx => ctx.db.patch(f.ids.lead.id, {healthExport: false}));
-    await expect(f.lead.mutation(api.permissions.exportPacket, {eventId: f.ids.events[0], includeHealth: true, paginationOpts: {cursor: first.continueCursor, numItems: 10}})).rejects.toThrow("health-export");
+    await expect(f.lead.mutation(api.permissions.exportPacket, {eventId: f.ids.events[0], includeHealth: true, paginationOpts: {cursor: first.continueCursor, numItems: 10}})).rejects.toThrow("Health export access");
     await expect(f.coach.mutation(api.permissions.exportPacket, {eventId: f.ids.events[0], includeHealth: true, paginationOpts: {cursor: null, numItems: 11}})).rejects.toThrow("at most 10");
   }, 15_000);
 

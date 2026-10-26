@@ -26,13 +26,13 @@ async function appendLegacyFieldTripSignature(reviewedBytes: Uint8Array, signatu
   y -= 20
   page.drawRectangle({ x: LEFT, y, width: RIGHT - LEFT, height: 2, color: GOLD })
   y -= 30
-  page.drawText('SYNTHETIC SIGNATURE EVIDENCE', { x: LEFT, y, font: heading, size: 15, color: PURPLE })
+  page.drawText('TEST SIGNATURE (FICTIONAL)', { x: LEFT, y, font: heading, size: 15, color: PURPLE })
   y -= 31
   const rows = [
-    ['Evidence source', signature.source === 'paper' ? 'Paper record' : 'Verified electronic signer'],
+    ['How it was signed', signature.source === 'paper' ? 'Paper record' : 'Verified electronic signer'],
     ['Signer', signature.typedName],
     ['Signed', signedDate(signature.signedAt)],
-    ['Reviewed PDF SHA-256', signature.reviewedSha256],
+    ['Reference code', signature.reviewedSha256],
   ] as const
   for (const [label, value] of rows) {
     page.drawText(label.toUpperCase(), { x: LEFT, y, font: heading, size: 8, color: MUTED })
@@ -43,7 +43,7 @@ async function appendLegacyFieldTripSignature(reviewedBytes: Uint8Array, signatu
     }
     y -= 16
   }
-  page.drawText('The preceding pages are the prepared PDF reviewed before signing.', { x: LEFT, y, font: body, size: 9, color: MUTED })
+  page.drawText('The pages before this one are the form reviewed before signing.', { x: LEFT, y, font: body, size: 9, color: MUTED })
   return document.save({ useObjectStreams: false })
 }
 
@@ -90,7 +90,7 @@ function continuation(document: PDFDocument, body: PDFFont, heading: PDFFont, ov
   function newPage() {
     page = document.addPage([PAGE_WIDTH, PAGE_HEIGHT])
     y = TOP
-    page.drawText('FIELD TRIP FORM - CONTINUATION', { x: LEFT, y, font: heading, size: 11, color: INK })
+    page.drawText('PERMISSION FORM - CONTINUATION', { x: LEFT, y, font: heading, size: 11, color: INK })
     y -= 27
   }
   newPage()
@@ -132,8 +132,8 @@ async function renderOriginalFieldTripPdf(snapshot: ConsentSnapshotV2): Promise<
   draw('Parent or guardian', snapshot.profile.guardian.name, 606, 153, 255, 8)
   draw('Guardian phone and email', `${snapshot.profile.guardian.phone} / ${snapshot.profile.guardian.email}`, 55, 191, 255, 7.2)
   draw('Alternate emergency contact', `${snapshot.profile.emergency.name}, ${snapshot.profile.emergency.relationship}, ${snapshot.profile.emergency.phone}`, 331, 191, 256, 7.2)
-  const insurance = snapshot.profile.insurance.state === 'provided' ? `${snapshot.profile.insurance.provider}, ${snapshot.profile.insurance.policy}` : snapshot.profile.insurance.state === 'none' ? 'None reported' : 'Unavailable'
-  const physician = snapshot.profile.physician.state === 'provided' ? `${snapshot.profile.physician.name}, ${snapshot.profile.physician.phone}` : snapshot.profile.physician.state === 'none' ? 'None reported' : 'Unavailable'
+  const insurance = snapshot.profile.insurance.state === 'provided' ? `${snapshot.profile.insurance.provider}, ${snapshot.profile.insurance.policy}` : snapshot.profile.insurance.state === 'none' ? 'None reported' : 'Information unavailable'
+  const physician = snapshot.profile.physician.state === 'provided' ? `${snapshot.profile.physician.name}, ${snapshot.profile.physician.phone}` : snapshot.profile.physician.state === 'none' ? 'None reported' : 'Information unavailable'
   draw('Insurance and physician', `${insurance} / ${physician}`, 606, 191, 255, 6.2, 4.8)
   const eventRows = snapshot.events.length > 3 ? snapshot.events.slice(0, 2) : snapshot.events
   for (const [index, event] of eventRows.entries()) {
@@ -170,20 +170,20 @@ async function renderOriginalFieldTripPdf(snapshot: ConsentSnapshotV2): Promise<
     }
   }
   const prescriptions = snapshot.profile.prescriptions
-  if (prescriptions.state === 'none') draw('Prescriptions', 'None reported', 400, 771, 460, 7.3)
+  if (prescriptions.state === 'none') draw('Medications', 'None reported', 400, 771, 460, 7.3)
   else {
     const rows = prescriptions.entries.length > 2 ? prescriptions.entries.slice(0, 1) : prescriptions.entries
     rows.forEach((entry, index) => {
       const y = index === 0 ? 771 : 796
-      draw(`Prescription ${index + 1} name`, entry.name, 400, y, 119, 7)
-      draw(`Prescription ${index + 1} dose`, entry.dose, 523, y, 74, 7)
-      draw(`Prescription ${index + 1} timing`, entry.timing, 601, y, 84, 7)
-      draw(`Prescription ${index + 1} reason`, entry.reason, 690, y, 91, 7)
-      draw(`Prescription ${index + 1} carried by`, entry.carriedBy, 786, y, 73, 7)
+      draw(`Medication ${index + 1} name`, entry.name, 400, y, 119, 7)
+      draw(`Medication ${index + 1} dose`, entry.dose, 523, y, 74, 7)
+      draw(`Medication ${index + 1} timing`, entry.timing, 601, y, 84, 7)
+      draw(`Medication ${index + 1} reason`, entry.reason, 690, y, 91, 7)
+      draw(`Medication ${index + 1} carried by`, entry.carriedBy, 786, y, 73, 7)
     })
     if (prescriptions.entries.length > 2) {
-      draw('Additional prescriptions', 'Additional prescriptions: see continuation', 400, 796, 460, 7)
-      prescriptions.entries.slice(1).forEach((entry, index) => extra.push({ label: `Additional prescription ${index + 2}`, value: `${entry.name}; dose ${entry.dose}; timing ${entry.timing}; reason ${entry.reason}; carried by ${entry.carriedBy}` }))
+      draw('Additional medications', 'Additional medications: see continuation', 400, 796, 460, 7)
+      prescriptions.entries.slice(1).forEach((entry, index) => extra.push({ label: `Additional medication ${index + 2}`, value: `${entry.name}; dose ${entry.dose}; timing ${entry.timing}; reason ${entry.reason}; carried by ${entry.carriedBy}` }))
     }
   }
   draw('Printed signer name', snapshot.signer.name, 372, 1110, 184, 8)
@@ -224,7 +224,7 @@ export async function renderFieldTripPdf(snapshot: ConsentSnapshotV2, signature?
 export async function appendFieldTripSignature(reviewedBytes: Uint8Array, signature: SignatureOptions): Promise<Uint8Array> {
   if (!/^[a-f0-9]{64}$/i.test(signature.reviewedSha256)) throw new Error('Reviewed PDF hash is invalid.')
   if (signature.templateVersion === fieldTripApproved.templateVersion) return signOriginalFieldTripPdf(reviewedBytes, signature)
-  if (signature.templateVersion && signature.templateVersion !== 'field-trip-v2') throw new Error('Unknown field trip PDF template.')
+  if (signature.templateVersion && signature.templateVersion !== 'field-trip-v2') throw new Error('This permission form version is not supported. Prepare the form again.')
   return appendLegacyFieldTripSignature(reviewedBytes, signature)
 }
 
@@ -339,8 +339,8 @@ async function renderLegacyFieldTripPdf(snapshot: ConsentSnapshotV2, signature?:
   field('Parent or guardian', `${snapshot.profile.guardian.name} (${snapshot.profile.guardian.relationship})`)
   field('Guardian phone / email', `${snapshot.profile.guardian.phone}  /  ${snapshot.profile.guardian.email}`)
   field('Alternate emergency contact', `${snapshot.profile.emergency.name} (${snapshot.profile.emergency.relationship})  /  ${snapshot.profile.emergency.phone}`)
-  field('Health insurance', snapshot.profile.insurance.state === 'provided' ? `${snapshot.profile.insurance.provider}  /  Policy ${snapshot.profile.insurance.policy}` : snapshot.profile.insurance.state === 'none' ? 'None reported' : 'Unavailable')
-  field('Physician', snapshot.profile.physician.state === 'provided' ? `${snapshot.profile.physician.name}  /  ${snapshot.profile.physician.phone}` : snapshot.profile.physician.state === 'none' ? 'None reported' : 'Unavailable')
+  field('Health insurance', snapshot.profile.insurance.state === 'provided' ? `${snapshot.profile.insurance.provider}  /  Policy ${snapshot.profile.insurance.policy}` : snapshot.profile.insurance.state === 'none' ? 'None reported' : 'Information unavailable')
+  field('Physician', snapshot.profile.physician.state === 'provided' ? `${snapshot.profile.physician.name}  /  ${snapshot.profile.physician.phone}` : snapshot.profile.physician.state === 'none' ? 'None reported' : 'Information unavailable')
 
   section('Events covered by this form')
   for (const [index, event] of snapshot.events.entries()) {
@@ -370,7 +370,7 @@ async function renderLegacyFieldTripPdf(snapshot: ConsentSnapshotV2, signature?:
     y -= 5
   }
 
-  section('Prescriptions')
+  section('Medications')
   if (snapshot.profile.prescriptions.state === 'none') paragraph('None reported.')
   else for (const [index, entry] of snapshot.profile.prescriptions.entries.entries()) {
     ensure(97)
@@ -388,7 +388,7 @@ async function renderLegacyFieldTripPdf(snapshot: ConsentSnapshotV2, signature?:
   if (signature) {
     field(snapshot.signer.source === 'paper' ? 'Paper signer' : 'Electronic signature', signature.typedName)
     field('Signed', signedDate(signature.signedAt))
-    field('Reviewed PDF SHA-256', signature.reviewedSha256)
+    field('Reference code', signature.reviewedSha256)
   } else if (snapshot.signer.source === 'paper') {
     field('Paper signer', snapshot.signer.name)
     smallNote('The paper signature and original document must be verified before this record is accepted.')
@@ -396,7 +396,7 @@ async function renderLegacyFieldTripPdf(snapshot: ConsentSnapshotV2, signature?:
     field('Signer to review', snapshot.signer.name)
     smallNote('Unsigned review copy. Electronic acknowledgment and typed signature are recorded after this exact form is reviewed.')
   }
-  smallNote(`Template ${snapshot.templateVersion}  |  Student ${snapshot.student.studentId}  |  Season ${snapshot.student.seasonId}`)
+  smallNote(`Form version ${snapshot.templateVersion}`)
 
   const pages = document.getPages()
   pages.forEach((item, index) => {

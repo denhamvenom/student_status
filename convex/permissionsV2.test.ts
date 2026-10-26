@@ -62,7 +62,7 @@ it("requires student setup and explicit parent confirmation before a populated P
   const f = await fixture();
   await expect(f.parent.mutation(internal.permissionsV2.createDraft, {studentId: f.ids.student, eventIds: [f.ids.event], source: "electronic"})).rejects.toThrow("Student setup");
   await expect(f.other.query(api.permissionsV2.profile, {studentId: f.ids.student})).rejects.toThrow();
-  await expect(f.parent.mutation(api.permissionsV2.saveProfile, {studentId: f.ids.student, expectedRevision: 0, value: {...profile, prescriptions: {state: "reported", entries: []}}})).rejects.toThrow("Prescriptions require");
+  await expect(f.parent.mutation(api.permissionsV2.saveProfile, {studentId: f.ids.student, expectedRevision: 0, value: {...profile, prescriptions: {state: "reported", entries: []}}})).rejects.toThrow("For Medications, choose None reported");
   await f.parent.mutation(api.permissionsV2.saveProfile, {studentId: f.ids.student, expectedRevision: 0, value: profile});
   await expect(f.parent.mutation(internal.permissionsV2.createDraft, {studentId: f.ids.student, eventIds: [f.ids.event], source: "electronic"})).rejects.toThrow("Student setup");
   await f.t.run(ctx => ctx.db.patch(f.ids.student, {profileCompletedAt: 1, profileRevision: 2}));
@@ -74,12 +74,12 @@ it("requires student setup and explicit parent confirmation before a populated P
   const student = await f.t.run(ctx => ctx.db.get(f.ids.student));
   expect(student?.allergies.text).toBe("Original free-text allergy");
   expect(privateStudent(student!).allergies).toMatchObject({state: "reported", text: expect.stringContaining("Synthetic pollen")});
-  await expect(f.parent.mutation(api.permissions.prepare, {studentId: f.ids.student, eventIds: [f.ids.event]})).rejects.toThrow("new PDF permission form");
+  await expect(f.parent.mutation(api.permissions.prepare, {studentId: f.ids.student, eventIds: [f.ids.event]})).rejects.toThrow("uses the new permission form");
 });
 
 it("rejects incomplete insurance and ungranted paper preparation without changing old health evidence", async () => {
   const f = await fixture();
-  await expect(f.parent.mutation(api.permissionsV2.saveProfile, {studentId: f.ids.student, expectedRevision: 0, value: {...profile, insurance: {state: "provided", provider: "Fictional Coverage", policy: null}}})).rejects.toThrow("Insurance needs complete details");
+  await expect(f.parent.mutation(api.permissionsV2.saveProfile, {studentId: f.ids.student, expectedRevision: 0, value: {...profile, insurance: {state: "provided", provider: "Fictional Coverage", policy: null}}})).rejects.toThrow("For Insurance, fill in every detail");
   await f.t.run(ctx => ctx.db.patch(f.ids.student, {profileCompletedAt: 1}));
   await f.parent.mutation(api.permissionsV2.saveProfile, {studentId: f.ids.student, expectedRevision: 0, value: profile});
   await expect(f.ungranted.mutation(internal.permissionsV2.createDraft, {studentId: f.ids.student, eventIds: [f.ids.event], source: "paper", paperName: "Fictional Parent"})).rejects.toThrow("health grant");
@@ -128,12 +128,12 @@ it("selects one immutable approved version and keeps prior V2 snapshot parsing",
   const f = await fixture();
   const first = await f.coach.mutation(api.permissionVersions.selectApprovedFieldTripTemplate, {});
   expect(await f.coach.mutation(api.permissionVersions.selectApprovedFieldTripTemplate, {})).toBe(first);
-  await expect(f.coach.mutation(api.permissionVersions.createVersionV2, {version: "other", title: "Other", wording: "minor first aid", acknowledgmentText: "Other"})).rejects.toThrow("Custom PDF wording is closed");
+  await expect(f.coach.mutation(api.permissionVersions.createVersionV2, {version: "other", title: "Other", wording: "minor first aid", acknowledgmentText: "Other"})).rejects.toThrow("wording can't be edited");
   await f.t.run(ctx => ctx.db.patch(f.ids.student, {profileCompletedAt: 1}));
   await f.parent.mutation(api.permissionsV2.saveProfile, {studentId: f.ids.student, expectedRevision: 0, value: profile});
   const draft = await f.parent.mutation(internal.permissionsV2.createDraft, {studentId: f.ids.student, eventIds: [f.ids.event], source: "electronic"});
   expect(draft.snapshot.templateVersion).toBe(fieldTripApproved.templateVersion);
-  expect(() => validateSnapshotV2({...draft.snapshot, version: {...draft.snapshot.version, wording: "Changed minor first aid"}})).toThrow("Approved field trip template");
+  expect(() => validateSnapshotV2({...draft.snapshot, version: {...draft.snapshot.version, wording: "Changed minor first aid"}})).toThrow("doesn't match the approved wording");
   const older = {...draft.snapshot, templateVersion: "field-trip-v2" as const, version: {...draft.snapshot.version, version: "prior-v2", wording: "Prior synthetic minor first aid wording."}};
   expect(validateSnapshotV2(older).templateVersion).toBe("field-trip-v2");
 });
@@ -150,10 +150,10 @@ it("fails closed until real signing is explicitly bound to this non-development 
   await f.t.run(ctx => ctx.db.patch(f.ids.student, {profileCompletedAt: 1}));
   await f.parent.mutation(api.permissionsV2.saveProfile, {studentId: f.ids.student, expectedRevision: 0, value: profile});
   vi.stubEnv("CONVEX_CLOUD_URL", prod);
-  await expect(f.parent.action(api.permissionsV2Pdf.prepare, {studentId: f.ids.student, eventIds: [f.ids.event]})).rejects.toThrow("You cannot sign for this student right now.");
+  await expect(f.parent.action(api.permissionsV2Pdf.prepare, {studentId: f.ids.student, eventIds: [f.ids.event]})).rejects.toThrow("Permission forms can't be signed here yet.");
   vi.stubEnv("PERMISSION_REAL_SIGNING_ENABLED", "true");
   vi.stubEnv("PERMISSION_REAL_SIGNING_CLOUD_URL", "https://other.convex.cloud");
-  await expect(f.parent.action(api.permissionsV2Pdf.prepare, {studentId: f.ids.student, eventIds: [f.ids.event]})).rejects.toThrow("You cannot sign for this student right now.");
+  await expect(f.parent.action(api.permissionsV2Pdf.prepare, {studentId: f.ids.student, eventIds: [f.ids.event]})).rejects.toThrow("Permission forms can't be signed here yet.");
   vi.stubEnv("PERMISSION_REAL_SIGNING_CLOUD_URL", prod);
   const workspace = await f.parent.query(api.permissions.workspace, {studentId: f.ids.student});
   expect(workspace).toMatchObject({signingMode: "real", canSign: true});
@@ -162,7 +162,7 @@ it("fails closed until real signing is explicitly bound to this non-development 
   const prepared = await f.parent.action(api.permissionsV2Pdf.prepare, {studentId: f.ids.student, eventIds: [f.ids.event]});
   expect(prepared.snapshot.synthetic).toBe(false);
   vi.stubEnv("PERMISSION_REAL_SIGNING_ENABLED", "false");
-  await expect(f.parent.action(api.permissionsV2Pdf.submit, {draftId: prepared.draftId, typedName: "Fictional Parent", acknowledged: true})).rejects.toThrow("You cannot sign for this student right now.");
+  await expect(f.parent.action(api.permissionsV2Pdf.submit, {draftId: prepared.draftId, typedName: "Fictional Parent", acknowledged: true})).rejects.toThrow("Permission forms can't be signed here yet.");
   vi.stubEnv("PERMISSION_REAL_SIGNING_ENABLED", "true");
   const submissionId = await f.parent.action(api.permissionsV2Pdf.submit, {draftId: prepared.draftId, typedName: "Fictional Parent", acknowledged: true});
   const receipt = await f.parent.query(api.permissionsV2.receipt, {submissionId});
