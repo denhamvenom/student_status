@@ -1,34 +1,48 @@
 # Handoff
 
-October 25, 2026 | Branch: feature/developer-sign-in
+October 25, 2026 | Branch: docs/release-2026-10-25 (from main 7376a71)
 
-## Student Status
+## Venom Status (formerly Student Status)
 
-Automatic past-event archival is live in [v0.1.0-onboarding.18](https://github.com/denhamvenom/student_status/releases/tag/v0.1.0-onboarding.18), PR38 merge `51ca4d5`. Events and remaining requirements leave Student/Parent views; outstanding balances remain visible. Coaches and Travel Leads can view the archive across seasons.
-Production backend and all five public application files were verified after the automatic rollout, with 100% Worker traffic. All 657 tests passed; lint/types, both app builds and synthetic phone/desktop light/dark checks passed. Real-account archive acceptance was not performed. [Release receipt and rollback limits](docs/releases/RELEASE_2026-10-23_EVENT_ARCHIVE.md)
-Parent Mentor/Travel Lead grants and role switching are live in PR37 / v0.1.0-onboarding.17; transportation choices and own-transport guards are live in PR36 / v0.1.0-onboarding.16. Their production verification is recorded in docs/releases/.
+[v0.1.0-onboarding.19](https://github.com/denhamvenom/student_status/releases/tag/v0.1.0-onboarding.19) is live (PR39–PR47, main `7376a71`):
+- App renamed Venom Status for people; repository, Convex project, Workers and domains keep their names.
+- Plain-language messages written to [docs/LANGUAGE.md](docs/LANGUAGE.md).
+- One six-digit invitation code.
+- Coach-only Contact admin button (emails admin@team8044.org).
+- Page-level error boundary.
+- Development-only developer sign-in.
+
+Production backend and both Workers were verified, and the live files match the local production build. No real-account production walkthrough, real Google join with a code, or real email send was done. [Release receipt and rollback limits](docs/releases/RELEASE_2026-10-25_VENOM_STATUS.md)
+Earlier releases (archive, parent staff roles, transportation) are recorded in docs/releases/.
 
 ## Timeclock
 
-Clocking, PIN controls, automatic closing, fixed event roster and historical attendance import remain implemented; Calendar checks run at 6 AM/3 PM Central plus manual refresh.
-Owner confirmed device concurrency/reconnection on October 22. This release's automatic Worker rollout reached 100%; the public endpoint returned HTTP 200.
+Clocking, PIN controls, automatic closing, fixed event roster and historical attendance import remain implemented; Calendar checks run at 6 AM/3 PM Central plus manual refresh. This release's automatic Timeclock rollout reached 100% and the public endpoint returned HTTP 200.
 
 ## In progress
 
-Claude Code is now project lead and integration owner (CLAUDE.md mirrors AGENTS.md); Codex sessions are helpers.
-Developer sign-in (draft PR #39, branch `feature/developer-sign-in`): six fictional development-only accounts for testing every role without Google. Synced to development `third-bandicoot-18` with the switch and key set and accounts created; all six signed in at phone/desktop sizes in a headless browser. Not merged; production unchanged. Key is in ignored `private-data/`. See docs/DECISIONS.md and docs/DEVELOPMENT.md.
-Pre-development baseline (October 25, at `749005e`, development data only): the private claude.ai artifact "Student Status Screen Baseline" holds 185 screens × phone/desktop × light/dark for all six developer accounts, including wizard steps, event states and Rooming. Timeclock and the `?review=` fixtures were out of scope. The owner has the draft "Student Status Language Dictionary" workbook (32 terms, 34 findings, 5,191 extracted strings) for term decisions. Screenshots, workbook and capture scripts are outside Git. Dev Student setup answers were saved with fictional values.
-Pre-redesign language work (October 25, all draft PRs, none merged, production unchanged). Approved terms are in docs/LANGUAGE.md. Stack: #39 → #40 typography/US spelling (plus two flaky-test fixes) → #41 page-error boundary + developer Parent verified record, and #42 money, #43 one six-digit invitation code, #44 permission-form messages (Parents no longer see hashes), #45 remaining server messages, each based on #40. Each branch passed `bun run check` on Windows; a local trial merge of all five had one test conflict (resolved) and passed apart from rotating 5–30 s timeouts. The trial merge is pushed as `integration/pre-redesign` (also has the owner-approved PDF wording on #44). On top of it: #46 renames the app to **Venom Status** (people-facing only; infrastructure names unchanged) and #47 adds a Coach-only Contact admin button that emails admin@team8044.org (new `adminContactRequests` table). Development `third-bandicoot-18` currently runs #46 + #47 combined (local branch `tmp/dev-combined`); all six accounts opened every menu page with no errors at 1440 light and 390 dark, except the known Coach Season overflow. Not done: real Google join with an unconnected account, real email delivery. A per-role dashboard draft for the redesign was given to the owner in chat.
-Start the next session on `feature/developer-sign-in` until PR #39 merges.
+Claude Code is project lead and integration owner (CLAUDE.md mirrors AGENTS.md); Codex sessions are helpers.
+Developer sign-in works only on development `third-bandicoot-18` (key in ignored `private-data/`; see docs/DEVELOPMENT.md). The pre-development screen baseline (185 screens) is a private claude.ai artifact; the screenshots, Language Dictionary workbook and capture scripts are outside Git.
+The redesign is next: a simpler bento interface, with a dashboard of each audience's most important needs and details revealed on demand. A per-role dashboard draft was given to the owner in chat on October 25 (tiles, urgency rules, needed new queries). Every redesigned screen is written to docs/LANGUAGE.md.
 
 ## Top open risks
 
+- **Exposed key fragments (October 25):** fragments of a production private key were printed into a working session while listing setting names. They came from either JWT_PRIVATE_KEY or TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_PRIVATE_KEY; it's unclear which. Nothing was published. Rotation was recommended and awaits the owner's decision. Never list production settings with `cut`; filter to key names only, or use the dashboard.
+- Outstanding five-digit invitation codes stay valid until they expire (low guessing risk; replacing them closes it).
 - Signed-in transportation walkthrough remains open; archive browser proof used synthetic data. [Testing](docs/BACKLOG.md#testing)
 - Real PDF signing remains deferred until separately authorized; backup/restore proof and security reviews remain open. [Security/Recovery](docs/BACKLOG.md#securityrecovery)
-- Payment recovery, finance rollback, intermittent-suite reports and the unconfirmed Pay-device issue remain for triage; this release's full suite passed. [Testing](docs/BACKLOG.md#testing)
-- Older waitlist, payment replay, event-date and fixture reports still need source triage. [Audit follow-ups](docs/BACKLOG.md#october-18-audit-follow-ups)
-- Coach Season overflows at 390px (deferred to the redesign). Slow tests (feeBulk, seasonTransition, calendarRefresh) intermittently hit 5–30 s timeouts in this OneDrive folder. [Testing](docs/BACKLOG.md#testing)
+- Payment recovery, finance rollback, intermittent-suite reports and the unconfirmed Pay-device issue remain for triage. Heavy tests (feeBulk, bulkInvites, financeExport, seasonTransition, calendarRefresh) time out intermittently in full runs in this OneDrive folder. [Testing](docs/BACKLOG.md#testing)
+- Coach Season overflows at 390px (deferred to the redesign).
 
 ## Next step
 
-Owner: review and merge #39 → #40 → #41–#45 (any order), then retarget and merge #46 and #47. Open: approve one real Contact admin test email from development; update production `PARENT_INVITE_EMAIL_FROM` to the Venom Status sender if it is set (production action); answer the dashboard draft decisions (Mentor dashboard, staff-mode family badge, Parent signups view-only). Then pick a visual direction in Claude Design for the Parent Home dashboard and start the redesign, writing every screen to docs/LANGUAGE.md. Heavy tests (feeBulk, bulkInvites, financeExport, seasonTransition, calendarRefresh) increasingly time out in full runs in this OneDrive folder; consider raising their timeouts. The signed-in Coach transportation walkthrough remains open.
+Owner:
+- Decide on key rotation.
+- Approve one real Contact admin test email, if wanted.
+- Answer the dashboard draft decisions:
+  - Should Mentors get a small dashboard?
+  - Should a Parent switched to staff see a family badge?
+  - Should Parent signups be view-only?
+- Pick a visual direction in Claude Design for the Parent Home dashboard.
+
+Then start the redesign on a new branch from main.
