@@ -23,7 +23,7 @@ Clocking, PIN controls, automatic closing, fixed event roster and historical att
 
 Claude Code is project lead and integration owner (CLAUDE.md mirrors AGENTS.md); Codex sessions are helpers.
 Developer sign-in works only on development `third-bandicoot-18` (key in ignored `private-data/`; see docs/DEVELOPMENT.md). The pre-development screen baseline (185 screens) is a private claude.ai artifact; the screenshots, Language Dictionary workbook and capture scripts are outside Git.
-The redesign is next: a simpler bento interface, with a dashboard of each audience's most important needs and details revealed on demand. A per-role dashboard draft was given to the owner in chat on October 25 (tiles, urgency rules, needed new queries). Every redesigned screen is written to docs/LANGUAGE.md.
+The redesign is next: a simpler bento interface, with a dashboard of each audience's most important needs and details revealed on demand. A per-role dashboard draft was given to the owner in chat on October 25 (tiles, urgency rules, needed new queries); its three decisions are recorded in docs/DECISIONS.md "Redesign dashboards". Every redesigned screen is written to docs/LANGUAGE.md.
 
 ## Top open risks
 
@@ -39,10 +39,6 @@ The redesign is next: a simpler bento interface, with a dashboard of each audien
 Owner:
 - Decide on key rotation.
 - Approve one real Contact admin test email, if wanted.
-- Answer the dashboard draft decisions:
-  - Should Mentors get a small dashboard?
-  - Should a Parent switched to staff see a family badge?
-  - Should Parent signups be view-only?
 - Pick a visual direction in Claude Design for the Parent Home dashboard.
 
 Then start the redesign on a new branch from main.
