@@ -35,7 +35,7 @@ export async function scheduleEventArchive(ctx: MutationCtx, eventId: Id<"events
 }
 
 function staff(user: Awaited<ReturnType<typeof viewer>>) {
-  if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new ConvexError("Archived events are available to Coaches and Travel Leads only.");
+  if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can open Past events.");
 }
 
 export const page = query({
@@ -55,7 +55,7 @@ export const detail = query({
   handler: async (ctx, args) => {
     staff(await viewer(ctx));
     const event = await ctx.db.get(args.eventId);
-    if (!event || !event.archived) throw new ConvexError("Archived event not found.");
+    if (!event || !event.archived) throw new ConvexError("This event isn't in Past events. Reload to see the list.");
     const requirements = await ctx.db.query("requirements").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(100);
     const rows = await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", event._id)).paginate(args.paginationOpts);
     const page = await Promise.all(rows.page.map(async row => {

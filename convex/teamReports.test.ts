@@ -36,7 +36,7 @@ describe("bounded role-scoped team reports",()=>{
       expect(JSON.stringify({report,team})).not.toContain("private-synthetic-link");
       expect(team[0]).not.toHaveProperty("fundraiserUrl");
     }
-    await expect(f.mentor.query(roster,{})).rejects.toThrow("Roster access denied");
+    await expect(f.mentor.query(roster,{})).rejects.toThrow("Only a Coach or Travel Lead can open the team roster");
     await f.t.run(ctx=>ctx.db.patch(f.ids.student,{fundraiserUrl:undefined}));
     expect((await f.lead.query(rows,args)).page[0].fundraiserConnected).toBe(false);
   });
@@ -50,7 +50,7 @@ describe("bounded role-scoped team reports",()=>{
     expect(result.page[0]).toMatchObject({name:"Synthetic Student",finance:{state:"uninitialized",paidCents:null,raisedCents:null},attendance:null,eventsCount:0,selectedEvent:null});
     expect(JSON.stringify(result)).not.toContain("PRIVATE HEALTH");
     expect(JSON.stringify(result)).not.toContain("private-student@example.invalid");
-    await expect(f.coach.query(rows,{paginationOpts:{numItems:11,cursor:null},asOf:100})).rejects.toThrow("between 1 and 10");
+    await expect(f.coach.query(rows,{paginationOpts:{numItems:11,cursor:null},asOf:100})).rejects.toThrow("This report could not load");
   });
   it("reports verified materialized money, unknown raised, and unverified kickoff separately",async()=>{
     const f=await fixture(2028);
@@ -83,7 +83,7 @@ describe("bounded role-scoped team reports",()=>{
     expect(result.page[0].selectedEvent).toMatchObject({state:"unknown",outstanding:["Whole Team enrollment is not complete."]});
     await f.t.run(async ctx=>{await ctx.db.patch(event,{enrollmentState:"complete"});await ctx.db.insert("participants",{eventId:event,studentId:f.ids.student,status:"pending",createdAt:1,updatedAt:1})});
     const pending=await f.coach.query(rows,{...args,eventId:event});
-    expect(pending.page.find((row:{studentId:string})=>row.studentId===f.ids.student)?.selectedEvent).toMatchObject({participation:"pending",state:"open",outstanding:["Participation is not confirmed"]});
+    expect(pending.page.find((row:{studentId:string})=>row.studentId===f.ids.student)?.selectedEvent).toMatchObject({participation:"pending",state:"open",outstanding:["Signup not confirmed yet"]});
     const budget=await f.coach.query(rows,{...args,paginationOpts:{numItems:10,maximumRowsRead:1,cursor:null}});
     expect(budget.page.length).toBeLessThanOrEqual(1);
   });

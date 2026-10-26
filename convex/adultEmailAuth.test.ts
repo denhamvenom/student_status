@@ -72,7 +72,7 @@ describe("adult email authentication", () => {
     expect(auth).toBe(history.auth);
     if (status === "pending") {
       const coach = f.t.withIdentity({ subject: `${f.ids.auth}|session` });
-      await expect(coach.mutation(api.admin.approveJoin, { requestId: history.join, approve: true })).rejects.toThrow("Email sign-in identities");
+      await expect(coach.mutation(api.admin.approveJoin, { requestId: history.join, approve: true })).rejects.toThrow("signed in with an email code");
       await expect(coach.mutation(api.bulkInvites.decideConnection, { requestId: history.bulk, approve: true })).rejects.toThrow("signed in with an email code");
       expect(await f.t.run(ctx => ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", history.auth)).unique())).toBeNull();
       expect(await f.t.run(ctx => ctx.db.get(history.join))).toMatchObject({ status: "pending" });

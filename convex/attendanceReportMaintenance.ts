@@ -74,7 +74,7 @@ export const continueSeason=internalMutation({
   handler:async(ctx,args):Promise<null>=>{
     try{await ctx.runMutation(internal.attendanceReportMaintenance.processSeasonPage,args)}catch{
       const state=await ctx.db.get(args.backfillId);
-      if(state?.state==="running"&&state.cursor===args.expectedCursor)await ctx.db.patch(state._id,{state:"failed",updatedAt:Date.now(),lastError:savedPublicError(null, "Attendance report coverage needs Coach review.")});
+      if(state?.state==="running"&&state.cursor===args.expectedCursor)await ctx.db.patch(state._id,{state:"failed",updatedAt:Date.now(),lastError:savedPublicError(null, "Attendance totals stopped updating. A Coach can choose Recalculate attendance to try again.")});
     }
     return null;
   },
@@ -96,7 +96,7 @@ export const rebuildSession=mutation({
   args:{sessionId:v.id("timeclockSessions")},returns:v.null(),
   handler:async(ctx,args)=>{
     requireRole(await viewer(ctx),"coach");const season=await activeSeason(ctx);const session=await ctx.db.get(args.sessionId);
-    if(!session||session.seasonId!==season._id)throw new ConvexError("Session unavailable in the active season.");
+    if(!session||session.seasonId!==season._id)throw new ConvexError("This meeting is no longer in the current season. Reload the meeting list and try again.");
     await invalidateAttendanceSession(ctx,session._id);return null;
   },
 });

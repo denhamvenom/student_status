@@ -106,7 +106,7 @@ describe("adult accounts", () => {
     await expect(f.invited.mutation(api.accounts.accept, { token: expired.token })).rejects.toThrow("expired");
     const removed = await createInvite(f);
     await f.t.run(ctx => ctx.db.patch(f.ids.coach, { active: false }));
-    await expect(f.invited.mutation(api.accounts.accept, { token: removed.token })).rejects.toThrow("Inviting Coach");
+    await expect(f.invited.mutation(api.accounts.accept, { token: removed.token })).rejects.toThrow("no longer has Coach access");
     expect(await f.invited.mutation(api.accounts.preview, { token: removed.token })).toMatchObject({ status: "unavailable", email: null });
   });
 
@@ -116,12 +116,12 @@ describe("adult accounts", () => {
     const link = await createInvite(f);
     const adult = await f.invited.mutation(api.accounts.accept, { token: link.token });
     await f.coach.mutation(api.accounts.updateAdult, { userId: adult.userId, expectedRevision: 0, ...access, healthExport: false, financialEdit: true, active: true, reason: "Finance only" });
-    await expect(f.coach.mutation(api.accounts.updateAdult, { userId: adult.userId, expectedRevision: 0, ...access, active: true, reason: "Stale" })).rejects.toThrow("Account changed");
+    await expect(f.coach.mutation(api.accounts.updateAdult, { userId: adult.userId, expectedRevision: 0, ...access, active: true, reason: "Stale" })).rejects.toThrow("This account changed since you opened it");
     expect(await f.t.run(ctx => ctx.db.get(adult.userId))).toMatchObject({ healthExport: false, financialEdit: true, accessRevision: 1 });
     await f.coach.mutation(api.accounts.updateAdult, { userId: adult.userId, expectedRevision: 1, ...access, active: false, reason: "Removed access" });
     await expect(f.invited.query(api.accounts.invitations, { paginationOpts: { cursor: null, numItems: 10 } })).rejects.toThrow("inactive");
     expect(await f.t.run(ctx => ctx.db.get(adult.userId))).toHaveProperty("archivedAt");
-    await expect(f.coach.mutation(api.accounts.inviteAdult, { ...invite, travelLead: false })).rejects.toThrow("require Travel Lead");
+    await expect(f.coach.mutation(api.accounts.inviteAdult, { ...invite, travelLead: false })).rejects.toThrow("only for Travel Leads");
   });
 
   it("refuses to convert or overwrite a parent account through invitation acceptance", async () => {

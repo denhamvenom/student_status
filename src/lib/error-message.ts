@@ -1,8 +1,8 @@
 import { ConvexError } from 'convex/values'
 
-const defaultMessage = 'Something went wrong. Please try again.'
-const networkMessage = 'Could not reach the service. Check your connection and try again.'
-const sessionMessage = 'Your session may have expired. Sign in again, then retry.'
+const defaultMessage = 'Something went wrong. Please try again. If it keeps happening, contact a Coach.'
+const networkMessage = 'Could not reach Student Status. Check your connection and try again.'
+const sessionMessage = 'Your sign-in may have expired. Sign in again, then try again.'
 
 function safeMessage(value: unknown, maxLength = 180): string | null {
   if (typeof value !== 'string') return null

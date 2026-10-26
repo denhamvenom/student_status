@@ -51,8 +51,8 @@ describe("attendance projection maintenance",()=>{
     await expect(f.family.mutation(api.attendanceReportMaintenance.start,{})).rejects.toThrow();
     const unknown=await f.family.query(api.dashboardReports.familyAttendance,{studentId:f.ids.students[0],asOf:start+3*hour});
     expect(unknown).toMatchObject({state:"updating",verified:null,legacy:{tuesdayHeld:0}});
-    await expect(f.family.query(api.dashboardReports.familyAttendance,{studentId:f.ids.students[0],asOf:start+3*hour,paginationOpts:{numItems:11,cursor:null}})).rejects.toThrow("up to 10 sessions");
-    await expect(f.family.query(api.dashboardReports.familyAttendance,{studentId:f.ids.students[0],asOf:start+3*hour,paginationOpts:{numItems:10,cursor:null,maximumRowsRead:Number.NaN}})).rejects.toThrow("positive integers");
+    await expect(f.family.query(api.dashboardReports.familyAttendance,{studentId:f.ids.students[0],asOf:start+3*hour,paginationOpts:{numItems:11,cursor:null}})).rejects.toThrow("up to 10 meetings");
+    await expect(f.family.query(api.dashboardReports.familyAttendance,{studentId:f.ids.students[0],asOf:start+3*hour,paginationOpts:{numItems:10,cursor:null,maximumRowsRead:Number.NaN}})).rejects.toThrow("Attendance could not load");
     await initialize(f);
     expect(await f.family.query(api.dashboardReports.familyAttendance,{studentId:f.ids.students[0],asOf:start+3*hour})).toMatchObject({state:"ready",verified:{sessionsHeld:1,sessionsAttended:1,tuesdayPercent:100}});
   });
@@ -134,7 +134,7 @@ describe("attendance projection maintenance",()=>{
     expect(second.sessions).toHaveLength(10);expect(second.sessions.some(row=>first.sessions.some(previous=>previous.sessionId===row.sessionId))).toBe(false);
     const nativeExpanded=await f.family.query(api.dashboardReports.familyAttendance,{studentId:f.ids.students[0],asOf:start+3*hour,paginationOpts:{numItems:1,cursor:null,endCursor:first.continueCursor,id:47}});
     expect(nativeExpanded.sessions.map(row=>row.sessionId)).toEqual(first.sessions.map(row=>row.sessionId));
-    await expect(f.family.query(api.dashboardReports.familyAttendance,{studentId:f.ids.students[0],asOf:start+3*hour,paginationOpts:{numItems:1,cursor:null,endCursor:second.continueCursor,maximumRowsRead:1000}})).rejects.toThrow("page expanded beyond 10 sessions");
+    await expect(f.family.query(api.dashboardReports.familyAttendance,{studentId:f.ids.students[0],asOf:start+3*hour,paginationOpts:{numItems:1,cursor:null,endCursor:second.continueCursor,maximumRowsRead:1000}})).rejects.toThrow("Too many meetings to show at once");
     const budgeted=await f.family.query(api.dashboardReports.familyAttendance,{studentId:f.ids.students[0],asOf:start+3*hour,paginationOpts:{numItems:10,cursor:null,endCursor:second.continueCursor,maximumRowsRead:3}});
     expect(budgeted.sessions.length).toBeLessThanOrEqual(3);expect(budgeted.isDone).toBe(false);expect(budgeted.pageStatus).toBe("SplitRequired");expect(budgeted.splitCursor).toBeTruthy();
     expect(JSON.stringify(first)).not.toContain("PRIVATE HEALTH");expect(JSON.stringify(first)).not.toContain("actorId");

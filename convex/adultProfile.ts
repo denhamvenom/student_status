@@ -31,17 +31,17 @@ const emailKey = (email: string) => email.trim().toLowerCase();
 async function reconciliationSource(ctx: Ctx, driverId: Doc<"drivers">["_id"], mentorId: Doc<"appUsers">["_id"]) {
   const season = await activeSeason(ctx);
   const [driver, mentor] = await Promise.all([ctx.db.get(driverId), ctx.db.get(mentorId)]);
-  if (!driver || driver.seasonId !== season._id || driver.ownerAppUserId) throw new ConvexError("The unowned driver is unavailable for reconciliation.");
-  if (!mentor || !mentor.active || mentor.role !== "mentor") throw new ConvexError("An active Mentor account is required.");
+  if (!driver || driver.seasonId !== season._id || driver.ownerAppUserId) throw new ConvexError("This driver is already linked to an account or is not in the current season. Reload the list.");
+  if (!mentor || !mentor.active || mentor.role !== "mentor") throw new ConvexError("Choose an active Mentor account.");
   const authUser = await ctx.db.get(mentor.authUserId);
-  if (!authUser?.email || authUser.isAnonymous || emailKey(authUser.email) !== emailKey(mentor.email)) throw new ConvexError("Mentor Google identity needs Coach review.");
-  if (emailKey(driver.email) !== emailKey(mentor.email)) throw new ConvexError("Driver and Mentor Google emails must match.");
+  if (!authUser?.email || authUser.isAnonymous || emailKey(authUser.email) !== emailKey(mentor.email)) throw new ConvexError("This Mentor's sign-in email doesn't match their account. Check the Mentor's account before linking.");
+  if (emailKey(driver.email) !== emailKey(mentor.email)) throw new ConvexError("Driver and Mentor sign-in emails must match. Update the driver's email, then try again.");
   const mentors = await ctx.db.query("appUsers").withIndex("by_role", q => q.eq("role", "mentor")).take(201);
-  if (mentors.length > 200 || mentors.some(other => other._id !== mentor._id && other.active && emailKey(other.email) === emailKey(mentor.email))) throw new ConvexError("Duplicate Mentor identity needs Coach review before linking.");
+  if (mentors.length > 200 || mentors.some(other => other._id !== mentor._id && other.active && emailKey(other.email) === emailKey(mentor.email))) throw new ConvexError("Another active Mentor account uses this email. Check the Mentor accounts before linking.");
   const owned = await ctx.db.query("drivers").withIndex("by_seasonId_and_ownerAppUserId", q => q.eq("seasonId", season._id).eq("ownerAppUserId", mentor._id)).unique();
-  if (owned) throw new ConvexError("Mentor already has a driver record in this season.");
+  if (owned) throw new ConvexError("This Mentor is already linked to a driver this season.");
   const drivers = await ctx.db.query("drivers").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(MAX_DRIVERS + 1);
-  if (drivers.length > MAX_DRIVERS || drivers.some(row => row._id !== driver._id && emailKey(row.email) === emailKey(mentor.email))) throw new ConvexError("Duplicate driver email needs Coach review before linking.");
+  if (drivers.length > MAX_DRIVERS || drivers.some(row => row._id !== driver._id && emailKey(row.email) === emailKey(mentor.email))) throw new ConvexError("Another driver this season uses this email. Check the driver list before linking.");
   return { driver, mentor };
 }
 
@@ -56,7 +56,7 @@ export const ownerReconciliationCandidates = query({
       ctx.db.query("drivers").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(MAX_DRIVERS + 1),
       ctx.db.query("appUsers").withIndex("by_role", q => q.eq("role", "mentor")).take(201),
     ]);
-    if (drivers.length > MAX_DRIVERS || mentors.length > 200) throw new ConvexError("Driver or Mentor list needs Coach review before reconciliation.");
+    if (drivers.length > MAX_DRIVERS || mentors.length > 200) throw new ConvexError("The driver or Mentor list is too long to match here. Contact the Student Status administrator.");
     const unowned = drivers.filter(driver => !driver.ownerAppUserId);
     const candidates = await Promise.all(unowned.map(async driver => {
       const matches = mentors.filter(mentor => mentor.active && emailKey(mentor.email) === emailKey(driver.email));
@@ -76,11 +76,11 @@ export const linkDriverOwner = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach");
-    if (!Number.isSafeInteger(args.expectedProfileRevision) || args.expectedProfileRevision < 0) throw new ConvexError("Invalid profile revision.");
+    if (!Number.isSafeInteger(args.expectedProfileRevision) || args.expectedProfileRevision < 0) throw new ConvexError("This Mentor's profile changed since you opened it. Reload to see the latest, then try again.");
     const reason = clean(args.reason, "Reconciliation reason", 500, true);
-    if (reason.length < 10) throw new ConvexError("Reconciliation reason must be at least 10 characters.");
+    if (reason.length < 10) throw new ConvexError("Enter a reason of at least 10 characters.");
     const { driver, mentor } = await reconciliationSource(ctx, args.driverId, args.mentorId);
-    if (args.expectedDriverFingerprint !== fingerprint(driver) || args.expectedProfileRevision !== (mentor.profileRevision ?? 0)) throw new ConvexError("Driver or Mentor changed. Review again before linking.");
+    if (args.expectedDriverFingerprint !== fingerprint(driver) || args.expectedProfileRevision !== (mentor.profileRevision ?? 0)) throw new ConvexError("This driver or Mentor changed since you opened it. Reload to see the latest, then try again.");
     await ctx.db.patch(driver._id, { ownerAppUserId: mentor._id, approved: false });
     await audit(ctx, actor, "drivers", driver._id, "linkDriverOwner", driver, { ...driver, ownerAppUserId: mentor._id, approved: false }, reason);
     return null;
@@ -107,11 +107,11 @@ function drivingDetails({ driver, state }: Awaited<ReturnType<typeof driverConte
 async function saveDriving(ctx: MutationCtx, actor: Doc<"appUsers">, context: Awaited<ReturnType<typeof driverContext>>, name: string, phone: string, args: { expectedDriverFingerprint: string | null; canDrive: boolean; vehicleName: string; passengerSeats: number | null; towCapable: boolean }) {
     const vehicleName = clean(args.vehicleName, "Vehicle", 100);
     if (args.canDrive) {
-      if (!phone) throw new ConvexError("Drivers need a phone number.");
+      if (!phone) throw new ConvexError("Add your phone number to drive for the team.");
       if (!vehicleName) throw new ConvexError("Describe your vehicle.");
       if (!Number.isSafeInteger(args.passengerSeats) || args.passengerSeats === null || args.passengerSeats < 1 || args.passengerSeats > 100) throw new ConvexError("Passenger seats must be a whole number from 1 to 100.");
     }
-    if (args.expectedDriverFingerprint !== fingerprint(context.driver)) throw new ConvexError("Driving details changed. Reload before saving.");
+    if (args.expectedDriverFingerprint !== fingerprint(context.driver)) throw new ConvexError("Driving details changed since you opened them. Reload to see the latest, then try again.");
     let state = context.state;
     if (context.driver) {
       const driver = context.driver;
@@ -168,7 +168,7 @@ export const dismissSetup = mutation({
   returns: v.object({ profileRevision: v.number() }),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach", "mentor");
-    if (!Number.isSafeInteger(args.expectedProfileRevision) || args.expectedProfileRevision < 0 || args.expectedProfileRevision !== (actor.profileRevision ?? 0)) throw new ConvexError("Profile changed. Reload before saving.");
+    if (!Number.isSafeInteger(args.expectedProfileRevision) || args.expectedProfileRevision < 0 || args.expectedProfileRevision !== (actor.profileRevision ?? 0)) throw new ConvexError("Profile changed since you opened it. Reload to see the latest, then try again.");
     const profileRevision = (actor.profileRevision ?? 0) + 1;
     await ctx.db.patch(actor._id, { staffSetupDismissedAt: actor.staffSetupDismissedAt ?? Date.now(), profileRevision });
     await audit(ctx, actor, "appUsers", actor._id, "dismissStaffSetup", { profileRevision: actor.profileRevision ?? 0 }, { profileRevision });
@@ -182,7 +182,7 @@ export const saveBasics = mutation({
   returns: v.object({ profileRevision: v.number(), driverState: v.union(driverState, v.null()) }),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach", "mentor");
-    if (!Number.isSafeInteger(args.expectedProfileRevision) || args.expectedProfileRevision < 0 || args.expectedProfileRevision !== (actor.profileRevision ?? 0)) throw new ConvexError("Profile changed. Reload before saving.");
+    if (!Number.isSafeInteger(args.expectedProfileRevision) || args.expectedProfileRevision < 0 || args.expectedProfileRevision !== (actor.profileRevision ?? 0)) throw new ConvexError("Profile changed since you opened it. Reload to see the latest, then try again.");
     const profileRevision = (actor.profileRevision ?? 0) + 1;
     const patch = {
       name: clean(args.name, "Name", 100) || actor.name, phone: normalizeChangedPhone(args.phone, actor.phone, "Phone") || actor.phone, shirtSize: args.shirtSize ?? actor.shirtSize,
@@ -193,7 +193,7 @@ export const saveBasics = mutation({
     let state: DriverState | null = null;
     if (args.driving) {
       const context = await driverContext(ctx, actor);
-      if (context.state !== "none" && context.state !== "owned") throw new ConvexError("Driving details need Coach review or an active season. Skip this step to save your personal information.");
+      if (context.state !== "none" && context.state !== "owned") throw new ConvexError("Your driving details can't be saved right now because a Coach needs to check your driver record. Skip this step to save your other details.");
       state = await saveDriving(ctx, actor, context, patch.name, patch.phone ?? "", args.driving);
     }
     await ctx.db.patch(actor._id, patch);
@@ -215,7 +215,7 @@ export const saveOwn = mutation({
   returns: v.object({ profileRevision: v.number(), driverState }),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach", "mentor");
-    if (!Number.isSafeInteger(args.expectedProfileRevision) || args.expectedProfileRevision < 0 || args.expectedProfileRevision !== (actor.profileRevision ?? 0)) throw new ConvexError("Profile changed. Reload before saving.");
+    if (!Number.isSafeInteger(args.expectedProfileRevision) || args.expectedProfileRevision < 0 || args.expectedProfileRevision !== (actor.profileRevision ?? 0)) throw new ConvexError("Profile changed since you opened it. Reload to see the latest, then try again.");
     const name = clean(args.name, "Name", 100, true);
     const phone = normalizeChangedPhone(args.phone, actor.phone, "Phone");
     const emergencyName = clean(args.emergencyName, "Emergency contact name", 100);

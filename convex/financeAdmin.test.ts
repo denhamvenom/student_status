@@ -110,7 +110,7 @@ const rebuildRef = makeFunctionReference<"mutation">("financialSources:rebuild")
       await ctx.db.insert("financeSummaryBackfills", { seasonId: f.ids.season, actorId: actor._id, state: "complete", cursor: null, processed: 2, updatedAt: Date.now() });
     });
     const result = await f.coach.query(makeFunctionReference<"query">("dashboardReports:team"), {});
-    expect(result).toMatchObject({ state: "failed", finance: null }); expect(result.message).toContain("exact-cent range");
+    expect(result).toMatchObject({ state: "failed", finance: null }); expect(result.message).toContain("too large to show");
   });  it("preserves and completes an already-partially-posted legacy payout without falsely upgrading its summary", async () => {
     const f = await fixture();
     await f.t.run(async ctx => {

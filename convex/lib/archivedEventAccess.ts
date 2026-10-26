@@ -12,7 +12,7 @@ export async function familyCanReadEvents(ctx: QueryCtx | MutationCtx, actor: Do
 }
 
 export async function requireFamilyEventAccess(ctx: QueryCtx | MutationCtx, actor: Doc<"appUsers">, eventIds: Id<"events">[]) {
-  if (!await familyCanReadEvents(ctx, actor, eventIds)) throw new ConvexError("This event is archived and is no longer available to students or parents. Any unpaid charges remain in Money.");
+  if (!await familyCanReadEvents(ctx, actor, eventIds)) throw new ConvexError("This event has ended and moved to Past events, which students and parents can't open. Any balance due for it stays in Money.");
 }
 
 export async function familyVisibleSubmissions(ctx: QueryCtx | MutationCtx, actor: Doc<"appUsers">, submissions: Doc<"permissionSubmissions">[]) {

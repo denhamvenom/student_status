@@ -58,11 +58,11 @@ describe("travel operations", () => {
     expect(data).toMatchObject({ event: { travel: "Provide your Own", transportEnabled: false }, drivers: [], assignments: [], riders: [], summary: { state: "notApplicable", demand: 0, open: [] } });
     const linked = { eventId: f.ids.event, studentId: f.ids.studentId };
     expect(await f.parent.query(api.travel.ownTravel, linked)).toMatchObject({ transportEnabled: false });
-    await expect(f.coach.mutation(api.travel.assignVehicle, { eventId: f.ids.event, driverId: driver, seats: 2 })).rejects.toThrow("does not manage");
-    await expect(f.coach.mutation(api.admin.assignDriver, { eventId: f.ids.event, driverId: driver, seats: 2 })).rejects.toThrow("does not manage");
-    await expect(f.coach.mutation(api.travel.removeVehicle, { eventId: f.ids.event, driverId: driver })).rejects.toThrow("does not manage");
-    await expect(f.parent.mutation(api.travel.setIndependentTravel, { ...linked, independentTravel: true })).rejects.toThrow("does not manage");
-    await expect(f.coach.mutation(api.travel.setEventTransport, settings)).rejects.toThrow("Choose team transportation");
+    await expect(f.coach.mutation(api.travel.assignVehicle, { eventId: f.ids.event, driverId: driver, seats: 2 })).rejects.toThrow("aren't managed");
+    await expect(f.coach.mutation(api.admin.assignDriver, { eventId: f.ids.event, driverId: driver, seats: 2 })).rejects.toThrow("Drivers and rides aren't managed for this event");
+    await expect(f.coach.mutation(api.travel.removeVehicle, { eventId: f.ids.event, driverId: driver })).rejects.toThrow("aren't managed");
+    await expect(f.parent.mutation(api.travel.setIndependentTravel, { ...linked, independentTravel: true })).rejects.toThrow("aren't managed");
+    await expect(f.coach.mutation(api.travel.setEventTransport, settings)).rejects.toThrow("Choose team transport");
     for (const travel of ["Charter Bus", "School Bus", "Team Carpool"] as const) {
       await f.coach.mutation(api.travel.setEventTransport, { ...settings, travel });
       const managed = await f.coach.query(api.travel.eventTransport, { eventId: f.ids.event });
@@ -98,29 +98,29 @@ describe("travel operations", () => {
     const f = await fixture();
     const settings = { eventId: f.ids.event, transportEnabled: true, busSeats: 2, additionalAdults: 0, trailerRequired: false };
     await expect(f.t.mutation(api.travel.setEventTransport, settings)).rejects.toThrow();
-    await expect(f.mentor.mutation(api.travel.setEventTransport, settings)).rejects.toThrow("Travel operations");
-    await expect(f.parent.mutation(api.travel.setEventTransport, settings)).rejects.toThrow("Travel operations");
-    await expect(f.coach.mutation(api.travel.setEventTransport, { ...settings, eventId: f.ids.oldEvent })).rejects.toThrow("active season");
+    await expect(f.mentor.mutation(api.travel.setEventTransport, settings)).rejects.toThrow("Coach or Travel Lead can manage transport");
+    await expect(f.parent.mutation(api.travel.setEventTransport, settings)).rejects.toThrow("Coach or Travel Lead can manage transport");
+    await expect(f.coach.mutation(api.travel.setEventTransport, { ...settings, eventId: f.ids.oldEvent })).rejects.toThrow("current season");
     await expect(f.coach.mutation(api.travel.setEventTransport, { ...settings, busSeats: 1.5 })).rejects.toThrow("whole number");
     await expect(f.coach.mutation(api.travel.setEventTransport, { ...settings, additionalAdults: -1 })).rejects.toThrow("whole number");
     await f.lead.mutation(api.travel.setEventTransport, settings);
     expect((await f.lead.query(api.travel.eventTransport, { eventId: f.ids.event })).summary.state).toBe("ready");
     await f.t.run(ctx => ctx.db.patch(f.ids.event, { archived: true }));
-    await expect(f.lead.query(api.travel.eventTransport, { eventId: f.ids.event })).rejects.toThrow("unavailable");
+    await expect(f.lead.query(api.travel.eventTransport, { eventId: f.ids.event })).rejects.toThrow("has ended");
   });
 
   it("counts current riders and adults, excludes independent students and withdrawn participation", async () => {
     const f = await fixture();
     await f.coach.mutation(api.travel.setEventTransport, { eventId: f.ids.event, transportEnabled: true, busSeats: 2, additionalAdults: 1, trailerRequired: false });
     expect((await f.coach.query(api.travel.eventTransport, { eventId: f.ids.event })).summary).toMatchObject({ state: "open", seats: 2, demand: 3, ridingStudents: 2 });
-    await expect(f.other.mutation(api.travel.setIndependentTravel, { eventId: f.ids.event, studentId: f.ids.studentId, independentTravel: true })).rejects.toThrow("Only a parent or Coach");
-    await expect(f.student.mutation(api.travel.setIndependentTravel, { eventId: f.ids.event, studentId: f.ids.studentId, independentTravel: true })).rejects.toThrow("Only a parent or Coach");
+    await expect(f.other.mutation(api.travel.setIndependentTravel, { eventId: f.ids.event, studentId: f.ids.studentId, independentTravel: true })).rejects.toThrow("parent or a Coach");
+    await expect(f.student.mutation(api.travel.setIndependentTravel, { eventId: f.ids.event, studentId: f.ids.studentId, independentTravel: true })).rejects.toThrow("parent or a Coach");
     await f.parent.mutation(api.travel.setIndependentTravel, { eventId: f.ids.event, studentId: f.ids.studentId, independentTravel: true });
     const overview = await f.coach.query(api.travel.eventTransport, { eventId: f.ids.event });
     expect(overview.summary).toMatchObject({ state: "ready", demand: 2, ridingStudents: 1 });
     expect(overview.riders).toEqual(expect.arrayContaining([{ studentId: f.ids.studentId, name: "student", independentTravel: true }]));
     expect(overview.riders[0]).not.toHaveProperty("email");
-    await expect(f.lead.mutation(api.travel.setIndependentTravel, { eventId: f.ids.event, studentId: f.ids.studentId, independentTravel: false })).rejects.toThrow("Only a parent or Coach");
+    await expect(f.lead.mutation(api.travel.setIndependentTravel, { eventId: f.ids.event, studentId: f.ids.studentId, independentTravel: false })).rejects.toThrow("parent or a Coach");
     await f.coach.mutation(api.travel.setIndependentTravel, { eventId: f.ids.event, studentId: f.ids.studentId, independentTravel: false });
     expect((await f.coach.query(api.travel.eventTransport, { eventId: f.ids.event })).summary.demand).toBe(3);
     await f.coach.mutation(api.travel.setIndependentTravel, { eventId: f.ids.event, studentId: f.ids.studentId, independentTravel: true });
@@ -137,7 +137,7 @@ describe("travel operations", () => {
     const driver = await f.coach.mutation(api.travel.saveDriver, driverArgs);
     await f.coach.mutation(api.travel.setEventTransport, { eventId: f.ids.event, transportEnabled: true, busSeats: 0, additionalAdults: 0, trailerRequired: true });
     expect((await f.coach.query(api.travel.eventTransport, { eventId: f.ids.event })).summary.state).toBe("open");
-    await expect(f.coach.mutation(api.travel.assignVehicle, { eventId: f.ids.event, driverId: driver, seats: 4 })).rejects.toThrow("exceed");
+    await expect(f.coach.mutation(api.travel.assignVehicle, { eventId: f.ids.event, driverId: driver, seats: 4 })).rejects.toThrow("can't be more than");
     await f.coach.mutation(api.travel.saveDriver, { ...driverArgs, driverId: driver, active: false });
     await expect(f.coach.mutation(api.travel.assignVehicle, { eventId: f.ids.event, driverId: driver, seats: 2 })).rejects.toThrow("active driver");
     await f.coach.mutation(api.travel.saveDriver, { ...driverArgs, driverId: driver });
@@ -170,7 +170,7 @@ describe("travel operations", () => {
       for (let i = 0; i < 200; i++) await ctx.db.insert("drivers", { seasonId: f.ids.season, name: `Driver ${i}`, email: `driver${i}@example.invalid`, phone: "(202) 555-0100", seats: 2, approved: true });
     });
     const args = { name: "Overflow", email: "overflow@example.invalid", phone: "(202) 555-0100", vehicleName: "Van", seats: 2, approved: true, towCapable: false, active: true };
-    await expect(f.coach.mutation(api.travel.saveDriver, args)).rejects.toThrow("Driver limit");
+    await expect(f.coach.mutation(api.travel.saveDriver, args)).rejects.toThrow("driver list is full");
     const records = await f.coach.query(api.travel.listDrivers, {});
     expect(records).toHaveLength(200);
     expect(records.some((d: { name: string }) => d.name === "Overflow")).toBe(false);

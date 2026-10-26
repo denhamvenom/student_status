@@ -69,7 +69,7 @@ describe("Student Status Calendar link", () => {
     await f.t.mutation(internal.eventCalendar.applyObserved, { eventId: "unlinked", title: "Ignore", location: "Elsewhere", start: 1, end: 2, allDay: false, recurring: false, cancelled: false, etag: "other", description: "" });
     expect((await f.t.run(ctx => ctx.db.get(f.ids.event)))?.name).toBe("Practice");
     const duplicate = await f.t.run(async ctx => ctx.db.insert("events", { seasonId: f.ids.season, name: "Second", type: "Team", startsAt: 100, endsAt: 200, destination: "Gym", travel: "None", overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "open", allowWithdrawal: true, permissionRequired: false, firstRequired: false, archived: false }));
-    await expect(f.coach.mutation(api.eventCalendar.connect, { eventId: duplicate, calendarChoice: { kind: "link", eventId: "cal-occurrence-1" } })).rejects.toThrow("already linked");
+    await expect(f.coach.mutation(api.eventCalendar.connect, { eventId: duplicate, calendarChoice: { kind: "link", eventId: "cal-occurrence-1" } })).rejects.toThrow("already connected");
     await f.t.mutation(internal.eventCalendar.finishPush, { eventId: f.ids.event, revision: 1, error: "The selected Calendar event is no longer available.", replaceable: true });
     expect((await f.coach.query(api.eventCalendar.status, { eventId: f.ids.event })).canReselect).toBe(true);
     await f.coach.mutation(api.eventCalendar.connect, { eventId: f.ids.event, calendarChoice: { kind: "link", eventId: "cal-occurrence-4" } });
