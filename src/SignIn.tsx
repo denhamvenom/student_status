@@ -1,10 +1,13 @@
 import { userFacingError } from '@/lib/error-message'
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useAuthActions } from '@convex-dev/auth/react'
 import { Button } from './components/ui/button'
 import { ParentEmailSignIn } from './ParentInvites'
 import { liveCopy } from './lib/live-copy'
 import { uiCopy } from './lib/ui-copy'
+
+// Vite replaces import.meta.env.DEV with false in production builds, so this chunk is never emitted there.
+const DeveloperSignIn = import.meta.env.DEV ? lazy(() => import('./DeveloperSignIn')) : null
 
 export default function SignIn() {
   const { signIn } = useAuthActions()
@@ -30,5 +33,5 @@ export default function SignIn() {
     </>}
     {error&&<p role="alert" className="open-text">{error}</p>}
     {screen!=='choose'&&<Button variant="link" className="button button-link" disabled={busy} onClick={()=>change(screen==='email'?'adult':'choose')}>Back</Button>}
-  </section></div></main>
+  </section>{DeveloperSignIn&&<Suspense fallback={null}><DeveloperSignIn/></Suspense>}</div></main>
 }

@@ -12,16 +12,16 @@ const studentId = v.id("students");
 const planId = v.id("seasonTransitionPlans");
 const pageArgs = { planId, studentId, paginationOpts: paginationOptsValidator };
 const checkPage = (options: { numItems: number; maximumRowsRead?: number }) => {
-  if (!Number.isSafeInteger(options.numItems) || options.numItems < 1 || options.numItems > 25) throw new ConvexError("Review pages support 1 to 25 records.");
-  if (options.maximumRowsRead !== undefined && (!Number.isSafeInteger(options.maximumRowsRead) || options.maximumRowsRead < 1)) throw new ConvexError("Invalid review read budget.");
+  if (!Number.isSafeInteger(options.numItems) || options.numItems < 1 || options.numItems > 25) throw new ConvexError("Up to 25 records can be shown at a time. Reload the page and try again.");
+  if (options.maximumRowsRead !== undefined && (!Number.isSafeInteger(options.maximumRowsRead) || options.maximumRowsRead < 1)) throw new ConvexError("The season review could not load. Reload the page and try again.");
   options.maximumRowsRead = Math.min(options.maximumRowsRead ?? 26, 26);
 };
 const studentFingerprint = (student: Doc<"students">) => JSON.stringify([student._id, student.seasonId, student.userId ?? null, student.active, student.profileRevision ?? 0]);
 const accountFingerprint = (account: Doc<"appUsers"> | null) => account ? JSON.stringify([account._id, account.active, account.archivedAt ?? null, account.accessRevision ?? 0, account.role]) : "none";
-const revision = (value: number) => { if (!Number.isSafeInteger(value) || value < 0) throw new ConvexError("Invalid review revision."); return value; };
+const revision = (value: number) => { if (!Number.isSafeInteger(value) || value < 0) throw new ConvexError("This choice could not be saved. Reload the page and try again."); return value; };
 const reason = (value: string, required: boolean) => {
   const normalized = value.trim().replace(/\s+/g, " ");
-  if (normalized.length > 500 || required && normalized.length < 8) throw new ConvexError("Provide a reason of 8 to 500 characters.");
+  if (normalized.length > 500 || required && normalized.length < 8) throw new ConvexError("Enter a reason of 8 to 500 characters.");
   return normalized;
 };
 
@@ -29,9 +29,9 @@ async function reviewed(ctx: Ctx, id: Id<"seasonTransitionPlans">, subjectId: Id
   requireRole(await viewer(ctx), "coach");
   const season = await activeSeason(ctx);
   const plan = await ctx.db.get(id);
-  if (!plan || !plan.open || plan.state !== "draft" || plan.sourceSeasonId !== season._id) throw new ConvexError("Season draft is unavailable for review.");
+  if (!plan || !plan.open || plan.state !== "draft" || plan.sourceSeasonId !== season._id) throw new ConvexError("This season draft was finished or discarded. Reload to see the latest.");
   const student = await ctx.db.get(subjectId);
-  if (!student || !student.active || student.seasonId !== season._id) throw new ConvexError("Student is unavailable in the active season.");
+  if (!student || !student.active || student.seasonId !== season._id) throw new ConvexError("This student is no longer active in the current season. Reload the review to see the latest.");
   const roster = await ctx.db.query("seasonTransitionRosterDecisions").withIndex("by_planId_and_sourceStudentId", q => q.eq("planId", id).eq("sourceStudentId", subjectId)).unique();
   const account = student.userId ? await ctx.db.get(student.userId) : null;
   return { season, plan, student, roster, account };
@@ -40,7 +40,7 @@ async function reviewed(ctx: Ctx, id: Id<"seasonTransitionPlans">, subjectId: Id
 async function mutationReview(ctx: MutationCtx, id: Id<"seasonTransitionPlans">, subjectId: Id<"students">, expectedPlanRevision: number) {
   const actor = await viewer(ctx); requireRole(actor, "coach");
   const state = await reviewed(ctx, id, subjectId);
-  if (state.plan.revision !== revision(expectedPlanRevision)) throw new ConvexError("Season review changed. Refresh before saving.");
+  if (state.plan.revision !== revision(expectedPlanRevision)) throw new ConvexError("The season review changed since you opened it. Reload to see the latest, then try again.");
   return { ...state, actor };
 }
 
@@ -74,13 +74,13 @@ export const saveStudentReview = mutation({
   returns: v.number(),
   handler: async (ctx, args) => {
     const { actor, plan, student, roster, account } = await mutationReview(ctx, args.planId, args.studentId, args.expectedPlanRevision);
-    if (!roster || roster.revision !== revision(args.expectedRosterRevision) || roster.studentFingerprint !== studentFingerprint(student) || args.expectedStudentFingerprint !== studentFingerprint(student) || args.expectedAccountFingerprint !== accountFingerprint(account)) throw new ConvexError("Student or account changed. Refresh this review.");
-    if (roster.choice === "return" && args.accountAction !== "keepActive") throw new ConvexError("A returning student's account cannot be archived.");
-    if (roster.choice === "depart" && (args.copyGuardianContact || args.copySubteam || args.copyParentLinks)) throw new ConvexError("Departing students cannot copy profile fields to a new season.");
-    if (args.accountAction === "archive" && (!account || !account.active || account.role !== "student")) throw new ConvexError("Only an active linked student account may be archived.");
+    if (!roster || roster.revision !== revision(args.expectedRosterRevision) || roster.studentFingerprint !== studentFingerprint(student) || args.expectedStudentFingerprint !== studentFingerprint(student) || args.expectedAccountFingerprint !== accountFingerprint(account)) throw new ConvexError("This student or their account changed since you opened it. Reload to see the latest, then try again.");
+    if (roster.choice === "return" && args.accountAction !== "keepActive") throw new ConvexError("A returning student's account must stay active. Change the student's season status first if they are leaving.");
+    if (roster.choice === "depart" && (args.copyGuardianContact || args.copySubteam || args.copyParentLinks)) throw new ConvexError("Departing students don't move to the new season, so their profile details can't be copied. Clear those choices to continue.");
+    if (args.accountAction === "archive" && (!account || !account.active || account.role !== "student")) throw new ConvexError("Only an active student account can be archived. Choose another option for this student.");
     const why = reason(args.reason, args.accountAction === "archive");
     const old = await ctx.db.query("seasonTransitionStudentReviews").withIndex("by_planId_and_sourceStudentId", q => q.eq("planId", plan._id).eq("sourceStudentId", student._id)).unique();
-    if ((old?.revision ?? null) !== args.expectedReviewRevision) throw new ConvexError("Student review changed. Refresh before saving.");
+    if ((old?.revision ?? null) !== args.expectedReviewRevision) throw new ConvexError("This student's review changed since you opened it. Reload to see the latest, then try again.");
     const next = { rosterRevision: roster.revision, studentFingerprint: studentFingerprint(student), accountFingerprint: accountFingerprint(account),
       copyGuardianContact: args.copyGuardianContact, copySubteam: args.copySubteam, copyParentLinks: args.copyParentLinks, accountAction: args.accountAction, reason: why,
       revision: (old?.revision ?? 0) + 1, reviewedBy: actor._id, reviewedAt: Date.now() };
@@ -100,9 +100,9 @@ export const chargePage = query({
     const { plan, student } = await reviewed(ctx, args.planId, args.studentId);
     checkPage(args.paginationOpts);
     const account = await financialAccount(ctx, student._id);
-    if (!account || account.state !== "ready" || account.allocationSourceVersion !== 1) throw new ConvexError("Financial preparation is unavailable; ask a Coach to finish the account review.");
+    if (!account || account.state !== "ready" || account.allocationSourceVersion !== 1) throw new ConvexError("This student's account is not ready yet. Finish preparing it on the Money page, then review balances again.");
     const result = await ctx.db.query("charges").withIndex("by_studentId_and_priority", q => q.eq("studentId", student._id)).paginate(args.paginationOpts);
-    if (result.page.length > 25) throw new ConvexError("Charge review page exceeded its limit.");
+    if (result.page.length > 25) throw new ConvexError("Too many fees to show at once. Reload the list to see fewer at a time.");
     const page = await Promise.all(result.page.map(async charge => {
       const outstandingCents = effectiveChargeCents(charge) - charge.appliedCents;
       const decision = await ctx.db.query("seasonTransitionChargeDecisions").withIndex("by_planId_and_chargeId", q => q.eq("planId", plan._id).eq("chargeId", charge._id)).unique();
@@ -120,14 +120,14 @@ export const saveChargeDecision = mutation({
   handler: async (ctx, args) => {
     const { actor, plan, student, roster } = await mutationReview(ctx, args.planId, args.studentId, args.expectedPlanRevision);
     if (!roster || roster.studentFingerprint !== studentFingerprint(student)) throw new ConvexError("Choose and review this student's season status first.");
-    if (args.choice === "carry" && roster.choice !== "return") throw new ConvexError("Only returning students can carry debt.");
+    if (args.choice === "carry" && roster.choice !== "return") throw new ConvexError("Only returning students can carry a balance due into the new season. Choose another option for this fee.");
     const account = await readyFinancialAccount(ctx, student._id);
     const charge = await ctx.db.get(args.chargeId);
     const outstandingCents = charge ? effectiveChargeCents(charge) - charge.appliedCents : 0;
-    if (!charge || charge.studentId !== student._id || outstandingCents <= 0 || (charge.revision ?? 0) !== args.expectedChargeRevision || outstandingCents !== args.expectedOutstandingCents || account.revision !== args.expectedFinancialRevision) throw new ConvexError("Charge or financial balance changed. Refresh this decision.");
+    if (!charge || charge.studentId !== student._id || outstandingCents <= 0 || (charge.revision ?? 0) !== args.expectedChargeRevision || outstandingCents !== args.expectedOutstandingCents || account.revision !== args.expectedFinancialRevision) throw new ConvexError("This fee or the student's balance changed since you opened it. Reload to see the latest, then try again.");
     const why = reason(args.reason, args.choice === "writeOff");
     const old = await ctx.db.query("seasonTransitionChargeDecisions").withIndex("by_planId_and_chargeId", q => q.eq("planId", plan._id).eq("chargeId", charge._id)).unique();
-    if ((old?.revision ?? null) !== args.expectedDecisionRevision) throw new ConvexError("Charge decision changed. Refresh before saving.");
+    if ((old?.revision ?? null) !== args.expectedDecisionRevision) throw new ConvexError("This fee decision changed since you opened it. Reload to see the latest, then try again.");
     const next = { choice: args.choice, outstandingCents, chargeRevision: charge.revision ?? 0, financialGeneration: account.generation, financialRevision: account.revision,
       reason: why, revision: (old?.revision ?? 0) + 1, decidedBy: actor._id, decidedAt: Date.now() };
     if (old) await ctx.db.patch(old._id, next);
@@ -146,9 +146,9 @@ export const sourcePage = query({
     const { plan, student } = await reviewed(ctx, args.planId, args.studentId);
     checkPage(args.paginationOpts);
     const account = await financialAccount(ctx, student._id);
-    if (!account || account.state !== "ready" || account.allocationSourceVersion !== 1) throw new ConvexError("Financial preparation is unavailable; ask a Coach to finish the account review.");
+    if (!account || account.state !== "ready" || account.allocationSourceVersion !== 1) throw new ConvexError("This student's account is not ready yet. Finish preparing it on the Money page, then review balances again.");
     const result = await ctx.db.query("financialSources").withIndex("by_studentId_and_generation_and_sourceCreatedAt", q => q.eq("studentId", student._id).eq("generation", account.generation)).paginate(args.paginationOpts);
-    if (result.page.length > 25) throw new ConvexError("Source review page exceeded its limit.");
+    if (result.page.length > 25) throw new ConvexError("Too many available funds to show at once. Reload the list to see fewer at a time.");
     const page = await Promise.all(result.page.map(async source => {
       const decision = await ctx.db.query("seasonTransitionSourceDecisions").withIndex("by_planId_and_sourceEntryId", q => q.eq("planId", plan._id).eq("sourceEntryId", source.sourceEntryId)).unique();
       return { sourceEntryId: source.sourceEntryId, kind: source.kind, availableCents: source.availableCents, sourceRevision: source.revision,
@@ -165,13 +165,13 @@ export const saveSourceDecision = mutation({
   handler: async (ctx, args) => {
     const { actor, plan, student, roster } = await mutationReview(ctx, args.planId, args.studentId, args.expectedPlanRevision);
     if (!roster || roster.studentFingerprint !== studentFingerprint(student)) throw new ConvexError("Choose and review this student's season status first.");
-    if (args.choice === "carry" && roster.choice !== "return" || args.choice === "team" && roster.choice !== "depart") throw new ConvexError("This source choice conflicts with the student's season status.");
+    if (args.choice === "carry" && roster.choice !== "return" || args.choice === "team" && roster.choice !== "depart") throw new ConvexError("This choice doesn't match the student's season status. Only returning students can carry funds forward, and only departing students' funds can move to the team.");
     const account = await readyFinancialAccount(ctx, student._id);
     const source = await ctx.db.query("financialSources").withIndex("by_studentId_and_generation_and_sourceEntryId", q => q.eq("studentId", student._id).eq("generation", account.generation).eq("sourceEntryId", args.sourceEntryId)).unique();
-    if (!source || source.availableCents <= 0 || source.revision !== args.expectedSourceRevision || source.availableCents !== args.expectedAvailableCents || account.revision !== args.expectedFinancialRevision) throw new ConvexError("Financial source changed. Refresh this decision.");
+    if (!source || source.availableCents <= 0 || source.revision !== args.expectedSourceRevision || source.availableCents !== args.expectedAvailableCents || account.revision !== args.expectedFinancialRevision) throw new ConvexError("These available funds changed since you opened them. Reload to see the latest, then try again.");
     const why = reason(args.reason, args.choice !== "carry");
     const old = await ctx.db.query("seasonTransitionSourceDecisions").withIndex("by_planId_and_sourceEntryId", q => q.eq("planId", plan._id).eq("sourceEntryId", source.sourceEntryId)).unique();
-    if ((old?.revision ?? null) !== args.expectedDecisionRevision) throw new ConvexError("Source decision changed. Refresh before saving.");
+    if ((old?.revision ?? null) !== args.expectedDecisionRevision) throw new ConvexError("This funds decision changed since you opened it. Reload to see the latest, then try again.");
     const next = { kind: source.kind, choice: args.choice, amountCents: source.availableCents, sourceRevision: source.revision,
       financialGeneration: account.generation, financialRevision: account.revision, reason: why,
       revision: (old?.revision ?? 0) + 1, decidedBy: actor._id, decidedAt: Date.now() };

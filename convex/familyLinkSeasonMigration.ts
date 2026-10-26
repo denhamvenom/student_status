@@ -33,7 +33,7 @@ export const start = mutation({
     const actor = await viewer(ctx); requireRole(actor, "coach");
     const previous = await current(ctx);
     if (previous?.state === "running" || previous?.state === "complete") return previous._id;
-    if (previous?.state === "failed") throw new ConvexError("Family link backfill failed. Review its status and use retry with a reason.");
+    if (previous?.state === "failed") throw new ConvexError("Family link maintenance stopped. Review its status, then try again with a reason.");
     const generation = (previous?.generation ?? 0) + 1;
     const now = Date.now();
     const id = previous ? previous._id : await ctx.db.insert("familyLinkSeasonBackfill", {
@@ -52,9 +52,9 @@ export const retry = mutation({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach");
     const reason = args.reason.trim();
-    if (reason.length < 8 || reason.length > 500) throw new ConvexError("Provide a retry reason of 8 to 500 characters.");
+    if (reason.length < 8 || reason.length > 500) throw new ConvexError("Enter a reason of 8 to 500 characters.");
     const job = await current(ctx);
-    if (!job || job.state !== "failed") throw new ConvexError("No failed family link backfill is available to retry.");
+    if (!job || job.state !== "failed") throw new ConvexError("Family link maintenance has not stopped, so there is nothing to restart. Reload to see its status.");
     const generation = job.generation + 1;
     await ctx.db.patch(job._id, { state: "running", generation, startedBy: actor._id, unresolved: 0, lastError: undefined, updatedAt: Date.now() });
     await audit(ctx, actor, "familyLinkSeasonBackfill", job._id, "retry", { state: "failed", phase: job.phase, cursor: job.cursor, error: job.lastError }, { state: "running", generation }, reason);
@@ -74,7 +74,7 @@ export const runStep = internalMutation({
       const fresh = await current(ctx);
       if (fresh?.state === "running" && fresh.generation === args.generation && fresh.phase === args.phase && fresh.cursor === args.cursor) {
         const message = error instanceof Error ? error.message.slice(0, 500) : "Family link backfill failed; Coach review is required.";
-        await ctx.db.patch(fresh._id, { state: "failed", unresolved: message.includes("Family link ") ? 1 : 0, lastError: savedPublicError(error, "Family links need Coach review before processing can continue."), updatedAt: Date.now() });
+        await ctx.db.patch(fresh._id, { state: "failed", unresolved: message.includes("Family link ") ? 1 : 0, lastError: savedPublicError(error, "Family link maintenance stopped because some links need review. Check the links, then try again with a reason."), updatedAt: Date.now() });
       }
     }
     return null;
@@ -87,7 +87,7 @@ export const processPage = internalMutation({
     const job = await current(ctx);
     if (!job || job.state !== "running" || job.generation !== args.generation || job.phase !== args.phase || job.cursor !== args.cursor) return null;
     const actor = await ctx.db.get(job.startedBy);
-    if (!actor?.active || actor.role !== "coach") throw new ConvexError("Backfill Coach access changed; another active Coach must review and retry.");
+    if (!actor?.active || actor.role !== "coach") throw new ConvexError("The Coach who started this maintenance no longer has Coach access. Another Coach must try again with a reason.");
     const page = await ctx.db.query("familyLinks").order("asc").paginate({ numItems: 40, cursor: job.cursor });
     for (const link of page.page) {
       const student = await ctx.db.get(link.studentId);

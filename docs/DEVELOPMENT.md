@@ -81,3 +81,19 @@ Passing those tests does not prove real Google sign-in, multi-account browser be
 ## Timeclock workspace
 
 Use the [backend handoff](TIMECLOCK_BACKEND_HANDOFF.md) for commands and API contracts. Root remains Student Status; `apps/timeclock` uses port5174, independent output and Cloudflare config. Root Bun lockfile governs both workspaces. `bun run dev:timeclock` starts frontend only. The frontend chat must never start its own Convex watcher. Existing Student Status namespace is preserved; Timeclock uses a separate namespace and exact localhost redirect origin. Calendar credentials and operator PIN stay only in development server configuration.
+
+## Developer sign-in
+
+The development deployment can sign in to six fixed fictional accounts (Coach, Mentor, Travel Lead, Parent, Parent with staff access, Student) without Google, so every role can be tested by the owner, Claude and automated browser checks. Policy and guards: [DECISIONS.md](DECISIONS.md#developer-sign-in).
+
+It works only on `third-bandicoot-18`, only while both server settings are present, and only in a local development build (`bun run dev`); the panel appears below the normal sign-in card. Any production build fails if any of it reaches the bundle (a Vite build check). Setup, once per development deployment:
+
+```powershell
+bunx convex env set --deployment dev DEVELOPER_SIGN_IN_ENABLED true
+bunx convex env set --deployment dev DEVELOPER_SIGN_IN_KEY <random value of at least 32 characters>
+bunx convex run --deployment dev developerSignIn:ensurePersonas
+```
+
+Keep the key outside Git (for example in the ignored `private-data/` folder) and paste it into the panel; the panel remembers it only for the current browser tab. Rerunning `ensurePersonas` restores the fictional accounts' grants, the Dev Student profile link, both family links and the two Parents' verified-parent records (needed for Profile and Permission forms) after testing changes them; it never touches other accounts. The fictional accounts use the reserved `developer.example.invalid` domain, cannot accept invitations, and stop working as soon as either setting is removed. Never set either value on production.
+
+This does not test Google or parent-email sign-in. Before releasing authentication changes, still sign in once for real.

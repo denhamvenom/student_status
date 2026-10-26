@@ -7,7 +7,7 @@ export const chargeAdministrationCopy = {
   cancellation: 'Cancel charge amount',
   original: 'Original charge',
   adjusted: 'Adjustment',
-  cancelled: 'Cancelled charge amount',
+  cancelled: 'Canceled charge amount',
   effective: 'Current charge total',
   applied: 'Applied funds',
   outstanding: 'Outstanding amount',

@@ -4,6 +4,7 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { getAuthUserId, getAuthSessionId } from "@convex-dev/auth/server";
 import { timeclockTransitionLocked } from "./timeclockTransition";
 import { requireMaintenanceAccess } from "./maintenanceAccess";
+import { isDeveloperEmail, requireDeveloperAccountAllowed, developerSignInEnabled } from "./developerSignIn";
 
 type Ctx = QueryCtx | MutationCtx;
 export type AppUser = Doc<"appUsers">;
@@ -33,21 +34,22 @@ async function effectiveViewer(ctx: Ctx, user: AppUser): Promise<AppUser> {
 
 export async function identity(ctx: Ctx) {
   const authUserId = await getAuthUserId(ctx);
-  if (!authUserId) throw new ConvexError("Sign in with Google to continue.");
+  if (!authUserId) throw new ConvexError("You are not signed in. Sign in to continue.");
   const authUser = await ctx.db.get(authUserId as Id<"users">);
-  if (!authUser?.email || authUser.isAnonymous) throw new ConvexError("A Google account with an email is required.");
+  if (!authUser?.email || authUser.isAnonymous) throw new ConvexError("This sign-in has no email address. Sign in with a Google account that has an email.");
   requireMaintenanceAccess(authUser.email);
+  requireDeveloperAccountAllowed(authUser.email);
   return { authUserId: authUser._id, email: authUser.email, name: authUser.name ?? authUser.email };
 }
 
 export async function viewer(ctx: Ctx): Promise<AppUser> {
   const who = await identity(ctx);
   const user = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique();
-  if (!user || !user.active) throw new ConvexError("Your account is waiting for approval or is inactive.");
+  if (!user || !user.active) throw new ConvexError("Your account is waiting for approval or is inactive. Ask a Coach if you need access.");
   const parentEmailIdentity = await ctx.db.query("parentEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique();
-  if (parentEmailIdentity && (user.role !== "parent" || parentEmailIdentity.email !== user.email.trim().toLowerCase())) throw new ConvexError("Parent email sign-in is limited to its parent account.");
+  if (parentEmailIdentity && (user.role !== "parent" || parentEmailIdentity.email !== user.email.trim().toLowerCase())) throw new ConvexError("This email sign-in works only for its Parent account. Sign out, then sign in with the right account.");
   const adultMarker = await ctx.db.query("adultEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique();
-  if (adultMarker && (!["coach", "mentor"].includes(user.role) || adultMarker.email !== user.email.trim().toLowerCase())) throw new ConvexError("Adult email sign-in is limited to its approved adult account.");
+  if (adultMarker && (!["coach", "mentor"].includes(user.role) || adultMarker.email !== user.email.trim().toLowerCase())) throw new ConvexError("This email sign-in works only for its Coach or Mentor account. Sign out, then sign in with the right account.");
   return effectiveViewer(ctx, user);
 }
 
@@ -56,6 +58,7 @@ export async function maybeViewer(ctx: Ctx): Promise<AppUser | null> {
   if (!authUserId) return null;
   const user = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", authUserId as Id<"users">)).unique();
   if (user) requireMaintenanceAccess(user.email);
+  if (user && isDeveloperEmail(user.email) && !developerSignInEnabled()) return null;
   const marker = user && await ctx.db.query("parentEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", authUserId as Id<"users">)).unique();
   if (marker && (user.role !== "parent" || marker.email !== user.email.trim().toLowerCase())) return null;
   const adultMarker = user && await ctx.db.query("adultEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", authUserId as Id<"users">)).unique();
@@ -64,24 +67,24 @@ export async function maybeViewer(ctx: Ctx): Promise<AppUser | null> {
 }
 
 export function requireRole(user: AppUser, ...roles: AppUser["role"][]) {
-  if (!roles.includes(user.role)) throw new ConvexError("You do not have permission for this action.");
+  if (!roles.includes(user.role)) throw new ConvexError("You do not have permission for this action. Ask a Coach if you need access.");
 }
 
 export async function activeSeason(ctx: Ctx) {
   const season = await ctx.db.query("seasons").withIndex("by_status", q => q.eq("status", "active")).unique();
-  if (!season) throw new ConvexError("No active season is configured.");
+  if (!season) throw new ConvexError("No season is active yet. Ask a Coach to set up the season.");
   return season;
 }
 
 export async function requireSeasonProfileWritable(ctx: Ctx, seasonId: Id<"seasons">) {
-  if (await timeclockTransitionLocked(ctx, seasonId)) throw new ConvexError("Season transition is in progress. Profile and roster changes are paused until it finishes.");
+  if (await timeclockTransitionLocked(ctx, seasonId)) throw new ConvexError("The team is moving to a new season. Profile and roster changes are paused until that finishes. Try again later.");
 }
 
 export async function studentAccess(ctx: Ctx, user: AppUser, studentId: Id<"students">): Promise<Doc<"students">> {
   const student = await ctx.db.get(studentId);
-  if (!student) throw new ConvexError("Student not found.");
+  if (!student) throw new ConvexError("This student was not found. Reload to see the current roster.");
   const season = await activeSeason(ctx);
-  if (!student.active || student.seasonId !== season._id) throw new ConvexError("Student is unavailable in the active season.");
+  if (!student.active || student.seasonId !== season._id) throw new ConvexError("This student is unavailable in the active season. Reload to see the current roster.");
   if ("scheduler" in ctx) await requireSeasonProfileWritable(ctx, season._id);
   if (user.role === "coach" || user.travelLead) return student;
   if (user.role === "student" && student.userId === user._id) return student;
@@ -89,7 +92,7 @@ export async function studentAccess(ctx: Ctx, user: AppUser, studentId: Id<"stud
     const link = await ctx.db.query("familyLinks").withIndex("by_parentUserId_and_studentId", q => q.eq("parentUserId", user._id).eq("studentId", studentId)).unique();
     if (link?.active) return student;
   }
-  throw new ConvexError("You do not have permission for this student.");
+  throw new ConvexError("You don't have permission for this student's record. Ask a Coach if this is wrong.");
 }
 
 export async function ownStudent(ctx: Ctx, user: AppUser): Promise<Doc<"students">> {
@@ -97,7 +100,7 @@ export async function ownStudent(ctx: Ctx, user: AppUser): Promise<Doc<"students
   const season = await activeSeason(ctx);
   const student = await ctx.db.query("students").withIndex("by_seasonId_and_userId", q => q.eq("seasonId", season._id).eq("userId", user._id)).unique();
   if ("scheduler" in ctx) await requireSeasonProfileWritable(ctx, season._id);
-  if (!student || !student.active) throw new ConvexError("No active student profile is linked to this account.");
+  if (!student || !student.active) throw new ConvexError("No student on this season's roster is linked to your account. Ask a Coach for help.");
   return student;
 }
 

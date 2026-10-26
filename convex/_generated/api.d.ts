@@ -10,6 +10,7 @@
 
 import type * as accounts from "../accounts.js";
 import type * as admin from "../admin.js";
+import type * as adminContact from "../adminContact.js";
 import type * as adultInviteEmail from "../adultInviteEmail.js";
 import type * as adultProfile from "../adultProfile.js";
 import type * as app from "../app.js";
@@ -27,6 +28,7 @@ import type * as consentProfileV2Schema from "../consentProfileV2Schema.js";
 import type * as consentRehearsal from "../consentRehearsal.js";
 import type * as crons from "../crons.js";
 import type * as dashboardReports from "../dashboardReports.js";
+import type * as developerSignIn from "../developerSignIn.js";
 import type * as developmentRehearsal from "../developmentRehearsal.js";
 import type * as eventArchive from "../eventArchive.js";
 import type * as eventCalendar from "../eventCalendar.js";
@@ -59,6 +61,7 @@ import type * as historicalFinancialCorrections from "../historicalFinancialCorr
 import type * as historicalRoster from "../historicalRoster.js";
 import type * as http from "../http.js";
 import type * as lib_access from "../lib/access.js";
+import type * as lib_adminContact from "../lib/adminContact.js";
 import type * as lib_archivedEventAccess from "../lib/archivedEventAccess.js";
 import type * as lib_attendanceReports from "../lib/attendanceReports.js";
 import type * as lib_authRedirect from "../lib/authRedirect.js";
@@ -72,6 +75,7 @@ import type * as lib_consentSnapshot from "../lib/consentSnapshot.js";
 import type * as lib_consentSnapshotV2 from "../lib/consentSnapshotV2.js";
 import type * as lib_contactEntry from "../lib/contactEntry.js";
 import type * as lib_contactValidation from "../lib/contactValidation.js";
+import type * as lib_developerSignIn from "../lib/developerSignIn.js";
 import type * as lib_eventEnrollmentState from "../lib/eventEnrollmentState.js";
 import type * as lib_feeBulkMoney from "../lib/feeBulkMoney.js";
 import type * as lib_feeDefinitions from "../lib/feeDefinitions.js";
@@ -82,6 +86,7 @@ import type * as lib_financialAllocation from "../lib/financialAllocation.js";
 import type * as lib_financialSources from "../lib/financialSources.js";
 import type * as lib_financialWithdrawal from "../lib/financialWithdrawal.js";
 import type * as lib_fundraisingMath from "../lib/fundraisingMath.js";
+import type * as lib_invitationCodes from "../lib/invitationCodes.js";
 import type * as lib_invitationIdentity from "../lib/invitationIdentity.js";
 import type * as lib_maintenanceAccess from "../lib/maintenanceAccess.js";
 import type * as lib_money from "../lib/money.js";
@@ -148,6 +153,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   accounts: typeof accounts;
   admin: typeof admin;
+  adminContact: typeof adminContact;
   adultInviteEmail: typeof adultInviteEmail;
   adultProfile: typeof adultProfile;
   app: typeof app;
@@ -165,6 +171,7 @@ declare const fullApi: ApiFromModules<{
   consentRehearsal: typeof consentRehearsal;
   crons: typeof crons;
   dashboardReports: typeof dashboardReports;
+  developerSignIn: typeof developerSignIn;
   developmentRehearsal: typeof developmentRehearsal;
   eventArchive: typeof eventArchive;
   eventCalendar: typeof eventCalendar;
@@ -197,6 +204,7 @@ declare const fullApi: ApiFromModules<{
   historicalRoster: typeof historicalRoster;
   http: typeof http;
   "lib/access": typeof lib_access;
+  "lib/adminContact": typeof lib_adminContact;
   "lib/archivedEventAccess": typeof lib_archivedEventAccess;
   "lib/attendanceReports": typeof lib_attendanceReports;
   "lib/authRedirect": typeof lib_authRedirect;
@@ -210,6 +218,7 @@ declare const fullApi: ApiFromModules<{
   "lib/consentSnapshotV2": typeof lib_consentSnapshotV2;
   "lib/contactEntry": typeof lib_contactEntry;
   "lib/contactValidation": typeof lib_contactValidation;
+  "lib/developerSignIn": typeof lib_developerSignIn;
   "lib/eventEnrollmentState": typeof lib_eventEnrollmentState;
   "lib/feeBulkMoney": typeof lib_feeBulkMoney;
   "lib/feeDefinitions": typeof lib_feeDefinitions;
@@ -220,6 +229,7 @@ declare const fullApi: ApiFromModules<{
   "lib/financialSources": typeof lib_financialSources;
   "lib/financialWithdrawal": typeof lib_financialWithdrawal;
   "lib/fundraisingMath": typeof lib_fundraisingMath;
+  "lib/invitationCodes": typeof lib_invitationCodes;
   "lib/invitationIdentity": typeof lib_invitationIdentity;
   "lib/maintenanceAccess": typeof lib_maintenanceAccess;
   "lib/money": typeof lib_money;

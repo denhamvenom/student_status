@@ -14,7 +14,7 @@ describe('fundraiser share action', () => {
   })
   it('uses native sharing on phones and does not copy after cancellation', async () => {
     const f=setup(true); expect(await shareFundraiser(url)).toBe('shared'); expect(f.share).toHaveBeenCalledWith({title:'Student fundraiser',url});
-    f.share.mockRejectedValue(Object.assign(new Error('Cancelled'),{name:'AbortError'})); expect(await shareFundraiser(url)).toBe('cancelled'); expect(f.writeText).not.toHaveBeenCalled()
+    f.share.mockRejectedValue(Object.assign(new Error('Canceled'),{name:'AbortError'})); expect(await shareFundraiser(url)).toBe('cancelled'); expect(f.writeText).not.toHaveBeenCalled()
   })
   it('falls back to clipboard and offers manual copying when unavailable', async () => {
     const f=setup(true); f.share.mockRejectedValue(new Error('Unavailable')); expect(await shareFundraiser(url)).toBe('copied'); f.writeText.mockRejectedValue(new Error('Denied')); expect(await shareFundraiser(url)).toBe('manual')

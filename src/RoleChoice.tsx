@@ -31,7 +31,7 @@ export function RoleChoice({ roles, currentRole, required, open, onClose, onChoo
   }
   return <Dialog open={open} onOpenChange={value => { if (!value && !required && !busy) onClose() }}>
     <DialogContent showCloseButton={!required && !busy}>
-      <DialogHeader><DialogTitle>Choose your role</DialogTitle><DialogDescription>Choose how you want to use Student Status. You can switch roles later.</DialogDescription></DialogHeader>
+      <DialogHeader><DialogTitle>Choose your role</DialogTitle><DialogDescription>Choose how you want to use Venom Status. You can switch roles later.</DialogDescription></DialogHeader>
       <div className="grid gap-3" aria-busy={busy}>{roles.map(role => <Button className="h-auto min-h-14 justify-start whitespace-normal text-left" key={role} variant="outline" disabled={busy} aria-pressed={!required && currentRole === role} onClick={() => void act(() => onChoose(role))}><span><strong className="block">{roleLabels[role]}</strong><span className="block text-sm font-normal">{descriptions[role]}</span></span></Button>)}</div>
       {error && <p role="alert">{error}</p>}
       <Button type="button" variant="ghost" disabled={busy} onClick={() => void act(onSignOut)}>Sign out</Button>

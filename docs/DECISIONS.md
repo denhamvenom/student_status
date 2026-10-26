@@ -8,12 +8,23 @@ Read this before changing parent linking, consent/PDF, finance, rooms/waitlists 
 - Require explicit good-faith parent/legal-guardian relationship and authority attestation. Email control does not independently prove guardianship or sign consent.
 - Preserve inbox privacy, the one-hour resend guard and revocation/access checks.
 
+## Product name
+
+- October 25 owner decision: the app shown to people is **Venom Status** (was Student Status): page titles, sign-in, About/Privacy/Terms, emails, PDF metadata and messages. Infrastructure names (GitHub repository `student_status`, Convex project, Cloudflare Workers, domains, code identifiers and internal docs) are unchanged unless the owner asks separately. A production `PARENT_INVITE_EMAIL_FROM` value, if set, overrides the default sender name and must be updated there.
+
+## Developer sign-in
+
+- October 25 owner decision: the development deployment (`third-bandicoot-18`) offers a developer sign-in so the owner and Claude can test every role without Google. It signs in only to fixed fictional accounts on the reserved `developer.example.invalid` domain: Coach, Mentor, Travel Lead, Parent, Parent with staff access, and Student. It never signs in, creates, links or changes a real account.
+- It works only when all of these hold: the backend is the hard-coded development URL, the server switch `DEVELOPER_SIGN_IN_ENABLED=true` is set, and the request carries the server-held `DEVELOPER_SIGN_IN_KEY`. Reserved-domain sessions are refused whenever those conditions stop holding. The sign-in panel exists only in local development builds; the production build fails if any of it is bundled.
+- Never set the switch or key on production. Fictional accounts and their family links hold synthetic data only. Real Google and parent-email sign-in still need a human check before releases that touch authentication.
+
 ## Consent/PDF
 
 - Require completed Student setup and a Parent-confirmed structured profile before the approved populated PDF workflow.
 - Preserve the exact reviewed/signed artifacts, acknowledgment and typed verified name.
 - Preserve the approved original one-page design, lossless continuation for genuine overflow and all historical receipts.
 - Active OTC/Medication Choices are superseded; do not introduce a new workflow for them.
+- October 25 owner decision: the permission form is not in use yet, so its PDF wording may change. Approved: "Reference code" (not "Reviewed PDF SHA-256"), "TEST SIGNATURE (FICTIONAL)" and "How it was signed" on the signature page, "Medications" (not "Prescriptions"), "Information unavailable", "PERMISSION FORM - CONTINUATION", and a footer showing only the form version (no internal IDs). The title "Field Trip Permission & Medical Release" stays.
 - October 22 owner decision: real PDF signing is deferred until the owner is ready. Do not enable it without a later explicit instruction; preserve approved wording and existing evidence. This decision does not assert or change the current production flag; check that setting when signing work resumes.
 
 ## Finance
@@ -49,6 +60,10 @@ Read this before changing parent linking, consent/PDF, finance, rooms/waitlists 
 - Completed shared information is reused for a second Parent; personal account answers remain scoped. Save/resume and multi-child selection must not overwrite another child's profile.
 - FIRST verification is once per student/season and requires both team acceptance and Consent & Release to be Coach-verified. Self-report does not clear readiness; reopening needs a reason and blocks Competitions again. New seasons start unverified; legacy event completions do not silently count as season-wide verification.
 - FIRST invitation/reporting follows age/birthday eligibility: do not direct minors to adult self-report. All Competitions inherit the season-wide status; Outreach/Team and historical evidence are preserved.
+
+## Admin contact
+
+- Admin contact (owner decision October 25): Coach-only setup errors offer Contact admin; requests are recorded and emailed to admin@team8044.org; no student data.
 
 ## Retention
 

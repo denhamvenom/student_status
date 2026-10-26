@@ -22,7 +22,7 @@ export async function studentReadiness(ctx: Ctx, event: Doc<"events">, student: 
   const open: string[] = [];
   const firstRegistrationState = event.type === "Competition" ? await firstStatus(ctx, student._id) : null;
   const participant = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
-  if (event.cancelled) return { state: "open" as const, open: ["This event is cancelled."], participation: participant?.status ?? null, permissionStatus: "unknown" as const, firstRegistrationState };
+  if (event.cancelled) return { state: "open" as const, open: ["This event is canceled."], participation: participant?.status ?? null, permissionStatus: "unknown" as const, firstRegistrationState };
   if (enrollmentPending(event)) return { state: "open" as const, open: ["Whole Team enrollment is not complete."], participation: participant?.status ?? null, permissionStatus: "unknown" as const, firstRegistrationState };
   if (participant?.status !== "confirmed") return { state: "notApplicable" as const, open, participation: participant?.status ?? null, permissionStatus: "notApplicable" as const, firstRegistrationState };
   const financialAccount = await ctx.db.query("financialAccounts").withIndex("by_studentId", q => q.eq("studentId", student._id)).unique();

@@ -5,6 +5,8 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 
 export const SYNTHETIC_CONSENT_CLOUD_URL = "https://third-bandicoot-18.convex.cloud";
 export type PermissionSigningMode = "synthetic" | "real" | "closed";
+/** Shown when signing is closed; the Parent screen shows the same words before the server is asked. */
+export const PERMISSION_SIGNING_CLOSED = "Permission forms can't be signed here yet. Ask a Coach how to complete this student's form.";
 
 export function resolvePermissionSigningMode(config: {
   cloudUrl?: string;
@@ -36,6 +38,6 @@ export async function v2SigningAllowed(ctx: Ctx, studentId: Id<"students">, pare
 
 export async function requireV2Signing(ctx: Ctx, studentId: Id<"students">, parentId?: Id<"appUsers">) {
   const mode = permissionSigningMode();
-  if (!await v2SigningAllowed(ctx, studentId, parentId)) throw new ConvexError(mode === "synthetic" ? "Only registered fictional development subjects may use consent." : "You cannot sign for this student right now.");
+  if (!await v2SigningAllowed(ctx, studentId, parentId)) throw new ConvexError(mode === "synthetic" ? "Only registered fictional development subjects may use consent." : PERMISSION_SIGNING_CLOSED);
   return mode;
 }

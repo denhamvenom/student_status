@@ -26,7 +26,7 @@ export const processPage = internalMutation({
     if (!actor?.active || !fundraisingCapabilities(actor).canPost) throw new Error("Financial editing permission is unavailable; a Coach must retry.");
     if (!fundraiser || fundraiser.seasonId !== season._id || fundraiser.postingJobId !== job._id || fundraiser.state !== "posting") throw new Error("Fundraiser posting scope changed.");
     const page = await ctx.db.query("fundraiserPostingRows").withIndex("by_jobId", q => q.eq("jobId", job._id)).paginate({ cursor: job.cursor, numItems: 1, maximumRowsRead: 2 });
-    if (page.page.length > 1) throw new Error("Fundraiser page exceeded its read budget.");
+    if (page.page.length > 1) throw new Error("This list couldn't load. Reload the page to try again.");
     const row = page.page[0];
     let committed = job.committed; let held = job.held; let advance = true;
     if (row && row.state !== "committed") {
@@ -42,10 +42,10 @@ export const processPage = internalMutation({
       const spent = !locked && reduction > available;
       if (unavailable || stale || spent) {
         if (locked) throw new Error("Locked fundraiser student became unavailable; Coach retry is required.");
-        await ctx.db.patch(row._id, { state: "held", holdCode: unavailable ? "projectionUnavailable" : stale ? "financialStateChanged" : "spentOrTransferred", message: unavailable ? "Financial records must finish updating." : stale ? "Financial amounts changed; refresh the preview before retrying." : "Original award credit was spent or transferred. Balances remain unchanged; Coach resolution is required." });
+        await ctx.db.patch(row._id, { state: "held", holdCode: unavailable ? "projectionUnavailable" : stale ? "financialStateChanged" : "spentOrTransferred", message: unavailable ? "This student's money records are still updating." : stale ? "This student's money changed. Review the amounts again before retrying." : "This student's Fundraising credit was already spent or moved, so it can't be lowered. Balances have not changed. A Coach needs to sort it out." });
         held++;
       } else {
-        if (!account) throw new Error("Financial account is unavailable.");
+        if (!account) throw new Error("This student's money records aren't ready. Wait a moment, then try again.");
         const now = Date.now();
         let revisionId = row.pendingRevisionId;
         if (!revisionId) {
@@ -115,12 +115,12 @@ export const run = internalMutation({
     if (!job || job.state !== "running") return null;
     try { await ctx.runMutation(pageRef, { jobId: job._id, cursor: job.cursor }); }
     catch (error) {
-      await ctx.db.patch(job._id, { state: "failed", lastError: savedPublicError(error, "Fundraiser posting failed; Coach review is required."), updatedAt: Date.now() });
+      await ctx.db.patch(job._id, { state: "failed", lastError: savedPublicError(error, "Posting fundraiser amounts stopped. A Coach needs to review it, then retry."), updatedAt: Date.now() });
       await ctx.db.patch(job.fundraiserId, { state: "failed" });
       const page = await ctx.db.query("fundraiserPostingRows").withIndex("by_jobId", q => q.eq("jobId", job._id)).paginate({ cursor: job.cursor, numItems: 1, maximumRowsRead: 2 });
       const current = page.page[0];
       const account = current ? await financialAccount(ctx, current.studentId) : null;
-      if (account?.fundraiserJobId === job._id && account.fundraiserRowId === current?._id) await ctx.db.patch(account._id, { state: "failed", lastError: savedPublicError(null, "Fundraiser reduction failed; Coach retry is required.") });
+      if (account?.fundraiserJobId === job._id && account.fundraiserRowId === current?._id) await ctx.db.patch(account._id, { state: "failed", lastError: savedPublicError(null, "Lowering fundraiser amounts stopped. A Coach needs to retry it.") });
     }
     return null;
   },
@@ -130,10 +130,10 @@ export const rows = query({
   args: { jobId: v.id("fundraiserPostingJobs"), paginationOpts: paginationOptsValidator }, returns: v.object({ page: v.array(schema.doc("fundraiserPostingRows").extend({ name: v.string() })), isDone: v.boolean(), continueCursor: v.string() }),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); const season = await activeSeason(ctx); const job = await ctx.db.get(args.jobId); const fundraiser = job ? await ctx.db.get(job.fundraiserId) : null;
-    if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead) || !fundraiser || fundraiser.seasonId !== season._id) throw new ConvexError("Fundraiser history access denied.");
+    if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead) || !fundraiser || fundraiser.seasonId !== season._id) throw new ConvexError("Fundraiser history isn't available. Only a Coach or Travel Lead can see it, for current-season fundraisers.");
     if (!Number.isSafeInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 30) throw new ConvexError("Request at most 30 rows per page.");
     const page = await ctx.db.query("fundraiserPostingRows").withIndex("by_jobId", q => q.eq("jobId", args.jobId)).paginate({ ...args.paginationOpts, maximumRowsRead: 31 });
-    if (page.page.length > 30) throw new ConvexError("Fundraiser page exceeded its read budget.");
+    if (page.page.length > 30) throw new ConvexError("This list couldn't load. Reload the page to try again.");
     const named = [];
     for (const row of page.page) { const student = await ctx.db.get(row.studentId); named.push({ ...row, name: student?.legalName || student?.preferredName || "Unavailable student" }); }
     return publicErrorResult({ page: named, isDone: page.isDone, continueCursor: page.continueCursor });
@@ -145,19 +145,19 @@ export const retryPreview = query({
   returns: v.array(v.object({ studentId: v.id("students"), name: v.string(), grossCents: v.number(), expectedRowRevision: v.number(), expectedFinancialRevision: v.union(v.number(), v.null()), requiredReductionCents: v.number(), availableOriginalCents: v.number(), state: v.union(v.literal("ready"), v.literal("hold"), v.literal("updating")), message: v.union(v.string(), v.null()) })),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); const season = await activeSeason(ctx); const job = await ctx.db.get(args.jobId); const fundraiser = job ? await ctx.db.get(job.fundraiserId) : null;
-    if (actor.role !== "coach" || !job || !fundraiser || fundraiser.seasonId !== season._id || !["held", "failed"].includes(job.state)) throw new ConvexError("Coach retry preview is unavailable.");
-    if (!args.studentIds.length || args.studentIds.length > 20 || new Set(args.studentIds).size !== args.studentIds.length) throw new ConvexError("Preview at most 20 unique held students.");
+    if (actor.role !== "coach" || !job || !fundraiser || fundraiser.seasonId !== season._id || !["held", "failed"].includes(job.state)) throw new ConvexError("Only a Coach can review a stopped or held posting. Reload to see the latest.");
+    if (!args.studentIds.length || args.studentIds.length > 20 || new Set(args.studentIds).size !== args.studentIds.length) throw new ConvexError("Choose up to 20 students on hold to review.");
     const result = [];
     for (const studentId of args.studentIds) {
       const row = await ctx.db.query("fundraiserPostingRows").withIndex("by_jobId_and_studentId", q => q.eq("jobId", job._id).eq("studentId", studentId)).unique();
-      if (!row || row.state !== "held" || row.pendingRevisionId) throw new ConvexError("Only held uncommitted rows may refresh their reviewed revisions.");
+      if (!row || row.state !== "held" || row.pendingRevisionId) throw new ConvexError("Only students still on hold can be reviewed again. Reload to see the latest.");
       const student = await ctx.db.get(studentId); const account = await financialAccount(ctx, studentId);
       const previous = await ctx.db.query("fundraiserStudentTotals").withIndex("by_fundraiserId_and_studentId", q => q.eq("fundraiserId", fundraiser._id).eq("studentId", studentId)).unique();
       const split = fundraisingSplit(row.grossCents, fundraiser.studentBps, fundraiser.teamBps);
       const required = Math.max(0, (previous?.travelCreditCents ?? 0) - split.travelCreditCents);
       const available = account ? await availableOriginalFundraiserCredit(ctx, studentId, account.generation, fundraiser._id) : 0;
       const state = !student?.active || student.seasonId !== fundraiser.seasonId || account?.state !== "ready" || account?.allocationSourceVersion !== 1 ? "updating" as const : required > available ? "hold" as const : "ready" as const;
-      result.push({ studentId, name: student?.legalName || student?.preferredName || "Unavailable student", grossCents: row.grossCents, expectedRowRevision: previous?.revision ?? 0, expectedFinancialRevision: account?.state === "ready" && account.allocationSourceVersion === 1 ? account.revision : null, requiredReductionCents: required, availableOriginalCents: available, state, message: state === "hold" ? "Original credit remains spent or transferred; balances remain unchanged." : state === "updating" ? "Student financial preparation must finish." : null });
+      result.push({ studentId, name: student?.legalName || student?.preferredName || "Unavailable student", grossCents: row.grossCents, expectedRowRevision: previous?.revision ?? 0, expectedFinancialRevision: account?.state === "ready" && account.allocationSourceVersion === 1 ? account.revision : null, requiredReductionCents: required, availableOriginalCents: available, state, message: state === "hold" ? "This student's Fundraising credit is still spent or moved. Balances have not changed." : state === "updating" ? "This student's money records are still updating." : null });
     }
     return publicErrorResult(result);
   },
@@ -167,14 +167,14 @@ export const retry = mutation({
   args: { jobId: v.id("fundraiserPostingJobs"), reason: v.string(), rows: v.array(v.object({ studentId: v.id("students"), expectedRowRevision: v.number(), expectedFinancialRevision: v.number() })) }, returns: v.null(),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); const season = await activeSeason(ctx); const job = await ctx.db.get(args.jobId); const fundraiser = job ? await ctx.db.get(job.fundraiserId) : null;
-    if (actor.role !== "coach") throw new ConvexError("Only a Coach may retry fundraiser posting.");
-    if (!job || !fundraiser || fundraiser.seasonId !== season._id || !["failed", "held"].includes(job.state) || fundraiser.postingJobId !== job._id) throw new ConvexError("No held or failed fundraiser posting is available to retry.");
+    if (actor.role !== "coach") throw new ConvexError("Only a Coach can retry posting fundraiser amounts.");
+    if (!job || !fundraiser || fundraiser.seasonId !== season._id || !["failed", "held"].includes(job.state) || fundraiser.postingJobId !== job._id) throw new ConvexError("There is no stopped or held posting to retry. Reload to see the latest.");
     await requireSeasonFinancialRetry(ctx, season._id, job._id);
-    if (args.reason.trim().length < 8 || args.reason.length > 1000 || args.rows.length > 500 || new Set(args.rows.map(r => r.studentId)).size !== args.rows.length) throw new ConvexError("Provide a reason and unique reviewed rows.");
+    if (args.reason.trim().length < 8 || args.reason.length > 1000 || args.rows.length > 500 || new Set(args.rows.map(r => r.studentId)).size !== args.rows.length) throw new ConvexError("Review the students to retry and enter a reason of at least eight characters.");
     for (const input of args.rows) {
-      if (!Number.isSafeInteger(input.expectedRowRevision) || input.expectedRowRevision < 0 || !Number.isSafeInteger(input.expectedFinancialRevision) || input.expectedFinancialRevision < 0) throw new ConvexError("Refresh reviewed row revisions before retrying.");
+      if (!Number.isSafeInteger(input.expectedRowRevision) || input.expectedRowRevision < 0 || !Number.isSafeInteger(input.expectedFinancialRevision) || input.expectedFinancialRevision < 0) throw new ConvexError("Review the students again before retrying.");
       const row = await ctx.db.query("fundraiserPostingRows").withIndex("by_jobId_and_studentId", q => q.eq("jobId", job._id).eq("studentId", input.studentId)).unique();
-      if (!row || row.state !== "held" || row.pendingRevisionId) throw new ConvexError("Only uncommitted held rows may refresh their reviewed revisions.");
+      if (!row || row.state !== "held" || row.pendingRevisionId) throw new ConvexError("Only students still on hold can be reviewed again. Reload to see the latest.");
       await ctx.db.patch(row._id, { expectedRowRevision: input.expectedRowRevision, expectedFinancialRevision: input.expectedFinancialRevision, state: "pending", holdCode: undefined, message: undefined });
     }
     await audit(ctx, actor, "fundraiserPostingJobs", job._id, "retry", { actorId: job.actorId, committed: job.committed }, { actorId: actor._id, reviewedRows: args.rows.length }, args.reason.trim());

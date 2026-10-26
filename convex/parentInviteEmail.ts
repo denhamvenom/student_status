@@ -12,7 +12,7 @@ export const markStalled = internalMutation({
   handler: async (ctx, args) => {
     const row = await ctx.db.get(args.inviteId);
     if (row?.emailStatus === "queued") await ctx.db.patch(row._id, {
-      emailStatus: "failed", emailError: "Email status could not be confirmed. Ask a Coach for help.",
+      emailStatus: "failed", emailError: "We couldn't confirm the invitation email was sent. Ask your parent to check their inbox and spam folder. If it isn't there, ask a Coach for help.",
     });
     return null;
   },
@@ -27,14 +27,14 @@ export const prepareSend = internalMutation({
         row.status !== "pending" || row.expiresAt <= Date.now() ||
         args.attempt < 1 || args.attempt > MAX_ATTEMPTS || (row.emailAttempt ?? 0) >= args.attempt) {
       if (row?.emailStatus === "queued" && (row.status !== "pending" || row.expiresAt <= Date.now())) {
-        await ctx.db.patch(row._id, { emailStatus: "not_sent", emailError: "Invitation is no longer active." });
+        await ctx.db.patch(row._id, { emailStatus: "not_sent", emailError: "This invitation is no longer active, so the email was not sent. Send a new invitation if your parent still needs one." });
       }
       return null;
     }
     const student = await ctx.db.get(row.studentId);
     const season = student && await ctx.db.get(student.seasonId);
     if (!student?.active || !season || season.status !== "active") {
-      await ctx.db.patch(row._id, { emailStatus: "not_sent", emailError: "Invitation is no longer active." });
+      await ctx.db.patch(row._id, { emailStatus: "not_sent", emailError: "This invitation is no longer active, so the email was not sent. Send a new invitation if your parent still needs one." });
       return null;
     }
     await ctx.db.patch(row._id, { emailAttempt: args.attempt });
@@ -51,7 +51,7 @@ export const finishSend = internalMutation({
     if (args.outcome === "sent") {
       await ctx.db.patch(row._id, { emailStatus: "sent", emailError: undefined, emailSentAt: Date.now() });
     } else if (args.outcome === "retry" && args.attempt < MAX_ATTEMPTS && row.status === "pending" && row.expiresAt > Date.now()) {
-      await ctx.db.patch(row._id, { emailError: "Email is delayed. Retrying automatically." });
+      await ctx.db.patch(row._id, { emailError: "The email is delayed. It will be sent again automatically." });
       await ctx.scheduler.runAfter(RETRY_DELAYS_MS[args.attempt - 1], internal.parentInviteEmail.send, { inviteId: args.inviteId, token: args.token, attempt: args.attempt + 1 });
     } else {
       await ctx.db.patch(row._id, { emailStatus: args.outcome === "not_sent" || row.status !== "pending" || row.expiresAt <= Date.now() ? "not_sent" : "failed", emailError: args.outcome === "not_sent" ? "Automatic email is not configured. Ask a Coach for help." : "Email could not be sent. Ask a Coach for help." });
@@ -78,9 +78,10 @@ export const send = internalAction({
       from: config.from,
       reply_to: config.replyTo,
       to: [ready.parentEmail],
-      subject: "Invitation to Denham Venom Student Status",
-      text: `You have been invited to Denham Venom Student Status as a parent. Open this private link and choose Continue to sign in: ${link}\n\nThe sign-in link is valid for 24 hours and can be used once. The invitation stays available for 7 days; after 24 hours, request a code sent to this email address. If you were not expecting this invitation, you can ignore this email.`,
-      html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#172431"><h1>Parent invitation</h1><p>You have been invited to Denham Venom Student Status as a parent.</p><p><a href="${link}" style="display:inline-block;background:#165d75;color:#fff;padding:12px 18px;text-decoration:none;border-radius:6px">Open private invitation</a></p><p>Choose Continue to sign in. This private link works once within 24 hours. The invitation remains available for 7 days; after 24 hours, request a code sent to this email address.</p><p>If you were not expecting this invitation, you can ignore this email.</p></div>`,
+      // Name the button exactly as it appears and state one time limit (the invitation's 7 days).
+      subject: "Parent invitation to Venom Status",
+      text: `A student on Denham Venom invited you to Venom Status as their parent or guardian.\n\nOpen this private link, sign in with this email address, then confirm your relationship to the student: ${link}\n\nThis invitation expires in 7 days.\n\nIf you were not expecting this invitation, you can ignore this email.`,
+      html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#172431"><h1>Parent invitation</h1><p>A student on Denham Venom invited you to Venom Status as their parent or guardian.</p><p><a href="${link}" style="display:inline-block;background:#165d75;color:#fff;padding:12px 18px;text-decoration:none;border-radius:6px">Open private invitation</a></p><p>Choose Open private invitation, sign in with this email address, then confirm your relationship to the student. This invitation expires in 7 days.</p><p>If you were not expecting this invitation, you can ignore this email.</p></div>`,
     });
     let outcome: "sent" | "retry" | "failed";
     try {

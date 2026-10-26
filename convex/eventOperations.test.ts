@@ -34,22 +34,22 @@ async function fixture() {
 
 describe("event operations", () => {
 
-  it("keeps cancelled events visible while blocking new signup, approval and roster charges", async () => {
+  it("keeps canceled events visible while blocking new signup, approval and roster charges", async () => {
     const f = await fixture();
     await f.student[0].mutation(api.participation.signUp, { eventId: f.ids.event });
     await f.lead.mutation(api.eventOperations.reviewSignup, { eventId: f.ids.event, studentId: f.ids.students[0], decision: "approve" });
     await f.student[1].mutation(api.participation.signUp, { eventId: f.ids.event });
     const before = await f.t.run(async ctx => ({ participants: await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", f.ids.event)).take(20), charges: await ctx.db.query("charges").withIndex("by_eventId_and_studentId", q => q.eq("eventId", f.ids.event)).take(20) }));
     await f.t.run(ctx => ctx.db.patch(f.ids.event, { cancelled: true }));
-    await expect(f.student[2].mutation(api.participation.signUp, { eventId: f.ids.event })).rejects.toThrow("unavailable");
-    await expect(f.coach.mutation(api.participation.setParticipation, { eventId: f.ids.event, studentId: f.ids.students[2], status: "confirmed" })).rejects.toThrow("not found");
-    await expect(f.lead.mutation(api.eventOperations.reviewSignup, { eventId: f.ids.event, studentId: f.ids.students[1], decision: "promote" })).rejects.toThrow("cancelled");
+    await expect(f.student[2].mutation(api.participation.signUp, { eventId: f.ids.event })).rejects.toThrow("can't sign up");
+    await expect(f.coach.mutation(api.participation.setParticipation, { eventId: f.ids.event, studentId: f.ids.students[2], status: "confirmed" })).rejects.toThrow("no longer active");
+    await expect(f.lead.mutation(api.eventOperations.reviewSignup, { eventId: f.ids.event, studentId: f.ids.students[1], decision: "promote" })).rejects.toThrow("canceled");
     expect((await f.coach.query(api.eventOperations.workspace, { eventId: f.ids.event })).event.cancelled).toBe(true);
     expect((await f.student[0].query(api.app.eventDetail, { eventId: f.ids.event })).event.cancelled).toBe(true);
     const after = await f.t.run(async ctx => ({ participants: await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", f.ids.event)).take(20), charges: await ctx.db.query("charges").withIndex("by_eventId_and_studentId", q => q.eq("eventId", f.ids.event)).take(20) }));
     expect(after).toEqual(before);
     const readiness = await f.student[0].query(api.app.eventReadiness, { eventId: f.ids.event, studentId: f.ids.students[0] });
-    expect(readiness.students[0]).toMatchObject({ state: "open", open: ["This event is cancelled."] });
+    expect(readiness.students[0]).toMatchObject({ state: "open", open: ["This event is canceled."] });
 
     for (const select of [selectedEvents, selectedEventsV2]) {
       await expect(f.t.run(async ctx => select(ctx, (await ctx.db.get(f.ids.students[0]))!, [f.ids.event]))).rejects.toThrow("unavailable");
@@ -70,10 +70,10 @@ describe("event operations", () => {
       }
     });
     await f.lead.mutation(api.eventOperations.reviewSignup, { eventId: f.ids.event, studentId: f.ids.students[0], decision: "approve" });
-    await expect(f.lead.mutation(api.eventOperations.reviewSignup, { eventId: f.ids.event, studentId: f.ids.students[2], decision: "promote" })).rejects.toThrow("earliest");
+    await expect(f.lead.mutation(api.eventOperations.reviewSignup, { eventId: f.ids.event, studentId: f.ids.students[2], decision: "promote" })).rejects.toThrow("joined the waitlist first");
     await f.coach.mutation(api.eventOperations.updateSettings, { eventId: f.ids.event, capacity: 2 });
     await expect(f.student[3].mutation(api.participation.signUp, { eventId: f.ids.event })).resolves.toBe("waitlist");
-    await expect(f.coach.mutation(api.participation.setParticipation, { eventId: f.ids.event, studentId: f.ids.students[2], status: "confirmed" })).rejects.toThrow("waitlist");
+    await expect(f.coach.mutation(api.participation.setParticipation, { eventId: f.ids.event, studentId: f.ids.students[2], status: "confirmed" })).rejects.toThrow("Promote");
     await f.lead.mutation(api.eventOperations.reviewSignup, { eventId: f.ids.event, studentId: f.ids.students[1], decision: "promote" });
     const view = await f.coach.query(api.eventOperations.workspace, { eventId: f.ids.event });
     expect(view.waitlist.map((x: { studentId: string }) => x.studentId)).toEqual([f.ids.students[2], f.ids.students[3]]);
@@ -102,7 +102,7 @@ describe("event operations", () => {
     const cross = await f.student[1].mutation(api.rooms.invite, { groupId: groupB, studentId: f.ids.students[2] }).catch(() => null);
     expect(cross).toBeNull();
     await f.t.run(ctx => ctx.db.patch(f.ids.event, { roomDeadline: Date.now() - 1000 }));
-    await expect(f.student[2].mutation(api.rooms.leave, { eventId: f.ids.event })).rejects.toThrow("unavailable");
+    await expect(f.student[2].mutation(api.rooms.leave, { eventId: f.ids.event })).rejects.toThrow("closed");
     await expect(f.coach.mutation(api.rooms.adultAssign, { groupId: groupB, studentId: f.ids.students[2], allowFifth: false })).rejects.toThrow("reason");
     await f.coach.mutation(api.rooms.adultAssign, { groupId: groupB, studentId: f.ids.students[2], allowFifth: false, reason: "Coach correction" });
     await expect(f.lead.mutation(api.rooms.finalize, { groupId: groupB, allowFifth: false })).rejects.toThrow("reason");
@@ -114,9 +114,9 @@ describe("event operations", () => {
     await f.t.run(ctx => ctx.db.patch(f.ids.event, { capacity: 7, signupMode: "open", feeCents: 0 }));
     for (const student of f.student) await student.mutation(api.participation.signUp, { eventId: f.ids.event });
     const group = await f.student[0].mutation(api.rooms.createGroup, { eventId: f.ids.event, name: "Test room" });
-    await expect(f.student[1].mutation(api.rooms.adultAssign, { groupId: group, studentId: f.ids.students[1], allowFifth: false })).rejects.toThrow("denied");
-    await expect(f.mentor.mutation(api.rooms.adultAssign, { groupId: group, studentId: f.ids.students[1], allowFifth: false })).rejects.toThrow("denied");
-    await expect(f.coach.mutation(api.rooms.adultAssign, { groupId: group, studentId: f.ids.students[6], allowFifth: false })).rejects.toThrow("category");
+    await expect(f.student[1].mutation(api.rooms.adultAssign, { groupId: group, studentId: f.ids.students[1], allowFifth: false })).rejects.toThrow("Only a Coach or Travel Lead");
+    await expect(f.mentor.mutation(api.rooms.adultAssign, { groupId: group, studentId: f.ids.students[1], allowFifth: false })).rejects.toThrow("Only a Coach or Travel Lead");
+    await expect(f.coach.mutation(api.rooms.adultAssign, { groupId: group, studentId: f.ids.students[6], allowFifth: false })).rejects.toThrow("Room type");
     for (let i = 1; i < 4; i++) await f.lead.mutation(api.rooms.adultAssign, { groupId: group, studentId: f.ids.students[i], allowFifth: false });
     await expect(f.coach.mutation(api.rooms.adultAssign, { groupId: group, studentId: f.ids.students[4], allowFifth: false })).rejects.toThrow("fifth");
     await expect(f.coach.mutation(api.rooms.adultAssign, { groupId: group, studentId: f.ids.students[4], allowFifth: true })).rejects.toThrow("fifth");
@@ -135,18 +135,18 @@ describe("event operations", () => {
     const first = await f.student[0].mutation(api.rooms.createGroup, { eventId: f.ids.event, name: "First" });
     await f.student[1].mutation(api.rooms.createGroup, { eventId: f.ids.event, name: "Second" });
     const staleInvite = await f.t.run(ctx => ctx.db.insert("roomInvites", { eventId: f.ids.event, groupId: first, studentId: f.ids.students[1], invitedBy: f.ids.students[0], status: "pending", createdAt: Date.now() }));
-    await expect(f.student[1].mutation(api.rooms.respond, { inviteId: staleInvite, accept: true })).rejects.toThrow("Leave your current group");
+    await expect(f.student[1].mutation(api.rooms.respond, { inviteId: staleInvite, accept: true })).rejects.toThrow("Leave your current room group");
     const liveInvite = await f.student[0].mutation(api.rooms.invite, { groupId: first, studentId: f.ids.students[2] });
     await f.t.run(ctx => ctx.db.patch(f.ids.event, { roomDeadline: Date.now() - 1000 }));
-    await expect(f.student[2].mutation(api.rooms.respond, { inviteId: liveInvite, accept: true })).rejects.toThrow("unavailable");
-    await expect(f.student[2].mutation(api.rooms.respond, { inviteId: liveInvite, accept: false })).rejects.toThrow("unavailable");
-    await expect(f.student[0].mutation(api.rooms.cancelInvite, { inviteId: liveInvite })).rejects.toThrow("unavailable");
-    await expect(f.student[2].mutation(api.rooms.requestAssignment, { eventId: f.ids.event })).rejects.toThrow("unavailable");
-    await expect(f.student[2].mutation(api.rooms.createGroup, { eventId: f.ids.event, name: "Too late" })).rejects.toThrow("unavailable");
-    await expect(f.student[0].mutation(api.rooms.invite, { groupId: first, studentId: f.ids.students[3] })).rejects.toThrow("unavailable");
-    await expect(f.student[0].mutation(api.rooms.leave, { eventId: f.ids.event })).rejects.toThrow("unavailable");
+    await expect(f.student[2].mutation(api.rooms.respond, { inviteId: liveInvite, accept: true })).rejects.toThrow("closed");
+    await expect(f.student[2].mutation(api.rooms.respond, { inviteId: liveInvite, accept: false })).rejects.toThrow("closed");
+    await expect(f.student[0].mutation(api.rooms.cancelInvite, { inviteId: liveInvite })).rejects.toThrow("closed");
+    await expect(f.student[2].mutation(api.rooms.requestAssignment, { eventId: f.ids.event })).rejects.toThrow("closed");
+    await expect(f.student[2].mutation(api.rooms.createGroup, { eventId: f.ids.event, name: "Too late" })).rejects.toThrow("closed");
+    await expect(f.student[0].mutation(api.rooms.invite, { groupId: first, studentId: f.ids.students[3] })).rejects.toThrow("closed");
+    await expect(f.student[0].mutation(api.rooms.leave, { eventId: f.ids.event })).rejects.toThrow("closed");
     const request = await f.t.run(ctx => ctx.db.insert("roomRequests", { eventId: f.ids.event, studentId: f.ids.students[3], requestedAt: Date.now() }));
-    await expect(f.student[3].mutation(api.rooms.cancelAssignmentRequest, { eventId: f.ids.event })).rejects.toThrow("unavailable");
+    await expect(f.student[3].mutation(api.rooms.cancelAssignmentRequest, { eventId: f.ids.event })).rejects.toThrow("closed");
     expect(await f.t.run(ctx => ctx.db.get(request))).not.toBeNull();
   });
 });

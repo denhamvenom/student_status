@@ -7,6 +7,7 @@ import type { MutationCtx } from "./_generated/server";
 import { emailKey, newToken, tokenHash } from "./lib/invitationIdentity";
 import { parentInviteEmailConfiguration } from "./lib/parentInviteEmail";
 import { requireMaintenanceAccess } from "./lib/maintenanceAccess";
+import { isDeveloperEmail } from "./lib/developerSignIn";
 import { components } from "./_generated/api";
 import { RateLimiter } from "@convex-dev/rate-limiter";
 
@@ -104,7 +105,7 @@ export const consumeInvite = internalMutation({
     if (!row || row.loginVersion !== 1 || row.status !== "pending" || row.loginUsedAt || !row.loginExpiresAt || row.loginExpiresAt <= now || row.expiresAt <= now || row.emailStatus !== "sent") return null;
     const student = await ctx.db.get(row.studentId);
     const season = student && await ctx.db.get(student.seasonId);
-    if (!student?.active || season?.status !== "active" || emailKey(student.email) === row.parentEmail) return null;
+    if (!student?.active || season?.status !== "active" || emailKey(student.email) === row.parentEmail || isDeveloperEmail(row.parentEmail)) return null;
     requireMaintenanceAccess(row.parentEmail);
     const userId = await eligibleUser(ctx, row.parentEmail);
     if (!userId || !await markParentIdentity(ctx, userId, row.parentEmail)) return null;
@@ -118,7 +119,7 @@ export const prepareCode = internalMutation({
   returns: v.boolean(),
   handler: async (ctx, args) => {
     const email = emailKey(args.email);
-    if (!validEmail(email) || !/^[0-9]{6}$/.test(args.code) || !/^[0-9a-f]{64}$/.test(args.nonce)) return false;
+    if (!validEmail(email) || isDeveloperEmail(email) || !/^[0-9]{6}$/.test(args.code) || !/^[0-9a-f]{64}$/.test(args.nonce)) return false;
     const app = await parentAccount(ctx, email);
     const adultId = await adultAccount(ctx, email);
     let adultInviteId: Id<"adultInvitations"> | undefined;
@@ -154,7 +155,7 @@ export const consumeCode = internalMutation({
   args: { email: v.string(), code: v.string() }, returns: v.union(v.id("users"), v.null()),
   handler: async (ctx, args) => {
     const email = emailKey(args.email);
-    if (!validEmail(email) || !/^[0-9]{6}$/.test(args.code)) return null;
+    if (!validEmail(email) || isDeveloperEmail(email) || !/^[0-9]{6}$/.test(args.code)) return null;
     const row = await ctx.db.query("parentEmailCodes").withIndex("by_email_and_createdAt", q => q.eq("email", email)).order("desc").first();
     if (!row || row.usedAt || row.expiresAt <= Date.now() || row.attempts >= 5) return null;
     await ctx.db.patch(row._id, { attempts: row.attempts + 1 });

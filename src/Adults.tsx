@@ -1,4 +1,5 @@
 import { ParentStaffAccess } from "./ParentStaffAccess"
+import { ContactAdminFor } from './ContactAdminButton'
 import { userFacingError } from '@/lib/error-message'
 import { ParentEmailSignIn } from './ParentInvites'
 import { Component, useEffect, useState, type FormEvent, type ReactNode } from 'react'
@@ -42,13 +43,13 @@ function EditAdult({adult, done, cancel, busyChanged}: {adult: Adult; done: () =
   const [active, setActive] = useState(adult.active)
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState<unknown>(null)
   const submit = async (event: FormEvent) => {
     event.preventDefault(); if (busy) return
-    setBusy(true); busyChanged(true); setError('')
-    try { await update({ userId: adult.userId, expectedRevision: adult.revision, role: choice === 'coach' ? 'coach' : 'mentor', travelLead: choice === 'lead', financialEdit: choice === 'lead' && finance, healthExport: choice === 'lead' && health, active, reason: reason.trim() }); done() } catch (error) { setError(message(error)) } finally { setBusy(false); busyChanged(false) }
+    setBusy(true); busyChanged(true); setError(null)
+    try { await update({ userId: adult.userId, expectedRevision: adult.revision, role: choice === 'coach' ? 'coach' : 'mentor', travelLead: choice === 'lead', financialEdit: choice === 'lead' && finance, healthExport: choice === 'lead' && health, active, reason: reason.trim() }); done() } catch (error) { setError(error) } finally { setBusy(false); busyChanged(false) }
   }
-  return <form className={styles.form} onSubmit={event => void submit(event)}><p><strong>{adult.name}</strong><br/>{adult.email}</p><AccessFields {...{choice, setChoice, finance, setFinance, health, setHealth, busy}}/><label className={styles.check}><Checkbox checked={active} disabled={busy} onCheckedChange={setActive}/><span>{copy.active}</span></label><label>{copy.reason}<Input value={reason} disabled={busy} required maxLength={1000} onChange={event => setReason(event.target.value)}/></label>{error && <p role="alert" className="open-text">{error}</p>}<div className={styles.actions}><Button type="button" variant="outline" disabled={busy} onClick={cancel}>{copy.cancel}</Button><Button type="submit" disabled={busy || !reason.trim()}>{busy ? copy.saving : copy.save}</Button></div></form>
+  return <form className={styles.form} onSubmit={event => void submit(event)}><p><strong>{adult.name}</strong><br/>{adult.email}</p><AccessFields {...{choice, setChoice, finance, setFinance, health, setHealth, busy}}/><label className={styles.check}><Checkbox checked={active} disabled={busy} onCheckedChange={setActive}/><span>{copy.active}</span></label><label>{copy.reason}<Input value={reason} disabled={busy} required maxLength={1000} onChange={event => setReason(event.target.value)}/></label>{error !== null && <><p role="alert" className="open-text">{message(error)}</p><ContactAdminFor error={error}/></>}<div className={styles.actions}><Button type="button" variant="outline" disabled={busy} onClick={cancel}>{copy.cancel}</Button><Button type="submit" disabled={busy || !reason.trim()}>{busy ? copy.saving : copy.save}</Button></div></form>
 }
 
 function AdultList() {
@@ -67,18 +68,18 @@ function InviteAdult() {
   const [finance, setFinance] = useState(false)
   const [health, setHealth] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState<unknown>(null)
   const [queued, setQueued] = useState('')
   const submit = async (event: FormEvent) => {
     event.preventDefault(); if (busy) return
-    setBusy(true); setError(''); setQueued('')
+    setBusy(true); setError(null); setQueued('')
     const recipient = email.trim()
     try {
       await create({email: recipient, role: choice === 'coach' ? 'coach' : 'mentor', travelLead: choice === 'lead', financialEdit: choice === 'lead' && finance, healthExport: choice === 'lead' && health})
       setQueued(recipient); setEmail('')
-    } catch (error) {setError(message(error))} finally {setBusy(false)}
+    } catch (error) {setError(error)} finally {setBusy(false)}
   }
-  return <Card className={styles.surface}><CardHeader><CardTitle>{copy.invite}</CardTitle><CardDescription>{copy.sevenDays}</CardDescription></CardHeader><CardContent><form className={styles.form} onSubmit={event => void submit(event)}><label>{copy.email}<Input type="email" autoComplete="email" required maxLength={254} value={email} disabled={busy} onChange={event => setEmail(event.target.value)}/></label><AccessFields {...{choice, setChoice, finance, setFinance, health, setHealth, busy}}/><Button type="submit" disabled={busy}>{busy ? copy.sending : copy.sendInvitation}</Button></form><p className="muted tiny">{copy.emailInstructions}</p>{queued && <p role="status">{copy.queuedFor(queued)}</p>}{error && <p role="alert" className="open-text">{error}</p>}</CardContent></Card>
+  return <Card className={styles.surface}><CardHeader><CardTitle>{copy.invite}</CardTitle><CardDescription>{copy.sevenDays}</CardDescription></CardHeader><CardContent><form className={styles.form} onSubmit={event => void submit(event)}><label>{copy.email}<Input type="email" autoComplete="email" required maxLength={254} value={email} disabled={busy} onChange={event => setEmail(event.target.value)}/></label><AccessFields {...{choice, setChoice, finance, setFinance, health, setHealth, busy}}/><Button type="submit" disabled={busy}>{busy ? copy.sending : copy.sendInvitation}</Button></form><p className="muted tiny">{copy.emailInstructions}</p>{queued && <p role="status">{copy.queuedFor(queued)}</p>}{error !== null && <><p role="alert" className="open-text">{message(error)}</p><ContactAdminFor error={error}/></>}</CardContent></Card>
 }
 
 function InvitationList() {
@@ -86,21 +87,21 @@ function InvitationList() {
   const revoke = useMutation(api.accounts.revokeInvitation)
   const resend = useMutation(api.accounts.resendInvitation)
   const [busy, setBusy] = useState<Id<'adultInvitations'> | null>(null)
-  const [error, setError] = useState('')
+  const [error, setError] = useState<unknown>(null)
   const [saved, setSaved] = useState('')
   const [now, setNow] = useState(Date.now)
   useEffect(() => {const timer = window.setInterval(() => setNow(Date.now()), 30_000); return () => window.clearInterval(timer)}, [])
   const act = async (invitationId: Id<'adultInvitations'>, action: 'revoke' | 'resend') => {
     if (busy) return
-    setBusy(invitationId); setError(''); setSaved('')
-    try {if (action === 'revoke') {await revoke({invitationId}); setSaved(copy.revoked)} else {await resend({invitationId}); setSaved(copy.resendQueued)}} catch (error) {setError(message(error))} finally {setBusy(null)}
+    setBusy(invitationId); setError(null); setSaved('')
+    try {if (action === 'revoke') {await revoke({invitationId}); setSaved(copy.revoked)} else {await resend({invitationId}); setSaved(copy.resendQueued)}} catch (error) {setError(error)} finally {setBusy(null)}
   }
   const labels = {pending: copy.pendingStatus, accepted: copy.acceptedStatus, revoked: copy.revokedStatus, replaced: copy.replacedStatus}
   const emailLabels = {not_sent: copy.emailNotSent, queued: copy.emailQueued, sent: copy.emailSent, failed: copy.emailFailed}
   return <Card className={styles.surface}><CardHeader><CardTitle>{copy.pending}</CardTitle></CardHeader><CardContent>{status === 'LoadingFirstPage' ? <p role="status">{copy.loadingInvitations}</p> : results.length === 0 ? <p className="muted">{copy.noInvitations}</p> : <div className={styles.invites}>{results.map(row => {
     const active = row.status === 'pending' && row.expiresAt > now
     return <div key={row.invitationId}><div><strong>{row.email}</strong><p>{roleLabel(row)}{row.financialEdit && ` · ${copy.finance}`}{row.healthExport && ` · ${copy.health}`}</p><p className="muted tiny">{row.status === 'pending' && !active ? copy.expiredStatus : labels[row.status]}{active && <> · {copy.expires} {when(row.expiresAt)}</>}</p>{active && <><p role="status">{emailLabels[row.emailStatus]}</p>{row.emailError && <p className="open-text">{userFacingError(new Error(row.emailError), copy.failed)}</p>}{row.resendAvailableAt > now && <p className="muted tiny">{copy.resendAfter} {when(row.resendAvailableAt)}</p>}</>}</div>{row.status === 'pending' && <div className={styles.actions}>{active && <Button variant="outline" disabled={busy !== null || row.emailStatus === 'queued' || row.resendAvailableAt > now} onClick={() => void act(row.invitationId, 'resend')}>{copy.resend}</Button>}<Button variant="outline" disabled={busy !== null} onClick={() => void act(row.invitationId, 'revoke')}>{copy.revoke}</Button></div>}</div>
-  })}</div>}{status !== 'Exhausted' && status !== 'LoadingFirstPage' && <Button variant="outline" disabled={status === 'LoadingMore'} onClick={() => loadMore(20)}>{status === 'LoadingMore' ? copy.loadingMore : copy.loadMore}</Button>}{error && <p role="alert" className="open-text">{error}</p>}{saved && <p role="status" className="ready-text">{saved}</p>}</CardContent></Card>
+  })}</div>}{status !== 'Exhausted' && status !== 'LoadingFirstPage' && <Button variant="outline" disabled={status === 'LoadingMore'} onClick={() => loadMore(20)}>{status === 'LoadingMore' ? copy.loadingMore : copy.loadMore}</Button>}{error !== null && <><p role="alert" className="open-text">{message(error)}</p><ContactAdminFor error={error}/></>}{saved && <p role="status" className="ready-text">{saved}</p>}</CardContent></Card>
 }
 
 export default function Adults() {return <div className={styles.page}><div className="page-head"><div><h1>{copy.title}</h1><p className="muted lead">{copy.description}</p></div></div><AccountsBoundary><AdultList/><ParentStaffAccess/><div className={styles.columns}><InviteAdult/><InvitationList/></div></AccountsBoundary></div>}

@@ -1,17 +1,12 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { RateLimiter } from "@convex-dev/rate-limiter";
 import { ConvexError, v } from "convex/values";
-import { components } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
-import { activeSeason, audit, requireRole, requireSeasonProfileWritable, viewer } from "./lib/access";
+import { activeSeason, audit, identity, requireRole, requireSeasonProfileWritable, viewer } from "./lib/access";
 import { refreshStudentFinance } from "./lib/financeSummaries";
+import { allocateInvitationCode, codeLimiter as limiter, googleRequiredForStudents, joinAttemptsLocked, normalizedInvitationCode, recordFailedJoinAttempt, usableTeamCode } from "./lib/invitationCodes";
 import { emailKey, tokenHash, verifiedGoogle } from "./lib/invitationIdentity";
 
-const limiter = new RateLimiter(components.rateLimiter, {
-  studentCodeAttempts: { kind: "fixed window", rate: 10, period: 60_000 },
-  studentCodeDailyAttempts: { kind: "fixed window", rate: 30, period: 86_400_000 },
-});
 const nameInput = v.object({ firstName: v.string(), lastName: v.string() });
 const entryInput = v.object({ firstName: v.string(), lastName: v.string(), resolution: v.union(v.literal("skip"), v.literal("create"), v.literal("link")), existingStudentId: v.optional(v.id("students")), confirmDuplicate: v.optional(v.boolean()) });
 type Ctx = QueryCtx | MutationCtx;
@@ -19,30 +14,25 @@ type Entry = { firstName: string; lastName: string; resolution: "skip" | "create
 
 function name(value: string) {
   const clean = value.trim().replace(/\s+/g, " ");
-  if (!clean || clean.length > 80 || [...clean].some(character => character.charCodeAt(0) < 32)) throw new ConvexError("Each student needs a first and last name under 80 characters.");
+  if (!clean || clean.length > 80 || [...clean].some(character => character.charCodeAt(0) < 32)) throw new ConvexError("Each student needs a first and last name, each under 80 characters. Fix the file, then upload it again.");
   return clean;
 }
 function key(first: string, last: string) { return `${first} ${last}`.normalize("NFKC").toLocaleLowerCase("en-US"); }
 function cleanRows<T extends { firstName: string; lastName: string }>(rows: T[]) {
-  if (rows.length < 1 || rows.length > 100) throw new ConvexError("Upload 1 to 100 students at a time.");
+  if (rows.length < 1 || rows.length > 100) throw new ConvexError("Upload between 1 and 100 students at a time. Split the file, then try again.");
   return rows.map(row => ({ ...row, firstName: name(row.firstName), lastName: name(row.lastName) }));
 }
+// New individual invitations are six digits from the namespace shared with team codes.
 async function newCode(ctx: MutationCtx) {
-  for (let attempt = 0; attempt < 100; attempt++) {
-    const value = crypto.getRandomValues(new Uint32Array(1))[0];
-    // Rejection sampling avoids modulo bias; no leading zero to lose in Excel.
-    if (value >= 4_294_890_000) continue;
-    const code = String(10_000 + value % 90_000);
-    const codeHash = await tokenHash(code);
-    const used = await ctx.db.query("bulkInviteCodeReservations").withIndex("by_codeHash", q => q.eq("codeHash", codeHash)).unique();
-    if (used) continue;
-    await ctx.db.insert("bulkInviteCodeReservations", { codeHash });
-    return code;
-  }
-  throw new ConvexError("Could not allocate an unused invitation code. Try again.");
+  const code = await allocateInvitationCode(ctx);
+  if (!code) throw new ConvexError("A new invitation code couldn't be created. Try again.");
+  // Reservations are never deleted, so a replaced or revoked code is never issued again.
+  await ctx.db.insert("bulkInviteCodeReservations", { codeHash: await tokenHash(code) });
+  return code;
 }
-function normalizedCode(value: string) { return value.trim().toUpperCase(); }
-function validCode(value: string) { return /^\d{5}$/.test(value) || /^DV-[0-9A-F]{32}$/.test(value); }
+const normalizedCode = normalizedInvitationCode;
+// Six digits are current; five digits and DV- codes were issued earlier and still work until they expire or are revoked.
+function validCode(value: string) { return /^\d{5,6}$/.test(value) || /^DV-[0-9A-F]{32}$/.test(value); }
 function effectiveExpiry(inviteExpiry: number | undefined, seasonExpiry: number | undefined) {
   if (inviteExpiry === undefined) return seasonExpiry ?? null;
   return seasonExpiry === undefined ? inviteExpiry : Math.min(inviteExpiry, seasonExpiry);
@@ -50,7 +40,7 @@ function effectiveExpiry(inviteExpiry: number | undefined, seasonExpiry: number 
 async function fingerprint(value: unknown) { return tokenHash(JSON.stringify(value)); }
 async function roster(ctx: Ctx, seasonId: Id<"seasons">) {
   const rows = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", seasonId)).take(1001);
-  if (rows.length > 1000) throw new ConvexError("Roster is too large for name matching; ask a Coach to review the roster.");
+  if (rows.length > 1000) throw new ConvexError("The roster is too large to check for matching names. Review the roster, then try again.");
   return rows;
 }
 function matches(rows: Doc<"students">[], first: string, last: string) {
@@ -61,7 +51,7 @@ async function permittedInvite(ctx: Ctx, inviteId: Id<"bulkStudentInvites">) {
   const actor = await viewer(ctx); requireRole(actor, "coach");
   const invite = await ctx.db.get(inviteId);
   const season = await activeSeason(ctx);
-  if (!invite || invite.seasonId !== season._id) throw new ConvexError("Invitation unavailable.");
+  if (!invite || invite.seasonId !== season._id) throw new ConvexError("This invitation is no longer available. Reload to see the latest.");
   return { actor, invite, season };
 }
 async function applicant(ctx: MutationCtx) {
@@ -95,7 +85,7 @@ export const preview = query({
       const nameKey = key(row.firstName, row.lastName);
       const duplicateInUpload = seen.has(nameKey); seen.add(nameKey);
       const found = matches(existing, row.firstName, row.lastName);
-      if (found.length > 20) throw new ConvexError("Too many matching records for one name; review the roster first.");
+      if (found.length > 20) throw new ConvexError("Too many students match one name. Review the roster, then try again.");
       return { firstName: row.firstName, lastName: row.lastName, duplicateInUpload, matches: found.map(student => ({ studentId: student._id, legalName: student.legalName, email: student.email, linked: !!student.userId, active: student.active })) };
     }) };
   },
@@ -109,15 +99,15 @@ export const createBatch = mutation({
     const season = await activeSeason(ctx);
     await requireSeasonProfileWritable(ctx, season._id);
     const entries: Entry[] = cleanRows(args.entries);
-    if (!/^[A-Za-z0-9_-]{8,128}$/.test(args.idempotencyKey)) throw new ConvexError("Use a valid batch submission key.");
+    if (!/^[A-Za-z0-9_-]{8,128}$/.test(args.idempotencyKey)) throw new ConvexError("This upload couldn't be submitted. Reload the page, then upload the file again.");
     const requestHash = await fingerprint(entries);
     const previous = await ctx.db.query("bulkInviteBatches").withIndex("by_createdBy_and_idempotencyKey", q => q.eq("createdBy", actor._id).eq("idempotencyKey", args.idempotencyKey)).unique();
     if (previous) {
-      if (previous.requestHash !== requestHash) throw new ConvexError("This submission key was already used for a different batch.");
+      if (previous.requestHash !== requestHash) throw new ConvexError("This upload was already submitted with different students. Reload the page, then upload the file again.");
       return { batchId: previous._id, created: previous.createdCount, linked: previous.linkedCount, skipped: previous.skippedCount };
     }
     const now = Date.now();
-    if (season.endsAt !== undefined && season.endsAt <= now) throw new ConvexError("The active season has ended.");
+    if (season.endsAt !== undefined && season.endsAt <= now) throw new ConvexError("The current season has ended, so new invitation codes can't be created. Start the next season first.");
     const expiresAt = season.endsAt;
     const existing = await roster(ctx, season._id);
     const chosen = new Set<Id<"students">>();
@@ -129,13 +119,13 @@ export const createBatch = mutation({
       names.add(nameKey);
       if (entry.resolution === "skip") { skipped++; continue; }
       if (entry.resolution === "create") {
-        if (entry.existingStudentId) throw new ConvexError("New records cannot select an existing student.");
-        if (duplicate && !entry.confirmDuplicate) throw new ConvexError(`Confirm the duplicate record for ${entry.firstName} ${entry.lastName}.`);
+        if (entry.existingStudentId) throw new ConvexError("A new student can't also be linked to an existing student. Review the choices, then try again.");
+        if (duplicate && !entry.confirmDuplicate) throw new ConvexError(`${entry.firstName} ${entry.lastName} matches an existing student. Confirm a second record, or link the existing student instead.`);
         created++;
       } else {
-        if (!entry.existingStudentId) throw new ConvexError("Choose an unlinked student record.");
+        if (!entry.existingStudentId) throw new ConvexError("Choose which existing student to link, then try again.");
         const student = existing.find(row => row._id === entry.existingStudentId);
-        if (!student || !student.active || student.userId || !matches([student], entry.firstName, entry.lastName).length || chosen.has(student._id)) throw new ConvexError("The selected student is unavailable or does not match this name.");
+        if (!student || !student.active || student.userId || !matches([student], entry.firstName, entry.lastName).length || chosen.has(student._id)) throw new ConvexError("The chosen student already has an account or doesn't match this name. Reload, then choose again.");
         chosen.add(student._id); linked++;
       }
     }
@@ -148,9 +138,9 @@ export const createBatch = mutation({
         studentId = await ctx.db.insert("students", { seasonId: season._id, legalName: `${entry.firstName} ${entry.lastName}`, preferredName: entry.firstName, firstName: entry.firstName, lastName: entry.lastName, structuredNameReviewed: true, email: "", subteam: "", active: true, travelTeam: false, roomCategoryLocked: false, allergies: { state: "unknown" }, medications: { state: "unknown" } });
         await refreshStudentFinance(ctx, studentId);
       }
-      if (!studentId) throw new ConvexError("Student record unavailable.");
+      if (!studentId) throw new ConvexError("A student record couldn't be found. Reload, then try again.");
       const previousCodes = await ctx.db.query("bulkStudentInvites").withIndex("by_studentId_and_status", q => q.eq("studentId", studentId).eq("status", "pending")).take(101);
-      if (previousCodes.length > 100) throw new ConvexError("Too many prior codes for this student.");
+      if (previousCodes.length > 100) throw new ConvexError("A student in this file has too many open invitation codes. Revoke the old codes, then try again.");
       for (const previousCode of previousCodes) {
         await ctx.db.patch(previousCode._id, { status: "replaced", code: "" });
         const oldBatch = await ctx.db.get(previousCode.batchId);
@@ -181,11 +171,11 @@ export const batchDetail = query({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach");
     const season = await activeSeason(ctx);
-    if (!Number.isSafeInteger(args.asOf)) throw new ConvexError("A valid review time is required.");
+    if (!Number.isSafeInteger(args.asOf)) throw new ConvexError("This page is out of date. Reload, then try again.");
     const batch = await ctx.db.get(args.batchId);
-    if (!batch || batch.seasonId !== season._id) throw new ConvexError("Batch unavailable.");
+    if (!batch || batch.seasonId !== season._id) throw new ConvexError("This upload is no longer available. Reload to see the latest.");
     const rows = await ctx.db.query("bulkStudentInvites").withIndex("by_batchId", q => q.eq("batchId", batch._id)).take(101);
-    if (rows.length > 100) throw new ConvexError("Batch exceeds its invitation limit.");
+    if (rows.length > 100) throw new ConvexError("This upload has more than 100 invitations, so it can't be shown here.");
     return { batchId: batch._id, createdAt: batch.createdAt, expiresAt: effectiveExpiry(batch.expiresAt, season.endsAt), invites: await Promise.all(rows.map(async row => {
       const student = await ctx.db.get(row.studentId);
       const expiresAt = effectiveExpiry(row.expiresAt, season.endsAt);
@@ -198,8 +188,8 @@ export const revoke = mutation({
   args: { inviteId: v.id("bulkStudentInvites"), expectedCode: v.string() }, returns: v.null(),
   handler: async (ctx, args) => {
     const { actor, invite } = await permittedInvite(ctx, args.inviteId);
-    if (invite.code !== args.expectedCode) throw new ConvexError("Invitation changed. Reload before managing its code.");
-    if (invite.status !== "pending") throw new ConvexError("Pending invitation unavailable.");
+    if (invite.code !== args.expectedCode) throw new ConvexError("This invitation changed since you opened it. Reload to see the latest, then try again.");
+    if (invite.status !== "pending") throw new ConvexError("This invitation code was already used, revoked or replaced. Reload to see the latest.");
     await ctx.db.patch(invite._id, { status: "revoked", code: "" });
     const batch = await ctx.db.get(invite.batchId);
     if (batch) await ctx.db.patch(batch._id, { pendingCount: batch.pendingCount - 1 });
@@ -212,14 +202,14 @@ export const replace = mutation({
   args: { inviteId: v.id("bulkStudentInvites"), expectedCode: v.string() }, returns: v.object({ code: v.string(), inviteId: v.id("bulkStudentInvites"), expiresAt: v.union(v.number(), v.null()) }),
   handler: async (ctx, args) => {
     const { actor, invite, season } = await permittedInvite(ctx, args.inviteId);
-    if (invite.code !== args.expectedCode) throw new ConvexError("Invitation changed. Reload before managing its code.");
+    if (invite.code !== args.expectedCode) throw new ConvexError("This invitation changed since you opened it. Reload to see the latest, then try again.");
     await requireSeasonProfileWritable(ctx, season._id);
     const student = await ctx.db.get(invite.studentId);
-    if (invite.status === "redeemed" || !student || !student.active || student.userId) throw new ConvexError("This student already has an account or is unavailable.");
+    if (invite.status === "redeemed" || !student || !student.active || student.userId) throw new ConvexError("This student already has an account or is no longer active, so a new code isn't needed.");
     const now = Date.now();
-    if (season.endsAt !== undefined && season.endsAt <= now) throw new ConvexError("The active season has ended.");
+    if (season.endsAt !== undefined && season.endsAt <= now) throw new ConvexError("The current season has ended, so new invitation codes can't be created. Start the next season first.");
     const otherCodes = await ctx.db.query("bulkStudentInvites").withIndex("by_studentId_and_status", q => q.eq("studentId", student._id).eq("status", "pending")).take(101);
-    if (otherCodes.length > 100) throw new ConvexError("Invitation history requires Coach review.");
+    if (otherCodes.length > 100) throw new ConvexError("This student has too many open invitation codes. Revoke the old codes, then try again.");
     for (const other of otherCodes) if (other._id !== invite._id) {
       await ctx.db.patch(other._id, { status: "replaced", code: "" });
       const otherBatch = await ctx.db.get(other.batchId);
@@ -250,6 +240,32 @@ export const previewCode = mutation({
     const emailAccounts = await ctx.db.query("appUsers").withIndex("by_email", q => q.eq("email", who.email)).take(2);
     if (account || emailAccounts.length) return { status: "accountConflict" as const, studentName: null };
     return { status: "valid" as const, studentName: null };
+  },
+});
+
+// One field accepts every invitation code; the answer tells the join page whether to ask
+// for a name (team code) or to request an account connection (individual invitation).
+// It reveals no more than requestJoin and previewCode already do: whether this account can
+// use the code. Wrong codes count toward the same 15-minute lockout as requestJoin, and every
+// check shares the per-account limits used by previewCode and redeem.
+export const checkInvitationCode = mutation({
+  args: { code: v.string() },
+  returns: v.object({ kind: v.union(v.literal("team"), v.literal("individual"), v.literal("unavailable"), v.literal("tooManyAttempts")) }),
+  handler: async (ctx, args) => {
+    const who = await identity(ctx);
+    if (await ctx.db.query("adultEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique()) throw new ConvexError(googleRequiredForStudents);
+    if (await ctx.db.query("parentEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique()) throw new ConvexError(googleRequiredForStudents);
+    const season = await activeSeason(ctx);
+    const now = Date.now();
+    if (await joinAttemptsLocked(ctx, who.authUserId, now)) return { kind: "tooManyAttempts" as const };
+    const attempt = await limiter.limit(ctx, "studentCodeAttempts", { key: who.authUserId });
+    if (!attempt.ok || !(await limiter.limit(ctx, "studentCodeDailyAttempts", { key: who.authUserId })).ok) return { kind: "tooManyAttempts" as const };
+    if (await usableTeamCode(ctx, args.code, season._id, now)) return { kind: "team" as const };
+    const person = await verifiedGoogle(ctx);
+    const found = person ? await usableCode(ctx, args.code) : null;
+    if (person && found && !(await accountConflict(ctx, person.authUserId, person.email, found.student))) return { kind: "individual" as const };
+    await recordFailedJoinAttempt(ctx, who.authUserId, now);
+    return { kind: "unavailable" as const };
   },
 });
 
@@ -330,10 +346,10 @@ export const decideConnection = mutation({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach");
     const request = await ctx.db.get(args.requestId);
-    if (!request) throw new ConvexError("Connection request unavailable.");
+    if (!request) throw new ConvexError("This connection request is no longer available. Reload to see the latest.");
     if (request.status !== "pending") {
       if (request.status === (args.approve ? "approved" : "declined")) return null;
-      throw new ConvexError("This connection request has already been decided.");
+      throw new ConvexError("This connection request was already approved or declined. Reload to see the latest.");
     }
     const now = Date.now();
     if (!args.approve) {
@@ -343,23 +359,23 @@ export const decideConnection = mutation({
     }
     const adultEmailIdentity = await ctx.db.query("adultEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", request.authUserId)).unique();
     const parentEmailIdentity = await ctx.db.query("parentEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", request.authUserId)).unique();
-    if (adultEmailIdentity || parentEmailIdentity) throw new ConvexError("Email sign-in identities cannot be approved as student accounts. Ask a Coach to review the adult invitation instead.");
+    if (adultEmailIdentity || parentEmailIdentity) throw new ConvexError("This person signed in with an email code, not Google, so they can't be connected as a student. Decline this request.");
     const row = await ctx.db.get(request.inviteId);
     const student = await ctx.db.get(request.studentId);
     const season = await activeSeason(ctx);
     if (!row || row.codeHash !== request.codeHash || row.status !== "pending" || row.studentId !== request.studentId || row.seasonId !== request.seasonId ||
         season._id !== request.seasonId || (season.endsAt !== undefined && season.endsAt <= now) || (row.expiresAt !== undefined && row.expiresAt <= now) ||
         !student || !student.active || student.userId || student.seasonId !== season._id) {
-      throw new ConvexError("This request is stale. Decline it and ask the student to use a current invitation.");
+      throw new ConvexError("This invitation code is no longer valid. Decline this request and give the student a new code.");
     }
     await requireSeasonProfileWritable(ctx, season._id);
     const authUser = await ctx.db.get(request.authUserId);
     const googleAccounts = await ctx.db.query("authAccounts").withIndex("userIdAndProvider", q => q.eq("userId", request.authUserId).eq("provider", "google")).take(2);
     if (!authUser?.emailVerificationTime || authUser.isAnonymous || !authUser.email || emailKey(authUser.email) !== request.googleEmail ||
         !googleAccounts.some(account => account.emailVerified && emailKey(account.emailVerified) === request.googleEmail)) {
-      throw new ConvexError("The verified Google identity has changed. Decline this request and issue a new invitation.");
+      throw new ConvexError("This person's Google account changed after they asked to connect. Decline this request and give the student a new code.");
     }
-    if (await accountConflict(ctx, request.authUserId, request.googleEmail, student)) throw new ConvexError("This Google account or email is already connected. Decline this request.");
+    if (await accountConflict(ctx, request.authUserId, request.googleEmail, student)) throw new ConvexError("This Google account or email is already connected to an account. Decline this request.");
     const userId = await ctx.db.insert("appUsers", { authUserId: request.authUserId, email: request.googleEmail, name: request.googleName, role: "student", travelLead: false, financialEdit: false, active: true });
     await ctx.db.patch(student._id, { userId, email: request.googleEmail });
     await ctx.db.patch(row._id, { status: "redeemed", code: "", redeemedBy: userId, redeemedAt: now });
@@ -367,7 +383,7 @@ export const decideConnection = mutation({
     const batch = await ctx.db.get(row.batchId);
     if (batch) await ctx.db.patch(batch._id, { pendingCount: batch.pendingCount - 1, connectedCount: batch.connectedCount + 1 });
     const requests = await ctx.db.query("joinRequests").withIndex("by_authUserId", q => q.eq("authUserId", request.authUserId)).take(21);
-    if (requests.length > 20) throw new ConvexError("Join request history requires Coach review.");
+    if (requests.length > 20) throw new ConvexError("This account has too many join requests to update. Review them in Join requests, then try again.");
     for (const pending of requests) if (pending.status === "pending" && pending.seasonId === student.seasonId) await ctx.db.patch(pending._id, { status: "approved", decidedAt: now, decidedBy: actor._id });
     await audit(ctx, actor, "bulkInviteConnectionRequests", request._id, "approve", "pending", { studentId: student._id, userId });
     return null;
