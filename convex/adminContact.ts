@@ -31,7 +31,7 @@ export const request = mutation({
     await limiter.limit(ctx, "adminContactHourly", { key });
     await limiter.limit(ctx, "adminContactDaily", { key });
     const configured = parentInviteEmailConfiguration() !== null;
-    const requestId = await ctx.db.insert("adminContactRequests", { requestedBy: actor._id, topic: args.topic, details, createdAt: Date.now(), emailStatus: configured ? "queued" : "notSent", emailAttempt: 0 });
+    const requestId = await ctx.db.insert("adminContactRequests", { requestedBy: actor._id, requesterName: actor.name, requesterEmail: actor.email, topic: args.topic, details, createdAt: Date.now(), emailStatus: configured ? "queued" : "notSent", emailAttempt: 0 });
     if (!configured) return { status: "notSent" as const };
     await ctx.scheduler.runAfter(0, internal.adminContact.send, { requestId, attempt: 1 });
     await ctx.scheduler.runAfter(20 * 60_000, internal.adminContact.markStalled, { requestId });
@@ -62,7 +62,8 @@ export const prepareSend = internalMutation({
       return null;
     }
     await ctx.db.patch(row._id, { emailAttempt: args.attempt });
-    return { topic: row.topic, details: row.details ?? null, name: requester.name, email: requester.email, createdAt: row.createdAt };
+    // Use the name and email saved with the request so every retry sends identical content under one idempotency key.
+    return { topic: row.topic, details: row.details ?? null, name: row.requesterName ?? requester.name, email: row.requesterEmail ?? requester.email, createdAt: row.createdAt };
   },
 });
 
@@ -126,7 +127,8 @@ export const send = internalAction({
         const body: unknown = await response.json();
         outcome = body && typeof body === "object" && "id" in body && typeof body.id === "string" ? "sent" : "retry";
       } else {
-        outcome = response.status === 429 || response.status >= 500 ? "retry" : "failed";
+        // 409: the same request is still in flight under this idempotency key; retry rather than fail.
+        outcome = response.status === 409 || response.status === 429 || response.status >= 500 ? "retry" : "failed";
       }
     } catch { outcome = "retry"; }
     await ctx.runMutation(internal.adminContact.finishSend, { ...args, outcome });

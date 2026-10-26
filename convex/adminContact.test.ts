@@ -89,6 +89,24 @@ describe("Contact admin request", () => {
     expect(await f.t.run(ctx => ctx.db.get(row._id))).toMatchObject({ emailStatus: "sent" });
   });
 
+  it("retries with the request's saved details after a profile edit and treats 409 as retry", async () => {
+    configure();
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response("{}", { status: 409 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "synthetic" })));
+    vi.stubGlobal("fetch", fetcher); const f = await fixture();
+    await f.coach.mutation(api.adminContact.request, { topic: "tooManyDrivers" });
+    const [row] = await f.requests();
+    await f.t.run(ctx => ctx.db.patch(f.ids.coach, { name: "Renamed Coach", email: "renamed@example.invalid" }));
+    await f.t.action(internal.adminContact.send, { requestId: row._id, attempt: 1 });
+    expect(await f.t.run(ctx => ctx.db.get(row._id))).toMatchObject({ emailStatus: "queued" });
+    await f.t.action(internal.adminContact.send, { requestId: row._id, attempt: 2 });
+    const bodies = fetcher.mock.calls.map(([, init]) => JSON.parse(init.body));
+    expect(bodies.map(body => body.reply_to)).toEqual(["coach@example.invalid", "coach@example.invalid"]);
+    expect(bodies[1].text).toContain("Synthetic Coach (Coach)");
+    expect(await f.t.run(ctx => ctx.db.get(row._id))).toMatchObject({ emailStatus: "sent" });
+  });
+
   it("records notSent and schedules nothing when email isn't set up", async () => {
     vi.stubEnv("PARENT_INVITE_EMAIL_ENABLED", "false"); const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher); const f = await fixture();
     expect(await f.coach.mutation(api.adminContact.request, { topic: "inviteEmailNotConfigured" })).toEqual({ status: "notSent" });
