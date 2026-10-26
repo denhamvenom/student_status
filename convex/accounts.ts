@@ -1,6 +1,7 @@
 import { normalizeEmail } from "./lib/contactValidation";
 import { internal } from "./_generated/api";
 import { parentInviteEmailConfiguration } from "./lib/parentInviteEmail";
+import { adminContactError } from "./lib/adminContact";
 import { ConvexError, v } from "convex/values";
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
 import { mutation, query } from "./_generated/server";
@@ -91,7 +92,7 @@ export const inviteAdult = mutation({
   args: { email: v.string(), ...grantFields }, returns: v.object({ invitationId: v.id("adultInvitations"), expiresAt: v.number() }),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach"); grants(args);
-    if (!parentInviteEmailConfiguration()) throw new ConvexError("Invitation email is not configured, so nothing was sent. Contact the Student Status administrator.");
+    if (!parentInviteEmailConfiguration()) throw adminContactError("inviteEmailNotConfigured", "Invitation email is not configured, so nothing was sent.");
     const email = normalizeEmail(args.email, "Account email");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) throw new ConvexError("Enter a valid email address, like name@example.com.");
     const existing = await ctx.db.query("appUsers").withIndex("by_email", q => q.eq("email", email)).take(2);
@@ -114,7 +115,7 @@ export const resendInvitation = mutation({
   args: { invitationId: v.id("adultInvitations") }, returns: v.object({ invitationId: v.id("adultInvitations"), expiresAt: v.number() }),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach");
-    if (!parentInviteEmailConfiguration()) throw new ConvexError("Invitation email is not configured, so nothing was sent. Contact the Student Status administrator.");
+    if (!parentInviteEmailConfiguration()) throw adminContactError("inviteEmailNotConfigured", "Invitation email is not configured, so nothing was sent.");
     const row = await ctx.db.get(args.invitationId); const now = Date.now();
     if (!row || row.status !== "pending" || row.expiresAt <= now) throw new ConvexError("This is no longer an active invitation. It was accepted, revoked or has expired. Reload the list, then send a new invitation if needed.");
     const issuer = await ctx.db.get(row.createdBy);
@@ -204,7 +205,7 @@ export const updateAdult = mutation({
     if (!args.reason.trim() || args.reason.trim().length > 1000) throw new ConvexError("Enter a reason (up to 1,000 characters).");
     if (user.active && user.role === "coach" && (!args.active || args.role !== "coach")) {
       const coaches = await ctx.db.query("appUsers").withIndex("by_role", q => q.eq("role", "coach")).take(501);
-      if (coaches.length > 500) throw new ConvexError("There are too many Coach accounts to check this change. Contact the Student Status administrator.");
+      if (coaches.length > 500) throw adminContactError("tooManyCoaches", "There are too many Coach accounts to check this change.");
       if (!coaches.some(coach => coach._id !== user._id && coach.active)) throw new ConvexError("The last active Coach can't lose Coach access. Give another account Coach access first.");
     }
     const patch = { role: args.role, travelLead: args.travelLead, financialEdit: args.financialEdit, healthExport: args.healthExport, active: args.active, accessRevision: (user.accessRevision ?? 0) + 1, ...(user.active && !args.active ? { archivedAt: Date.now() } : {}) };

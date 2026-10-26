@@ -4,6 +4,7 @@ import { mutation, query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { activeSeason, audit, requireRole, viewer } from "./lib/access";
+import { adminContactError } from "./lib/adminContact";
 
 const shirtSize = v.union(v.literal("XS"), v.literal("S"), v.literal("M"), v.literal("L"), v.literal("XL"), v.literal("2XL"), v.literal("3XL"));
 const staffRole = v.union(v.literal("coach"), v.literal("mentor"));
@@ -56,7 +57,7 @@ export const ownerReconciliationCandidates = query({
       ctx.db.query("drivers").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(MAX_DRIVERS + 1),
       ctx.db.query("appUsers").withIndex("by_role", q => q.eq("role", "mentor")).take(201),
     ]);
-    if (drivers.length > MAX_DRIVERS || mentors.length > 200) throw new ConvexError("The driver or Mentor list is too long to match here. Contact the Student Status administrator.");
+    if (drivers.length > MAX_DRIVERS || mentors.length > 200) throw adminContactError("tooManyDrivers", "The driver or Mentor list is too long to match here.");
     const unowned = drivers.filter(driver => !driver.ownerAppUserId);
     const candidates = await Promise.all(unowned.map(async driver => {
       const matches = mentors.filter(mentor => mentor.active && emailKey(mentor.email) === emailKey(driver.email));

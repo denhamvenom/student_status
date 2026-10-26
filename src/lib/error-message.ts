@@ -1,4 +1,5 @@
 import { ConvexError } from 'convex/values'
+import { adminContactTopics, type AdminContactTopic } from '../../convex/lib/adminContact'
 
 const defaultMessage = 'Something went wrong. Please try again. If it keeps happening, contact a Coach.'
 const networkMessage = 'Could not reach Student Status. Check your connection and try again.'
@@ -30,4 +31,11 @@ export function userFacingError(error: unknown, fallback = defaultMessage, allow
     }
   }
   return safeMessage(fallback) ?? defaultMessage
+}
+
+/** The Contact admin topic a Coach-only setup error carries, or null for any other error. */
+export function adminContactTopic(error: unknown): AdminContactTopic | null {
+  const data = error instanceof ConvexError ? error.data : null
+  const topic: unknown = data && typeof data === 'object' && 'contactAdmin' in data ? data.contactAdmin : null
+  return adminContactTopics.find(known => known === topic) ?? null
 }

@@ -57,6 +57,10 @@ Read this before changing parent linking, consent/PDF, finance, rooms/waitlists 
 - FIRST verification is once per student/season and requires both team acceptance and Consent & Release to be Coach-verified. Self-report does not clear readiness; reopening needs a reason and blocks Competitions again. New seasons start unverified; legacy event completions do not silently count as season-wide verification.
 - FIRST invitation/reporting follows age/birthday eligibility: do not direct minors to adult self-report. All Competitions inherit the season-wide status; Outreach/Team and historical evidence are preserved.
 
+## Admin contact
+
+- Admin contact (owner decision October 25): Coach-only setup errors offer Contact admin; requests are recorded and emailed to admin@team8044.org; no student data.
+
 ## Retention
 
 - Five years runs from the latest archival after reactivation and triggers review, not automatic erasure. Automatic deletion remains unauthorized.

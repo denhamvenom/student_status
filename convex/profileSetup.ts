@@ -29,7 +29,7 @@ export const complete = mutation({
     for (const field of [args.guardianName, args.guardianRelationship, args.guardianPhone, args.guardianEmail]) if ((field?.trim().length ?? 0) > 254) throw new ConvexError("Parent contact details must be 254 characters or fewer.");
     const email = args.guardianEmail === undefined ? undefined : normalizeChangedEmail(args.guardianEmail, student.guardianEmail, "Parent contact email");
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ConvexError("Enter a valid parent email, like name@example.com.");
-    if (student.roomCategory !== args.roomCategory) await markRoomCategoryReview(ctx, student._id, student.seasonId);
+    if (student.roomCategory !== args.roomCategory) await markRoomCategoryReview(ctx, student._id, student.seasonId, false);
     const preferredName = args.preferredName?.trim() || student.firstName || student.preferredName || student.legalName;
     await ctx.db.patch(student._id, { preferredName, shirtSize: args.shirtSize, roomCategory: args.roomCategory, roomCategoryLocked: true, profileCompletedAt: Date.now(), profileRevision: (student.profileRevision ?? 0) + 1, guardianName: args.guardianName?.trim() || undefined, guardianRelationship: args.guardianRelationship?.trim() || undefined, guardianPhone: args.guardianPhone === undefined ? undefined : normalizeChangedPhone(args.guardianPhone, student.guardianPhone, "Parent contact phone") || undefined, guardianEmail: email || undefined });
     await audit(ctx, actor, "students", student._id, "completeProfileSetup", { revision: student.profileRevision ?? 0 }, { roomCategory: args.roomCategory, shirtSize: args.shirtSize, revision: (student.profileRevision ?? 0) + 1 });
@@ -67,7 +67,7 @@ export const correct = mutation({
     if (args.legalName !== undefined && (!args.legalName.trim() || args.legalName.trim().length > 160)) throw new ConvexError("Enter a legal name (up to 160 characters).");
     const request = args.requestId ? await ctx.db.get(args.requestId) : null;
     if (args.requestId && (!request || request.studentId !== student._id || request.status !== "pending" || request.field === "account" || request.field === "roomCategory" && args.roomCategory === undefined || request.field === "legalName" && args.legalName === undefined)) throw new ConvexError("This correction request was already reviewed or doesn't match this change. Reload the requests, then try again.");
-    if (args.roomCategory !== undefined && args.roomCategory !== student.roomCategory) await markRoomCategoryReview(ctx, student._id, student.seasonId);
+    if (args.roomCategory !== undefined && args.roomCategory !== student.roomCategory) await markRoomCategoryReview(ctx, student._id, student.seasonId, true);
     const changes = { ...(args.roomCategory !== undefined ? { roomCategory: args.roomCategory, roomCategoryLocked: true } : {}), ...(args.legalName !== undefined ? { legalName: args.legalName.trim() } : {}), profileRevision: (student.profileRevision ?? 0) + 1 };
     await ctx.db.patch(student._id, changes);
     if (request) await ctx.db.patch(request._id, { status: "approved", decidedBy: actor._id, decidedAt: Date.now(), reason: args.reason.trim() });
