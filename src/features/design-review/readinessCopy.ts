@@ -1,7 +1,7 @@
 export const readinessCopy = {
   title: 'Event readiness',
   brand: '8044 Denham Venom',
-  product: 'STUDENT STATUS',
+  product: 'VENOM STATUS',
   seasonFallback: 'Current season',
   development: 'Development workspace — synthetic data only',
   role: 'Coach',

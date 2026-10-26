@@ -137,7 +137,7 @@ describe("role-scoped dashboard reports", () => {
     await settleSession(f.t,f.ids.session);
     expect((await f.student.query(attendanceRef, { studentId: f.ids.sid, asOf: start + 4 * hour })).verified?.sessionsHeld).toBe(2);
   });
-  it("does not combine split visits to meet one uninterrupted hour or count open/cancelled sessions", async () => {
+  it("does not combine split visits to meet one uninterrupted hour or count open/canceled sessions", async () => {
     const f = await fixture();
     await f.t.run(async ctx => {
       const corrections = await ctx.db.query("timeclockCorrections").withIndex("by_sessionId_and_studentId", q => q.eq("sessionId", f.ids.session).eq("studentId", f.ids.sid)).take(10);

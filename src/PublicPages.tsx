@@ -8,7 +8,7 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
       <div className={styles.headerInner}>
         <Link to="/" className={styles.brand} aria-label="Denham Venom home">
           <img src="/assets/logos/logo-mark-white-text.png" alt="Denham Venom" />
-          <span>STUDENT STATUS</span>
+          <span>VENOM STATUS</span>
         </Link>
         <nav className={styles.navigation} aria-label="Public pages">
           <Link to="/">Sign in</Link>
@@ -23,7 +23,7 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
 export function AboutPage() {
   return <PublicLayout>
     <p className="eyebrow">TEAM 8044</p>
-    <h1>Denham Venom Student Status</h1>
+    <h1>Venom Status</h1>
     <p className={styles.intro}>A place for approved team members and families to coordinate enrollment, events, attendance, travel readiness, permission forms and team finances.</p>
     <p>DS Robotics Foundation operates Denham Venom Team 8044 and these team apps.</p>
     <section className={styles.card} aria-labelledby="access-heading">
@@ -41,12 +41,12 @@ export function AboutPage() {
 
 export function PrivacyPage() {
   return <PublicLayout>
-    <p className="eyebrow">STUDENT STATUS &amp; TIMECLOCK</p>
+    <p className="eyebrow">VENOM STATUS &amp; TIMECLOCK</p>
     <h1>Privacy notice</h1>
     <p className="muted">Updated October 17, 2026</p>
     <section className={styles.section} aria-labelledby="purpose-heading">
       <h2 id="purpose-heading">How the apps are used</h2>
-      <p>DS Robotics Foundation operates Student Status and Timeclock for Denham Venom Team 8044 to coordinate team enrollment, student and parent setup, attendance, event readiness, permission forms and team financial participation.</p>
+      <p>DS Robotics Foundation operates Venom Status and Timeclock for Denham Venom Team 8044 to coordinate team enrollment, student and parent setup, attendance, event readiness, permission forms and team financial participation.</p>
     </section>
     <section className={styles.section} aria-labelledby="information-heading">
       <h2 id="information-heading">Information in the apps</h2>
@@ -77,7 +77,7 @@ export function PrivacyPage() {
 
 export function TermsPage() {
   return <PublicLayout>
-    <p className="eyebrow">STUDENT STATUS &amp; TIMECLOCK</p>
+    <p className="eyebrow">VENOM STATUS &amp; TIMECLOCK</p>
     <h1>Terms of use</h1>
     <p className="muted">Updated October 17, 2026</p>
     <section className={styles.section} aria-labelledby="authorized-use-heading">

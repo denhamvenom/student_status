@@ -1,8 +1,9 @@
 import { ConvexError } from 'convex/values'
+import { adminContactTopics, type AdminContactTopic } from '../../convex/lib/adminContact'
 
-const defaultMessage = 'Something went wrong. Please try again.'
-const networkMessage = 'Could not reach the service. Check your connection and try again.'
-const sessionMessage = 'Your session may have expired. Sign in again, then retry.'
+const defaultMessage = 'Something went wrong. Please try again. If it keeps happening, contact a Coach.'
+const networkMessage = 'Could not reach Venom Status. Check your connection and try again.'
+const sessionMessage = 'Your sign-in may have expired. Sign in again, then try again.'
 
 function safeMessage(value: unknown, maxLength = 180): string | null {
   if (typeof value !== 'string') return null
@@ -30,4 +31,11 @@ export function userFacingError(error: unknown, fallback = defaultMessage, allow
     }
   }
   return safeMessage(fallback) ?? defaultMessage
+}
+
+/** The Contact admin topic a Coach-only setup error carries, or null for any other error. */
+export function adminContactTopic(error: unknown): AdminContactTopic | null {
+  const data = error instanceof ConvexError ? error.data : null
+  const topic: unknown = data && typeof data === 'object' && 'contactAdmin' in data ? data.contactAdmin : null
+  return adminContactTopics.find(known => known === topic) ?? null
 }

@@ -4,7 +4,7 @@ import reference from './ui-copy.reference.json'
 // Newer approved workflows retain their wording here rather than modifying the reference.
 export const uiCopy = {
   reference,
-  brand: { name: '8044 Denham Venom', product: 'STUDENT STATUS' },
+  brand: { name: '8044 Denham Venom', product: 'VENOM STATUS' },
   navigation: { more: 'More', close: 'Close menu', account: 'Account', withdrawals: 'Withdrawals' },
   status: {
     notApplicable: reference.options.statusWords[4],

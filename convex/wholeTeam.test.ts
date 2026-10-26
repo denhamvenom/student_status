@@ -216,13 +216,13 @@ describe("Whole Team enrollment", () => {
 
   it("rejects capacity and selected subsets for automatic Whole Team events", async () => {
     const f = await fixture();
-    await expect(f.coach.mutation(api.admin.createEvent, { ...details(), capacity: 1 })).rejects.toThrow("cannot use capacity");
-    await expect(f.coach.mutation(api.admin.createEvent, { ...details(), assignedStudentIds: [f.ids.students[0]] })).rejects.toThrow("cannot use capacity");
+    await expect(f.coach.mutation(api.admin.createEvent, { ...details(), capacity: 1 })).rejects.toThrow("Leave capacity blank");
+    await expect(f.coach.mutation(api.admin.createEvent, { ...details(), assignedStudentIds: [f.ids.students[0]] })).rejects.toThrow("Leave capacity blank");
   });
 });
 
 
-describe("cancelled Whole Team events", () => {
+describe("canceled Whole Team events", () => {
   it("stops queued assignment and cannot retry or enroll newly activated students", async () => {
     const f = await fixture();
     vi.useFakeTimers();

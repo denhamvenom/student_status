@@ -12,10 +12,10 @@ export const students = query({
   args: { paginationOpts: paginationOptsValidator, active: v.optional(v.boolean()) }, returns: paginationResultValidator(row).extend({ seasonId: v.id("seasons"), maintenance: feeMaintenanceValidator }),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); const readable = actor.role === "coach" || actor.role === "mentor" && actor.travelLead;
-    if (!readable) throw new ConvexError("Team finance viewing is not enabled for this account.");
+    if (!readable) throw new ConvexError("Only a Coach or Travel Lead can see team money.");
     const season = await activeSeason(ctx); const maintenance = await feeMaintenanceProjection(ctx, season._id); const opts = boundedFinancePage(args.paginationOpts);
     const result = await ctx.db.query("students").withIndex("by_seasonId_and_active", q => q.eq("seasonId", season._id).eq("active", args.active ?? true)).paginate(opts);
-    if (result.page.length > 20) throw new ConvexError("Finance roster page exceeded its supported size.");
+    if (result.page.length > 20) throw new ConvexError("This list couldn't load. Reload the page to try again.");
     const page = await Promise.all(result.page.map(async student => {
       const { account, ...projection } = await financeRow(ctx, student._id);
       const writable = !maintenance || maintenance.state === "ready";
@@ -29,9 +29,9 @@ const change = v.object({ feeDefinitionId: v.union(v.id("feeDefinitions"), v.nul
 export const recentChanges = query({
   args: { paginationOpts: paginationOptsValidator }, returns: paginationResultValidator(change).extend({ seasonId: v.id("seasons"), coverage: v.object({ state: v.union(v.literal("updating"), v.literal("ready"), v.literal("failed")), startedAt: nullable, completedAt: nullable }) }),
   handler: async (ctx, args) => {
-    const actor = await viewer(ctx); if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Team finance viewing is not enabled for this account.");
+    const actor = await viewer(ctx); if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can see team money.");
     const season = await activeSeason(ctx); const result = await ctx.db.query("financeChangeEvents").withIndex("by_seasonId_and_occurredAt", q => q.eq("seasonId", season._id)).order("desc").paginate(boundedFinancePage(args.paginationOpts));
-    if (result.page.length > 20) throw new ConvexError("Finance change page exceeded its supported size.");
+    if (result.page.length > 20) throw new ConvexError("This list couldn't load. Reload the page to try again.");
     const coverage = await ctx.db.query("financeChangeBackfills").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).unique();
     const page = await Promise.all(result.page.map(async item => {
       const [student, actor, fee] = await Promise.all([item.studentId ? ctx.db.get(item.studentId) : null, ctx.db.get(item.actorId), item.feeDefinitionId ? ctx.db.get(item.feeDefinitionId) : null]);
@@ -43,14 +43,14 @@ export const recentChanges = query({
 
 type Options = { numItems: number; cursor: string | null; maximumRowsRead?: number };
 export function boundedFinancePage<T extends Options>(opts: T): T {
-  if (!Number.isSafeInteger(opts.numItems) || opts.numItems < 1 || opts.numItems > 20 || opts.maximumRowsRead !== undefined && (!Number.isSafeInteger(opts.maximumRowsRead) || opts.maximumRowsRead < 1)) throw new ConvexError("Request between 1 and 20 records with a valid row budget.");
+  if (!Number.isSafeInteger(opts.numItems) || opts.numItems < 1 || opts.numItems > 20 || opts.maximumRowsRead !== undefined && (!Number.isSafeInteger(opts.maximumRowsRead) || opts.maximumRowsRead < 1)) throw new ConvexError("This list couldn't load. Reload the page to try again.");
   return { ...opts, maximumRowsRead: Math.min(opts.maximumRowsRead ?? 21, 21) };
 }
 
 export const status = query({
   args: {}, returns: v.object({ seasonId: v.id("seasons"), maintenance: feeMaintenanceValidator, coverage: v.object({ state: v.union(v.literal("updating"), v.literal("ready"), v.literal("failed")), startedAt: nullable, completedAt: nullable }), canPrepareHistory: v.boolean() }),
   handler: async ctx => {
-    const actor = await viewer(ctx); if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Team finance viewing is not enabled for this account.");
+    const actor = await viewer(ctx); if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can see team money.");
     const season = await activeSeason(ctx);
     const coverage = await ctx.db.query("financeChangeBackfills").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).unique();
     return { seasonId: season._id, maintenance: await feeMaintenanceProjection(ctx, season._id), coverage: { state: coverage?.state === "complete" ? "ready" as const : coverage?.state === "failed" ? "failed" as const : "updating" as const, startedAt: coverage?.startedAt ?? null, completedAt: coverage?.completedAt ?? null }, canPrepareHistory: actor.role === "coach" && coverage?.state !== "running" && coverage?.state !== "complete" };

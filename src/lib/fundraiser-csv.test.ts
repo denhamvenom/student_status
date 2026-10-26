@@ -8,7 +8,7 @@ describe('fundraiser CSV', () => {
   })
   it('rejects changed headers, duplicate IDs, invalid revisions and oversized batches', () => {
     expect(() => parseFundraiserCsv(fundraiserCsv([row]).replace('Link Revision', 'Revision'))).toThrow('columns changed')
-    expect(() => parseFundraiserCsv(fundraiserCsv([row, row]))).toThrow('repeats')
+    expect(() => parseFundraiserCsv(fundraiserCsv([row, row]))).toThrow('same student twice')
     expect(() => parseFundraiserCsv(fundraiserCsv([{ ...row, revision: 1.5 }]))).toThrow('invalid')
     expect(() => parseFundraiserCsv(fundraiserCsv(Array.from({ length: 501 }, (_, index) => ({ ...row, studentId: `student${index}` }))))).toThrow('500')
     expect(() => parseFundraiserCsv('"Unclosed')).toThrow('unclosed')

@@ -6,7 +6,7 @@ export type EmailConfiguration = { apiKey: string; from: string; replyTo: string
 export function parentInviteEmailConfiguration(): EmailConfiguration | null {
   if (env.PARENT_INVITE_EMAIL_ENABLED !== "true") return null;
   const apiKey = env.RESEND_API_KEY?.trim();
-  const from = env.PARENT_INVITE_EMAIL_FROM?.trim() ?? "Denham Venom Robotics <notifications@team8044.org>";
+  const from = env.PARENT_INVITE_EMAIL_FROM?.trim() ?? "Venom Status <notifications@team8044.org>";
   const replyTo = env.PARENT_INVITE_EMAIL_REPLY_TO?.trim() ?? "coach@team8044.org";
   const origin = env.PARENT_INVITE_APP_ORIGIN?.trim();
   if (!apiKey || !from || !origin || /[\r\n]/.test(from)) return null;

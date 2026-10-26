@@ -24,7 +24,7 @@ export async function chargeFeeDefinition(ctx: MutationCtx, actorId: Id<"appUser
   const originKey = main ? `event:${draft.eventId}:main` : `manual:${actorId}:${draft.idempotencyKey}`;
   const existing = await ctx.db.query("feeDefinitions").withIndex("by_seasonId_and_originKey", q => q.eq("seasonId", student.seasonId).eq("originKey", originKey)).unique();
   if (existing) {
-    if (existing.state !== "active" || existing.eventId !== draft.eventId) throw new Error("Fee definition is cancelled or belongs to another event.");
+    if (existing.state !== "active" || existing.eventId !== draft.eventId) throw new Error("Fee definition is canceled or belongs to another event.");
     return existing;
   }
   const control = await seasonFinanceControl(ctx, student.seasonId);

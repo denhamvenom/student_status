@@ -119,7 +119,7 @@ describe("withdrawal decisions", () => {
     expect(await f.student.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.event, idempotencyKey: "request-one" })).toBe(requestId);
     expect((await f.t.run(ctx => ctx.db.get(f.ids.participant)))?.status).toBe("confirmed");
     await expect(f.mentor.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.event, idempotencyKey: "other-key" })).rejects.toThrow();
-    await expect(f.mentor.mutation(api.withdrawals.reviewWithdrawal, { requestId, decision: "full", cancelUnpaidMain: false, reason: "Please release", expectedRevision: revision })).rejects.toThrow("denied");
+    await expect(f.mentor.mutation(api.withdrawals.reviewWithdrawal, { requestId, decision: "full", cancelUnpaidMain: false, reason: "Please release", expectedRevision: revision })).rejects.toThrow("can review withdrawal requests");
     await f.lead.mutation(api.withdrawals.reviewWithdrawal, { requestId, decision: "deny", cancelUnpaidMain: false, reason: "Needs attendance", expectedRevision: revision });
     expect((await f.t.run(ctx => ctx.db.get(f.ids.participant)))?.status).toBe("confirmed");
     const request2 = await f.student.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.event, idempotencyKey: "request-two" });
@@ -139,21 +139,21 @@ describe("withdrawal decisions", () => {
     expect(state.entries.filter(x => x.kind === "allocation" && x.chargeId === f.ids.other).every(x => x.sourceKind === "payment")).toBe(true);
     const finances = await f.student.query(api.app.studentFinances, { studentId: f.ids.student });
     expect(finances.summary).toMatchObject({ dueCents: 2000, personalAvailableCents: 1000, fundraisingAvailableCents: 3000 });
-    await expect(f.student.mutation(api.participation.signUp, { eventId: f.ids.event })).rejects.toThrow("Coach must review reenrollment");
-    await expect(f.coach.mutation(api.participation.setParticipation, { eventId: f.ids.event, studentId: f.ids.student, status: "pending" })).rejects.toThrow("Coach must review reenrollment");
+    await expect(f.student.mutation(api.participation.signUp, { eventId: f.ids.event })).rejects.toThrow("Ask a Coach to sign you up again");
+    await expect(f.coach.mutation(api.participation.setParticipation, { eventId: f.ids.event, studentId: f.ids.student, status: "pending" })).rejects.toThrow("Only a Coach can sign them up again");
   });
 
   it("rejects over-return and source ambiguity without changing participation or charges", async () => {
     const f = await fixture(true);
     const requestId = await f.student.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.event, idempotencyKey: "request-ambiguous" });
     const expectedRevision = (await f.coach.query(api.withdrawals.withdrawalPreview, { eventId: f.ids.event, studentId: f.ids.student })).revision;
-    await expect(f.coach.mutation(api.withdrawals.reviewWithdrawal, { requestId, decision: "partial", returnCents: 9001, cancelUnpaidMain: false, reason: "Too many cents", expectedRevision })).rejects.toThrow("eligible paid");
+    await expect(f.coach.mutation(api.withdrawals.reviewWithdrawal, { requestId, decision: "partial", returnCents: 9001, cancelUnpaidMain: false, reason: "Too many cents", expectedRevision })).rejects.toThrow("amount paid for this event");
     await expect(prepare(f.t, f.ids.coach.user, f.ids.student)).rejects.toThrow("ambiguous funding sources");
     await expect(f.coach.mutation(api.withdrawals.reviewWithdrawal, { requestId, decision: "full", cancelUnpaidMain: false, reason: "Unknown source", expectedRevision })).rejects.toThrow("updating");
     expect((await f.t.run(ctx => ctx.db.get(f.ids.participant)))?.status).toBe("confirmed");
     expect((await f.t.run(ctx => ctx.db.get(f.ids.main)))?.cancelledCents).toBeUndefined();
-    await expect(f.student.mutation(api.participation.withdraw, { eventId: f.ids.event })).rejects.toThrow("Submit a withdrawal request");
-    await expect(f.coach.mutation(api.participation.setParticipation, { eventId: f.ids.event, studentId: f.ids.student, status: "withdrawn" })).rejects.toThrow("reviewed withdrawal");
+    await expect(f.student.mutation(api.participation.withdraw, { eventId: f.ids.event })).rejects.toThrow("Send a withdrawal request");
+    await expect(f.coach.mutation(api.participation.setParticipation, { eventId: f.ids.event, studentId: f.ids.student, status: "withdrawn" })).rejects.toThrow("use Withdrawal requests");
   });
 
   it("is idempotent for the same decision and rejects a contradictory repeat", async () => {
@@ -163,7 +163,7 @@ describe("withdrawal decisions", () => {
     const args = { requestId, decision: "retain" as const, cancelUnpaidMain: true, reason: "Nonrefundable travel", expectedRevision };
     await f.lead.mutation(api.withdrawals.reviewWithdrawal, args);
     await f.lead.mutation(api.withdrawals.reviewWithdrawal, args);
-    await expect(f.coach.mutation(api.withdrawals.reviewWithdrawal, { ...args, decision: "full" })).rejects.toThrow("already decided differently");
+    await expect(f.coach.mutation(api.withdrawals.reviewWithdrawal, { ...args, decision: "full" })).rejects.toThrow("already decided");
     await finish(f);
     const charges = await f.t.run(async ctx => ({ main: await ctx.db.get(f.ids.main), extra: await ctx.db.get(f.ids.extra) }));
     expect(charges.main).toMatchObject({ appliedCents: 8000, cancelledCents: 2000 });
@@ -195,7 +195,7 @@ describe("withdrawal decisions", () => {
     const args = { requestId, decision: "full" as const, cancelUnpaidMain: false, reason: "Stale screen approval", expectedRevision };
     await expect(f.coach.mutation(api.withdrawals.reviewWithdrawal, args)).rejects.toThrow("changed");
     await f.t.run(ctx => ctx.db.patch(f.ids.event, { archived: true }));
-    await expect(f.coach.mutation(api.withdrawals.reviewWithdrawal, args)).rejects.toThrow("archived");
+    await expect(f.coach.mutation(api.withdrawals.reviewWithdrawal, args)).rejects.toThrow("Past events");
     expect((await f.t.run(ctx => ctx.db.get(f.ids.participant)))?.status).toBe("confirmed");
     expect((await f.t.run(ctx => ctx.db.get(requestId)))?.status).toBe("pending");
   });

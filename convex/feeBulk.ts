@@ -15,31 +15,31 @@ export const prepareBulk = mutation({
   args: { kind, feeDefinitionId: v.optional(v.id("feeDefinitions")), label: v.optional(v.string()), targetAmountCents: v.number(), scope, studentIds: v.optional(v.array(v.id("students"))), eventId: v.optional(v.id("events")), supersedeHeldJobId: v.optional(v.id("feeBulkJobs")), expectedHeldRows: v.optional(v.number()), reason: v.string(), idempotencyKey: v.string() }, returns: v.id("feeBulkJobs"),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach"); const season = await activeSeason(ctx);
-    if (!Number.isSafeInteger(args.targetAmountCents) || args.targetAmountCents < 0 || args.kind === "cancel" && (args.targetAmountCents !== 0 || args.scope !== "existingCharges") || args.reason.trim().length < 8 || args.reason.length > 1000 || args.idempotencyKey.length < 8 || args.idempotencyKey.length > 150) throw new ConvexError("Provide an exact fee amount, review reason, and unique key.");
-    if (args.scope === "selected" ? !args.studentIds?.length || args.studentIds.length > 500 || new Set(args.studentIds).size !== args.studentIds.length : !!args.studentIds?.length) throw new ConvexError("Select up to 500 distinct students, or use an automatic immutable scope.");
-    if (args.kind === "create" ? !!args.feeDefinitionId || !args.label?.trim() || args.label.length > 150 || args.scope === "existingCharges" : !args.feeDefinitionId) throw new ConvexError("Choose a new fee label or an existing custom definition.");
-    if (args.scope === "confirmedEvent" && !args.eventId) throw new ConvexError("Choose the confirmed event scope.");
+    if (!Number.isSafeInteger(args.targetAmountCents) || args.targetAmountCents < 0 || args.kind === "cancel" && (args.targetAmountCents !== 0 || args.scope !== "existingCharges") || args.reason.trim().length < 8 || args.reason.length > 1000 || args.idempotencyKey.length < 8 || args.idempotencyKey.length > 150) throw new ConvexError("Enter the fee amount and a reason of at least eight characters.");
+    if (args.scope === "selected" ? !args.studentIds?.length || args.studentIds.length > 500 || new Set(args.studentIds).size !== args.studentIds.length : !!args.studentIds?.length) throw new ConvexError("Choose up to 500 students, or choose a whole group.");
+    if (args.kind === "create" ? !!args.feeDefinitionId || !args.label?.trim() || args.label.length > 150 || args.scope === "existingCharges" : !args.feeDefinitionId) throw new ConvexError("Enter a name for the new fee, or choose an existing fee.");
+    if (args.scope === "confirmedEvent" && !args.eventId) throw new ConvexError("Choose an event.");
     const hash = await tokenHash(JSON.stringify([season._id, args.kind, args.feeDefinitionId ?? null, args.label?.trim() ?? null, args.targetAmountCents, args.scope, args.studentIds ?? null, args.eventId ?? null, args.supersedeHeldJobId ?? null, args.expectedHeldRows ?? null, args.reason.trim()]));
     const previous = await ctx.db.query("feeBulkJobs").withIndex("by_originalActorId_and_idempotencyKey", q => q.eq("originalActorId", actor._id).eq("idempotencyKey", args.idempotencyKey)).unique();
-    if (previous) { if (previous.operationHash !== hash) throw new ConvexError("Fee key belongs to another prepared command."); return previous._id; }
+    if (previous) { if (previous.operationHash !== hash) throw new ConvexError("This was already submitted with different details. Reload to see the latest, then try again."); return previous._id; }
     await requireSeasonFinanceReady(ctx, season._id); const control = await seasonFinanceControl(ctx, season._id);
-    if (!control?.mappingInitialized || !control.orderReady || control.unmappedCount !== 0) throw new ConvexError("Finish historical fee mapping before preparing shared custom fees.");
+    if (!control?.mappingInitialized || !control.orderReady || control.unmappedCount !== 0) throw new ConvexError("Finish matching earlier charges to fees first, then add this fee.");
     if (args.eventId) {
       const event = await ctx.db.get(args.eventId);
-      if (!event || event.seasonId !== season._id || event.archived || event.enrollmentState === "running" || event.enrollmentState === "failed") throw new ConvexError("Event scope is archived or its enrollment is not complete.");
+      if (!event || event.seasonId !== season._id || event.archived || event.enrollmentState === "running" || event.enrollmentState === "failed") throw new ConvexError("This event is in Past events or its signups are still updating. Choose another event or wait, then try again.");
     }
     const now = Date.now(); let fee = args.feeDefinitionId ? await ctx.db.get(args.feeDefinitionId) : null; const before = fee ? JSON.stringify(fee) : null;
-    if (fee && (fee.seasonId !== season._id || fee.kind !== "custom" || fee.state !== "active" || args.eventId && fee.eventId !== args.eventId)) throw new ConvexError("Choose an active custom fee in the current season.");
+    if (fee && (fee.seasonId !== season._id || fee.kind !== "custom" || fee.state !== "active" || args.eventId && fee.eventId !== args.eventId)) throw new ConvexError("Choose a fee from the current season.");
     const prior = fee?.latestJobId ? await ctx.db.get(fee.latestJobId) : null;
     if (args.supersedeHeldJobId) {
-      if (args.kind !== "cancel" || args.scope !== "existingCharges" || !prior || prior._id !== args.supersedeHeldJobId || prior.state !== "held" || prior.feeDefinitionId !== fee?._id || prior.held !== args.expectedHeldRows || !Number.isSafeInteger(args.expectedHeldRows) || !args.expectedHeldRows || !prior.snapshotComplete) throw new ConvexError("Explicitly review the latest held operation and its never-posted rows before full cancellation.");
-    } else if (args.expectedHeldRows !== undefined || fee?.latestJobId && prior?.state !== "complete" && prior?.state !== "cancelled") throw new ConvexError("Finish or cancel the definition's existing prepared operation.");
+      if (args.kind !== "cancel" || args.scope !== "existingCharges" || !prior || prior._id !== args.supersedeHeldJobId || prior.state !== "held" || prior.feeDefinitionId !== fee?._id || prior.held !== args.expectedHeldRows || !Number.isSafeInteger(args.expectedHeldRows) || !args.expectedHeldRows || !prior.snapshotComplete) throw new ConvexError("Review the students whose fee is on hold, then cancel again.");
+    } else if (args.expectedHeldRows !== undefined || fee?.latestJobId && prior?.state !== "complete" && prior?.state !== "cancelled") throw new ConvexError("Another change to this fee is still in progress. Finish or cancel it first.");
     if (!fee) {
       const last = await ctx.db.query("feeDefinitions").withIndex("by_seasonId_and_priority", q => q.eq("seasonId", season._id)).order("desc").first();
       const id = await ctx.db.insert("feeDefinitions", { seasonId: season._id, kind: "custom", label: args.label!.trim(), eventId: args.eventId, defaultAmountCents: args.targetAmountCents, priority: (last?.priority ?? 0) + 1, revision: 0, state: "active", createdBy: actor._id, createdAt: now, updatedAt: now, originKey: `custom:${actor._id}:${args.idempotencyKey}`, originProof: "custom" });
       fee = await ctx.db.get(id);
     }
-    if (!fee) throw new ConvexError("Custom definition could not be prepared.");
+    if (!fee) throw new ConvexError("This fee couldn't be set up. Reload and try again.");
     const jobId = await ctx.db.insert("feeBulkJobs", { requiredFinancialProjectionVersion: 4, seasonId: season._id, feeDefinitionId: fee._id, originalActorId: actor._id, actorId: actor._id, kind: args.kind, scope: args.scope, scopeEventId: args.eventId, targetAmountCents: args.targetAmountCents, definitionBeforeJson: before, state: "draining", phase: "drain", step: 0, cursor: null, processed: 0, committed: 0, held: 0, priorHeldJobId: args.supersedeHeldJobId, priorHeldRows: args.expectedHeldRows, supersededRows: 0, snapshotHash: await tokenHash(JSON.stringify([hash, fee._id])), snapshotCount: 0, snapshotComplete: false, expectedDefinitionRevision: fee.revision, idempotencyKey: args.idempotencyKey, operationHash: hash, reason: args.reason.trim(), createdAt: now, updatedAt: now });
     for (const studentId of args.studentIds ?? []) await ctx.db.insert("feeBulkRows", { jobId, studentId, targetAmountCents: args.targetAmountCents, state: "pending" });
     await ctx.db.patch(fee._id, { latestJobId: jobId, updatedAt: now });
@@ -53,11 +53,11 @@ export const previewBulk = query({
   args: { jobId: v.id("feeBulkJobs") }, returns: v.object({ job: schema.doc("feeBulkJobs"), definition: schema.doc("feeDefinitions"), state: v.union(v.literal("ready"), v.literal("hold"), v.literal("updating")), message: v.union(v.string(), v.null()), expectedScopeHash: v.string(), expectedOrderRevision: v.number(), expectedDefinitionRevision: v.number(), scopeMemberCount: v.number(), canCommit: v.boolean() }),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach"); const season = await activeSeason(ctx); const job = await ctx.db.get(args.jobId);
-    if (!job || job.seasonId !== season._id) throw new ConvexError("Prepared fee scope is unavailable.");
+    if (!job || job.seasonId !== season._id) throw new ConvexError("This fee change no longer exists. Reload to see the latest.");
     const definition = await ctx.db.get(job.feeDefinitionId); const control = await seasonFinanceControl(ctx, season._id);
-    if (!definition || !control) throw new ConvexError("Prepared fee scope lost its definition or season control.");
+    if (!definition || !control) throw new ConvexError("This fee or season changed. Reload to see the latest, then start again.");
     const canCommit = job.state === "prepared" && job.snapshotComplete && (job.snapshotCount > 0 || (job.priorHeldRows ?? 0) > 0) && job.originalActorId === actor._id && definition.latestJobId === job._id && definition.revision === job.expectedDefinitionRevision && control.state === "ready";
-    return publicErrorResult({ job, definition, state: canCommit ? "ready" as const : job.state === "draining" || job.state === "preparing" ? "updating" as const : "hold" as const, message: canCommit ? null : job.state === "prepared" && job.snapshotCount === 0 ? "This immutable scope contains no eligible rows." : "Scope preparation, authorization, or definition state requires review.", expectedScopeHash: job.snapshotHash, expectedOrderRevision: control.revision, expectedDefinitionRevision: definition.revision, scopeMemberCount: job.snapshotCount, canCommit });
+    return publicErrorResult({ job, definition, state: canCommit ? "ready" as const : job.state === "draining" || job.state === "preparing" ? "updating" as const : "hold" as const, message: canCommit ? null : job.state === "prepared" && job.snapshotCount === 0 ? "No students match this fee change. Choose other students." : "This fee change needs a Coach to review it before it can continue.", expectedScopeHash: job.snapshotHash, expectedOrderRevision: control.revision, expectedDefinitionRevision: definition.revision, scopeMemberCount: job.snapshotCount, canCommit });
   },
 });
 
@@ -65,11 +65,11 @@ export const commitBulk = mutation({
   args: { jobId: v.id("feeBulkJobs"), expectedScopeHash: v.string(), expectedOrderRevision: v.number(), expectedDefinitionRevision: v.number(), reason: v.string() }, returns: v.id("feeBulkJobs"),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach"); const season = await activeSeason(ctx); const job = await ctx.db.get(args.jobId);
-    if (!job || job.seasonId !== season._id || job.originalActorId !== actor._id || args.expectedScopeHash !== job.snapshotHash || !job.snapshotComplete) throw new ConvexError("Review your exact immutable prepared scope before committing.");
-    if (job.state !== "prepared") { if (["draining", "applying", "held", "complete"].includes(job.state)) return job._id; throw new ConvexError("Prepared fee command is not available to commit."); }
-    if (args.reason.trim().length < 8 || args.reason.length > 1000) throw new ConvexError("Provide a confirmation reason of at least eight characters.");
+    if (!job || job.seasonId !== season._id || job.originalActorId !== actor._id || args.expectedScopeHash !== job.snapshotHash || !job.snapshotComplete) throw new ConvexError("Review the list of students for this fee change, then confirm again.");
+    if (job.state !== "prepared") { if (["draining", "applying", "held", "complete"].includes(job.state)) return job._id; throw new ConvexError("This fee change can't be confirmed now. Reload to see the latest."); }
+    if (args.reason.trim().length < 8 || args.reason.length > 1000) throw new ConvexError("Enter a reason of at least eight characters.");
     await requireSeasonFinanceReady(ctx, season._id); const control = await seasonFinanceControl(ctx, season._id); const definition = await ctx.db.get(job.feeDefinitionId);
-    if ((!job.snapshotCount && !job.priorHeldRows) || !control || control.revision !== args.expectedOrderRevision || !definition || definition.latestJobId !== job._id || definition.revision !== args.expectedDefinitionRevision || definition.revision !== job.expectedDefinitionRevision) throw new ConvexError("Shared fee order or definition changed; review the prepared scope again.");
+    if ((!job.snapshotCount && !job.priorHeldRows) || !control || control.revision !== args.expectedOrderRevision || !definition || definition.latestJobId !== job._id || definition.revision !== args.expectedDefinitionRevision || definition.revision !== job.expectedDefinitionRevision) throw new ConvexError("This fee or the fee order changed. Review the students again, then confirm.");
     await ctx.db.patch(job._id, { state: "draining", phase: "drain", actorId: actor._id, reviewOrderRevision: control.revision, processed: job.held, step: job.step + 1, cursor: null, updatedAt: Date.now() });
     await ctx.db.patch(control._id, { state: "draining", bulkJobId: job._id, mappingJobId: undefined, priorityJobId: undefined, revision: control.revision + 1, updatedAt: Date.now() });
     await audit(ctx, actor, "feeBulkJobs", job._id, "commitPreparedScope", { snapshotHash: job.snapshotHash, count: job.snapshotCount }, { snapshotHash: job.snapshotHash, count: job.snapshotCount }, args.reason.trim());
@@ -81,13 +81,13 @@ export const cancelPrepared = mutation({
   args: { jobId: v.id("feeBulkJobs"), reason: v.string() }, returns: v.null(),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach"); const season = await activeSeason(ctx); const job = await ctx.db.get(args.jobId);
-    if (!job || job.seasonId !== season._id || !(job.state === "prepared" || job.state === "failed" && !job.snapshotComplete) || job.committed !== 0 || job.processed !== 0 || args.reason.trim().length < 8 || args.reason.length > 1000) throw new ConvexError("Only an untouched prepared scope may be cancelled with a review reason.");
+    if (!job || job.seasonId !== season._id || !(job.state === "prepared" || job.state === "failed" && !job.snapshotComplete) || job.committed !== 0 || job.processed !== 0 || args.reason.trim().length < 8 || args.reason.length > 1000) throw new ConvexError("This fee change has already started, so it can't be canceled. Enter a reason only for changes that haven't started.");
     const control = await seasonFinanceControl(ctx, season._id);
-    if (control && control.state !== "ready" && !(control.state === "failed" && control.bulkJobId === job._id && !job.snapshotComplete)) throw new ConvexError("Another season maintenance operation blocks cancelling this preparation.");
+    if (control && control.state !== "ready" && !(control.state === "failed" && control.bulkJobId === job._id && !job.snapshotComplete)) throw new ConvexError("Another season fee update is running. Wait for it to finish, then try again.");
     const waiting = await ctx.db.query("feeBulkRows").withIndex("by_jobId_and_state", q => q.eq("jobId", job._id).eq("state", "waiting")).first();
-    if (waiting) throw new ConvexError("A money child exists; preparation cannot be abandoned.");
+    if (waiting) throw new ConvexError("A student's money is already being updated, so this can't be canceled. Wait for it to finish.");
     const definition = await ctx.db.get(job.feeDefinitionId);
-    if (!definition || definition.latestJobId !== job._id) throw new ConvexError("Prepared definition changed.");
+    if (!definition || definition.latestJobId !== job._id) throw new ConvexError("This changed since you opened it. Reload to see the latest, then try again.");
     await ctx.db.patch(job._id, { state: "cancelled", updatedAt: Date.now() });
     await ctx.db.patch(definition._id, { latestJobId: job.priorHeldJobId, state: job.kind === "create" ? "cancelled" : definition.state, revision: job.priorHeldJobId ? definition.revision : definition.revision + 1, updatedAt: Date.now() });
     if (control?.bulkJobId === job._id) await ctx.db.patch(control._id, { state: "ready", bulkJobId: undefined, revision: control.revision + 1, updatedAt: Date.now() });
@@ -98,8 +98,8 @@ export const cancelPrepared = mutation({
 export const bulkStatus = query({
   args: { jobId: v.id("feeBulkJobs") }, returns: v.object({ job: schema.doc("feeBulkJobs"), originalActorName: v.string(), processingActorName: v.string(), canCommit: v.boolean(), canRetry: v.boolean(), canCancel: v.boolean() }),
   handler: async (ctx, args) => {
-    const actor = await viewer(ctx); if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Fee operation viewing is not enabled.");
-    const season = await activeSeason(ctx); const job = await ctx.db.get(args.jobId); if (!job || job.seasonId !== season._id) throw new ConvexError("Shared fee operation is unavailable.");
+    const actor = await viewer(ctx); if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can see team money.");
+    const season = await activeSeason(ctx); const job = await ctx.db.get(args.jobId); if (!job || job.seasonId !== season._id) throw new ConvexError("This fee change no longer exists. Reload to see the latest.");
     const original = await ctx.db.get(job.originalActorId); const processor = await ctx.db.get(job.actorId); const coach = actor.role === "coach";
     const control = await seasonFinanceControl(ctx, season._id); const definition = await ctx.db.get(job.feeDefinitionId);
     const available = (!control || control.state === "ready") && definition?.latestJobId === job._id;
@@ -111,12 +111,12 @@ export const priorHeldRows = query({
   args: { jobId: v.id("feeBulkJobs"), paginationOpts: paginationOptsValidator }, returns: paginationResultValidator(schema.doc("feeBulkRows").extend({ name: v.string() })),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach"); const season = await activeSeason(ctx); const job = await ctx.db.get(args.jobId);
-    if (!job || job.seasonId !== season._id || !job.priorHeldJobId) throw new ConvexError("No prior unposted scope belongs to this full cancellation.");
+    if (!job || job.seasonId !== season._id || !job.priorHeldJobId) throw new ConvexError("There are no held students for this cancellation. Reload to see the latest.");
     const opts = args.paginationOpts;
-    if (!Number.isSafeInteger(opts.numItems) || opts.numItems < 1 || opts.numItems > 20 || opts.maximumRowsRead !== undefined && (!Number.isSafeInteger(opts.maximumRowsRead) || opts.maximumRowsRead < 1)) throw new ConvexError("Request between 1 and 20 rows with a valid budget.");
+    if (!Number.isSafeInteger(opts.numItems) || opts.numItems < 1 || opts.numItems > 20 || opts.maximumRowsRead !== undefined && (!Number.isSafeInteger(opts.maximumRowsRead) || opts.maximumRowsRead < 1)) throw new ConvexError("This list couldn't load. Reload the page to try again.");
     const state = job.state === "complete" ? "superseded" as const : "held" as const;
     const result = await ctx.db.query("feeBulkRows").withIndex("by_jobId_and_state", q => q.eq("jobId", job.priorHeldJobId!).eq("state", state)).paginate({ ...opts, maximumRowsRead: Math.min(opts.maximumRowsRead ?? 21, 21) });
-    if (result.page.length > 20) throw new ConvexError("Prior unposted scope page exceeded its supported size.");
+    if (result.page.length > 20) throw new ConvexError("This list couldn't load. Reload the page to try again.");
     const page = await Promise.all(result.page.map(async row => { const student = await ctx.db.get(row.studentId); return { ...row, name: student?.legalName || student?.preferredName || "Archived student" }; })); return publicErrorResult({ ...result, page });
   },
 });
@@ -126,11 +126,11 @@ export const bulkRows = query({
   args: { jobId: v.id("feeBulkJobs"), paginationOpts: paginationOptsValidator }, returns: paginationResultValidator(rowValidator),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach"); const season = await activeSeason(ctx); const job = await ctx.db.get(args.jobId);
-    if (!job || job.seasonId !== season._id) throw new ConvexError("Shared fee rows are unavailable.");
+    if (!job || job.seasonId !== season._id) throw new ConvexError("This fee change no longer exists. Reload to see the latest.");
     const opts = args.paginationOpts;
-    if (!Number.isSafeInteger(opts.numItems) || opts.numItems < 1 || opts.numItems > 20 || opts.maximumRowsRead !== undefined && (!Number.isSafeInteger(opts.maximumRowsRead) || opts.maximumRowsRead < 1)) throw new ConvexError("Request between 1 and 20 rows with a valid budget.");
+    if (!Number.isSafeInteger(opts.numItems) || opts.numItems < 1 || opts.numItems > 20 || opts.maximumRowsRead !== undefined && (!Number.isSafeInteger(opts.maximumRowsRead) || opts.maximumRowsRead < 1)) throw new ConvexError("This list couldn't load. Reload the page to try again.");
     const result = await ctx.db.query("feeBulkRows").withIndex("by_jobId", q => q.eq("jobId", job._id)).paginate({ ...opts, maximumRowsRead: Math.min(opts.maximumRowsRead ?? 21, 21) });
-    if (result.page.length > 20) throw new ConvexError("Fee row page exceeded its supported size.");
+    if (result.page.length > 20) throw new ConvexError("This list couldn't load. Reload the page to try again.");
     const page = await Promise.all(result.page.map(async row => {
       const student = await ctx.db.get(row.studentId); const charge = row.chargeId ? await ctx.db.get(row.chargeId) : null; const account = await financialAccount(ctx, row.studentId);
       const child = row.correctionJobId ? await ctx.db.get(row.correctionJobId) : row.allocationJobId ? await ctx.db.get(row.allocationJobId) : null;
@@ -143,13 +143,13 @@ export const bulkRows = query({
 export const bulkJobs = query({
   args: { feeDefinitionId: v.id("feeDefinitions"), paginationOpts: paginationOptsValidator }, returns: paginationResultValidator(schema.doc("feeBulkJobs")),
   handler: async (ctx, args) => {
-    const actor = await viewer(ctx); if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Fee operation viewing is not enabled.");
+    const actor = await viewer(ctx); if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can see team money.");
     const season = await activeSeason(ctx); const fee = await ctx.db.get(args.feeDefinitionId);
-    if (!fee || fee.seasonId !== season._id) throw new ConvexError("Shared fee history is unavailable.");
+    if (!fee || fee.seasonId !== season._id) throw new ConvexError("This fee isn't in the current season. Reload to see the latest.");
     const opts = args.paginationOpts;
-    if (!Number.isSafeInteger(opts.numItems) || opts.numItems < 1 || opts.numItems > 20 || opts.maximumRowsRead !== undefined && (!Number.isSafeInteger(opts.maximumRowsRead) || opts.maximumRowsRead < 1)) throw new ConvexError("Request between 1 and 20 operations with a valid budget.");
+    if (!Number.isSafeInteger(opts.numItems) || opts.numItems < 1 || opts.numItems > 20 || opts.maximumRowsRead !== undefined && (!Number.isSafeInteger(opts.maximumRowsRead) || opts.maximumRowsRead < 1)) throw new ConvexError("This list couldn't load. Reload the page to try again.");
     const result = await ctx.db.query("feeBulkJobs").withIndex("by_feeDefinitionId", q => q.eq("feeDefinitionId", fee._id)).order("desc").paginate({ ...opts, maximumRowsRead: Math.min(opts.maximumRowsRead ?? 21, 21) });
-    if (result.page.length > 20) throw new ConvexError("Fee history page exceeded its supported size."); return publicErrorResult(result);
+    if (result.page.length > 20) throw new ConvexError("This list couldn't load. Reload the page to try again."); return publicErrorResult(result);
   },
 });
 
@@ -157,19 +157,19 @@ export const retryBulk = mutation({
   args: { jobId: v.id("feeBulkJobs"), rows: v.array(v.object({ rowId: v.id("feeBulkRows"), expectedFinancialRevision: v.number(), expectedGeneration: v.number(), expectedChargeRevision: v.union(v.number(), v.null()) })), reason: v.string() }, returns: v.null(),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach"); const season = await activeSeason(ctx); const job = await ctx.db.get(args.jobId);
-    if (!job || job.seasonId !== season._id || !["held", "failed"].includes(job.state) || args.rows.length > 20 || new Set(args.rows.map(row => row.rowId)).size !== args.rows.length || args.reason.trim().length < 8 || args.reason.length > 1000) throw new ConvexError("Choose a held or failed fee operation with reviewed rows and a reason.");
+    if (!job || job.seasonId !== season._id || !["held", "failed"].includes(job.state) || args.rows.length > 20 || new Set(args.rows.map(row => row.rowId)).size !== args.rows.length || args.reason.trim().length < 8 || args.reason.length > 1000) throw new ConvexError("Review the students to retry and enter a reason, then try again.");
     const definition = await ctx.db.get(job.feeDefinitionId); const control = await seasonFinanceControl(ctx, season._id);
-    if (!definition || definition.latestJobId !== job._id || definition.revision !== job.expectedDefinitionRevision || !control || control.state !== "ready" && control.bulkJobId !== job._id) throw new ConvexError("Another season operation or definition change blocks this retry.");
+    if (!definition || definition.latestJobId !== job._id || definition.revision !== job.expectedDefinitionRevision || !control || control.state !== "ready" && control.bulkJobId !== job._id) throw new ConvexError("This fee changed or another season update is running. Reload, then try again.");
     const waiting = await ctx.db.query("feeBulkRows").withIndex("by_jobId_and_state", q => q.eq("jobId", job._id).eq("state", "waiting")).first();
     if (waiting) {
       const account = await financialAccount(ctx, waiting.studentId);
-      if (account?.state !== "ready") throw new ConvexError("Finish or retry the existing row money child before resuming this operation.");
+      if (account?.state !== "ready") throw new ConvexError("A student's money is still updating. Retry that student first, then try again.");
     }
-    if (job.state === "held" && !args.rows.length) throw new ConvexError("Explicitly review at least one held row before retrying.");
-    if (args.rows.length && !job.snapshotComplete) throw new ConvexError("Finish or cancel zero-money scope preparation before refreshing held posting rows.");
+    if (job.state === "held" && !args.rows.length) throw new ConvexError("Review at least one student on hold, then try again.");
+    if (args.rows.length && !job.snapshotComplete) throw new ConvexError("The student list is still being prepared. Wait, or cancel this fee change, then try again.");
     for (const input of args.rows) {
       const row = await ctx.db.get(input.rowId); const account = row ? await financialAccount(ctx, row.studentId) : null; const charge = row?.chargeId ? await ctx.db.get(row.chargeId) : null;
-      if (!row || row.jobId !== job._id || row.state !== "held" || row.correctionJobId || row.allocationJobId || !account || account.state !== "ready" || account.revision !== input.expectedFinancialRevision || account.generation !== input.expectedGeneration || (charge ? charge.revision ?? 0 : null) !== input.expectedChargeRevision) throw new ConvexError("Held row or financial evidence changed; refresh its explicit review.");
+      if (!row || row.jobId !== job._id || row.state !== "held" || row.correctionJobId || row.allocationJobId || !account || account.state !== "ready" || account.revision !== input.expectedFinancialRevision || account.generation !== input.expectedGeneration || (charge ? charge.revision ?? 0 : null) !== input.expectedChargeRevision) throw new ConvexError("A student's fee or money changed. Review that student again, then try again.");
       const fence = await ctx.db.query("feeBulkStudentFences").withIndex("by_jobId_and_studentId", q => q.eq("jobId", job._id).eq("studentId", row.studentId)).unique();
       if (fence) await ctx.db.patch(fence._id, { generation: account.generation, expectedFinancialRevision: account.revision });
       else await ctx.db.insert("feeBulkStudentFences", { jobId: job._id, studentId: row.studentId, generation: account.generation, expectedFinancialRevision: account.revision });

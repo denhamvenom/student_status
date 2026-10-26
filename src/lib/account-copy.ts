@@ -1,6 +1,6 @@
 export const accountCopy = {
   setup: {
-    steps: ['Welcome', 'Shirt size', 'Rooming category', 'Parent contact', 'Invite a parent'], progress: (step: number) => `Set up your profile · ${step} of 5`, welcome: (name: string) => `Welcome, ${name}`, subteam: 'Subteam', correction: 'Something wrong? Let your Coach know.', next: 'Continue', back: 'Back', skip: 'Skip for now', invite: 'Invite a parent', inviteNote: 'A parent or guardian completes health info and permission forms. Share your invitation link from the Parents page.', signOut: 'Sign out', title: 'Complete your profile', description: 'Confirm your details before using Student Status.',
+    steps: ['Welcome', 'Shirt size', 'Rooming category', 'Parent contact', 'Invite a parent'], progress: (step: number) => `Set up your profile · ${step} of 5`, welcome: (name: string) => `Welcome, ${name}`, subteam: 'Subteam', correction: 'Something wrong? Let your Coach know.', next: 'Continue', back: 'Back', skip: 'Skip for now', invite: 'Invite a parent', inviteNote: 'A parent or guardian completes health info and permission forms. Share your invitation link from the Parents page.', signOut: 'Sign out', title: 'Complete your profile', description: 'Confirm your details before using Venom Status.',
     identity: 'Student details', legalName: 'Legal name', preferredName: 'Preferred name (optional)', email: 'Google account',
     shirt: 'Shirt size', choose: 'Choose…', category: 'Rooming category', boys: 'Boys', girls: 'Girls',
     lockNotice: 'Your rooming category locks after setup. Ask the Coach if it needs correction.',
@@ -23,7 +23,7 @@ export const accountCopy = {
     unavailableDetail: 'This link has expired, was used, or is no longer available. Ask a Coach for a new invitation.',
     accountMismatch: 'This account is not the one invited. Use the invited email address to sign in with Google or an email code, or ask a Coach for a new invitation.',
     accountConflict: 'This account already has access or another role. Ask a Coach to review it.', switchAccount: 'Use another account',
-    checking: 'Checking invitation…', landing: 'Mentor/Staff invitation', returnHome: 'Return to Student Status', signInDescription: 'Use the invited email address to sign in with Google or an email code.',
+    checking: 'Checking invitation…', landing: 'Mentor/Staff invitation', returnHome: 'Return to Venom Status', signInDescription: 'Use the invited email address to sign in with Google or an email code.',
     acceptedDescription: 'Your adult account is ready. Continue to view the team.', inviteRole: 'Invited access',
     title: 'Users & Roles', description: 'Manage adult access and invitations.', coach: 'Coach', mentor: 'Mentor',
     invite: 'Invite Mentor/Staff', email: 'Email address', role: 'Role', travel: 'Travel Lead', finance: 'Financial editing', health: 'Health export',
@@ -31,7 +31,7 @@ export const accountCopy = {
     noAccounts: 'No accounts in this role.', loadMore: 'Load more', loading: 'Loading accounts…',
     pending: 'Invitations', expires: 'Expires', revoke: 'Revoke',
     sevenDays: 'Enter the mentor or staff member’s email address. They can sign in with Google or an email code using that same address. Invitations expire after one week.',
-    accept: 'Accept invitation', accepting: 'Accepting…', signIn: 'Continue with Google', accepted: 'Invitation accepted', continue: 'Continue to Student Status',
+    accept: 'Accept invitation', accepting: 'Accepting…', signIn: 'Continue with Google', accepted: 'Invitation accepted', continue: 'Continue to Venom Status',
     failed: 'This action could not be completed.', confirmation: 'Review the access below before accepting.',
   },
 } as const

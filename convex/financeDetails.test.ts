@@ -64,6 +64,6 @@ describe("paginated financial evidence", () => {
     await expect(client.query(api.financeDetails.history, { studentId: ids.unrelatedId, paginationOpts: { cursor: null, numItems: 25 } })).rejects.toThrow();
     await expect(client.query(api.financeDetails.history, { studentId: ids.studentId, paginationOpts: { cursor: null, numItems: 26 } })).rejects.toThrow("25 records");
     await t.run(ctx => ctx.db.patch(ids.parent, { role: "mentor" }));
-    await expect(client.query(api.financeDetails.charges, { studentId: ids.studentId, paginationOpts: { cursor: null, numItems: 25 } })).rejects.toThrow("Finance access denied");
+    await expect(client.query(api.financeDetails.charges, { studentId: ids.studentId, paginationOpts: { cursor: null, numItems: 25 } })).rejects.toThrow("Mentors can't see student money");
   });
 });

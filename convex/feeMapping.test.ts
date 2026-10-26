@@ -35,7 +35,7 @@ it("cancels a stale zero-money mapping review after an existing allocator drains
   await t.mutation(run, { jobId }); await t.mutation(run, { jobId });
   expect(await t.run(ctx => ctx.db.get(jobId))).toMatchObject({ state: "failed", mapped: 0, phase: "review" });
   expect(await t.run(ctx => ctx.db.get(ids.allocation))).toMatchObject({ state: "complete" });
-  await coach.mutation(makeFunctionReference<"mutation">("feeDefinitions:cancelMapping"), { jobId, reason: "Coach cancelled stale zero-money mapping review" });
+  await coach.mutation(makeFunctionReference<"mutation">("feeDefinitions:cancelMapping"), { jobId, reason: "Coach canceled stale zero-money mapping review" });
   expect(await t.run(ctx => financialAccount(ctx, ids.student))).toMatchObject({ state: "ready", chargedCents: 100, paidCents: 1, personalAvailableCents: 0 });
   const charge = await t.run(ctx => ctx.db.get(ids.charge)); const control = await t.run(ctx => ctx.db.get(ids.control));
   const fresh = await coach.mutation(map, { chargeIds: [{ chargeId: ids.charge, expectedChargeRevision: charge!.revision }], feeDefinitionId: ids.fee, expectedOrderRevision: control!.revision, reason: "Coach reviewed completed allocation evidence", idempotencyKey: "fresh-mapping-review" }) as Id<"feeMappingJobs">;

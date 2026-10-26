@@ -19,11 +19,11 @@ export const driverReconciliationCopy = {
   title: 'Driver ownership review',
   description: "Link a driver to a Mentor when the driver's email matches one Mentor's Google email. Check other cases by hand.",
   empty: 'No matching unowned drivers are ready to link.',
-  loading: 'Loading driver reconciliation...',
+  loading: 'Loading driver reconciliation…',
   failed: 'The driver could not be linked.',
   matchingMentor: 'Matching Mentor',
   linkNote: 'Linking preserves the driver record and requires fresh approval before event assignment.',
   stale: 'Driver or Mentor details changed. Review the current match before linking.',
   reason: 'Reason for linking', review: 'Review current match',
-  linking: 'Linking...', link: 'Link driver to Mentor',
+  linking: 'Linking…', link: 'Link driver to Mentor',
 } as const

@@ -75,7 +75,7 @@ describe("Timeclock roster and attendance boundary", () => {
   it("removes the legacy Travel Lead attendance-write bypass", async () => {
     const f = await fixture();
     const args = { meetingId: f.ids.meeting, studentId: f.ids.z, present: true };
-    await expect(f.mentor.mutation(api.admin.recordAttendance, args)).rejects.toThrow("Coach-only");
+    await expect(f.mentor.mutation(api.admin.recordAttendance, args)).rejects.toThrow("Only a Coach can record attendance");
     await f.coach.mutation(api.admin.recordAttendance, args);
     expect((await f.t.run(ctx => ctx.db.query("attendanceRecords").take(2)))).toHaveLength(1);
     expect((await f.t.run(ctx => ctx.db.query("timeclockIntervals").take(1)))).toHaveLength(0);

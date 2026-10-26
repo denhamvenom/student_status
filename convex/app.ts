@@ -12,6 +12,7 @@ import { transportSummary } from "./travel";
 import { age18, firstStatus } from "./firstRegistration";
 import { studentSetupCompleteFor } from "./setupWizard";
 import { operatingRole } from "./lib/access";
+import { clearJoinAttempts, codeLimiter, googleRequiredForStudents, joinAttemptsLocked, recordFailedJoinAttempt, usableTeamCode } from "./lib/invitationCodes";
 
 export const viewer = query({
   args: {}, returns: v.any(),
@@ -58,9 +59,9 @@ export const eventDetail = query({
     const user = await requireViewer(ctx);
     const event = await ctx.db.get(args.eventId);
     const season = await activeSeason(ctx);
-    if (!event || event.seasonId !== season._id) throw new ConvexError("Event not found.");
+    if (!event || event.seasonId !== season._id) throw new ConvexError("This event is no longer available. It may have moved to Past events. Reload to see current events.");
     if (event.archived) {
-      if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new ConvexError("This event is archived. Any unpaid charges remain in Money.");
+      if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new ConvexError("This event has ended and moved to Past events. Any balance due for it stays in Money.");
       return { event, participation: null, requirements: [], readiness: null };
     }
     if (user.role === "mentor" && !user.travelLead) return { event: mentorEvent(event), participation: null, requirements: [], readiness: null };
@@ -76,10 +77,10 @@ export const studentFinances = query({
   args: { studentId: v.id("students") }, returns: v.any(),
   handler: async (ctx, args) => {
     const user = await requireViewer(ctx);
-    if (user.role === "mentor" && !user.travelLead) throw new ConvexError("Finance access denied.");
+    if (user.role === "mentor" && !user.travelLead) throw new ConvexError("Mentors can't see Money. Ask a Coach or Travel Lead for help.");
     const student = await studentAccess(ctx, user, args.studentId);
     const season = await activeSeason(ctx);
-    if (student.seasonId !== season._id) throw new ConvexError("Archived finances are unavailable.");
+    if (student.seasonId !== season._id) throw new ConvexError("This student's account is from an earlier season. Ask a Coach for past Money records.");
     return await financeFor(ctx, student._id);
   },
 });
@@ -90,7 +91,7 @@ export const studentDashboard = query({
     const user = await requireViewer(ctx);
     const student = await studentAccess(ctx, user, args.studentId);
     const season = await activeSeason(ctx);
-    if (student.seasonId !== season._id) throw new ConvexError("Archived students are unavailable.");
+    if (student.seasonId !== season._id) throw new ConvexError("This student is from an earlier season. Reload to see the current roster.");
     const finance = await financeFor(ctx, student._id);
     const events = await ctx.db.query("events").withIndex("by_seasonId_and_archived_and_endsAt", q => q.eq("seasonId", season._id).eq("archived", false)).take(200).then(rows => rows.sort((a, b) => a.startsAt - b.startsAt));
     const participations = await ctx.db.query("participants").withIndex("by_studentId", q => q.eq("studentId", student._id)).take(200);
@@ -143,7 +144,7 @@ export const teamRoster = query({
   args: {}, returns: v.any(),
   handler: async ctx => {
     const user = await requireViewer(ctx);
-    if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Roster access denied.");
+    if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Only a Coach or Travel Lead can open the team roster.");
     const season = await activeSeason(ctx);
     const students = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(500);
     return students.map(student => ({ ...(user.role === "coach" ? privateStudent(student) : publicStudent(student)), fundraiserConnected: !!student.fundraiserUrl }));
@@ -174,9 +175,9 @@ export const eventReadiness = query({
     const user = await requireViewer(ctx);
     const event = await ctx.db.get(args.eventId);
     const season = await activeSeason(ctx);
-    if (!event || event.seasonId !== season._id || event.archived) throw new ConvexError("Event not found.");
+    if (!event || event.seasonId !== season._id || event.archived) throw new ConvexError("This event is no longer available. It may have moved to Past events. Reload to see current events.");
     if (user.role === "student" || user.role === "parent") {
-      if (!args.studentId) throw new ConvexError("Student selection required.");
+      if (!args.studentId) throw new ConvexError("Choose a student to see what's left for this event.");
       const student = await studentAccess(ctx, user, args.studentId);
       return { event: { _id: event._id, name: event.name }, students: [{ student: publicStudent(student), ...await studentReadiness(ctx, event, student) }], transportation: null, rooming: null, overall: null };
     }
@@ -208,23 +209,23 @@ export const updateStudentProfile = mutation({
   handler: async (ctx, args) => {
     const user = await requireViewer(ctx);
     const student = await studentAccess(ctx, user, args.studentId);
-    if ((student.profileRevision ?? 0) !== args.expectedRevision) throw new ConvexError("Profile changed. Reload before saving.");
+    if ((student.profileRevision ?? 0) !== args.expectedRevision) throw new ConvexError("Profile changed since you opened it. Reload to see the latest, then try again.");
     const before = privateStudent(student);
     const changes: Partial<Doc<"students">> = {};
     if (args.preferredName !== undefined) {
-      if (user.role === "mentor") throw new ConvexError("Preferred name edit denied.");
+      if (user.role === "mentor") throw new ConvexError("Mentors can't change a preferred name. Ask a Coach.");
       const name = args.preferredName.trim();
-      if (!name || name.length > 80) throw new ConvexError("Enter a preferred name under 80 characters.");
+      if (!name || name.length > 80) throw new ConvexError("Enter a preferred name (up to 80 characters).");
       changes.preferredName = name;
     }
     if (args.shirtSize !== undefined) {
-      if (user.role !== "student" && user.role !== "coach" && user.role !== "parent") throw new ConvexError("Shirt size edit denied.");
+      if (user.role !== "student" && user.role !== "coach" && user.role !== "parent") throw new ConvexError("Only the student, a parent or a Coach can change shirt size.");
       if (!["XS", "S", "M", "L", "XL", "2XL", "3XL"].includes(args.shirtSize.trim())) throw new ConvexError("Choose a valid shirt size.");
       changes.shirtSize = args.shirtSize.trim();
     }
     const privateEdit = args.emergencyName !== undefined || args.emergencyRelationship !== undefined || args.emergencyPhone !== undefined || args.allergies !== undefined || args.medications !== undefined || args.otcAuthorization !== undefined;
-    if (privateEdit && user.role !== "coach" && user.role !== "parent") throw new ConvexError("Health and emergency edits require a linked parent or coach.");
-    if (args.otcAuthorization !== undefined) throw new ConvexError("Medication choices are no longer part of this profile.");
+    if (privateEdit && user.role !== "coach" && user.role !== "parent") throw new ConvexError("Only a parent or a Coach can change Health information and emergency contacts.");
+    if (args.otcAuthorization !== undefined) throw new ConvexError("Over-the-counter medication choices are no longer on this profile. Reload the page, then save again.");
     if (args.emergencyName !== undefined) changes.emergencyName = args.emergencyName.trim();
     if (args.emergencyRelationship !== undefined) changes.emergencyRelationship = args.emergencyRelationship.trim();
     if (args.emergencyPhone !== undefined) changes.emergencyPhone = normalizeChangedPhone(args.emergencyPhone, student.emergencyPhone, "Emergency contact phone");
@@ -263,26 +264,24 @@ export const requestJoin = mutation({
   args: { code: v.string(), firstName: v.string(), lastName: v.string() }, returns: v.union(v.id("joinRequests"), v.null()),
   handler: async (ctx, args) => {
     const who = await identity(ctx);
-    if (await ctx.db.query("adultEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique()) throw new ConvexError("A Google account is required for student enrollment.");
-    if (await ctx.db.query("parentEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique()) throw new ConvexError("A Google account is required for student enrollment.");
+    if (await ctx.db.query("adultEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique()) throw new ConvexError(googleRequiredForStudents);
+    if (await ctx.db.query("parentEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique()) throw new ConvexError(googleRequiredForStudents);
     const season = await activeSeason(ctx);
     const latest = await ctx.db.query("joinRequests").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).order("desc").first();
     const existing = latest?.seasonId === season._id ? latest : null;
     if (existing?.status === "pending") return existing._id;
     if (existing?.status === "approved") return null;
     const now = Date.now();
-    const attempts = await ctx.db.query("joinAttempts").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique();
-    if (attempts && attempts.lockedUntil > now) return null;
-    const code = await ctx.db.query("joinCodes").withIndex("by_code", q => q.eq("code", args.code.trim().toUpperCase())).unique();
-    if (!code || code.seasonId !== season._id || code.revoked || code.expiresAt < now) {
-      const failed = (attempts?.failed ?? 0) + 1;
-      if (attempts) await ctx.db.patch(attempts._id, { failed: failed >= 5 ? 0 : failed, lockedUntil: failed >= 5 ? now + 15 * 60_000 : 0 });
-      else await ctx.db.insert("joinAttempts", { authUserId: who.authUserId, failed, lockedUntil: failed >= 5 ? now + 15 * 60_000 : 0 });
+    if (await joinAttemptsLocked(ctx, who.authUserId, now)) return null;
+    // Same per-account limits as checkInvitationCode, so team codes cannot be guessed faster here.
+    if (!(await codeLimiter.limit(ctx, "studentCodeAttempts", { key: who.authUserId })).ok || !(await codeLimiter.limit(ctx, "studentCodeDailyAttempts", { key: who.authUserId })).ok) return null;
+    if (!(await usableTeamCode(ctx, args.code, season._id, now))) {
+      await recordFailedJoinAttempt(ctx, who.authUserId, now);
       return null;
     }
-    if (attempts) await ctx.db.patch(attempts._id, { failed: 0, lockedUntil: 0 });
+    await clearJoinAttempts(ctx, who.authUserId);
     const firstName = args.firstName.trim(); const lastName = args.lastName.trim();
-    if (!firstName || !lastName || firstName.length > 80 || lastName.length > 80) throw new ConvexError("Enter your first and last name.");
+    if (!firstName || !lastName || firstName.length > 80 || lastName.length > 80) throw new ConvexError("Enter your first and last name, each under 80 characters.");
     if (existing) {
       await ctx.db.patch(existing._id, { email: who.email.toLowerCase(), firstName, lastName, status: "pending", createdAt: now, decidedAt: undefined, decidedBy: undefined });
       return existing._id;

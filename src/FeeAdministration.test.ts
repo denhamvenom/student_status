@@ -36,7 +36,7 @@ describe('shared fee presentation', () => {
     expect(bulkReviewUnchanged(reviewed, { ...reviewed, expectedDefinitionRevision: 5 })).toBe(false)
     expect(bulkCommitArgs(reviewed)).toEqual({ jobId: reviewed.job._id, expectedScopeHash: 'frozen-scope', expectedOrderRevision: 2, expectedDefinitionRevision: 3, reason: 'Original reviewed reason' })
   })
-  it('exposes only authorized mapping recovery and labels cancelled receipts accurately', () => {
+  it('exposes only authorized mapping recovery and labels canceled receipts accurately', () => {
     const receipt = { job: { state: 'failed', processed: 4, mapped: 2, unmapped: 2, reason: 'Synthetic mapping review' }, originalActorName: 'Coach', processingActorName: 'Coach', canRetry: true, canCancel: true }
     try {
       queryState.mapping = receipt
@@ -48,7 +48,7 @@ describe('shared fee presentation', () => {
       expect(renderToStaticMarkup(createElement(LiveMappingReceipt, { jobId: 'synthetic-mapping' as Id<'feeMappingJobs'> }))).not.toContain('Cancel mapping review')
       queryState.mapping = { ...receipt, job: { ...receipt.job, state: 'cancelled' }, canRetry: false, canCancel: false }
       const cancelled = renderToStaticMarkup(createElement(LiveMappingReceipt, { jobId: 'synthetic-mapping' as Id<'feeMappingJobs'> }))
-      expect(cancelled).toContain('This mapping review was cancelled')
+      expect(cancelled).toContain('This mapping review was canceled')
       expect(cancelled).not.toContain('<form')
     } finally { queryState.mapping = null }
   })

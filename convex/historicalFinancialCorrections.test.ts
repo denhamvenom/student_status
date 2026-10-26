@@ -54,7 +54,7 @@ it("denies expired/wrong-role/stale grants and holds all linked histories withou
   const args = { correctionSessionId: f.grant.id, chargeId: f.ids.charge, targetEffectiveCents: 50, kind: "cancellation", expectedChargeRevision: preview.expectedChargeRevision, expectedFinancialRevision: preview.expectedFinancialRevision, reason: "Reviewed historical cancellation", idempotencyKey: "historical-denial-command" };
   await expect(f.coach.mutation(correctRef, { ...args, expectedFinancialRevision: preview.expectedFinancialRevision - 1 })).rejects.toThrow("changed");
   await f.t.run(ctx => ctx.db.patch(f.grant.id, { expiresAt: 0 }));
-  await expect(f.coach.mutation(correctRef, args)).rejects.toThrow("access has ended");
+  await expect(f.coach.mutation(correctRef, args)).rejects.toThrow("Correction mode has ended");
   const fresh = await f.coach.mutation(api.historicalCorrections.open, { seasonId: f.ids.season, reason: "Renewed historical review access", acknowledged: true });
   await f.t.run(async ctx => {
     const account = await financialAccount(ctx, f.ids.student);
@@ -64,8 +64,8 @@ it("denies expired/wrong-role/stale grants and holds all linked histories withou
     await recordProjectedEntry(ctx, out, account!);
   });
   const before = await f.t.run(ctx => financialAccount(ctx, f.ids.student));
-  expect(await f.coach.query(previewRef, query)).toMatchObject({ ready: false, message: expect.stringContaining("downstream") });
-  await expect(f.coach.mutation(correctRef, { ...args, correctionSessionId: fresh.id })).rejects.toThrow("downstream");
+  expect(await f.coach.query(previewRef, query)).toMatchObject({ ready: false, message: expect.stringContaining("separate review") });
+  await expect(f.coach.mutation(correctRef, { ...args, correctionSessionId: fresh.id })).rejects.toThrow("separate review");
   expect(await f.t.run(ctx => financialAccount(ctx, f.ids.student))).toEqual(before);
 });
 
@@ -85,7 +85,7 @@ it("pauses archived allocation after grant expiry and resumes only with a fresh 
   await f.t.run(ctx => ctx.db.patch(f.grant.id, { expiresAt: 0 }));
   await f.t.mutation(makeFunctionReference<"mutation">("financialAllocation:run"), { jobId: account!.allocationJobId });
   expect((await f.t.run(ctx => financialAccount(ctx, f.ids.student)))?.state).toBe("failed");
-  await expect(f.coach.mutation(makeFunctionReference<"mutation">("historicalFinancialCorrections:retry"), { correctionSessionId: f.grant.id, jobId: job, reason: "Expired access is rejected" })).rejects.toThrow("access has ended");
+  await expect(f.coach.mutation(makeFunctionReference<"mutation">("historicalFinancialCorrections:retry"), { correctionSessionId: f.grant.id, jobId: job, reason: "Expired access is rejected" })).rejects.toThrow("Correction mode has ended");
   const fresh = await f.coach.mutation(api.historicalCorrections.open, { seasonId: f.ids.season, reason: "Fresh grant for recovery", acknowledged: true });
   await f.coach.mutation(makeFunctionReference<"mutation">("historicalFinancialCorrections:retry"), { correctionSessionId: fresh.id, jobId: job, reason: "Coach reviewed failed allocation" });
   for (let step = 0; step < 10; step++) {

@@ -89,15 +89,15 @@ describe("durable prepared custom fees", () => {
     const jobId = await f.coach.mutation(prepare, { kind: "edit", feeDefinitionId: original.fee, targetAmountCents: 20, scope: "existingCharges", reason: "Prepare immutable existing charge review", idempotencyKey: "prepared-edit-fence" }) as Id<"feeBulkJobs">;
     await finish(f, jobId);
     const proof = () => f.coach.mutation(makeFunctionReference<"mutation">("feeDefinitions:prepareMapping"), { reason: "Attempt to reset the season mapping", idempotencyKey: "must-not-remap-held" });
-    await expect(proof()).rejects.toThrow("prepared or held shared fee scope");
+    await expect(proof()).rejects.toThrow("fee change in progress");
     const control = await f.t.run(ctx => ctx.db.get(f.ids.control));
-    await expect(f.coach.mutation(makeFunctionReference<"mutation">("feeDefinitions:mapCharges"), { chargeIds: [{ chargeId: original.charge, expectedChargeRevision: 0 }], feeDefinitionId: original.fee, expectedOrderRevision: control!.revision, reason: "Attempt to remap prepared charge", idempotencyKey: "must-not-map-prepared" })).rejects.toThrow("prepared or held shared fee scope");
-    for (const scope of ["allActive", "selected", "confirmedEvent"]) await expect(f.coach.mutation(prepare, { kind: "cancel", feeDefinitionId: original.fee, targetAmountCents: 0, scope, ...(scope === "selected" ? { studentIds: f.ids.students } : {}), reason: "Invalid subset cancellation request", idempotencyKey: `invalid-cancel-${scope}` })).rejects.toThrow("exact fee amount");
+    await expect(f.coach.mutation(makeFunctionReference<"mutation">("feeDefinitions:mapCharges"), { chargeIds: [{ chargeId: original.charge, expectedChargeRevision: 0 }], feeDefinitionId: original.fee, expectedOrderRevision: control!.revision, reason: "Attempt to remap prepared charge", idempotencyKey: "must-not-map-prepared" })).rejects.toThrow("fee change in progress");
+    for (const scope of ["allActive", "selected", "confirmedEvent"]) await expect(f.coach.mutation(prepare, { kind: "cancel", feeDefinitionId: original.fee, targetAmountCents: 0, scope, ...(scope === "selected" ? { studentIds: f.ids.students } : {}), reason: "Invalid subset cancellation request", idempotencyKey: `invalid-cancel-${scope}` })).rejects.toThrow("fee amount");
     expect(await f.t.run(ctx => ctx.db.query("feeBulkJobs").collect())).toHaveLength(1);
     expect(await f.t.run(ctx => ctx.db.get(original.fee))).toMatchObject({ revision: 0 });
     await f.coach.mutation(makeFunctionReference<"mutation">("finance:recordFunds"), { studentId: f.ids.students[0], kind: "payment", amountCents: 1, reason: "Changed balance after prepared scope", idempotencyKey: "changed-fence-payment" });
     await confirm(f, jobId); expect(await finish(f, jobId)).toMatchObject({ state: "held", committed: 0 });
-    await expect(proof()).rejects.toThrow("prepared or held shared fee scope");
+    await expect(proof()).rejects.toThrow("fee change in progress");
     expect(await f.t.run(ctx => ctx.db.get(original.fee))).toMatchObject({ revision: 0 });
   });
 
@@ -145,11 +145,11 @@ describe("durable prepared custom fees", () => {
     await finish(f, originalId); await confirm(f, originalId); const original = await finish(f, originalId);
     expect(original).toMatchObject({ state: "held", committed: 1, held: 1 });
     const input = { kind: "cancel", feeDefinitionId: original!.feeDefinitionId, targetAmountCents: 0, scope: "existingCharges", reason: "Coach reviewed full cancellation and unposted row", idempotencyKey: "full-cancel-held-scope" };
-    await expect(f.coach.mutation(prepare, input)).rejects.toThrow("existing prepared operation");
+    await expect(f.coach.mutation(prepare, input)).rejects.toThrow("still in progress");
     const cancelledDraft = await f.coach.mutation(prepare, { ...input, supersedeHeldJobId: originalId, expectedHeldRows: 1 }) as Id<"feeBulkJobs">;
     await finish(f, cancelledDraft);
     expect(await f.coach.query(makeFunctionReference<"query">("feeDefinitions:priorHeldRows"), { jobId: cancelledDraft, paginationOpts: { numItems: 20, cursor: null } })).toMatchObject({ page: [{ state: "held", targetAmountCents: 100 }] });
-    await f.coach.mutation(makeFunctionReference<"mutation">("feeDefinitions:cancelPrepared"), { jobId: cancelledDraft, reason: "Coach cancelled this zero-money prepared review" });
+    await f.coach.mutation(makeFunctionReference<"mutation">("feeDefinitions:cancelPrepared"), { jobId: cancelledDraft, reason: "Coach canceled this zero-money prepared review" });
     expect(await f.t.run(ctx => ctx.db.get(original!.feeDefinitionId))).toMatchObject({ latestJobId: originalId, revision: original!.expectedDefinitionRevision });
     const cancellation = await f.coach.mutation(prepare, { ...input, idempotencyKey: "confirmed-full-cancel", supersedeHeldJobId: originalId, expectedHeldRows: 1 }) as Id<"feeBulkJobs">;
     const prepared = await finish(f, cancellation);
@@ -233,10 +233,10 @@ describe("durable prepared custom fees", () => {
     const f = await fixture(2);
     const jobId = await f.coach.mutation(prepare, { kind: "create", label: "Never posted", targetAmountCents: 90, scope: "selected", studentIds: f.ids.students, reason: "Prepare explicit two member fee", idempotencyKey: "never-posted-key" }) as Id<"feeBulkJobs">;
     const prepared = await finish(f, jobId);
-    await f.coach.mutation(makeFunctionReference<"mutation">("feeDefinitions:cancelPrepared"), { jobId, reason: "Coach cancelled before monetary confirmation" });
+    await f.coach.mutation(makeFunctionReference<"mutation">("feeDefinitions:cancelPrepared"), { jobId, reason: "Coach canceled before monetary confirmation" });
     expect(await f.t.run(ctx => ctx.db.get(jobId))).toMatchObject({ state: "cancelled", snapshotCount: 2, snapshotHash: prepared!.snapshotHash });
     expect(await f.t.run(ctx => ctx.db.query("feeBulkRows").collect())).toHaveLength(2);
     expect(await f.t.run(ctx => ctx.db.query("ledgerEntries").collect())).toHaveLength(0);
-    await expect(confirm(f, jobId)).rejects.toThrow("not available");
+    await expect(confirm(f, jobId)).rejects.toThrow("can't be confirmed now");
   });
 });

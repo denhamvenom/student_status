@@ -12,7 +12,7 @@ import { consentEventValidator, consentSnapshotValidator, correctionFieldValidat
 import { compareCoverage, controlledCoverage, coverageFor, expectedCoverage, sealedSnapshot, setPendingCoverage } from "./lib/permissionCoverage";
 import { consentSnapshotV2Validator } from "./lib/consentSnapshotV2";
 import { sealedSnapshotV2 } from "./permissionsV2";
-import { permissionSigningMode, v2SigningAllowed } from "./lib/permissionSigningMode";
+import { PERMISSION_SIGNING_CLOSED, permissionSigningMode, v2SigningAllowed } from "./lib/permissionSigningMode";
 
 type Ctx = QueryCtx | MutationCtx;
 const DEV_URL = "https://third-bandicoot-18.convex.cloud";
@@ -32,8 +32,8 @@ export const workspaceValidator = v.object({
 });
 const paperFields = { studentId: v.id("students"), eventIds: v.array(v.id("events")), signerName: v.string(), signerEmail: v.optional(v.string()), paperSignedAt: v.number(), paperReference: v.string() };
 const paperPreviewValidator = v.object({snapshot: consentSnapshotValidator, versionId: v.id("permissionVersions"), expectedProfileRevision: v.number(), eventFingerprint: v.string(), expectedCoverage: v.array(expectedCoverageValidator)});
-function operations(actor: Doc<"appUsers">) {if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Permission review requires a Coach or Travel Lead.")}
-function formAccess(actor: Doc<"appUsers">) {if (actor.role !== "parent" && actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Form access denied.")}
+function operations(actor: Doc<"appUsers">) {if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can do this with permission forms. Ask a Coach if you need Travel Lead access.")}
+function formAccess(actor: Doc<"appUsers">) {if (actor.role !== "parent" && actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Permission forms are open to Parents, Coaches and Travel Leads. Ask a Coach if you need access.")}
 async function syntheticAllowed(ctx: Ctx, studentId: Id<"students">, parentId?: Id<"appUsers">) {
   if (env.CONVEX_CLOUD_URL !== DEV_URL) return false;
   const row = await ctx.db.query("syntheticConsentSubjects").withIndex("by_studentId_and_parentId", q => q.eq("studentId", studentId).eq("parentId", parentId)).unique();
@@ -41,23 +41,23 @@ async function syntheticAllowed(ctx: Ctx, studentId: Id<"students">, parentId?: 
 }
 async function syntheticGate(ctx: Ctx, studentId: Id<"students">, parentId?: Id<"appUsers">) {if (!await syntheticAllowed(ctx, studentId, parentId)) throw new ConvexError("Real permission signing is unavailable. Only internally registered fictional development subjects may use this workflow.")}
 async function signer(ctx: Ctx, actor: Doc<"appUsers">) {
-  if (actor.role !== "parent") throw new ConvexError("Only a linked parent may sign.");
+  if (actor.role !== "parent") throw new ConvexError("Only a parent linked to this student can sign the permission form.");
   const who = await verifiedParent(ctx);
-  if (!who || who.authUserId !== actor.authUserId) throw new ConvexError("A verified parent account is required.");
+  if (!who || who.authUserId !== actor.authUserId) throw new ConvexError("Sign in with the parent account linked to this student, then try again.");
   return who;
 }
 async function currentVersion(ctx: Ctx, student: Doc<"students">) {
   const season = await activeSeason(ctx);
   const version = season.activePermissionVersionId ? await ctx.db.get(season.activePermissionVersionId) : null;
-  if (!version || version.seasonId !== student.seasonId || student.seasonId !== season._id) throw new ConvexError("No current permission wording is available.");
-  if (version.formFormat === 2) throw new ConvexError("This season uses the new PDF permission form. Prepare it in the updated form workflow.");
+  if (!version || version.seasonId !== student.seasonId || student.seasonId !== season._id) throw new ConvexError("A Coach hasn't set up this season's permission form yet. Check back later, or ask a Coach when it will be ready.");
+  if (version.formFormat === 2) throw new ConvexError("This season uses the new permission form. Reload the page to open it.");
   return version;
 }
 async function buildSnapshot(ctx: Ctx, student: Doc<"students">, actor: Doc<"appUsers">, eventIds: Id<"events">[], identity: ConsentSnapshot["signer"]) {
   const version = await currentVersion(ctx, student);
   for (const [label, value] of [["Emergency contact name", student.emergencyName], ["Emergency contact relationship", student.emergencyRelationship], ["Emergency contact phone", student.emergencyPhone]] as const) boundedText(value ?? "", 254, label);
   function health(report: Doc<"students">["allergies"]) {
-    if (report.state === "unknown") throw new ConvexError("Complete allergy and medication reports before preparing permission.");
+    if (report.state === "unknown") throw new ConvexError("Fill in Allergies and Medications in Health information, then prepare the permission form.");
     if (report.state === "reported") boundedText(report.text ?? "", 4000, "Health details");
     return { state: report.state, text: report.state === "reported" ? report.text!.trim() : null };
   }
@@ -102,7 +102,7 @@ export const workspace = query({
     const canSign = !!who && who.authUserId === actor.authUserId && (v2 ? await v2SigningAllowed(ctx, student._id, actor._id) : await syntheticAllowed(ctx, student._id, actor._id));
     const canRecordPaper = (v2 ? actor.role === "coach" || actor.role === "mentor" && actor.travelLead && actor.healthExport === true : canReview) && (v2 ? await v2SigningAllowed(ctx, student._id) : await syntheticAllowed(ctx, student._id));
     const projected = privateStudent(student);
-    return {student: {studentId: student._id, legalName: student.legalName, preferredName: student.preferredName, profileRevision: student.profileRevision ?? 0, emergencyName: projected.emergencyName, emergencyRelationship: projected.emergencyRelationship, emergencyPhone: projected.emergencyPhone, allergies: projected.allergies, medications: projected.medications}, actor: {name: who?.name ?? actor.name, email: who?.email ?? actor.email, role: actor.role, travelLead: actor.travelLead, healthExport: actor.healthExport ?? false}, version: version ? {...publicVersion(version), formFormat: version.formFormat === 2 ? 2 as const : 1 as const} : null, events, coverage, receipts: await Promise.all((await familyVisibleSubmissions(ctx, actor, submissions)).map(submission => summary(ctx, submission))), signingMode, canSign, canRecordPaper, canReview, canHealthExport: actor.role === "coach" || actor.role === "mentor" && actor.travelLead && (actor.healthExport ?? false), gateReason: canSign || canRecordPaper ? null : signingMode === "synthetic" ? "Only registered fictional development subjects may use consent." : "You cannot sign for this student right now."};
+    return {student: {studentId: student._id, legalName: student.legalName, preferredName: student.preferredName, profileRevision: student.profileRevision ?? 0, emergencyName: projected.emergencyName, emergencyRelationship: projected.emergencyRelationship, emergencyPhone: projected.emergencyPhone, allergies: projected.allergies, medications: projected.medications}, actor: {name: who?.name ?? actor.name, email: who?.email ?? actor.email, role: actor.role, travelLead: actor.travelLead, healthExport: actor.healthExport ?? false}, version: version ? {...publicVersion(version), formFormat: version.formFormat === 2 ? 2 as const : 1 as const} : null, events, coverage, receipts: await Promise.all((await familyVisibleSubmissions(ctx, actor, submissions)).map(submission => summary(ctx, submission))), signingMode, canSign, canRecordPaper, canReview, canHealthExport: actor.role === "coach" || actor.role === "mentor" && actor.travelLead && (actor.healthExport ?? false), gateReason: canSign || canRecordPaper ? null : signingMode === "synthetic" ? "Only registered fictional development subjects may use consent." : PERMISSION_SIGNING_CLOSED};
   },
 });
 
@@ -112,7 +112,7 @@ export const listSubmissions = query({
 });
 export const receipt = query({
   args: {submissionId: v.id("permissionSubmissions")}, returns: receiptValidator,
-  handler: async (ctx, args) => {const actor = await viewer(ctx); formAccess(actor); const submission = await ctx.db.get(args.submissionId); if (!submission) throw new ConvexError("Signed form not found."); await studentAccess(ctx, actor, submission.studentId); await requireFamilyEventAccess(ctx, actor, submission.eventIds); const recorder = submission.recordedBy ? await ctx.db.get(submission.recordedBy) : null; return {summary: await summary(ctx, submission), snapshot: submission.snapshotFormat === 1 ? await sealedSnapshot(ctx, submission) : null, recorderName: recorder?.name ?? "Historical recorder unavailable"}},
+  handler: async (ctx, args) => {const actor = await viewer(ctx); formAccess(actor); const submission = await ctx.db.get(args.submissionId); if (!submission) throw new ConvexError("This signed permission form isn't available. Reload the page to see the current list."); await studentAccess(ctx, actor, submission.studentId); await requireFamilyEventAccess(ctx, actor, submission.eventIds); const recorder = submission.recordedBy ? await ctx.db.get(submission.recordedBy) : null; return {summary: await summary(ctx, submission), snapshot: submission.snapshotFormat === 1 ? await sealedSnapshot(ctx, submission) : null, recorderName: recorder?.name ?? "Historical recorder unavailable"}},
 });
 export const prepare = mutation({
   args: {studentId: v.id("students"), eventIds: v.array(v.id("events"))}, returns: v.object({draftId: v.id("permissionDrafts"), expiresAt: v.number(), snapshot: consentSnapshotValidator, expectedCoverage: v.array(expectedCoverageValidator)}),
@@ -134,7 +134,7 @@ async function insertSealed(ctx: MutationCtx, actor: Doc<"appUsers">, student: D
   await syntheticGate(ctx, student._id, snapshot.signer.source === "electronic" ? actor._id : undefined);
   await compareCoverage(ctx, student._id, expected, snapshot.events.map(event => event.eventId));
   validateSnapshot(ctx, snapshot);
-  if (!snapshot.acknowledged || !snapshot.choices || snapshot.signedAt === null || snapshot.recordedAt === null || snapshot.typedName === null) throw new ConvexError("A complete signed snapshot is required.");
+  if (!snapshot.acknowledged || !snapshot.choices || snapshot.signedAt === null || snapshot.recordedAt === null || snapshot.typedName === null) throw new ConvexError("This permission form isn't complete. Prepare it again, then sign.");
   const priorIds = [...new Set(snapshot.priorCoverage.flatMap(row => row.submissionId ? [row.submissionId] : []))];
   const sealedHash = await snapshotHash(snapshot);
   const submissionId = await ctx.db.insert("permissionSubmissions", { studentId: student._id, seasonId: student.seasonId, signedBy: snapshot.signer.accountId ?? undefined, typedName: snapshot.typedName!, wordingVersion: snapshot.version.version, eventIds: snapshot.events.map(event => event.eventId), answersJson: JSON.stringify({choices: snapshot.choices, acknowledged: snapshot.acknowledged}), signedAt: snapshot.signedAt!, versionId: snapshot.version.versionId, draftId: extra.draftId, source: snapshot.signer.source, synthetic: true, snapshotFormat: 1, snapshotJson: JSON.stringify(snapshot), snapshotHash: sealedHash, recordedBy: actor._id, signerName: snapshot.signer.name, signerEmail: snapshot.signer.email ?? undefined, supersedesSubmissionId: priorIds.length === 1 ? priorIds[0] : undefined, idempotencyKey: extra.idempotencyKey, operationHash: extra.operationHash, paperReference: snapshot.paper?.reference, paperSignedAt: snapshot.paper?.signedAt, paperAttestation: snapshot.paper?.attested });
@@ -147,22 +147,22 @@ export const submitDraft = mutation({
   args: {draftId: v.id("permissionDrafts"), typedName: v.string(), acknowledged: v.boolean(), choices: medicationChoicesValidator}, returns: v.id("permissionSubmissions"),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); const who = await signer(ctx, actor); const draft = await ctx.db.get(args.draftId);
-    if (!draft || draft.parentId !== actor._id) throw new ConvexError("Permission draft not found for this account.");
+    if (!draft || draft.parentId !== actor._id) throw new ConvexError("This permission form isn't available for your account. Prepare it again.");
     const student = await studentAccess(ctx, actor, draft.studentId); await syntheticGate(ctx, student._id, actor._id);
-    if (!args.acknowledged || args.typedName.trim() !== who.name.trim()) throw new ConvexError("Type the verified account name exactly and acknowledge the permission wording.");
+    if (!args.acknowledged || args.typedName.trim() !== who.name.trim()) throw new ConvexError("Your typed name is your signature, so it must match the name on your account exactly. Type it as shown and check the box to agree.");
     if (draft.usedSubmissionId) {
       const original = await ctx.db.get(draft.usedSubmissionId);
-      if (!original || original.signedBy !== actor._id) throw new ConvexError("The signed form from this draft is unavailable.");
+      if (!original || original.signedBy !== actor._id) throw new ConvexError("The form you signed isn't available. Reload the page to see your signed forms.");
       await requireFamilyEventAccess(ctx, actor, original.eventIds);
       const sealed = await sealedSnapshot(ctx, original);
-      if (sealed.typedName !== args.typedName.trim() || JSON.stringify(sealed.choices) !== JSON.stringify(args.choices)) throw new ConvexError("This draft was already signed with different answers.");
+      if (sealed.typedName !== args.typedName.trim() || JSON.stringify(sealed.choices) !== JSON.stringify(args.choices)) throw new ConvexError("This form was already signed with different answers. Reload the page to see the signed form.");
       return original._id;
     }
-    if (draft.expiresAt <= Date.now()) throw new ConvexError("Permission draft expired. Prepare it again.");
+    if (draft.expiresAt <= Date.now()) throw new ConvexError("The time to sign this permission form ran out. Prepare it again.");
     const snapshot = parseSnapshot(ctx, draft.snapshotJson);
-    if (await snapshotHash(snapshot) !== draft.snapshotHash) throw new ConvexError("Prepared permission evidence is inconsistent.");
+    if (await snapshotHash(snapshot) !== draft.snapshotHash) throw new ConvexError("This permission form changed after it was prepared. Prepare it again, then sign.");
     const current = await buildSnapshot(ctx, student, actor, snapshot.events.map(event => event.eventId), {source: "electronic", accountId: actor._id, name: who.name, email: who.email, recordedBy: actor._id});
-    if (current.version._id !== draft.versionId || student.profileRevision !== undefined && student.profileRevision !== draft.profileRevision || current.eventFingerprint !== draft.eventFingerprint || await snapshotHash(current.snapshot) !== draft.snapshotHash) throw new ConvexError("Profile, event, wording or coverage changed. Prepare a new permission draft.");
+    if (current.version._id !== draft.versionId || student.profileRevision !== undefined && student.profileRevision !== draft.profileRevision || current.eventFingerprint !== draft.eventFingerprint || await snapshotHash(current.snapshot) !== draft.snapshotHash) throw new ConvexError("The profile, events or form changed after you prepared it. Prepare the permission form again.");
     await compareCoverage(ctx, student._id, draft.expectedCoverage, snapshot.events.map(event => event.eventId));
     const now = Date.now(); const final: ConsentSnapshot = {...snapshot, choices: args.choices, typedName: args.typedName.trim(), acknowledged: true, signedAt: now, recordedAt: now};
     const submissionId = await insertSealed(ctx, actor, student, final, draft.expectedCoverage, {draftId: draft._id});
@@ -175,7 +175,7 @@ type PaperArgs = {studentId: Id<"students">; eventIds: Id<"events">[]; signerNam
 async function paperSnapshot(ctx: MutationCtx, actor: Doc<"appUsers">, args: PaperArgs) {
   operations(actor); const student = await studentAccess(ctx, actor, args.studentId); await syntheticGate(ctx, student._id);
   boundedText(args.signerName, 160, "Parent or guardian named on paper"); boundedText(args.paperReference, 254, "Paper reference");
-  if (!Number.isFinite(args.paperSignedAt) || args.paperSignedAt <= 0 || args.paperSignedAt > Date.now()) throw new ConvexError("Paper signing date must be valid and not in the future.");
+  if (!Number.isFinite(args.paperSignedAt) || args.paperSignedAt <= 0 || args.paperSignedAt > Date.now()) throw new ConvexError("Enter the date the paper form was signed. It can't be in the future.");
   if (args.signerEmail) normalizeEmail(args.signerEmail, "Paper signer email");
   const prepared = await buildSnapshot(ctx, student, actor, args.eventIds, {source: "paper", accountId: null, name: args.signerName.trim(), email: args.signerEmail?.trim().toLowerCase() || null, recordedBy: actor._id});
   return {student, ...prepared};
@@ -188,12 +188,12 @@ export const recordPaper = mutation({
   args: {...paperFields, versionId: v.id("permissionVersions"), expectedProfileRevision: v.number(), eventFingerprint: v.string(), expectedCoverage: v.array(expectedCoverageValidator), choices: medicationChoicesValidator, paperAttested: v.boolean(), idempotencyKey: v.string()}, returns: v.id("permissionSubmissions"),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); operations(actor); const student = await studentAccess(ctx, actor, args.studentId); await syntheticGate(ctx, student._id);
-    boundedText(args.idempotencyKey, 128, "Retry key"); if (!args.paperAttested) throw new ConvexError("Signed paper authorization on file must be attested.");
+    boundedText(args.idempotencyKey, 128, "Retry key"); if (!args.paperAttested) throw new ConvexError("Check the box to confirm you have the signed paper form.");
     const operationHash = await tokenHash(JSON.stringify({...args, eventIds: [...args.eventIds].sort(), expectedCoverage: [...args.expectedCoverage].sort((a,b) => a.eventId.localeCompare(b.eventId)), signerName: args.signerName.trim(), signerEmail: args.signerEmail?.trim().toLowerCase(), paperReference: args.paperReference.trim()}));
     const duplicate = await ctx.db.query("permissionSubmissions").withIndex("by_recordedBy_and_idempotencyKey", q => q.eq("recordedBy", actor._id).eq("idempotencyKey", args.idempotencyKey)).unique();
-    if (duplicate) {if (duplicate.operationHash !== operationHash || duplicate.source !== "paper") throw new ConvexError("Retry key is already used for a different paper record."); await sealedSnapshot(ctx, duplicate); return duplicate._id}
+    if (duplicate) {if (duplicate.operationHash !== operationHash || duplicate.source !== "paper") throw new ConvexError("This paper form was already recorded with different details. Reload the page, then try again."); await sealedSnapshot(ctx, duplicate); return duplicate._id}
     const prepared = await paperSnapshot(ctx, actor, args);
-    if (prepared.version._id !== args.versionId || (student.profileRevision ?? 0) !== args.expectedProfileRevision || prepared.eventFingerprint !== args.eventFingerprint) throw new ConvexError("Profile, event or wording changed. Prepare the paper record again.");
+    if (prepared.version._id !== args.versionId || (student.profileRevision ?? 0) !== args.expectedProfileRevision || prepared.eventFingerprint !== args.eventFingerprint) throw new ConvexError("The profile, events or form changed. Prepare the paper form again.");
     await compareCoverage(ctx, student._id, args.expectedCoverage, args.eventIds);
     const final: ConsentSnapshot = {...prepared.snapshot, choices: args.choices, typedName: args.signerName.trim(), acknowledged: true, signedAt: args.paperSignedAt, recordedAt: Date.now(), paper: {reference: args.paperReference.trim(), signedAt: args.paperSignedAt, attested: true}};
     return insertSealed(ctx, actor, student, final, args.expectedCoverage, {idempotencyKey: args.idempotencyKey, operationHash});
@@ -204,17 +204,17 @@ export const review = mutation({
   args: {submissionId: v.id("permissionSubmissions"), status: reviewStatusValidator, note: v.optional(v.string()), field: v.optional(correctionFieldValidator), expectedLatestReviewId: v.union(v.id("permissionReviews"), v.null()), expectedCoverage: v.array(expectedCoverageValidator), idempotencyKey: v.string()}, returns: v.null(),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); operations(actor); boundedText(args.idempotencyKey, 128, "Retry key");
-    const submission = await ctx.db.get(args.submissionId); if (!submission) throw new ConvexError("Submission not found.");
+    const submission = await ctx.db.get(args.submissionId); if (!submission) throw new ConvexError("This signed permission form isn't available. Reload the page to see the current list.");
     await studentAccess(ctx, actor, submission.studentId); await requireFamilyEventAccess(ctx, actor, submission.eventIds); if (submission.snapshotFormat === 2) {if (actor.role === "mentor" && !actor.healthExport) throw new ConvexError("The Health export permission is required to review signed form PDFs."); await sealedSnapshotV2(ctx, submission);} else await sealedSnapshot(ctx, submission);
     if (args.status === "correction") boundedText(args.note ?? "", 1000, "Correction note");
-    if ((args.note?.length ?? 0) > 1000) throw new ConvexError("Review note is too long.");
+    if ((args.note?.length ?? 0) > 1000) throw new ConvexError("Shorten the review note to 1,000 characters or fewer.");
     const operationHash = await tokenHash(JSON.stringify({...args, expectedCoverage: [...args.expectedCoverage].sort((a,b) => a.eventId.localeCompare(b.eventId))}));
     const duplicate = await ctx.db.query("permissionReviews").withIndex("by_reviewedBy_and_idempotencyKey", q => q.eq("reviewedBy", actor._id).eq("idempotencyKey", args.idempotencyKey)).unique();
-    if (duplicate) {if (duplicate.operationHash !== operationHash) throw new ConvexError("Retry key is already used for a different review."); return null}
+    if (duplicate) {if (duplicate.operationHash !== operationHash) throw new ConvexError("This review was already saved with different details. Reload the page, then try again."); return null}
     const latest = await ctx.db.query("permissionReviews").withIndex("by_submissionId", q => q.eq("submissionId", submission._id)).order("desc").take(1);
     if ((latest[0]?._id ?? null) !== args.expectedLatestReviewId) throw new ConvexError("Review changed. Reload before deciding.");
     const rows = await controlledCoverage(ctx, submission._id);
-    if (rows.some(row => row.studentId !== submission.studentId || row.seasonId !== submission.seasonId || row.versionId !== submission.versionId || !submission.eventIds.includes(row.eventId))) throw new ConvexError("Current permission coverage is inconsistent.");
+    if (rows.some(row => row.studentId !== submission.studentId || row.seasonId !== submission.seasonId || row.versionId !== submission.versionId || !submission.eventIds.includes(row.eventId))) throw new ConvexError("The events this form covers changed. Reload the page, then try again.");
     if (!rows.length) throw new ConvexError("This signed form no longer covers an event that can be reviewed, or a new signature was requested.");
     await compareCoverage(ctx, submission.studentId, args.expectedCoverage, rows.map(row => row.eventId));
     const reviewId = await ctx.db.insert("permissionReviews", {submissionId: submission._id, status: args.status, note: args.note?.trim() || undefined, field: args.field, controlledCoverage: rows.map(row => ({eventId: row.eventId, priorRevision: row.revision})), snapshotHash: submission.snapshotHash, reviewedBy: actor._id, reviewedAt: Date.now(), idempotencyKey: args.idempotencyKey, operationHash});
@@ -246,16 +246,16 @@ export const exportPacket = mutation({
   args: {eventId: v.id("events"), includeHealth: v.boolean(), paginationOpts: v.optional(paginationOptsValidator)}, returns: v.object({event: v.object({eventId: v.id("events"), name: v.string()}), synthetic: v.boolean(), generatedAt: v.number(), schemaVersion: v.literal(1), isDone: v.boolean(), continueCursor: v.string(), records: v.array(exportRecordValidator)}),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); operations(actor);
-    if (args.includeHealth && actor.role !== "coach" && !actor.healthExport) throw new ConvexError("Separate health-export permission is required.");
+    if (args.includeHealth && actor.role !== "coach" && !actor.healthExport) throw new ConvexError("Downloading health information needs Health export access. Ask a Coach for it.");
     const season = await activeSeason(ctx); const event = await ctx.db.get(args.eventId);
-    if (!event || event.archived || event.seasonId !== season._id || enrollmentPending(event)) throw new ConvexError("Event export is unavailable.");
+    if (!event || event.archived || event.seasonId !== season._id || enrollmentPending(event)) throw new ConvexError("This event's permission list can't be downloaded. Choose a current event, then try again.");
     const options = args.paginationOpts ?? {cursor: null, numItems: 10};
     if (!Number.isSafeInteger(options.numItems) || options.numItems < 1 || options.numItems > 10) throw new ConvexError("Collect export pages of at most 10 event participants.");
     if (options.maximumRowsRead !== undefined && (!Number.isSafeInteger(options.maximumRowsRead) || options.maximumRowsRead < 1)) throw new ConvexError("Export row budget must be a positive integer.");
     // Keep every native option while enforcing a server read budget for adaptive/end-cursor pages.
     options.maximumRowsRead = Math.min(options.maximumRowsRead ?? 11, 11);
     const page = await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", event._id)).paginate(options);
-    if (page.page.length > 10) throw new ConvexError("Export page expanded beyond 10 rows. Retry with a simple cursor page.");
+    if (page.page.length > 10) throw new ConvexError("The download couldn't continue. Start the download again.");
     const generatedAt = Date.now();
     const records: Infer<typeof exportRecordValidator>[] = [];
     for (const participant of page.page) {

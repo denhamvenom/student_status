@@ -213,13 +213,13 @@ export async function collectFundraisingPreview(fetchPage: (args: FunctionArgs<t
   if (!input.rows.length || input.rows.length > 500 || new Set(input.rows.map(row => row.studentId)).size !== input.rows.length) throw new Error('Review between one and 500 unique student amounts.')
   const rows: AmountPreview['rows'] = []
   for (let index = 0; index < input.rows.length; index += 20) {
-    if (cancelled()) throw new Error('Preview cancelled.')
+    if (cancelled()) throw new Error('Preview canceled.')
     const requested = input.rows.slice(index, index + 20)
     const page = await fetchPage({ ...input, rows: requested })
     if (page.fundraiserRevision !== input.expectedRevision || page.rows.length !== requested.length || new Set(page.rows.map(row => row.studentId)).size !== requested.length || requested.some(row => !page.rows.some(result => result.studentId === row.studentId && result.grossCents === row.grossCents))) throw new Error('The preview changed. Review the amounts again.')
     rows.push(...page.rows)
   }
-  if (cancelled()) throw new Error('Preview cancelled.')
+  if (cancelled()) throw new Error('Preview canceled.')
   return { fundraiserRevision: input.expectedRevision, rows }
 }
 

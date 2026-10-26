@@ -65,10 +65,10 @@ describe("financial operations", () => {
   it("records only unallocated personal payment refunds and preserves both source and idempotency", async () => {
     const f = await fixture();
     const args = { studentId: f.ids.student, amountCents: 1000, method: "check" as const, reference: "synthetic-check", occurredAt: 1, reason: "Family received check", idempotencyKey: key };
-    await expect(f.coach.mutation(api.financeOperations.recordPayout, { ...args, amountCents: 1001 })).rejects.toThrow("unallocated personal");
+    await expect(f.coach.mutation(api.financeOperations.recordPayout, { ...args, amountCents: 1001 })).rejects.toThrow("Unused payments");
     const id = await f.coach.mutation(api.financeOperations.recordPayout, args);
     expect(await f.coach.mutation(api.financeOperations.recordPayout, args)).toBe(id);
-    await expect(f.coach.mutation(api.financeOperations.recordPayout, { ...args, amountCents: 500 })).rejects.toThrow("different operation");
+    await expect(f.coach.mutation(api.financeOperations.recordPayout, { ...args, amountCents: 500 })).rejects.toThrow("already submitted with different details");
     const money = await finances(f, f.ids.student);
     expect(money.summary).toMatchObject({ personalAvailableCents: 0, fundraisingAvailableCents: 7000 });
     const payouts = money.entries.filter((entry: { kind: string }) => entry.kind === "payout");
@@ -99,15 +99,15 @@ describe("financial operations", () => {
   it("rejects unauthorized, cross-season, inactive, duplicate-key, and overdraw attempts", async () => {
     const f = await fixture();
     const args = { studentId: f.ids.student, recipientStudentId: f.ids.recipient, amountCents: 1000, reason: "Approved transfer", idempotencyKey: key };
-    await expect(f.student.mutation(api.financeOperations.transferFundraising, args)).rejects.toThrow("Financial editing");
-    await expect(f.mentor.mutation(api.financeOperations.transferFundraising, args)).rejects.toThrow("Financial editing");
-    await expect(f.ungrantedLead.mutation(api.financeOperations.transferFundraising, args)).rejects.toThrow("Financial editing");
-    await expect(f.ungrantedLead.query(api.financeOperations.operationOptions, { studentId: f.ids.student })).rejects.toThrow("Financial editing");
+    await expect(f.student.mutation(api.financeOperations.transferFundraising, args)).rejects.toThrow("Money editing access");
+    await expect(f.mentor.mutation(api.financeOperations.transferFundraising, args)).rejects.toThrow("Money editing access");
+    await expect(f.ungrantedLead.mutation(api.financeOperations.transferFundraising, args)).rejects.toThrow("Money editing access");
+    await expect(f.ungrantedLead.query(api.financeOperations.operationOptions, { studentId: f.ids.student })).rejects.toThrow("Money editing access");
     await expect(f.coach.mutation(api.financeOperations.transferFundraising, { ...args, recipientStudentId: f.ids.old })).rejects.toThrow("active student");
     await expect(f.coach.mutation(api.financeOperations.transferFundraising, { ...args, recipientStudentId: f.ids.inactive })).rejects.toThrow("active student");
-    await expect(f.coach.mutation(api.financeOperations.transferFundraising, { ...args, amountCents: 7001 })).rejects.toThrow("available fundraising");
+    await expect(f.coach.mutation(api.financeOperations.transferFundraising, { ...args, amountCents: 7001 })).rejects.toThrow("Fundraising credit");
     const id = await f.coach.mutation(api.financeOperations.transferFundraising, args);
-    await expect(f.coach.mutation(api.financeOperations.transferFundraising, { ...args, reason: "Changed" })).rejects.toThrow("different operation");
+    await expect(f.coach.mutation(api.financeOperations.transferFundraising, { ...args, reason: "Changed" })).rejects.toThrow("already submitted with different details");
     expect(id).toBeTruthy();
   });
 
@@ -137,7 +137,7 @@ describe("financial operations", () => {
     await rebuildStudent(f.t, f.ids.coach.user, f.ids.recipient);
     const money = await finances(f, f.ids.recipient);
     expect(money.summary).toMatchObject({ personalAvailableCents: 0, fundraisingAvailableCents: 1000 });
-    await expect(f.coach.mutation(api.financeOperations.recordPayout, { studentId: f.ids.recipient, amountCents: 1000, method: "check", reference: "not-allowed", occurredAt: 1, reason: "No fundraising cashout", idempotencyKey: "no-fundraising-payout" })).rejects.toThrow("unallocated personal");
+    await expect(f.coach.mutation(api.financeOperations.recordPayout, { studentId: f.ids.recipient, amountCents: 1000, method: "check", reference: "not-allowed", occurredAt: 1, reason: "No fundraising cashout", idempotencyKey: "no-fundraising-payout" })).rejects.toThrow("Unused payments");
   });
 
   it("rejects a competing spend when the available source changes", async () => {
@@ -186,7 +186,7 @@ describe("financial operations", () => {
   it("returns preparation state without invented balances for historical accounts awaiting rebuild", async () => {
     const f = await fixture(false);
     expect(await f.coach.query(api.financeOperations.operationOptions, { studentId: f.ids.student })).toEqual({ state: "uninitialized", personalAvailableCents: null, fundraisingAvailableCents: null, sourceCount: null, chargeCount: null, recipients: [] });
-    await expect(f.mentor.query(api.financeOperations.operationOptions, { studentId: f.ids.student })).rejects.toThrow("Financial editing");
+    await expect(f.mentor.query(api.financeOperations.operationOptions, { studentId: f.ids.student })).rejects.toThrow("Money editing access");
     await f.coach.mutation(makeFunctionReference<"mutation">("financialSources:rebuild"), { studentId: f.ids.student });
     expect(await f.coach.query(api.financeOperations.operationOptions, { studentId: f.ids.student })).toEqual({ state: "updating", personalAvailableCents: null, fundraisingAvailableCents: null, sourceCount: null, chargeCount: null, recipients: [] });
     await rebuildStudent(f.t, f.ids.coach.user, f.ids.student);
@@ -206,10 +206,10 @@ describe("financial operations", () => {
     const outgoing = entries.filter(e => e.operationId === id);
     expect(outgoing).toHaveLength(2);
     expect(outgoing.every(e => e.kind === "transferOut" && e.destination === "team" && e.sourceKind === "fundraiser" && e.originEntryId === e.sourceEntryId && !e.counterpartyStudentId)).toBe(true);
-    await expect(f.lead.mutation(transfer, { ...args, amountCents: 1 })).rejects.toThrow("different financial command");
-    await expect(f.student.mutation(transfer, args)).rejects.toThrow("Financial editing");
+    await expect(f.lead.mutation(transfer, { ...args, amountCents: 1 })).rejects.toThrow("already submitted with different details");
+    await expect(f.student.mutation(transfer, args)).rejects.toThrow("Money editing access");
     const updated = await f.t.run(ctx => financialAccount(ctx, f.ids.student)); if (!updated) throw new Error("Missing account");
-    await expect(f.coach.mutation(transfer, { ...args, amountCents: 2001, expectedFinancialRevision: updated.revision, idempotencyKey: "cannot-transfer-personal" })).rejects.toThrow("Personal payments");
+    await expect(f.coach.mutation(transfer, { ...args, amountCents: 2001, expectedFinancialRevision: updated.revision, idempotencyKey: "cannot-transfer-personal" })).rejects.toThrow("Only Fundraising credit can move");
     await expect(f.coach.mutation(transfer, { ...args, amountCents: 1, idempotencyKey: "stale-team-preview" })).rejects.toThrow("changed");
   });
 

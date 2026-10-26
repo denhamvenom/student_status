@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import rateLimiter from '@convex-dev/rate-limiter/test';
 import { createTest as convexTest } from '../testUtils';
 import { api } from './_generated/api';
 import { tokenHash } from './lib/invitationIdentity';
@@ -12,7 +13,7 @@ const closedMessage = 'Sign-in is temporarily closed for maintenance';
 afterEach(() => vi.unstubAllEnvs());
 
 async function fixture() {
-  const t = convexTest(schema, modules);
+  const t = convexTest(schema, modules); rateLimiter.register(t);
   const ids = await t.run(async ctx => {
     const coachAuth = await ctx.db.insert('users', { email: 'coach@example.invalid', name: 'Coach' });
     const mentorAuth = await ctx.db.insert('users', { email: 'mentor@example.invalid', name: 'Mentor' });
