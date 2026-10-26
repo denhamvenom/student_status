@@ -12,7 +12,7 @@ const method = v.union(v.literal("cash"), v.literal("check"), v.literal("other")
 type Method = "cash" | "check" | "other";
 
 function financialEditor(user: Doc<"appUsers">) {
-  if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead && user.financialEdit)) throw new ConvexError("Financial editing is not enabled for this account.");
+  if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead && user.financialEdit)) throw new ConvexError("Only a Coach or a Travel Lead with Money editing access can do this.");
 }
 
 function requiredText(value: string, label: string, max: number) {
@@ -22,7 +22,7 @@ function requiredText(value: string, label: string, max: number) {
 }
 
 function validAmount(amountCents: number) {
-  if (!Number.isSafeInteger(amountCents) || amountCents <= 0) throw new ConvexError("Enter a positive amount in cents.");
+  if (!Number.isSafeInteger(amountCents) || amountCents <= 0) throw new ConvexError("Enter an amount greater than $0.00.");
 }
 
 async function activeStudent(ctx: Parameters<typeof activeSeason>[0], studentId: Id<"students">) {
@@ -46,9 +46,9 @@ export const operationOptions = query({
       state: uninitialized ? "uninitialized" as const : account?.state === "failed" ? "failed" as const : "updating" as const,
       personalAvailableCents: null, fundraisingAvailableCents: null, sourceCount: null, chargeCount: null, recipients: [],
     };
-    if (!account) throw new ConvexError("Financial account is unavailable.");
+    if (!account) throw new ConvexError("This student's money records aren't ready. Wait a moment, then try again.");
     const recipients = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", student.seasonId)).take(501);
-    if (recipients.length > 500) throw new ConvexError("Student selection limit reached; contact an administrator.");
+    if (recipients.length > 500) throw new ConvexError("Too many students to list here. Ask a Coach for help.");
     return {
       state: maintenance && maintenance.state !== "ready" ? maintenance.state === "failed" ? "failed" as const : "updating" as const : account.state === "ready" ? "ready" as const : account.state === "failed" ? "failed" as const : "updating" as const, sourceCount: account.sourceCount, chargeCount: account.chargeCount,
       personalAvailableCents: account.personalAvailableCents,
@@ -69,15 +69,15 @@ export const recordPayout = mutation({
     const reason = requiredText(args.reason, "Reason", 500);
     const reference = requiredText(args.reference, "Check or receipt number", 150);
     const key = requiredText(args.idempotencyKey, "Transaction key", 150);
-    if (key.length < 8 || !Number.isSafeInteger(args.occurredAt) || args.occurredAt < 0 || args.occurredAt > Date.now()) throw new ConvexError("Provide a valid transaction key and payout date.");
+    if (key.length < 8 || !Number.isSafeInteger(args.occurredAt) || args.occurredAt < 0 || args.occurredAt > Date.now()) throw new ConvexError("Enter a payout date that isn't in the future.");
     const existing = await ctx.db.query("financeOperations").withIndex("by_idempotencyKey", q => q.eq("idempotencyKey", key)).unique();
     if (existing) {
-      if (existing.kind !== "payout" || existing.studentId !== args.studentId || existing.amountCents !== args.amountCents || existing.method !== args.method || existing.reference !== reference || existing.occurredAt !== args.occurredAt || existing.reason !== reason) throw new ConvexError("Transaction key is already used for a different operation.");
+      if (existing.kind !== "payout" || existing.studentId !== args.studentId || existing.amountCents !== args.amountCents || existing.method !== args.method || existing.reference !== reference || existing.occurredAt !== args.occurredAt || existing.reason !== reason) throw new ConvexError("This was already submitted with different details. Reload to see the latest, then try again.");
       return existing._id;
     }
     const account = await ensureFinancialAccount(ctx, args.studentId);
     const beforePersonal = account.personalAvailableCents;
-    if (args.amountCents > beforePersonal) throw new ConvexError("Amount exceeds unallocated personal payments.");
+    if (args.amountCents > beforePersonal) throw new ConvexError("That's more than this student's Unused payments. Enter a smaller amount.");
     const recordedAt = Date.now();
     const operationId = await ctx.db.insert("financeOperations", { kind: "payout", studentId: args.studentId, amountCents: args.amountCents, reason, method: args.method as Method, reference, occurredAt: args.occurredAt, recordedBy: actor._id, recordedAt, idempotencyKey: key, state: "running", committedCents: 0 });
     const jobId = await ctx.db.insert("financialOperationJobs", { requiredFinancialProjectionVersion: 4, kind: "payout", studentId: args.studentId, actorId: actor._id, generation: account.generation, state: "running", step: 0, amountCents: args.amountCents, committedCents: 0, idempotencyKey: key, operationId, chargeCursor: null, reason, method: args.method, reference, occurredAt: args.occurredAt, updatedAt: recordedAt });
@@ -100,21 +100,21 @@ export const transferFundraising = mutation({
     const actor = await viewer(ctx); financialEditor(actor);
     const sender = await activeStudent(ctx, args.studentId);
     const recipient = await activeStudent(ctx, args.recipientStudentId);
-    if (sender._id === recipient._id || sender.seasonId !== recipient.seasonId) throw new ConvexError("Choose another active student in the same season.");
+    if (sender._id === recipient._id || sender.seasonId !== recipient.seasonId) throw new ConvexError("Choose a different active student in this season.");
     validAmount(args.amountCents);
     const reason = requiredText(args.reason, "Reason", 500);
     const key = requiredText(args.idempotencyKey, "Transaction key", 150);
-    if (key.length < 8) throw new ConvexError("Provide a unique transaction key.");
+    if (key.length < 8) throw new ConvexError("Something went wrong preparing this transfer. Reload, then try again.");
     const existing = await ctx.db.query("financeOperations").withIndex("by_idempotencyKey", q => q.eq("idempotencyKey", key)).unique();
     if (existing) {
-      if (existing.kind !== "transfer" || existing.studentId !== args.studentId || existing.recipientStudentId !== args.recipientStudentId || existing.amountCents !== args.amountCents || existing.reason !== reason) throw new ConvexError("Transaction key is already used for a different operation.");
+      if (existing.kind !== "transfer" || existing.studentId !== args.studentId || existing.recipientStudentId !== args.recipientStudentId || existing.amountCents !== args.amountCents || existing.reason !== reason) throw new ConvexError("This was already submitted with different details. Reload to see the latest, then try again.");
       return existing._id;
     }
     const senderAccount = await ensureFinancialAccount(ctx, sender._id);
     const recipientAccount = await ensureFinancialAccount(ctx, recipient._id);
     const senderBefore = senderAccount.fundraisingAvailableCents;
     const recipientBefore = recipientAccount.fundraisingAvailableCents;
-    if (args.amountCents > senderBefore) throw new ConvexError("Amount exceeds available fundraising credits.");
+    if (args.amountCents > senderBefore) throw new ConvexError("That's more than this student's Fundraising credit. Enter a smaller amount.");
     const recordedAt = Date.now();
     const operationId = await ctx.db.insert("financeOperations", { kind: "transfer", studentId: sender._id, recipientStudentId: recipient._id, amountCents: args.amountCents, reason, recordedBy: actor._id, recordedAt, idempotencyKey: key, state: "running", committedCents: 0 });
     const jobId = await ctx.db.insert("financialOperationJobs", { requiredFinancialProjectionVersion: 4, kind: "transfer", studentId: sender._id, recipientStudentId: recipient._id, actorId: actor._id, generation: senderAccount.generation, recipientGeneration: recipientAccount.generation, state: "running", step: 0, amountCents: args.amountCents, committedCents: 0, idempotencyKey: key, operationId, chargeCursor: null, reason, updatedAt: recordedAt });
@@ -138,9 +138,9 @@ export const previewTeamTransfer = query({
   handler: async (ctx, args) => {
     financialEditor(await viewer(ctx)); await activeStudent(ctx, args.studentId); validAmount(args.amountCents);
     const account = await financialAccount(ctx, args.studentId);
-    if (account?.state !== "ready") return { destination: "team" as const, state: "updating" as const, fundraisingAvailableCents: null, amountCents: args.amountCents, expectedFinancialRevision: null, message: "Financial preparation must finish before a transfer to the team." };
+    if (account?.state !== "ready") return { destination: "team" as const, state: "updating" as const, fundraisingAvailableCents: null, amountCents: args.amountCents, expectedFinancialRevision: null, message: "This student's money records are still updating. Wait a moment, then review the transfer again." };
     const hold = args.amountCents > account.fundraisingAvailableCents;
-    return { destination: "team" as const, state: hold ? "hold" as const : "ready" as const, fundraisingAvailableCents: account.fundraisingAvailableCents, amountCents: args.amountCents, expectedFinancialRevision: account.revision, message: hold ? "Amount exceeds available fundraising credit. Personal payments cannot transfer to the team." : null };
+    return { destination: "team" as const, state: hold ? "hold" as const : "ready" as const, fundraisingAvailableCents: account.fundraisingAvailableCents, amountCents: args.amountCents, expectedFinancialRevision: account.revision, message: hold ? "That's more than this student's Fundraising credit. Only Fundraising credit can move to the team." : null };
   },
 });
 
@@ -150,16 +150,16 @@ export const transferToTeam = mutation({
     await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const actor = await viewer(ctx); financialEditor(actor); await activeStudent(ctx, args.studentId); validAmount(args.amountCents);
     const reason = requiredText(args.reason, "Reason", 1000); const key = requiredText(args.idempotencyKey, "Transaction key", 150);
-    if (reason.length < 8 || key.length < 8 || !Number.isSafeInteger(args.expectedFinancialRevision) || args.expectedFinancialRevision < 0) throw new ConvexError("Provide reviewed amounts, a reason of eight characters, and a unique transaction key.");
+    if (reason.length < 8 || key.length < 8 || !Number.isSafeInteger(args.expectedFinancialRevision) || args.expectedFinancialRevision < 0) throw new ConvexError("Review the amounts and enter a reason of at least eight characters.");
     const hash = await tokenHash(JSON.stringify(["teamTransfer", args.studentId, args.amountCents, args.expectedFinancialRevision, reason]));
     const existing = await ctx.db.query("financialOperationJobs").withIndex("by_originalActorId_and_idempotencyKey", q => q.eq("originalActorId", actor._id).eq("idempotencyKey", key)).unique();
     if (existing) {
-      if (existing.kind !== "teamTransfer" || existing.operationHash !== hash || !existing.operationId) throw new ConvexError("Transaction key is already used for a different financial command.");
+      if (existing.kind !== "teamTransfer" || existing.operationHash !== hash || !existing.operationId) throw new ConvexError("This was already submitted with different details. Reload to see the latest, then try again.");
       return existing.operationId;
     }
     const account = await ensureFinancialAccount(ctx, args.studentId);
-    if (account.revision !== args.expectedFinancialRevision) throw new ConvexError("Financial records changed; refresh the team transfer preview.");
-    if (args.amountCents > account.fundraisingAvailableCents) throw new ConvexError("Amount exceeds available fundraising credit. Personal payments cannot transfer to the team.");
+    if (account.revision !== args.expectedFinancialRevision) throw new ConvexError("This student's money changed. Review the transfer again.");
+    if (args.amountCents > account.fundraisingAvailableCents) throw new ConvexError("That's more than this student's Fundraising credit. Only Fundraising credit can move to the team.");
     const now = Date.now();
     const operationId = await ctx.db.insert("financeOperations", { kind: "teamTransfer", destination: "team", studentId: args.studentId, amountCents: args.amountCents, reason, recordedBy: actor._id, recordedAt: now, idempotencyKey: `team:${actor._id}:${key}`, state: "running", committedCents: 0 });
     const jobId = await ctx.db.insert("financialOperationJobs", { requiredFinancialProjectionVersion: 4, kind: "teamTransfer", destination: "team", studentId: args.studentId, actorId: actor._id, originalActorId: actor._id, generation: account.generation, state: "running", step: 0, amountCents: args.amountCents, committedCents: 0, idempotencyKey: key, operationHash: hash, operationId, chargeCursor: null, reason, updatedAt: now });

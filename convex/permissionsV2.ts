@@ -74,7 +74,7 @@ export const saveProfile = mutation({
   args: {studentId: v.id("students"), expectedRevision: v.number(), value: consentProfileV2Validator}, returns: v.null(),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); await parentSigner(ctx, actor); const student = await studentAccess(ctx, actor, args.studentId);
-    if ((student.profileRevision ?? 0) !== args.expectedRevision) throw new ConvexError("Profile changed. Reload before saving.");
+    if ((student.profileRevision ?? 0) !== args.expectedRevision) throw new ConvexError(`${student.preferredName || student.legalName}'s profile changed since you opened it. Reload to see the latest, then save again.`);
     const setupDraft = await ctx.db.query("setupDrafts").withIndex("by_studentId", q => q.eq("studentId", student._id)).unique();
     const value = validateConsentProfileV2({...normalizeConsentContacts(args.value, student.consentProfileV2), grade: gradeForSave(args.value.grade, [student.consentProfileV2?.grade, setupDraft?.grade])});
     if (Date.parse(`${value.dateOfBirth}T00:00:00Z`) >= Date.now()) throw new ConvexError("Date of birth must be in the past.");
@@ -164,7 +164,7 @@ export const receipt = query({
   args: {submissionId: v.id("permissionSubmissions")}, returns: v.object({snapshot: consentSnapshotV2Validator, reviewedPdfSha256: v.string(), signedPdfSha256: v.string()}),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); formReader(actor); const submission = await ctx.db.get(args.submissionId);
-    if (!submission) throw new ConvexError("Signed form not found."); await studentAccess(ctx, actor, submission.studentId); await requireFamilyEventAccess(ctx, actor, submission.eventIds);
+    if (!submission) throw new ConvexError("This signed permission form isn't available. Reload the page to see the current list."); await studentAccess(ctx, actor, submission.studentId); await requireFamilyEventAccess(ctx, actor, submission.eventIds);
     const snapshot = await sealedSnapshotV2(ctx, submission);
     return {snapshot, reviewedPdfSha256: submission.reviewedPdfSha256!, signedPdfSha256: submission.signedPdfSha256!};
   },

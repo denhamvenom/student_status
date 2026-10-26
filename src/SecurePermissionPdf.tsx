@@ -21,14 +21,14 @@ export function SecurePermissionPdf({ draftId, submissionId, rendition, expected
     setError('')
     void fetchPdf({ ...(draftId ? { draftId } : { submissionId: submissionId! }), rendition }).then(result => {
       if (!alive) return
-      if (result.sha256 !== expectedSha256) throw new Error('The PDF no longer matches the prepared record. Prepare it again.')
+      if (result.sha256 !== expectedSha256) throw new Error('The form changed. Open it again to review the latest version.')
       objectUrl = URL.createObjectURL(new Blob([result.bytes], { type: 'application/pdf' }))
       setUrl(objectUrl)
       onReady?.(true)
-    }).catch(cause => { if (alive) { setError(userFacingError(cause, 'The PDF is unavailable. Retry or prepare a new form.')); onReady?.(false) } })
+    }).catch(cause => { if (alive) { setError(userFacingError(cause, "The form couldn't be opened. Try again, or go back and prepare it again.")); onReady?.(false) } })
     return () => { alive = false; onReady?.(false); if (objectUrl) URL.revokeObjectURL(objectUrl) }
   }, [draftId, submissionId, rendition, expectedSha256, fetchPdf, onReady])
-  return <section className={styles.preview} aria-label={rendition === 'reviewed' ? 'PDF to review' : 'Signed form PDF'}>
-    {url ? <><iframe className={styles.frame} src={url} title={rendition === 'reviewed' ? 'Prepared field trip PDF' : 'Signed field trip PDF'} /><a className={styles.download} href={url} download={rendition === 'reviewed' ? 'field-trip-review.pdf' : 'field-trip-signed.pdf'}>Download PDF</a></> : <p role={error ? 'alert' : 'status'}>{error || 'Loading PDF…'}</p>}
+  return <section className={styles.preview} aria-label={rendition === 'reviewed' ? 'Permission form to review' : 'Signed permission form'}>
+    {url ? <><iframe className={styles.frame} src={url} title={rendition === 'reviewed' ? 'Permission form to review' : 'Signed permission form'} /><a className={styles.download} href={url} download={rendition === 'reviewed' ? 'permission-form-review.pdf' : 'permission-form-signed.pdf'}>Download PDF</a></> : <p role={error ? 'alert' : 'status'}>{error || 'Loading the form…'}</p>}
   </section>
 }

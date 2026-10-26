@@ -28,28 +28,28 @@ export function readCsvCells(input: string): string[][] {
         row = []
       }
     } else if (char === '"' && !cell && !closed) quoted = true
-    else if (char === '"' || closed) throw new Error('The CSV has a misplaced quote.')
+    else if (char === '"' || closed) throw new Error('The file has a misplaced quote. Fix it in your spreadsheet, then upload it again.')
     else cell += char
   }
-  if (quoted) throw new Error('The CSV has an unclosed quoted value.')
+  if (quoted) throw new Error('The file has an unclosed quote. Fix it in your spreadsheet, then upload it again.')
   if (cell || row.length || !rows.length) { row.push(cell); rows.push(row) }
   return rows
 }
 
 export function parseInviteCsv(input: string): InviteCsvRow[] {
-  if (new TextEncoder().encode(input).length > MAX_INVITE_CSV_BYTES) throw new Error('The CSV is too large. Use a file under 128 KB.')
+  if (new TextEncoder().encode(input).length > MAX_INVITE_CSV_BYTES) throw new Error('The file is too large. Use a file under 128 KB, or split it into smaller files.')
   const rows = readCsvCells(input.replace(/^\uFEFF/, ''))
   if (rows[0]?.length !== 2 || rows[0][0].trim().toLowerCase() !== HEADER[0].toLowerCase() || rows[0][1].trim().toLowerCase() !== HEADER[1].toLowerCase()) {
-    throw new Error('The first row must be First Name,Last Name.')
+    throw new Error('The first row must be First Name,Last Name. Start from the template, then upload it again.')
   }
   const data = rows.slice(1).filter(row => row.some(value => value.trim()))
-  if (!data.length) throw new Error('Add at least one student below the header.')
-  if (data.length > MAX_INVITE_ROWS) throw new Error(`Upload at most ${MAX_INVITE_ROWS} students at a time.`)
+  if (!data.length) throw new Error('Add at least one student below the First Name,Last Name row, then upload it again.')
+  if (data.length > MAX_INVITE_ROWS) throw new Error(`Upload at most ${MAX_INVITE_ROWS} students at a time. Split the file, then try again.`)
   return data.map((row, index) => {
-    if (row.length !== 2) throw new Error(`Row ${index + 2} must have two columns.`)
+    if (row.length !== 2) throw new Error(`Row ${index + 2} must have two columns: first name and last name. Fix it, then upload it again.`)
     const firstName = row[0].trim()
     const lastName = row[1].trim()
-    if (!firstName || !lastName || firstName.length > 80 || lastName.length > 80) throw new Error(`Row ${index + 2} needs a first and last name, each at most 80 characters.`)
+    if (!firstName || !lastName || firstName.length > 80 || lastName.length > 80) throw new Error(`Row ${index + 2} needs a first and last name, each at most 80 characters. Fix it, then upload it again.`)
     return { firstName, lastName }
   })
 }

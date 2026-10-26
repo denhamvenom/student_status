@@ -109,6 +109,10 @@ export const ensurePersonas = internalMutation({
       const link = await ctx.db.query("familyLinks").withIndex("by_parentUserId_and_studentId", q => q.eq("parentUserId", parent._id).eq("studentId", student._id)).unique();
       if (!link) { counts.created++; await ctx.db.insert("familyLinks", { parentUserId: parent._id, studentId: student._id, seasonId: season._id, active: true, createdBy: coach._id }); }
       else if (!link.active || link.seasonId !== season._id) { counts.restored++; await ctx.db.patch(link._id, { active: true, seasonId: season._id, revokedAt: undefined, revokedBy: undefined }); }
+      // Parent-only pages (Profile, Permission forms) require a verified parent, as a real email-code Parent has.
+      const marker = await ctx.db.query("parentEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", parent.authUserId)).unique();
+      if (!marker) { counts.created++; await ctx.db.insert("parentEmailIdentities", { authUserId: parent.authUserId, email: developerEmail(id), createdAt: Date.now() }); }
+      else if (marker.email !== developerEmail(id)) throw new Error("Developer parent sign-in record changed; manual review required.");
     }
     await audit(ctx, coach, "developerSignIn", season._id, "ensureDeveloperPersonas", null, { studentId: student._id, ...counts }, REASON);
     return { studentId: student._id, ...counts };

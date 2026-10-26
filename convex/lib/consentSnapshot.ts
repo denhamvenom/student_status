@@ -52,26 +52,29 @@ function matches(ctx: Ctx, value: unknown, validator: GenericValidator): boolean
     default: return false;
   }
 }
+/** Who can prepare a form again: a Parent signs online; a Coach or Travel Lead records paper forms. */
+export const PREPARE_FORM_AGAIN = "Prepare the permission form again. A parent prepares their own form; a Coach or Travel Lead prepares paper forms.";
+const formMismatch = (what: string) => `${what} ${PREPARE_FORM_AGAIN}`;
 export function validateSnapshot(ctx: Ctx, value: unknown): ConsentSnapshot {
-  if (!matches(ctx, value, consentSnapshotValidator)) throw new ConvexError("Permission snapshot evidence is invalid.");
+  if (!matches(ctx, value, consentSnapshotValidator)) throw new ConvexError(formMismatch("This permission form can't be used as it was prepared."));
   const snapshot = value as ConsentSnapshot;
   validateVersion(snapshot.version);
-  if (!snapshot.events.length || snapshot.events.length > MAX_CONSENT_EVENTS || new Set(snapshot.events.map(event => event.eventId)).size !== snapshot.events.length || snapshot.events.some(event => event.endsAt < event.startsAt || !Number.isSafeInteger(event.feeCents) || event.feeCents < 0)) throw new ConvexError("Permission event snapshot is invalid.");
+  if (!snapshot.events.length || snapshot.events.length > MAX_CONSENT_EVENTS || new Set(snapshot.events.map(event => event.eventId)).size !== snapshot.events.length || snapshot.events.some(event => event.endsAt < event.startsAt || !Number.isSafeInteger(event.feeCents) || event.feeCents < 0)) throw new ConvexError(formMismatch("The events on this permission form don't match."));
   for (const revision of [snapshot.student.profileRevision, ...snapshot.priorCoverage.map(row => row.revision)]) assertRevision(revision);
-  if (snapshot.priorCoverage.length !== snapshot.events.length || snapshot.priorCoverage.some(row => !snapshot.events.some(event => event.eventId === row.eventId))) throw new ConvexError("Permission prior coverage snapshot is invalid.");
-  if (snapshot.signer.source === "electronic" && (!snapshot.signer.accountId || !snapshot.signer.email || snapshot.paper !== null) || snapshot.signer.source === "paper" && snapshot.signer.accountId !== null) throw new ConvexError("Permission signer provenance is invalid.");
+  if (snapshot.priorCoverage.length !== snapshot.events.length || snapshot.priorCoverage.some(row => !snapshot.events.some(event => event.eventId === row.eventId))) throw new ConvexError(formMismatch("The earlier forms for these events don't match."));
+  if (snapshot.signer.source === "electronic" && (!snapshot.signer.accountId || !snapshot.signer.email || snapshot.paper !== null) || snapshot.signer.source === "paper" && snapshot.signer.accountId !== null) throw new ConvexError(formMismatch("The signer on this permission form doesn't match."));
   boundedText(snapshot.student.legalName, 160, "Student legal name"); boundedText(snapshot.signer.name, 160, "Signer name");
   for (const [label, value] of [["Emergency contact name", snapshot.emergency.name], ["Emergency contact relationship", snapshot.emergency.relationship], ["Emergency contact phone", snapshot.emergency.phone]] as const) boundedText(value, 254, label);
   for (const report of [snapshot.health.allergies, snapshot.health.medications]) {
     if (report.state === "reported") boundedText(report.text ?? "", 4000, "Health details");
-    else if (report.text !== null) throw new ConvexError("None-reported health evidence must not contain contradictory details.");
+    else if (report.text !== null) throw new ConvexError(formMismatch("Health information on this form says none reported but also has details."));
   }
-  if (snapshot.priorCoverage.some((row,index,all) => all.findIndex(item => item.eventId === row.eventId) !== index)) throw new ConvexError("Duplicate prior coverage evidence is invalid.");
-  if (new TextEncoder().encode(JSON.stringify(snapshot)).byteLength > MAX_SNAPSHOT_BYTES) throw new ConvexError("Permission snapshot is too large. Choose fewer covered events or shorten draft wording before preparing it again.");
+  if (snapshot.priorCoverage.some((row,index,all) => all.findIndex(item => item.eventId === row.eventId) !== index)) throw new ConvexError(formMismatch("An event is listed twice on this permission form."));
+  if (new TextEncoder().encode(JSON.stringify(snapshot)).byteLength > MAX_SNAPSHOT_BYTES) throw new ConvexError("This permission form is too long. Choose fewer events or shorten the wording, then prepare it again.");
   return snapshot;
 }
-export function parseSnapshot(ctx: Ctx, raw: string) {let value: unknown; try {value = JSON.parse(raw)} catch {throw new ConvexError("Permission snapshot evidence is invalid.")} return validateSnapshot(ctx, value)}
-export function assertRevision(value: number) {if (!Number.isSafeInteger(value) || value < 0) throw new ConvexError("Permission revision is invalid.")}
+export function parseSnapshot(ctx: Ctx, raw: string) {let value: unknown; try {value = JSON.parse(raw)} catch {throw new ConvexError(formMismatch("This permission form can't be used as it was prepared."))} return validateSnapshot(ctx, value)}
+export function assertRevision(value: number) {if (!Number.isSafeInteger(value) || value < 0) throw new ConvexError("This permission form changed since you opened it. Reload to see the latest, then try again.")}
 export function boundedText(value: string, maximum: number, label: string) {if (!value.trim() || value.length > maximum) throw new ConvexError(`${label} is required and must be at most ${maximum} characters.`)}
 export function validateVersion(version: Infer<typeof versionValidator> | Omit<Doc<"permissionVersions">, "_id" | "_creationTime">) {
   boundedText(version.version, 80, "Version"); boundedText(version.title, 160, "Form title"); boundedText(version.wording, 20000, "Permission wording"); boundedText(version.administrationText, 5000, "Administration text"); boundedText(version.acknowledgmentText, 2000, "Acknowledgment");

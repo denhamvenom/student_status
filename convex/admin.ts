@@ -12,6 +12,7 @@ import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
 import { markRoomCategoryReview } from "./lib/profileCorrections";
 import { syncWholeTeamMembership } from "./lib/wholeTeam";
 import { subteamOptions } from "../src/lib/subteams";
+import { allocateInvitationCode } from "./lib/invitationCodes";
 
 export const listJoinRequests = query({
   args: {}, returns: v.any(),
@@ -22,20 +23,16 @@ export const listJoinRequests = query({
   },
 });
 
+const coachOnlyCodes = "Only a Coach can create or revoke invitation codes. Ask a Coach for a code.";
+
 export const createJoinCode = mutation({
   args: { duration: v.union(v.literal("24h"), v.literal("1w"), v.literal("2w")) }, returns: v.object({ code: v.string(), expiresAt: v.number() }),
   handler: async (ctx, args) => {
-    const user = await viewer(ctx); if (user.role !== "coach") throw new ConvexError("Join code management is coach only.");
+    const user = await viewer(ctx); if (user.role !== "coach") throw new ConvexError(coachOnlyCodes);
     const season = await activeSeason(ctx);
-    let code = "";
-    for (let attempt = 0; attempt < 100; attempt++) {
-      const value = crypto.getRandomValues(new Uint32Array(1))[0];
-      if (value >= 4_294_800_000) continue;
-      const candidate = String(100_000 + value % 900_000);
-      const existing = await ctx.db.query("joinCodes").withIndex("by_code", q => q.eq("code", candidate)).first();
-      if (!existing) { code = candidate; break; }
-    }
-    if (!code) throw new ConvexError("Could not allocate an unused team code. Try again.");
+    // Shared six-digit namespace: never equal to any team code or individual invitation ever issued.
+    const code = await allocateInvitationCode(ctx);
+    if (!code) throw new ConvexError("A new invitation code couldn't be created. Try again.");
     const expiresAt = Date.now() + { "24h": 86_400_000, "1w": 604_800_000, "2w": 1_209_600_000 }[args.duration];
     await ctx.db.insert("joinCodes", { seasonId: season._id, code, expiresAt, revoked: false, createdBy: user._id });
     await audit(ctx, user, "joinCodes", code, "create", null, { expiresAt });
@@ -48,8 +45,8 @@ export const activeJoinCodes = query({
   returns: v.object({ items: v.array(v.object({ codeId: v.id("joinCodes"), code: v.string(), expiresAt: v.number() })), truncated: v.boolean() }),
   handler: async (ctx, args) => {
     const user = await viewer(ctx);
-    if (user.role !== "coach") throw new ConvexError("Join code management is coach only.");
-    if (!Number.isSafeInteger(args.asOf)) throw new ConvexError("A valid review time is required.");
+    if (user.role !== "coach") throw new ConvexError(coachOnlyCodes);
+    if (!Number.isSafeInteger(args.asOf)) throw new ConvexError("This page is out of date. Reload, then try again.");
     const season = await activeSeason(ctx);
     const page = await ctx.db.query("joinCodes").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).order("desc").take(101);
     return { items: page.slice(0, 100).filter(code => !code.revoked && code.expiresAt > args.asOf).map(code => ({ codeId: code._id, code: code.code, expiresAt: code.expiresAt })), truncated: page.length > 100 };
@@ -58,7 +55,7 @@ export const activeJoinCodes = query({
 
 export const revokeJoinCode = mutation({
   args: { codeId: v.id("joinCodes") }, returns: v.null(),
-  handler: async (ctx, args) => { const user = await viewer(ctx); if (user.role !== "coach") throw new ConvexError("Join code management is coach only."); const code = await ctx.db.get(args.codeId); if (!code) throw new ConvexError("Code not found."); await ctx.db.patch(code._id, { revoked: true }); await audit(ctx, user, "joinCodes", code._id, "revoke", false, true); return null; },
+  handler: async (ctx, args) => { const user = await viewer(ctx); if (user.role !== "coach") throw new ConvexError(coachOnlyCodes); const code = await ctx.db.get(args.codeId); if (!code) throw new ConvexError("This invitation code is no longer available. Reload to see the latest."); await ctx.db.patch(code._id, { revoked: true }); await audit(ctx, user, "joinCodes", code._id, "revoke", false, true); return null; },
 });
 
 export const approveJoin = mutation({

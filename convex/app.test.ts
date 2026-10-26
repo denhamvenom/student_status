@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import { describe, expect, it } from "vitest";
+import rateLimiter from "@convex-dev/rate-limiter/test";
 import { createTest as convexTest } from "../testUtils";
 import { api } from "./_generated/api";
 import schema from "./schema";
@@ -7,7 +8,7 @@ import schema from "./schema";
 const modules = import.meta.glob("./**/*.ts");
 
 async function fixture() {
-  const t = convexTest(schema, modules);
+  const t = convexTest(schema, modules); rateLimiter.register(t);
   const ids = await t.run(async ctx => {
     const authCoach = await ctx.db.insert("users", { email: "coach@example.org", name: "Coach" });
     const authParent = await ctx.db.insert("users", { email: "parent@example.org", name: "Parent" });
@@ -81,7 +82,7 @@ describe("server boundaries", () => {
     expect(await f.student.mutation(api.participation.signUp, { eventId: f.ids.event })).toBe("pending");
     expect(await f.other.mutation(api.participation.signUp, { eventId: f.ids.event })).toBe("waitlist");
     expect((await f.student.query(api.financeDetails.charges, { studentId: f.ids.student, paginationOpts: { cursor: null, numItems: 25 } })).page).toHaveLength(0);
-    await expect(f.mentor.mutation(api.finance.recordFunds, { studentId: f.ids.student, kind: "payment", amountCents: 1000, reason: "Cash", idempotencyKey: "pay-123456" })).rejects.toThrow("Financial editing");
+    await expect(f.mentor.mutation(api.finance.recordFunds, { studentId: f.ids.student, kind: "payment", amountCents: 1000, reason: "Cash", idempotencyKey: "pay-123456" })).rejects.toThrow("Money editing access");
     await f.coach.mutation(api.participation.setParticipation, { eventId: f.ids.event, studentId: f.ids.student, status: "confirmed" });
     const money = await f.student.query(api.app.studentFinances, { studentId: f.ids.student });
     expect(money.summary!.chargedCents).toBe(45000);
@@ -125,7 +126,7 @@ describe("server boundaries", () => {
     const asOf = Date.now();
     const list = await f.coach.query(api.admin.activeJoinCodes, { asOf });
     expect(list.items).toEqual([expect.objectContaining({ code: code.code })]);
-    await expect(f.mentor.query(api.admin.activeJoinCodes, { asOf })).rejects.toThrow("coach only");
+    await expect(f.mentor.query(api.admin.activeJoinCodes, { asOf })).rejects.toThrow("Only a Coach");
     await f.coach.mutation(api.admin.revokeJoinCode, { codeId: list.items[0].codeId });
     expect((await f.coach.query(api.admin.activeJoinCodes, { asOf })).items).toEqual([]);
   });
@@ -138,6 +139,15 @@ describe("server boundaries", () => {
     const attempt = await f.t.run(ctx => ctx.db.query("joinAttempts").withIndex("by_authUserId", q => q.eq("authUserId", authJoiner)).unique());
     expect(attempt?.lockedUntil).toBeGreaterThan(Date.now());
     const code = await f.coach.mutation(api.admin.createJoinCode, { duration: "1w" });
+    expect(await joiner.mutation(api.app.requestJoin, { code: code.code, firstName: "A", lastName: "B" })).toBeNull();
+  });
+
+  it("applies the shared per-account code limit to team join requests", async () => {
+    const f = await fixture();
+    const authJoiner = await f.t.run(ctx => ctx.db.insert("users", { email: "limited@example.org", name: "Limited" }));
+    const joiner = f.t.withIdentity({ subject: `${authJoiner}|sessionA` });
+    const code = await f.coach.mutation(api.admin.createJoinCode, { duration: "1w" });
+    for (let i = 0; i < 10; i++) expect(await joiner.mutation(api.bulkInvites.checkInvitationCode, { code: code.code })).toEqual({ kind: "team" });
     expect(await joiner.mutation(api.app.requestJoin, { code: code.code, firstName: "A", lastName: "B" })).toBeNull();
   });
 
@@ -176,7 +186,7 @@ describe("server boundaries", () => {
     const f = await fixture();
     await f.student.mutation(api.participation.signUp, { eventId: f.ids.event });
     await f.t.run(ctx => ctx.db.patch(f.ids.event, { archived: true }));
-    await expect(f.student.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.event, idempotencyKey: "archived-request-test" })).rejects.toThrow("unavailable");
+    await expect(f.student.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.event, idempotencyKey: "archived-request-test" })).rejects.toThrow("can't withdraw");
     const row = await f.t.run(ctx => ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", f.ids.event).eq("studentId", f.ids.student)).unique());
     expect(row?.status).toBe("pending");
   });

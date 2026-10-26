@@ -94,6 +94,6 @@ bunx convex env set --deployment dev DEVELOPER_SIGN_IN_KEY <random value of at l
 bunx convex run --deployment dev developerSignIn:ensurePersonas
 ```
 
-Keep the key outside Git (for example in the ignored `private-data/` folder) and paste it into the panel; the panel remembers it only for the current browser tab. Rerunning `ensurePersonas` restores the fictional accounts' grants, the Dev Student profile link and both family links after testing changes them; it never touches other accounts. The fictional accounts use the reserved `developer.example.invalid` domain, cannot accept invitations, and stop working as soon as either setting is removed. Never set either value on production.
+Keep the key outside Git (for example in the ignored `private-data/` folder) and paste it into the panel; the panel remembers it only for the current browser tab. Rerunning `ensurePersonas` restores the fictional accounts' grants, the Dev Student profile link, both family links and the two Parents' verified-parent records (needed for Profile and Permission forms) after testing changes them; it never touches other accounts. The fictional accounts use the reserved `developer.example.invalid` domain, cannot accept invitations, and stop working as soon as either setting is removed. Never set either value on production.
 
 This does not test Google or parent-email sign-in. Before releasing authentication changes, still sign in once for real.

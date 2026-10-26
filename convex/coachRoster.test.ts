@@ -123,7 +123,7 @@ describe("Coach student roster and record",()=>{
     await f.t.run(ctx=>ctx.db.patch(f.ids.student,{active:false}));
     expect((await f.coach.query(list,{...page,active:false})).page[0]).toMatchObject({active:false,readinessCoverage:"notApplicable"});
     expect(await f.coach.query(detail,{studentId:f.ids.student,asOf:100})).toMatchObject({active:false,legalName:"Synthetic Student",balance:{dueCents:null}});
-    await expect(f.coach.query(list,{paginationOpts:{numItems:21,cursor:null},asOf:100})).rejects.toThrow("between 1 and 20");
+    await expect(f.coach.query(list,{paginationOpts:{numItems:21,cursor:null},asOf:100})).rejects.toThrow("list couldn't load");
   });
   it("matches the finance roster projection and withholds invalid balance data",async()=>{
     const f=await fixture();

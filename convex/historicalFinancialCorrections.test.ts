@@ -64,8 +64,8 @@ it("denies expired/wrong-role/stale grants and holds all linked histories withou
     await recordProjectedEntry(ctx, out, account!);
   });
   const before = await f.t.run(ctx => financialAccount(ctx, f.ids.student));
-  expect(await f.coach.query(previewRef, query)).toMatchObject({ ready: false, message: expect.stringContaining("downstream") });
-  await expect(f.coach.mutation(correctRef, { ...args, correctionSessionId: fresh.id })).rejects.toThrow("downstream");
+  expect(await f.coach.query(previewRef, query)).toMatchObject({ ready: false, message: expect.stringContaining("separate review") });
+  await expect(f.coach.mutation(correctRef, { ...args, correctionSessionId: fresh.id })).rejects.toThrow("separate review");
   expect(await f.t.run(ctx => financialAccount(ctx, f.ids.student))).toEqual(before);
 });
 

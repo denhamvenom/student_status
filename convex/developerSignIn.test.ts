@@ -60,7 +60,7 @@ describe("developer sign-in", () => {
   it("creates the fixed fictional accounts and links without touching real accounts, and is repeatable", async () => {
     const f = await fixture(); enable();
     const first = await f.t.mutation(internal.developerSignIn.ensurePersonas, {});
-    expect(first).toMatchObject({ created: DEVELOPER_PERSONAS.length + 3, restored: 0 });
+    expect(first).toMatchObject({ created: DEVELOPER_PERSONAS.length + 5, restored: 0 });
     const state = await f.t.run(async ctx => ({
       app: await ctx.db.query("appUsers").take(20),
       links: await ctx.db.query("familyLinks").withIndex("by_studentId", q => q.eq("studentId", first.studentId)).take(5),
@@ -71,6 +71,14 @@ describe("developer sign-in", () => {
     expect(state.links.map(link => link.active)).toEqual([true, true]);
     expect(state.student).toMatchObject({ seasonId: f.ids.season, email: developerEmail("student"), active: true });
     expect(await f.t.mutation(internal.developerSignIn.ensurePersonas, {})).toMatchObject({ studentId: first.studentId, created: 0, restored: 0 });
+  });
+
+  it.each(["parent", "parentStaff"] as const)("lets the fictional %s open parent-only pages", async persona => {
+    const f = await fixture(); enable();
+    const { studentId } = await f.t.mutation(internal.developerSignIn.ensurePersonas, {});
+    await signInAs(f.t, persona);
+    const as = f.t.withIdentity({ subject: await sessionFor(f.t, persona) });
+    await expect(as.query(api.permissionsV2.profile, { studentId })).resolves.toMatchObject({ studentId });
   });
 
   it("restores grants and family links changed during testing", async () => {
