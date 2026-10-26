@@ -12,7 +12,7 @@ import { transportSummary } from "./travel";
 import { age18, firstStatus } from "./firstRegistration";
 import { studentSetupCompleteFor } from "./setupWizard";
 import { operatingRole } from "./lib/access";
-import { clearJoinAttempts, googleRequiredForStudents, joinAttemptsLocked, recordFailedJoinAttempt, usableTeamCode } from "./lib/invitationCodes";
+import { clearJoinAttempts, codeLimiter, googleRequiredForStudents, joinAttemptsLocked, recordFailedJoinAttempt, usableTeamCode } from "./lib/invitationCodes";
 
 export const viewer = query({
   args: {}, returns: v.any(),
@@ -273,6 +273,8 @@ export const requestJoin = mutation({
     if (existing?.status === "approved") return null;
     const now = Date.now();
     if (await joinAttemptsLocked(ctx, who.authUserId, now)) return null;
+    // Same per-account limits as checkInvitationCode, so team codes cannot be guessed faster here.
+    if (!(await codeLimiter.limit(ctx, "studentCodeAttempts", { key: who.authUserId })).ok || !(await codeLimiter.limit(ctx, "studentCodeDailyAttempts", { key: who.authUserId })).ok) return null;
     if (!(await usableTeamCode(ctx, args.code, season._id, now))) {
       await recordFailedJoinAttempt(ctx, who.authUserId, now);
       return null;
