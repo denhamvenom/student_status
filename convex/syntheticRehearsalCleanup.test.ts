@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import { afterEach, describe, expect, it } from "vitest";
+import rateLimiter from "@convex-dev/rate-limiter/test";
 import { createTest as convexTest } from "../testUtils";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
@@ -20,7 +21,7 @@ function enabled() {
 }
 
 async function fixture() {
-  const t = convexTest(schema, modules);
+  const t = convexTest(schema, modules); rateLimiter.register(t);
   const ids = await t.run(async ctx => {
     const coachAuth = await ctx.db.insert("users", { email: "coach@example.invalid", emailVerificationTime: 1 });
     const coachAccount = await ctx.db.insert("authAccounts", { userId: coachAuth, provider: "google", providerAccountId: "real-coach-google-sub", emailVerified: "coach@example.invalid" });
