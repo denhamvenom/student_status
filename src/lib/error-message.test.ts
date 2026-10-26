@@ -36,7 +36,7 @@ describe('userFacingError', () => {
   })
 
   it('offers an action for connection and session failures', () => {
-    expect(userFacingError(new Error('Failed to fetch'))).toBe('Could not reach Student Status. Check your connection and try again.')
+    expect(userFacingError(new Error('Failed to fetch'))).toBe('Could not reach Venom Status. Check your connection and try again.')
     expect(userFacingError(new Error('Unauthenticated'))).toBe('Your sign-in may have expired. Sign in again, then try again.')
   })
 

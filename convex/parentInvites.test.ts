@@ -335,7 +335,7 @@ describe("parent invitation email", () => {
     expect(body.html).toContain("Choose Open private invitation");
     expect(body.html).not.toContain("Continue");
     expect(body.html).not.toContain("24 hours");
-    expect(body.subject).toBe("Parent invitation to Denham Venom Student Status");
+    expect(body.subject).toBe("Parent invitation to Venom Status");
     expect(body.html).not.toContain("Synthetic Student");
     expect(body.text).toContain("private link");
     expect(JSON.stringify(await f.t.run(ctx => ctx.db.get(invite.inviteId)))).not.toContain(invite.token);

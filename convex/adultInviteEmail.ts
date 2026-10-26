@@ -14,11 +14,11 @@ function offeredRole(row: { role: "coach" | "mentor"; travelLead: boolean }): Of
 
 // Each role gets its own subject and heading so it never reads like the parent invitation.
 function adultInvitationEmail(role: OfferedRole, link: string) {
-  const offer = `You have been invited to join Denham Venom Student Status as a ${role}.`;
+  const offer = `You have been invited to join Venom Status, the Denham Venom team app, as a ${role}.`;
   const steps = "Choose Open private invitation, sign in with Google or an email code sent to this address, then accept the invitation. This invitation expires in 7 days.";
   const ignore = "If you were not expecting this invitation, you can ignore this email.";
   return {
-    subject: `${role} invitation to Denham Venom Student Status`,
+    subject: `${role} invitation to Venom Status`,
     text: `${offer}\n\nOpen this private link, sign in with Google or an email code sent to this address, then accept the invitation: ${link}\n\nThis invitation expires in 7 days.\n\n${ignore}`,
     html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#172431"><h1>${role} invitation</h1><p>${offer}</p><p><a href="${link}" style="display:inline-block;background:#f5c400;color:#211432;padding:12px 18px;text-decoration:none;border-radius:6px">Open private invitation</a></p><p>${steps}</p><p>${ignore}</p></div>`,
   };

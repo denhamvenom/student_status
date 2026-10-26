@@ -79,9 +79,9 @@ export const send = internalAction({
       reply_to: config.replyTo,
       to: [ready.parentEmail],
       // Name the button exactly as it appears and state one time limit (the invitation's 7 days).
-      subject: "Parent invitation to Denham Venom Student Status",
-      text: `A student on Denham Venom invited you to Student Status as their parent or guardian.\n\nOpen this private link, sign in with this email address, then confirm your relationship to the student: ${link}\n\nThis invitation expires in 7 days.\n\nIf you were not expecting this invitation, you can ignore this email.`,
-      html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#172431"><h1>Parent invitation</h1><p>A student on Denham Venom invited you to Student Status as their parent or guardian.</p><p><a href="${link}" style="display:inline-block;background:#165d75;color:#fff;padding:12px 18px;text-decoration:none;border-radius:6px">Open private invitation</a></p><p>Choose Open private invitation, sign in with this email address, then confirm your relationship to the student. This invitation expires in 7 days.</p><p>If you were not expecting this invitation, you can ignore this email.</p></div>`,
+      subject: "Parent invitation to Venom Status",
+      text: `A student on Denham Venom invited you to Venom Status as their parent or guardian.\n\nOpen this private link, sign in with this email address, then confirm your relationship to the student: ${link}\n\nThis invitation expires in 7 days.\n\nIf you were not expecting this invitation, you can ignore this email.`,
+      html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#172431"><h1>Parent invitation</h1><p>A student on Denham Venom invited you to Venom Status as their parent or guardian.</p><p><a href="${link}" style="display:inline-block;background:#165d75;color:#fff;padding:12px 18px;text-decoration:none;border-radius:6px">Open private invitation</a></p><p>Choose Open private invitation, sign in with this email address, then confirm your relationship to the student. This invitation expires in 7 days.</p><p>If you were not expecting this invitation, you can ignore this email.</p></div>`,
     });
     let outcome: "sent" | "retry" | "failed";
     try {

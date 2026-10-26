@@ -47,7 +47,7 @@ async function fixture() {
   return { t, ids, coach: t.withIdentity({ subject: `${ids.authCoach}|one` }), mentor: t.withIdentity({ subject: `${ids.authMentor}|one` }) };
 }
 
-describe("Student Status Calendar link", () => {
+describe("Venom Status Calendar link", () => {
   it("preserves unrelated description while changing only the managed media line", () => {
     expect(withMediaMarker("Bring gear\nContact coach", true)).toBe("Bring gear\nContact coach\nMedia Support Requested");
     expect(withMediaMarker("Bring gear\nMedia Support Requested\nContact coach", false)).toBe("Bring gear\nContact coach");

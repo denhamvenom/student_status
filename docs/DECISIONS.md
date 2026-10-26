@@ -8,6 +8,10 @@ Read this before changing parent linking, consent/PDF, finance, rooms/waitlists 
 - Require explicit good-faith parent/legal-guardian relationship and authority attestation. Email control does not independently prove guardianship or sign consent.
 - Preserve inbox privacy, the one-hour resend guard and revocation/access checks.
 
+## Product name
+
+- October 25 owner decision: the app shown to people is **Venom Status** (was Student Status): page titles, sign-in, About/Privacy/Terms, emails, PDF metadata and messages. Infrastructure names (GitHub repository `student_status`, Convex project, Cloudflare Workers, domains, code identifiers and internal docs) are unchanged unless the owner asks separately. A production `PARENT_INVITE_EMAIL_FROM` value, if set, overrides the default sender name and must be updated there.
+
 ## Developer sign-in
 
 - October 25 owner decision: the development deployment (`third-bandicoot-18`) offers a developer sign-in so the owner and Claude can test every role without Google. It signs in only to fixed fictional accounts on the reserved `developer.example.invalid` domain: Coach, Mentor, Travel Lead, Parent, Parent with staff access, and Student. It never signs in, creates, links or changes a real account.

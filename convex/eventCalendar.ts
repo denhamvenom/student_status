@@ -21,7 +21,7 @@ function writeEnabled() { return configured() && env.CONVEX_CLOUD_URL === produc
 function eventUrl(eventId?: string) { return `${calendarBase}${encodeURIComponent(env.TIMECLOCK_CALENDAR_ID!)}/events${eventId ? `/${encodeURIComponent(eventId)}` : ""}`; }
 async function token(write: boolean) { return serviceToken(env.TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_EMAIL!, env.TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_PRIVATE_KEY!, write ? writeScope : undefined); }
 function calendarError(status: number) {
-  if (status === 401 || status === 403) return "Student Status can't edit Team Calendar. Ask the Calendar owner to give Student Status editor access, then try again.";
+  if (status === 401 || status === 403) return "Venom Status can't edit Team Calendar. Ask the Calendar owner to give Venom Status editor access, then try again.";
   if (status === 404) return "The selected Calendar entry no longer exists. Choose another entry or try again.";
   if (status === 412) return "This entry changed in Team Calendar. Reload Calendar details, then try again.";
   return `Team Calendar could not be updated (error ${status}). Try again in a few minutes. If it keeps happening, contact a Coach.`;
@@ -126,7 +126,7 @@ export const status = query({
     if (!event || event.seasonId !== season._id) throw new ConvexError("This event is no longer in the current season. Reload to see current events.");
     const disabled = !!event.calendarChoice && !writeEnabled();
     const state: "unlinked" | "pending" | "synced" | "failed" | "conflict" | "disabled" = !event.calendarChoice ? "unlinked" : disabled ? "disabled" : event.calendarSyncState ?? "pending";
-    return { state, error: disabled ? "Calendar updates are turned off in this copy of Student Status, so changes here won't reach Team Calendar." : event.calendarSyncError ?? null, calendarEventId: event.calendarEventId ?? null, mediaSupportRequested: event.mediaSupportRequested ?? false, cancelled: event.cancelled ?? false, allDay: !!event.calendarAllDayStartDate, recurring: event.calendarRecurring ?? false, revision: event.calendarRevision ?? 0, canReselect: event.calendarChoice === "link" && event.calendarSyncState === "failed" && !!event.calendarLinkReplaceable && !event.calendarEtag };
+    return { state, error: disabled ? "Calendar updates are turned off in this copy of Venom Status, so changes here won't reach Team Calendar." : event.calendarSyncError ?? null, calendarEventId: event.calendarEventId ?? null, mediaSupportRequested: event.mediaSupportRequested ?? false, cancelled: event.cancelled ?? false, allDay: !!event.calendarAllDayStartDate, recurring: event.calendarRecurring ?? false, revision: event.calendarRevision ?? 0, canReselect: event.calendarChoice === "link" && event.calendarSyncState === "failed" && !!event.calendarLinkReplaceable && !event.calendarEtag };
   },
 });
 
@@ -217,7 +217,7 @@ export const push = internalAction({ args: { eventId: v.id("events"), revision: 
   const snapshot = await ctx.runQuery(internal.eventCalendar.pushSnapshot, args);
   if (!snapshot) return null;
   const fail = async (error: string, conflict = false, replaceable = false) => ctx.runMutation(internal.eventCalendar.finishPush, { ...args, error, conflict, replaceable });
-  if (!writeEnabled()) { await fail("Calendar updates are turned off in this copy of Student Status, so changes here won't reach Team Calendar."); return null; }
+  if (!writeEnabled()) { await fail("Calendar updates are turned off in this copy of Venom Status, so changes here won't reach Team Calendar."); return null; }
   if (!await boundCalendar(ctx)) { await fail("Team Calendar settings changed or haven't been checked yet. Try again after the next Calendar update, or contact a Coach.", true); return null; }
   try {
     const auth = `Bearer ${await token(true)}`;
@@ -225,7 +225,7 @@ export const push = internalAction({ args: { eventId: v.id("events"), revision: 
       const response = await fetch(eventUrl(snapshot.calendarEventId), { headers: { authorization: auth } });
       if (!response.ok) { await fail(calendarError(response.status), false, response.status === 404); return null; }
       const detail = googleDetails(await response.json());
-      if (detail.parentSeries || (!detail.cancelled && (detail.startsAt === null || detail.endsAt === null))) { await fail("This Calendar entry has a schedule Student Status can't use. Fix it in Team Calendar, then try again.", true); return null; }
+      if (detail.parentSeries || (!detail.cancelled && (detail.startsAt === null || detail.endsAt === null))) { await fail("This Calendar entry has a schedule Venom Status can't use. Fix it in Team Calendar, then try again.", true); return null; }
       await ctx.runMutation(internal.eventCalendar.finishPush, { ...args, calendarEventId: detail.id, etag: detail.etag, providerUpdatedAt: detail.updatedAt, observed: { title: detail.cancelled ? snapshot.name : detail.title, location: detail.cancelled ? snapshot.destination : detail.location, startsAt: detail.startsAt ?? snapshot.startsAt, endsAt: detail.endsAt ?? snapshot.endsAt, cancelled: detail.cancelled, media: detail.cancelled ? snapshot.media : detail.description.split(/\r?\n/).some(line => line.trim() === mediaMarker), startDate: detail.startDate ?? undefined, endDate: detail.endDate ?? undefined, recurring: detail.recurring } });
       return null;
     }
@@ -367,7 +367,7 @@ export const applyObserved = internalMutation({ args: observedArgs, returns: v.n
   if (event.calendarProviderUpdatedAt !== undefined && !args.authoritativeGone && (args.providerUpdatedAt === undefined || args.providerUpdatedAt < event.calendarProviderUpdatedAt)) return null;
   if (event.calendarEtag && args.etag === event.calendarEtag) return null;
   if (!args.cancelled && (args.start === undefined || args.end === undefined || args.end <= args.start || args.allDay && (!args.allDayStartDate || !args.allDayEndDate))) {
-    await ctx.db.patch(event._id, { calendarSyncState: "conflict", calendarSyncError: "This entry was changed in Team Calendar to a repeating, all-day or invalid time that Student Status can't use. Fix it in Team Calendar." });
+    await ctx.db.patch(event._id, { calendarSyncState: "conflict", calendarSyncError: "This entry was changed in Team Calendar to a repeating, all-day or invalid time that Venom Status can't use. Fix it in Team Calendar." });
     return null;
   }
   const title = args.cancelled ? event.name : args.title;
