@@ -131,6 +131,7 @@ import type * as seasonHistory from "../seasonHistory.js";
 import type * as seasonTransition from "../seasonTransition.js";
 import type * as seasonTransitionReview from "../seasonTransitionReview.js";
 import type * as setupWizard from "../setupWizard.js";
+import type * as studentHome from "../studentHome.js";
 import type * as subteamMigration from "../subteamMigration.js";
 import type * as syntheticRehearsalCleanup from "../syntheticRehearsalCleanup.js";
 import type * as teamReports from "../teamReports.js";
@@ -274,6 +275,7 @@ declare const fullApi: ApiFromModules<{
   seasonTransition: typeof seasonTransition;
   seasonTransitionReview: typeof seasonTransitionReview;
   setupWizard: typeof setupWizard;
+  studentHome: typeof studentHome;
   subteamMigration: typeof subteamMigration;
   syntheticRehearsalCleanup: typeof syntheticRehearsalCleanup;
   teamReports: typeof teamReports;
