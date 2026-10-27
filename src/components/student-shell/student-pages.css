@@ -1,0 +1,9 @@
+/*
+ * Student pages in the redesign palette. Every selector starts with :root[data-design="student"]
+ * (set by AppShell while a Student is signed in), so Parent and staff screens are unchanged.
+ */
+
+/* The phone bottom bar grows by the home-indicator inset; keep the public footer links above it. */
+@media (max-width: 1023px) {
+    :root[data-design="student"] .app-frame footer { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+}
