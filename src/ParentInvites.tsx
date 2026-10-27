@@ -22,12 +22,16 @@ const message = (error:unknown) => userFacingError(error)
 const oauthTokenKey = 'student-status-parent-invite-oauth'
 const focusAcceptedHeading = (element:HTMLHeadingElement|null) => element?.focus()
 const deliveryText = (status:string|null|undefined) => familyCopy.parent[invitationEmailStatus(status)]
-const invitationText: Record<InvitationState,string> = {waiting:familyCopy.parent.invitationWaiting,expired:familyCopy.parent.expired,accepted:familyCopy.parent.invitationAccepted,revoked:familyCopy.parent.invitationRevoked,replaced:familyCopy.parent.invitationReplaced}
-/** The Student's Parents page: "Waiting for your parent to accept · expires Oct 30, 2026, 3:00 PM". */
-const invitationLine = (invite:{status:'pending'|'accepted'|'revoked'|'replaced';expiresAt:number;acceptedAt:number|null}, now:number) => {
+const invitationText: Record<'student'|'staff',Record<InvitationState,string>> = {
+  student: {waiting:familyCopy.parent.invitationWaiting,expired:familyCopy.parent.expired,accepted:familyCopy.parent.invitationAccepted,revoked:familyCopy.parent.invitationRevoked,replaced:familyCopy.parent.invitationReplaced},
+  staff: {waiting:familyCopy.parent.invitationWaitingStaff,expired:familyCopy.parent.expired,accepted:familyCopy.parent.invitationAccepted,revoked:familyCopy.parent.invitationRevoked,replaced:familyCopy.parent.invitationReplaced},
+}
+/** Student's Parents page: "Waiting for your parent to accept · expires Oct 30, 2026, 3:00 PM"; the Coach's review says "the parent". */
+const invitationLine = (invite:{status:'pending'|'accepted'|'revoked'|'replaced';expiresAt:number;acceptedAt:number|null}, now:number, audience:'student'|'staff' = 'student') => {
   const state = invitationState(invite, now)
+  const text = invitationText[audience][state]
   const date = state === 'waiting' ? `${familyCopy.parent.expires} ${when(invite.expiresAt)}` : state === 'expired' ? when(invite.expiresAt) : state === 'accepted' && invite.acceptedAt !== null ? when(invite.acceptedAt) : null
-  return date ? `${invitationText[state]} · ${date}` : invitationText[state]
+  return date ? `${text} · ${date}` : text
 }
 const resendWait = (milliseconds:number) => {
   const seconds = Math.ceil(milliseconds / 1000)
@@ -72,11 +76,12 @@ function InviteRecords({student}:{student:RosterStudent}) {
   const [reason,setReason] = useState('')
   const [reinviteReason,setReinviteReason] = useState('')
   const run = async (key:string,action:()=>Promise<unknown>) => {setBusy(key);setError('');try{await action()}catch(e){setError(message(e))}finally{setBusy(null)}}
+  const now = Date.now()
   return <div className="parent-records">
     <h3>{familyCopy.parent.invitations}</h3>
     {!invites ? <p>{familyCopy.parent.loadingInvitations}</p> : invites.length === 0 ? <p className="muted">{familyCopy.parent.noneInvitations}</p> : <div className="simple-list">{invites.map(invite => <div className="parent-record" key={invite._id}>
-      <div><strong>{invite.parentEmail}</strong><p className="muted tiny">{invite.status === 'pending' && invite.expiresAt <= Date.now() ? familyCopy.parent.expired : invite.status} · {familyCopy.parent.expires} {when(invite.expiresAt)}</p><p className="muted tiny">{deliveryText(invite.emailStatus)}</p></div>
-      {invite.status === 'pending' && invite.expiresAt > Date.now() && <Button className="button button-outline" disabled={busy !== null} onClick={() => void run(invite._id,()=>revokeInvite({inviteId:invite._id}))}>{familyCopy.parent.revokeInvitation}</Button>}
+      <div><strong>{invite.parentEmail}</strong><p className="muted tiny">{invitationLine(invite, now, 'staff')}</p><p className="muted tiny">{deliveryText(invite.emailStatus)}</p></div>
+      {invitationState(invite, now) === 'waiting' && <Button className="button button-outline" disabled={busy !== null} onClick={() => void run(invite._id,()=>revokeInvite({inviteId:invite._id}))}>{familyCopy.parent.revokeInvitation}</Button>}
       {invite.status === 'revoked' && <form className="parent-restore" onSubmit={e=>{e.preventDefault();void run(invite._id,()=>allowReinvite({inviteId:invite._id,reason:reinviteReason.trim()})).then(()=>setReinviteReason(''))}}><label>{familyCopy.parent.reinviteReason} <Input value={reinviteReason} onChange={e=>setReinviteReason(e.target.value)} required/></label><Button className="button button-outline" type="submit" disabled={busy !== null || !reinviteReason.trim()}>{familyCopy.parent.allowReplacement}</Button></form>}
     </div>)}</div>}
     <h3>{familyCopy.parent.access}</h3>

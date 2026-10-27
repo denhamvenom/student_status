@@ -61,7 +61,10 @@ const summaryBase = (overrides: Partial<StudentHomeSummary>): StudentHomeSummary
   whatsLeft: [], openSignups: [], roomChoices: [], competitions, ...overrides,
 })
 
-// Busy week: room choice closes Friday, a signup closes Monday, something overdue, money due.
+// Busy week: Highlights lead with an overdue fee (Fall Scrimmage started Oct 17), the permission form and
+// the room choice that closes Friday (three to-do cards, the most allowed), then five pins and the countdown:
+// nine cards, the most Highlights ever show. A signup closes Monday and money is due. The PRI fee (not
+// overdue yet) and FIRST verification stay in What's left only.
 const busySignups = [
   signup('glacier', 'Glacier Peak Classic', 'Competition', '2026-11-14T08:00', '2026-11-02T09:00', 8500),
   signup('oregon', 'Oregon State Scrimmage', 'Competition', '2026-12-05T08:00', '2026-11-13T23:59', 4000, 'approval'),
@@ -81,11 +84,12 @@ const busyWeek: StudentHomeFixture = {
     }],
     openSignups: busySignups,
     whatsLeft: [
-      item('photo', 'requirement', 'student', { eventId: eventId('pri'), eventName: 'Pacific Robotics Invitational', label: 'Team photo form', dueAt: at('2026-10-23T23:59'), href: `/events/${eventId('pri')}` }),
-      item('first', 'firstRegistration', 'student', { dueAt: at('2026-10-29T23:59'), href: '/setup' }),
       item('room', 'roomChoice', 'student', { eventId: eventId('pri'), eventName: 'Pacific Robotics Invitational', dueAt: at('2026-10-30T23:59'), href: `/events/${eventId('pri')}/rooming` }),
+      item('first', 'firstVerification', 'coach'),
       item('permission', 'permissionForm', 'parent', { eventId: eventId('pri'), eventName: 'Pacific Robotics Invitational', dueAt: at('2026-11-06T23:59') }),
-      item('payment', 'requiredPayment', 'parent', { eventId: eventId('pri'), eventName: 'Pacific Robotics Invitational' }),
+      // Fees are due when the event starts (until fee due dates exist), so only Fall Scrimmage is overdue.
+      item('payment-pri', 'requiredPayment', 'parent', { eventId: eventId('pri'), eventName: 'Pacific Robotics Invitational', dueAt: at('2026-11-21T08:00') }),
+      item('payment-scrimmage', 'requiredPayment', 'parent', { eventId: eventId('scrimmage'), eventName: 'Fall Scrimmage', dueAt: at('2026-10-17T08:00') }),
       item('approval', 'signupApproval', 'coach', { eventId: eventId('winter'), eventName: 'Winter Showcase' }),
     ],
   }),
@@ -94,6 +98,11 @@ const busyWeek: StudentHomeFixture = {
     { id: pinId('hotel'), title: 'Hotel check-in', body: 'Check-in for the Pacific Robotics Invitational opens at 3 PM on Friday.\nRoom choice closes Friday night, so pick your group before then.\n\nPack for three days: a team shirt for each day, closed-toe shoes for the pit, a jacket for the bus and any medicine listed on your permission form.\nThe bus leaves the school at 6:30 AM. Eat breakfast before you come.', authorName: 'Sam Ortiz', authorRole: 'travelLead', pinnedAt: at('2026-10-24T09:00'), showUntil: at('2026-11-23T23:59') },
     { id: pinId('kickoff'), title: 'Kickoff watch party', body: 'We watch the game reveal together at school on January 9.\nBring your engineering notebook and a water bottle.', authorName: 'Coach Rivera', authorRole: 'coach', pinnedAt: at('2026-10-22T16:00'), showUntil: null },
     { id: pinId('expired'), title: 'Fall fundraiser', body: 'The fall fundraiser ended on October 25.', authorName: 'Coach Rivera', authorRole: 'coach', pinnedAt: at('2026-10-25T08:00'), showUntil: at('2026-10-25T23:59') },
+    { id: pinId('shirts'), title: 'Team shirts', body: 'Shirt sizes are due Wednesday. Tell a Travel Lead if your size changed.', authorName: 'Sam Ortiz', authorRole: 'travelLead', pinnedAt: at('2026-10-21T10:00'), showUntil: null },
+    { id: pinId('pit'), title: null, body: 'Pit crew practice moves to Thursday this week.', authorName: 'Coach Rivera', authorRole: 'coach', pinnedAt: at('2026-10-20T15:00'), showUntil: null },
+    { id: pinId('photos'), title: 'Team photos', body: 'Team photos are at the start of the Tuesday meeting. Wear your team shirt.', authorName: 'Coach Rivera', authorRole: 'coach', pinnedAt: at('2026-10-19T09:00'), showUntil: null },
+    // A sixth visible pin: Highlights show five at most, so this one stays off Home.
+    { id: pinId('welcome'), title: 'Welcome back', body: 'Welcome to the 2026–2027 season.', authorName: 'Coach Rivera', authorRole: 'coach', pinnedAt: at('2026-08-03T09:00'), showUntil: null },
   ],
   finance: { state: 'ready', dueCents: 8500, availableCents: 4000 },
   availability: {
@@ -105,7 +114,8 @@ const busyWeek: StudentHomeFixture = {
   failingSignups: [eventId('stem-night')],
 }
 
-// All done: nothing of the Student's own; one item waits for a Coach.
+// All done: nothing of the Student's own and no to-do cards (the room is final); one item waits for a
+// Coach. Highlights show the pin, then the countdown.
 const demoDay = signup('demo-day', 'Spring Demo Day', 'Outreach', '2026-12-12T10:00', '2026-11-16T23:59', 0)
 const allDone: StudentHomeFixture = {
   label: 'All done',
@@ -123,7 +133,8 @@ const allDone: StudentHomeFixture = {
   availability: { [eventId('demo-day')]: availabilityFor(demoDay, 40, 22, 'waitingForApproval') },
 }
 
-// New student: no parent linked yet (so nothing waits on a parent), no fundraiser page, nothing signed up.
+// New student: no parent linked yet, so Highlights lead with Invite a parent; FIRST registration (a
+// parent's step for a Student under 18) waits behind it. No fundraiser page, nothing signed up.
 const newSignups = [
   signup('glacier', 'Glacier Peak Classic', 'Competition', '2026-11-14T08:00', '2026-11-02T09:00', 8500),
   signup('demo-day', 'Spring Demo Day', 'Outreach', '2026-12-12T10:00', '2026-11-16T23:59', 0),
@@ -134,7 +145,7 @@ const newStudent: StudentHomeFixture = {
   summary: summaryBase({
     greetingName: 'Riley', displayName: 'Riley Student', initials: 'RS', parentLinked: false,
     openSignups: newSignups,
-    whatsLeft: [item('invite', 'inviteParent', 'student', { href: '/parents' })],
+    whatsLeft: [item('invite', 'inviteParent', 'student', { href: '/parents' }), item('first', 'firstRegistration', 'parent')],
   }),
   attendance: readyAttendance(1, 2, [0, 0], { state: 'beforeKickoff', minutes: 0, targetHours: null }),
   announcements: [],
@@ -146,11 +157,12 @@ const newStudent: StudentHomeFixture = {
 }
 
 // Before kickoff: under 48 hours to go, so the countdown is in hours. Money and attendance are updating.
+// One calm to-do card (due in six weeks), then the countdown.
 const beforeKickoff: StudentHomeFixture = {
   label: 'Before kickoff',
   now: at('2027-01-07T18:00'),
   summary: summaryBase({
-    whatsLeft: [item('notebook', 'requirement', 'student', { eventId: eventId('lonestar'), eventName: 'Lone Star Central Regional', label: 'Engineering notebook check', dueAt: at('2027-02-20T23:59') })],
+    whatsLeft: [item('notebook', 'requirement', 'student', { eventId: eventId('lonestar'), eventName: 'Lone Star Central Regional', label: 'Engineering notebook check', dueAt: at('2027-02-20T23:59'), href: `/events/${eventId('lonestar')}` })],
   }),
   attendance: { ...readyAttendance(30, 36, [4, 6], { state: 'beforeKickoff', minutes: 0, targetHours: 120 }), state: 'updating' },
   announcements: [],
@@ -158,9 +170,10 @@ const beforeKickoff: StudentHomeFixture = {
   availability: {},
 }
 
-// Build season: counting down to the next Competition; build hours are adding up. A fee is due but
-// the Student has no fundraiser page, so Balance due has no Fundraise button. The open signup has no
-// availability entry, so its sheet shows the load error.
+// Build season: counting down to the next Competition; build hours are adding up. Highlights: an overdue
+// and a due-soon requirement, then the calm room choice, the pin and the countdown. A fee is due but not
+// overdue (the event has not started), so it has no card; the Student has no fundraiser page, so Balance
+// due has no Fundraise button. The open signup has no availability entry, so its sheet shows the load error.
 const openHouse = signup('open-house', 'Robotics Open House', 'Outreach', '2027-02-20T10:00', '2027-02-13T23:59', 0)
 const buildSeason: StudentHomeFixture = {
   label: 'Build season',
@@ -173,8 +186,9 @@ const buildSeason: StudentHomeFixture = {
     openSignups: [openHouse],
     whatsLeft: [
       item('inspection', 'requirement', 'student', { eventId: eventId('lonestar'), eventName: 'Lone Star Central Regional', label: 'Robot safety quiz', dueAt: at('2027-02-05T23:59'), href: `/events/${eventId('lonestar')}` }),
+      item('notebook', 'requirement', 'student', { eventId: eventId('lonestar'), eventName: 'Lone Star Central Regional', label: 'Engineering notebook check', dueAt: at('2027-01-29T23:59'), href: `/events/${eventId('lonestar')}` }),
       item('permission', 'permissionReview', 'coach', { eventId: eventId('lonestar'), eventName: 'Lone Star Central Regional' }),
-      item('payment', 'requiredPayment', 'parent', { eventId: eventId('lonestar'), eventName: 'Lone Star Central Regional' }),
+      item('payment', 'requiredPayment', 'parent', { eventId: eventId('lonestar'), eventName: 'Lone Star Central Regional', dueAt: at('2027-03-04T08:00') }),
     ],
   }),
   attendance: { ...readyAttendance(41, 48, [5, 7], { state: 'ready', minutes: 46 * 60 + 30, targetHours: 120 }), kickoffAt: season2027.kickoffAt },

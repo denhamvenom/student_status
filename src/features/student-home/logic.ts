@@ -13,8 +13,10 @@ export const DAY_MS = 24 * HOUR_MS
 export const SOON_MS = 7 * DAY_MS
 /** Under this, the countdown switches from days to hours. */
 export const HOURS_THRESHOLD_MS = 48 * HOUR_MS
-/** At most this many pinned messages appear in the hero stack. */
+/** At most this many pinned messages appear in Highlights. */
 export const MAX_PINNED = 5
+/** At most this many to-do cards (things to do and room choices) lead Highlights. */
+export const MAX_TODO = 3
 
 const ascending = (a: number | null, b: number | null) => (a ?? Number.POSITIVE_INFINITY) === (b ?? Number.POSITIVE_INFINITY) ? 0 : (a ?? Number.POSITIVE_INFINITY) < (b ?? Number.POSITIVE_INFINITY) ? -1 : 1
 const clamp01 = (value: number) => Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0
@@ -62,7 +64,7 @@ export function roomDeadlineView(room: RoomChoice, now: number): RoomDeadlineVie
   return { urgent, daysLeft, closes }
 }
 
-// Hero stack ----------------------------------------------------------------
+// Highlights: countdown and pinned messages -----------------------------------
 
 export type CountdownTarget =
   | { kind: 'kickoff'; at: number; from: number }
@@ -106,17 +108,91 @@ export function visibleAnnouncements(announcements: PinnedAnnouncement[], now: n
   return announcements.filter(item => item.showUntil === null || item.showUntil > now).sort((a, b) => b.pinnedAt - a.pinnedAt).slice(0, MAX_PINNED)
 }
 
+// Highlights: to-do cards ----------------------------------------------------
+
+/** What's left kinds that can lead Highlights, in priority order. Room choice cards follow them. */
+export const HIGHLIGHT_ORDER = ['inviteParent', 'firstRegistration', 'requiredPayment', 'permissionForm', 'requirement'] as const
+export type HighlightKind = typeof HIGHLIGHT_ORDER[number]
+
+/** The pill: overdue; due within seven days ("Due Fri", "Due today"); or later ("Due Nov 19"). */
+export type HighlightDue =
+  | { state: 'overdue'; at: number }
+  | { state: 'soon' | 'later'; at: number; daysLeft: number }
+
+export type HighlightAction = {
+  kind: HighlightKind
+  item: WhatsLeftItem
+  /** Red pill and gold border: overdue, due within seven days, or Invite a parent. */
+  urgent: boolean
+  due: HighlightDue | null
+}
+
+/** Without a connected parent these wait behind "Invite a parent" (they stay listed in What's left). */
+const waitsForParentLink = (item: WhatsLeftItem) =>
+  item.kind === 'requiredPayment' || item.kind === 'permissionForm' || (item.kind === 'firstRegistration' && item.owner === 'parent')
+
+/**
+ * Which card an item becomes, or null. Fees count only once overdue (dueAt is the event start until fee
+ * due dates exist). FIRST verification, permission review, setup, health, signup approval and staff
+ * review are someone else's step or live elsewhere, so they never become cards.
+ */
+function highlightKind(item: WhatsLeftItem, now: number): Exclude<HighlightKind, 'inviteParent'> | null {
+  if (item.kind === 'firstRegistration') return item.owner === 'coach' ? null : 'firstRegistration'
+  if (item.kind === 'requiredPayment') return item.dueAt !== null && item.dueAt < now ? 'requiredPayment' : null
+  if (item.kind === 'permissionForm') return item.owner === 'parent' ? 'permissionForm' : null
+  if (item.kind === 'requirement') return item.owner === 'student' ? 'requirement' : null
+  return null
+}
+
+export function highlightDue(dueAt: number | null, now: number): HighlightDue | null {
+  if (dueAt === null) return null
+  const state = dueState({ dueAt }, now)
+  if (state === 'overdue') return { state, at: dueAt }
+  return { state: state === 'soon' ? 'soon' : 'later', at: dueAt, daysLeft: calendarDaysUntil(dueAt, now) }
+}
+
+/** Used when the summary says no parent is connected but sends no Invite a parent item. */
+const inviteParentItem: WhatsLeftItem = { key: 'inviteParent', kind: 'inviteParent', owner: 'student', eventId: null, eventName: null, label: null, dueAt: null, href: '/parents' }
+
+/**
+ * The Student's to-do cards, most important first: Invite a parent, FIRST registration, overdue fees,
+ * permission forms, then the Coach's event requirements; soonest due first within a type, undated last.
+ */
+export function highlightActions(summary: Pick<StudentHomeSummary, 'whatsLeft' | 'parentLinked'>, now: number): HighlightAction[] {
+  const invite = summary.whatsLeft.find(item => item.kind === 'inviteParent') ?? (summary.parentLinked ? null : inviteParentItem)
+  const candidates: { kind: HighlightKind; item: WhatsLeftItem }[] = invite ? [{ kind: 'inviteParent', item: invite }] : []
+  for (const item of summary.whatsLeft) {
+    const kind = highlightKind(item, now)
+    if (kind && !(invite && waitsForParentLink(item))) candidates.push({ kind, item })
+  }
+  const rank = (kind: HighlightKind) => HIGHLIGHT_ORDER.indexOf(kind)
+  return candidates
+    .sort((a, b) => rank(a.kind) - rank(b.kind) || ascending(a.item.dueAt, b.item.dueAt))
+    .map(({ kind, item }) => {
+      const due = highlightDue(item.dueAt, now)
+      return { kind, item, due, urgent: kind === 'inviteParent' || due?.state === 'overdue' || due?.state === 'soon' }
+    })
+}
+
 export type HeroCard =
+  | { kind: 'action'; key: string; action: HighlightAction }
   | { kind: 'room'; key: string; room: RoomChoice }
   | { kind: 'announcement'; key: string; announcement: PinnedAnnouncement }
   | { kind: 'countdown'; key: 'countdown'; target: CountdownTarget }
 
-/** Room choices (soonest deadline first), then pinned messages, then the countdown last. */
-export function heroCards(summary: Pick<StudentHomeSummary, 'roomChoices' | 'season' | 'competitions'>, announcements: PinnedAnnouncement[], now: number): HeroCard[] {
+/**
+ * Highlights: up to three to-do cards (things to do, then open room choices by soonest deadline), then
+ * pinned messages (newest pin first, up to five), then the countdown last.
+ */
+export function heroCards(summary: Pick<StudentHomeSummary, 'whatsLeft' | 'parentLinked' | 'roomChoices' | 'season' | 'competitions'>, announcements: PinnedAnnouncement[], now: number): HeroCard[] {
   const rooms = summary.roomChoices.filter(room => isRoomOpen(room, now)).sort((a, b) => ascending(a.roomDeadline, b.roomDeadline) || a.startsAt - b.startsAt)
+  const todo: HeroCard[] = [
+    ...highlightActions(summary, now).map(action => ({ kind: 'action' as const, key: `todo:${action.item.key}`, action })),
+    ...rooms.map(room => ({ kind: 'room' as const, key: `room:${room.eventId}`, room })),
+  ].slice(0, MAX_TODO)
   const target = countdownTarget(summary.season, summary.competitions, now)
   return [
-    ...rooms.map(room => ({ kind: 'room' as const, key: `room:${room.eventId}`, room })),
+    ...todo,
     ...visibleAnnouncements(announcements, now).map(announcement => ({ kind: 'announcement' as const, key: `pin:${announcement.id}`, announcement })),
     ...(target ? [{ kind: 'countdown' as const, key: 'countdown' as const, target }] : []),
   ]

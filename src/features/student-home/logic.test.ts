@@ -5,7 +5,8 @@ import type { HomeAttendance, OpenSignup, PinnedAnnouncement, RoomChoice, Studen
 import { homeCopy } from './copy'
 import { at } from './fixtures'
 import { formatDateRange } from './format'
-import { calendarDaysUntil, countdownTarget, countdownValue, heroCards, HOUR_MS, isWithinSoon, openSignupsSummary, participationView, percentAttended, roomDeadlineView, SOON_MS, upcomingMilestones, whatsLeftSummary } from './logic'
+import { calendarDaysUntil, countdownTarget, countdownValue, heroCards, highlightActions, HOUR_MS, isWithinSoon, openSignupsSummary, participationView, percentAttended, roomDeadlineView, SOON_MS, upcomingMilestones, whatsLeftSummary } from './logic'
+import { actionContent } from './tiles/ActionCard'
 
 const NOW = at('2026-10-26T12:00')
 const event = (key: string) => key as Id<'events'>
@@ -24,25 +25,47 @@ const item = (key: string, owner: WhatsLeftItem['owner'], dueAt: number | null =
 const signup = (key: string, signupClosesAt: number | null): OpenSignup => ({
   eventId: event(key), name: key, type: 'Competition', startsAt: NOW + 40 * 24 * HOUR_MS, endsAt: NOW + 41 * 24 * HOUR_MS, signupClosesAt, feeCents: 0, signupMode: 'open',
 })
-const summary = (overrides: Partial<StudentHomeSummary>): Pick<StudentHomeSummary, 'roomChoices' | 'season' | 'competitions'> => ({ roomChoices: [], season, competitions: [], ...overrides })
+type HighlightsInput = Pick<StudentHomeSummary, 'whatsLeft' | 'parentLinked' | 'roomChoices' | 'season' | 'competitions'>
+const summary = (overrides: Partial<HighlightsInput>): HighlightsInput => ({ whatsLeft: [], parentLinked: true, roomChoices: [], season, competitions: [], ...overrides })
+/** A What's left item as the summary sends it; the key doubles as the label. */
+const todo = (key: string, kind: WhatsLeftItem['kind'], owner: WhatsLeftItem['owner'], dueAt: number | null = null): WhatsLeftItem => ({
+  key, kind, owner, eventId: event('pri'), eventName: 'Pacific Robotics Invitational', label: key, dueAt, href: owner === 'student' ? '/somewhere' : null,
+})
+const DAY = 24 * HOUR_MS
+const actionKeys = (input: Partial<HighlightsInput>, now = NOW) => highlightActions(summary(input), now).map(action => action.item.key)
 
-describe('hero stack order', () => {
+describe('Highlights order', () => {
   it.each([
     {
-      name: 'rooms by soonest deadline (no deadline last), then pins newest first, then the countdown',
-      input: summary({ roomChoices: [room('later', NOW + 9 * 24 * HOUR_MS), room('none', null), room('soon', NOW + 2 * 24 * HOUR_MS)] }),
+      name: 'the three most important to-do cards, then the countdown',
+      input: summary({
+        whatsLeft: [todo('photo', 'requirement', 'student', NOW + DAY), todo('permission', 'permissionForm', 'parent', NOW + 2 * DAY), todo('fee', 'requiredPayment', 'parent', NOW - DAY), todo('first', 'firstRegistration', 'parent')],
+        roomChoices: [room('soon', NOW + DAY)],
+      }),
+      pins: [],
+      keys: ['todo:first', 'todo:fee', 'todo:permission', 'countdown'],
+    },
+    {
+      name: 'Invite a parent leads; then the room choice, pins newest first and the countdown',
+      input: summary({ parentLinked: false, whatsLeft: [todo('invite', 'inviteParent', 'student')], roomChoices: [room('soon', NOW + 2 * DAY)] }),
       pins: [pin('old', NOW - 5 * HOUR_MS), pin('new', NOW - HOUR_MS)],
-      keys: ['room:soon', 'room:later', 'room:none', 'pin:new', 'pin:old', 'countdown'],
+      keys: ['todo:invite', 'room:soon', 'pin:new', 'pin:old', 'countdown'],
     },
     {
-      name: 'hides final rooms, passed deadlines and expired pins',
-      input: summary({ roomChoices: [room('final', NOW + 24 * HOUR_MS, 'final'), room('passed', NOW - 1)] }),
+      name: 'at most three to-do cards, rooms included; pins and the countdown still follow',
+      input: summary({ whatsLeft: [todo('a', 'requirement', 'student', NOW + DAY), todo('b', 'requirement', 'student', NOW + 2 * DAY)], roomChoices: [room('later', NOW + 9 * DAY), room('soon', NOW + 2 * DAY)] }),
+      pins: [pin('pin', NOW - HOUR_MS)],
+      keys: ['todo:a', 'todo:b', 'room:soon', 'pin:pin', 'countdown'],
+    },
+    {
+      name: 'rooms by soonest deadline, no deadline last; final rooms, passed deadlines and expired pins are hidden',
+      input: summary({ roomChoices: [room('none', null), room('final', NOW + DAY, 'final'), room('passed', NOW - 1), room('later', NOW + 9 * DAY)] }),
       pins: [pin('expired', NOW - HOUR_MS, NOW), pin('showing', NOW - 2 * HOUR_MS, NOW + 1)],
-      keys: ['pin:showing', 'countdown'],
+      keys: ['room:later', 'room:none', 'pin:showing', 'countdown'],
     },
     {
-      name: 'shows at most five pins',
-      input: summary({}),
+      name: 'no to-do cards: up to five pins, then the countdown',
+      input: summary({ whatsLeft: [todo('verify', 'firstVerification', 'coach')] }),
       pins: Array.from({ length: 7 }, (_, index) => pin(`p${index}`, NOW - index * HOUR_MS)),
       keys: ['pin:p0', 'pin:p1', 'pin:p2', 'pin:p3', 'pin:p4', 'countdown'],
     },
@@ -54,6 +77,73 @@ describe('hero stack order', () => {
     },
   ])('$name', ({ input, pins, keys }) => {
     expect(heroCards(input, pins, NOW).map(card => card.key)).toEqual(keys)
+  })
+
+  it('orders to-do cards by type first: FIRST registration, overdue fee, permission form, event requirement', () => {
+    expect(actionKeys({ whatsLeft: [todo('photo', 'requirement', 'student', NOW - 2 * DAY), todo('permission', 'permissionForm', 'parent', NOW + 2 * DAY), todo('fee', 'requiredPayment', 'parent', NOW - DAY), todo('first', 'firstRegistration', 'parent')] }))
+      .toEqual(['first', 'fee', 'permission', 'photo'])
+  })
+
+  it('soonest due first within a type, undated last', () => {
+    expect(actionKeys({ whatsLeft: [todo('undated', 'requirement', 'student'), todo('later', 'requirement', 'student', NOW + 20 * DAY), todo('overdue', 'requirement', 'student', NOW - DAY), todo('soon', 'requirement', 'student', NOW + DAY)] }))
+      .toEqual(['overdue', 'soon', 'later', 'undated'])
+  })
+
+  it.each([
+    { name: 'FIRST registration a parent finishes (under 18)', item: todo('first', 'firstRegistration', 'parent'), waits: true },
+    { name: 'an overdue fee', item: todo('fee', 'requiredPayment', 'parent', NOW - DAY), waits: true },
+    { name: 'a permission form', item: todo('permission', 'permissionForm', 'parent', NOW + DAY), waits: true },
+    { name: 'FIRST registration the Student finishes (18+)', item: todo('first', 'firstRegistration', 'student'), waits: false },
+    { name: 'an event requirement', item: todo('photo', 'requirement', 'student', NOW + DAY), waits: false },
+  ])('without a connected parent, $name waits behind Invite a parent: $waits', ({ item, waits }) => {
+    expect(actionKeys({ whatsLeft: [item] })).toEqual([item.key])
+    expect(actionKeys({ parentLinked: false, whatsLeft: [todo('invite', 'inviteParent', 'student'), item] })).toEqual(waits ? ['invite'] : ['invite', item.key])
+  })
+
+  it('shows Invite a parent when no parent is connected, even without the What\'s left item', () => {
+    expect(highlightActions(summary({ parentLinked: false }), NOW).map(action => [action.kind, action.item.href])).toEqual([['inviteParent', '/parents']])
+  })
+
+  it.each([
+    { name: 'a fee with no due date', dueAt: null, card: false },
+    { name: 'a fee due later', dueAt: NOW + DAY, card: false },
+    { name: 'a fee due right now', dueAt: NOW, card: false },
+    { name: 'a fee past due', dueAt: NOW - 1, card: true },
+  ])('$name is a card only once overdue: $card', ({ dueAt, card }) => {
+    expect(actionKeys({ whatsLeft: [todo('fee', 'requiredPayment', 'parent', dueAt)] })).toEqual(card ? ['fee'] : [])
+  })
+
+  it.each([
+    ['firstVerification', 'coach'], ['permissionReview', 'coach'], ['studentSetup', 'student'], ['healthProfile', 'parent'], ['signupApproval', 'coach'], ['staffReview', 'coach'], ['roomChoice', 'student'],
+  ] as const)('%s never becomes a to-do card', (kind, owner) => {
+    expect(actionKeys({ whatsLeft: [todo(kind, kind, owner, NOW - DAY)] })).toEqual([])
+  })
+
+  it.each([
+    { name: 'under 18: remind your parent, no button', owner: 'parent' as const, text: homeCopy.highlights.firstRegistration.parentText, primary: null },
+    { name: '18+: finish it yourself', owner: 'student' as const, text: homeCopy.highlights.firstRegistration.studentText, primary: { label: homeCopy.highlights.firstRegistration.action, to: '/somewhere' } },
+  ])('FIRST registration card, $name', ({ owner, text, primary }) => {
+    const [action] = highlightActions(summary({ whatsLeft: [todo('first', 'firstRegistration', owner)] }), NOW)
+    expect(actionContent(action, false)).toMatchObject({ text, primary })
+  })
+
+  it.each([
+    { name: 'a student with a fundraiser page can fundraise', fundraiserLinked: true, to: '/finances#fundraiser' },
+    { name: 'otherwise the button opens Money', fundraiserLinked: false, to: '/finances' },
+  ])('overdue fee card: $name', ({ fundraiserLinked, to }) => {
+    const [action] = highlightActions(summary({ whatsLeft: [todo('fee', 'requiredPayment', 'parent', NOW - DAY)] }), NOW)
+    expect(actionContent(action, fundraiserLinked).primary?.to).toBe(to)
+  })
+
+  it.each([
+    { name: 'overdue', kind: 'requirement' as const, dueAt: NOW - 1, urgent: true, state: 'overdue' },
+    { name: 'exactly seven days ahead', kind: 'requirement' as const, dueAt: NOW + SOON_MS, urgent: true, state: 'soon' },
+    { name: 'a minute more than seven days ahead', kind: 'requirement' as const, dueAt: NOW + SOON_MS + 60_000, urgent: false, state: 'later' },
+    { name: 'no due date', kind: 'requirement' as const, dueAt: null, urgent: false, state: null },
+    { name: 'Invite a parent, always', kind: 'inviteParent' as const, dueAt: null, urgent: true, state: null },
+  ])('urgency: $name', ({ kind, dueAt, urgent, state }) => {
+    const [action] = highlightActions(summary({ whatsLeft: [todo('item', kind, 'student', dueAt)] }), NOW)
+    expect({ urgent: action.urgent, state: action.due?.state ?? null }).toEqual({ urgent, state })
   })
 })
 
