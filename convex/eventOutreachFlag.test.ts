@@ -64,7 +64,7 @@ describe("Outreach flag on events", () => {
     const { occurrenceId } = await linked(f, { isOutreach: flag });
     const result = await f.coach.mutation(api.timeclock.openOccurrence, { occurrenceId, key: "of-open-device-001" });
     expect(result.ok).toBe(true);
-    expect(await sessionFor(f, occurrenceId)).toEqual({ override: expectOutreach ? true : undefined, outreach: expectOutreach, generation: 1 });
+    expect(await sessionFor(f, occurrenceId)).toEqual({ override: flag, outreach: expectOutreach, generation: 1 });
   });
 
   it("changing the flag later sets and clears the session override and recalculates it", async () => {
@@ -79,7 +79,7 @@ describe("Outreach flag on events", () => {
     expect(marked.generation).toBeGreaterThan(before.generation!);
     await f.coach.mutation(api.eventOperations.updateSettings, { eventId, isOutreach: false });
     const cleared = await sessionFor(f, occurrenceId);
-    expect(cleared).toEqual({ override: undefined, outreach: false, generation: cleared.generation });
+    expect(cleared).toEqual({ override: false, outreach: false, generation: cleared.generation });
     expect(cleared.generation).toBeGreaterThan(marked.generation!);
     // Saving the same value again changes nothing.
     await f.coach.mutation(api.eventOperations.updateSettings, { eventId, isOutreach: false });

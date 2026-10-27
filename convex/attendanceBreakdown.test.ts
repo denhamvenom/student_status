@@ -72,6 +72,10 @@ describe("meeting classification", () => {
     { name: "Thursday is Other", spec: { title: "Team meeting", at: thursday }, required: false, outreach: false },
     { name: "Outreach by title is never Required", spec: { title: "Library Outreach", at: tuesdayBeforeKickoff }, required: false, outreach: true },
     { name: "Outreach marked by the Coach is never Required", spec: { title: "Team meeting", at: tuesdayBeforeKickoff, outreachOverride: true }, required: false, outreach: true },
+    { name: "Outreach title unmarked by the Coach is Required on a Tuesday", spec: { title: "Outreach - Library Night", at: tuesdayBeforeKickoff, outreachOverride: false }, required: true, outreach: false },
+    { name: "Outreach title unmarked by the Coach is Other on a Thursday", spec: { title: "Outreach - Library Night", at: thursday, outreachOverride: false }, required: false, outreach: false },
+    { name: "Outreach title marked by the Coach is Outreach", spec: { title: "Outreach - Library Night", at: tuesdayBeforeKickoff, outreachOverride: true }, required: false, outreach: true },
+    { name: "Outreach title with no Coach flag is decided by the title", spec: { title: "Outreach - Library Night", at: tuesdayBeforeKickoff }, required: false, outreach: true },
     { name: "Coach can make a Thursday Required", spec: { title: "Team meeting", at: thursday, requiredOverride: true }, required: true, outreach: false },
     { name: "Coach can make a Tuesday Other", spec: { title: "Team meeting", at: tuesdayBeforeKickoff, requiredOverride: false }, required: false, outreach: false },
   ])("$name", async ({ spec, required, outreach }) => {

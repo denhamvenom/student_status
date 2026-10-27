@@ -115,7 +115,7 @@ export const updateSettings = mutation({
       const occurrence = claim ? await ctx.db.query("timeclockOccurrences").withIndex("by_source_and_sourceKey", q => q.eq("source", "calendar").eq("sourceKey", claim.calendarEventId)).unique() : null;
       const session = occurrence ? await ctx.db.query("timeclockSessions").withIndex("by_occurrenceId", q => q.eq("occurrenceId", occurrence._id)).unique() : null;
       if (session) {
-        await ctx.db.patch(session._id, { outreachOverride: args.isOutreach ? true : undefined });
+        await ctx.db.patch(session._id, { outreachOverride: args.isOutreach });
         await invalidateAttendanceSession(ctx, session._id);
       }
     }
