@@ -64,9 +64,12 @@ function SignupDetails({ signup, handlers, onDone }: { signup: OpenSignup; handl
       <Fact label={copy.whatHappens}>{outcomeText(availability)}</Fact>
     </dl>
     {submit.kind === 'failed' && <p role="alert" className="m-0 rounded-inset border border-vs-urgent-border bg-vs-urgent-soft p-3 text-[14px] text-vs-urgent">{submit.message}</p>}
-    <button type="button" disabled={closed || submit.kind === 'busy'} onClick={() => void signUp()} className={cn(dashboardButtonVariants({ tone: 'primary', size: 'lg' }), 'w-full')}>
-      {submit.kind === 'busy' ? copy.signingUp : copy.signUp}
-    </button>
+    {/* Closed (or assigned): nothing to press but Close; the text above says who to ask. */}
+    {closed
+      ? <button type="button" onClick={onDone} className={cn(dashboardButtonVariants({ tone: 'soft', size: 'md' }), 'w-full')}>{copy.close}</button>
+      : <button type="button" disabled={submit.kind === 'busy'} onClick={() => void signUp()} className={cn(dashboardButtonVariants({ tone: 'primary', size: 'lg' }), 'w-full')}>
+        {submit.kind === 'busy' ? copy.signingUp : copy.signUp}
+      </button>}
   </div>
 }
 

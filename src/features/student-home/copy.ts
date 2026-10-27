@@ -7,6 +7,8 @@ import type { WhatsLeftKind } from './contract'
  */
 
 const plural = (count: number, one: string, many: string) => count === 1 ? one : many
+const daysLeft = (days: number) => days <= 0 ? 'Last day' : `${days} ${plural(days, 'day', 'days')} left`
+const dateLine = (date: string, left: string) => `${date} · ${left}`
 
 export const homeCopy = {
   greeting: {
@@ -29,8 +31,8 @@ export const homeCopy = {
     title: 'Room choice',
     closesOn: (day: string) => `Closes ${day}`,
     closesToday: 'Closes today',
-    daysLeft: (days: number) => days <= 0 ? 'Last day' : `${days} ${plural(days, 'day', 'days')} left`,
-    dateLine: (date: string, left: string) => `${date} · ${left}`,
+    daysLeft,
+    dateLine,
     eventLine: (event: string, dates: string) => `${event} · ${dates}`,
     yourGroup: 'Your room group',
     notChosen: 'Not chosen yet',
@@ -45,6 +47,47 @@ export const homeCopy = {
     noInvitations: 'No invitations yet',
     deadline: (date: string) => `No changes after the ${date} deadline`,
     choose: 'Choose your room',
+  },
+
+  /** Highlights to-do cards (owner decision 2026-10-27). */
+  highlights: {
+    overdue: 'Overdue',
+    dueOn: (day: string) => `Due ${day}`,
+    dueToday: 'Due today',
+    /** Next to the Overdue pill: "Due Fri, Oct 23". */
+    wasDue: (date: string) => `Due ${date}`,
+    daysLeft,
+    dateLine,
+    inviteParent: {
+      title: 'Invite a parent',
+      text: 'Connect a parent so they can finish FIRST registration, permission forms and payments.',
+      action: 'Invite a parent',
+    },
+    firstRegistration: {
+      title: 'FIRST registration',
+      parentText: 'Remind your parent to finish FIRST registration and Consent & Release.',
+      studentText: 'Finish FIRST registration and Consent & Release.',
+      action: 'Finish FIRST registration',
+    },
+    payment: {
+      title: 'Balance due',
+      text: (event: string) => `The fee for ${event} is past due. Your parent needs to review the payment due.`,
+      amount: 'Balance due',
+      fundraise: 'Fundraise',
+      openMoney: 'Open Money',
+    },
+    permissionForm: {
+      title: 'Permission form',
+      text: (event: string) => `Remind your parent to complete the permission form for ${event}.`,
+      viewEvent: 'View event',
+    },
+    requirement: {
+      title: 'Event requirement',
+      text: (event: string) => `For ${event}.`,
+      action: 'Open event',
+    },
+    /** Stands in for a missing event name (the summary always sends one for event items). */
+    thisEvent: 'this event',
   },
 
   announcement: {
@@ -105,6 +148,7 @@ export const homeCopy = {
       pending: 'Your signup is waiting for Coach or Travel Lead approval.',
     },
     done: 'Done',
+    close: 'Close',
   },
 
   whatsLeft: {
@@ -116,6 +160,9 @@ export const homeCopy = {
     leftForYou: (count: number) => `${count} left for you`,
     nothingForYou: 'Nothing for you right now',
     showAll: 'Show all',
+    /** Desktop one-line summary of items waiting on others when they wait on more than one group. */
+    waitingOthers: (count: number) => `${count} waiting for others`,
+    waitingGroup: (group: string, count: number) => `${group} · ${count}`,
     groups: {
       student: 'For you',
       parent: 'Waiting for your parent',

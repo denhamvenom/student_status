@@ -19,9 +19,17 @@ export const uiCopy = {
     withdrawn: 'Withdrawn',
     declined: 'Declined',
   },
+  // docs/LANGUAGE.md: what Students and Parents see for an event signup. Staff screens keep `status`.
+  familyParticipation: {
+    confirmed: 'Signed up',
+    pending: 'Waiting for approval',
+    waitlist: 'Waitlisted',
+    notSignedUp: 'Not signed up',
+    withdrawn: 'Withdrawn',
+  },
   finance: { editDescription: 'Review a student account and record payments.', readDescription: 'Review a student account.', description: 'Charges, credits and transaction history.' },
   event: { staffRequirements: 'Review student requirements in Event readiness.', readiness: 'Event readiness', noRequirements: 'No requirements for this event.', participants: 'Signups', requirements: 'Requirements', transport: 'Transport', rooming: 'Rooming', overview: 'Overview' },
-  readiness: { noEvents: 'No events yet.', noStudents: 'No students are registered for this event.', allComplete: 'All applicable requirements are complete.', students: 'Students', transportation: 'Transportation', rooming: 'Rooming' },
+  readiness: { noEvents: 'No events yet.', noStudents: 'No students are signed up for this event.', allComplete: 'All applicable requirements are complete.', students: 'Students', transportation: 'Transportation', rooming: 'Rooming' },
   theme: { dark: 'Dark mode', light: 'Light mode', failed: 'Appearance could not be saved. Please try again.' },
   wizard: { steps: reference.options.newEventSteps, cancel: 'Cancel', back: 'Back', continue: 'Continue', create: 'Create event' },
   // Three categories supersede the reference's older four-choice workflow.
@@ -29,10 +37,18 @@ export const uiCopy = {
   errors: { pageTitle: 'Something went wrong', pageBody: 'The page could not load. Please try again.', reload: 'Reload page', signIn: 'Sign-in could not be completed. Please try again.', rooming: 'Room selection is unavailable for this view. Return to the event or try again.', retry: 'Try again', returnEvent: 'Return to event' },
 } as const
 
+/** Status words on staff screens ("Pending approval", "Waitlist"); also readiness and other statuses. */
 export function statusLabel(value: string | null | undefined): string {
   if (!value) return uiCopy.status.notSignedUp
   const labels: Record<string, string> = uiCopy.status
   return labels[value] ?? value.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, c => c.toUpperCase())
+}
+
+/** A Student's own signup status as Students and Parents see it ("Signed up", "Waiting for approval"). */
+export function familyParticipationLabel(value: string | null | undefined): string {
+  if (!value) return uiCopy.familyParticipation.notSignedUp
+  const labels: Record<string, string> = uiCopy.familyParticipation
+  return labels[value] ?? statusLabel(value)
 }
 
 export function percentageLabel(value: number | null | undefined): string {

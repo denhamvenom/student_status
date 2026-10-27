@@ -50,7 +50,8 @@ export function OpenSignupsTile({ signups, now, handlers }: { signups: OpenSignu
     {rows.length === 0
       ? <p className="mt-1.5 text-[13px] text-vs-muted lg:text-[12px]">{copy.empty}</p>
       : <ul className="mt-2.5 flex flex-col gap-[7px] lg:mt-3 lg:gap-2">{rows.slice(0, INLINE_ROWS).map(signup => <SignupRow key={signup.eventId} signup={signup} now={now} onSignUp={() => choose(signup)} />)}</ul>}
-    {rows.length > INLINE_ROWS && <button type="button" onClick={() => setListOpen(true)} className={cn(dashboardButtonVariants({ tone: 'ghost', size: 'sm' }), 'mt-1.5 -mb-1.5 self-center')}>{copy.showMore}</button>}
+    {/* Desktop keeps the right column short (Participation above the fold at 1280×800): a compact link whose 44px target overlaps the padding. */}
+    {rows.length > INLINE_ROWS && <button type="button" onClick={() => setListOpen(true)} className={cn(dashboardButtonVariants({ tone: 'ghost', size: 'sm' }), "mt-1.5 -mb-1.5 self-center lg:relative lg:mt-3 lg:mb-0 lg:min-h-0 lg:rounded-sm lg:px-1 lg:hover:bg-transparent lg:hover:underline lg:after:absolute lg:after:-inset-x-2 lg:after:-inset-y-3.5 lg:after:content-['']")}>{copy.showMore}</button>}
 
     <DetailsSheet open={listOpen} onOpenChange={setListOpen} title={copy.allTitle}>
       <ul className="flex flex-col gap-2">{rows.map(signup => <SignupRow key={signup.eventId} signup={signup} now={now} onSignUp={() => choose(signup)} />)}</ul>

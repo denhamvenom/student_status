@@ -51,33 +51,53 @@ function Badge({ badge }: { badge: WhatsLeftBadge }) {
   return <StatusBadge tone="success">{copy.allSet}</StatusBadge>
 }
 
-/** The Student's own items, plus quiet lines for items waiting on a parent or staff. */
+/** One quiet line for desktop: the group when only one is waiting, otherwise the total. */
+function waitingText(waiting: { group: WhatsLeftGroup; count: number }[]) {
+  if (waiting.length === 1) return copy.waitingGroup(copy.groups[waiting[0].group], waiting[0].count)
+  return copy.waitingOthers(waiting.reduce((total, line) => total + line.count, 0))
+}
+
+/**
+ * The Student's own items, plus quiet lines for items waiting on a parent or staff. Phones list the first
+ * rows (as drawn); desktop draws only the title, count and badge, so the tile stays compact and
+ * Participation stays above the fold, with one quiet line for others' items and "Show all" for the list.
+ */
 export function WhatsLeftTile({ items, now }: { items: WhatsLeftItem[]; now: number }) {
   const titleId = useId()
   const [open, setOpen] = useState(false)
   const summary = whatsLeftSummary(items, now)
   const countColor = summary.tone === 'overdue' ? 'text-vs-urgent' : summary.tone === 'urgent' ? 'text-vs-warning dark:text-vs-gold' : summary.tone === 'done' ? 'text-vs-success' : 'text-vs-heading'
-  const hidden = summary.count > INLINE_ROWS || summary.waiting.length > 0
+  // Phones show "Show all" when rows are left out; desktop shows no rows, so any item needs it.
+  const hiddenOnPhone = summary.count > INLINE_ROWS || summary.waiting.length > 0
+  const showAll = () => setOpen(true)
 
-  return <DashboardTile tone={summary.tone} aria-labelledby={titleId}>
-    <div className="flex items-start justify-between gap-3">
-      <div className="min-w-0 lg:pt-2">
+  return <DashboardTile tone={summary.tone} aria-labelledby={titleId} className="lg:flex-1 lg:justify-center">
+    <div className="flex items-start justify-between gap-3 lg:items-center">
+      <div className="min-w-0">
         <TileTitle id={titleId}>{copy.title}</TileTitle>
-        <p className={cn('mt-0.5 text-[13px] text-vs-muted lg:text-[12px]', summary.count > 0 && 'sr-only lg:not-sr-only')}>{summary.count > 0 ? copy.leftForYou(summary.count) : copy.nothingForYou}</p>
+        <p className={cn('mt-0.5 text-[13px] text-vs-muted lg:mt-1 lg:text-[12px]', summary.count > 0 && 'sr-only lg:not-sr-only')}>{summary.count > 0 ? copy.leftForYou(summary.count) : copy.nothingForYou}</p>
+        {/* Desktop: one quiet line for others' items and a compact "Show all" (its 44px target overlaps the padding, not the layout). */}
+        {items.length > 0 && <div className="mt-1.5 hidden min-w-0 items-center gap-3 text-[12px] leading-[1.4] lg:flex">
+          {summary.waiting.length > 0 && <span className="flex min-w-0 items-center gap-1.5 text-vs-muted">
+            <Clock size={12} aria-hidden="true" className="shrink-0" />
+            <span className="truncate">{waitingText(summary.waiting)}</span>
+          </span>}
+          <button type="button" onClick={showAll} className={cn("relative shrink-0 cursor-pointer rounded-sm border-0 bg-transparent p-0 font-sans! text-[12px]! leading-[1.4]! font-bold! text-vs-accent-text! hover:underline after:absolute after:-inset-x-2 after:-inset-y-3.5 after:content-['']", focusRing)}>{copy.showAll}</button>
+        </div>}
       </div>
-      <div className="flex shrink-0 flex-col items-end gap-1.5">
+      <div className="flex shrink-0 flex-col items-end gap-1.5 lg:items-center lg:gap-[5px]">
         <span aria-hidden="true" className={cn('font-heading text-[34px] leading-none lg:text-[46px]', countColor)}>{summary.count}</span>
         <Badge badge={summary.badge} />
       </div>
     </div>
 
-    {summary.count > 0 && <ul className="mt-3 flex flex-col gap-1.5">{summary.own.slice(0, INLINE_ROWS).map(item => <ItemRow key={item.key} item={item} now={now} />)}</ul>}
-    {summary.waiting.length > 0 && <ul className="mt-2.5 flex flex-col gap-1">{summary.waiting.map(line => <li key={line.group} className="flex items-center gap-2 text-[12px] text-vs-muted">
+    {summary.count > 0 && <ul className="mt-3 flex flex-col gap-1.5 lg:hidden">{summary.own.slice(0, INLINE_ROWS).map(item => <ItemRow key={item.key} item={item} now={now} />)}</ul>}
+    {summary.waiting.length > 0 && <ul className="mt-2.5 flex flex-col gap-1 lg:hidden">{summary.waiting.map(line => <li key={line.group} className="flex items-center gap-2 text-[12px] text-vs-muted">
       <Clock size={13} aria-hidden="true" className="shrink-0" />
       <span className="min-w-0 flex-1">{copy.groups[line.group]}</span>
       <span className="font-semibold text-vs-text-2">{line.count}</span>
     </li>)}</ul>}
-    {hidden && <button type="button" onClick={() => setOpen(true)} className={cn(dashboardButtonVariants({ tone: 'ghost', size: 'sm' }), 'mt-1.5 -mb-1.5 self-start -ml-3.5')}>{copy.showAll}</button>}
+    {hiddenOnPhone && <button type="button" onClick={showAll} className={cn(dashboardButtonVariants({ tone: 'ghost', size: 'sm' }), 'mt-1.5 -mb-1.5 -ml-3.5 self-start lg:hidden')}>{copy.showAll}</button>}
 
     <DetailsSheet open={open} onOpenChange={setOpen} title={copy.title}>
       {items.length === 0 ? <p className="text-[14px] text-vs-muted">{copy.emptySheet}</p> : <div className="flex flex-col gap-5">
