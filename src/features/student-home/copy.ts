@@ -100,7 +100,7 @@ export const homeCopy = {
     label: 'Countdown',
     unit: (unit: 'days' | 'hours', value: number) => unit === 'days' ? plural(value, 'day', 'days') : plural(value, 'hour', 'hours'),
     toKickoff: 'to kickoff',
-    toEvent: (name: string) => `to ${name}`,
+    toGo: 'to go',
     now: 'Now',
     kickoff: 'Kickoff',
     target: (name: string, date: string) => `${name} · ${date}`,

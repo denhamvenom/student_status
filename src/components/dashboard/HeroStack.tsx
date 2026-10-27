@@ -23,7 +23,7 @@ const MIN_DOT = 24
  * How many dots go in one row: all of them while each gets at least 24px, otherwise as few balanced rows
  * as fit (9 dots in 188px: rows of 5 and 4, 37px each, rather than 7 and 2).
  */
-function dotColumns(count: number, width: number) {
+export function dotColumns(count: number, width: number) {
   const fit = Math.max(1, Math.floor(width / MIN_DOT))
   return Math.ceil(count / Math.ceil(count / fit))
 }

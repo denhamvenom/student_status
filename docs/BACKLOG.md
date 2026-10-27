@@ -15,6 +15,7 @@ Read this only when the owner requests backlog work or the current task relates 
 ## Product
 
 - Fee due dates (owner, October 27): let a Coach set a due date on a fee so Highlights can flag a payment as past due before the event starts. Until then "past due" means unpaid after the event start. This is a money change; read DECISIONS.md first.
+- Student Home release prerequisites: before kickoff (January 9, 2027), and with owner approval, run Recalculate attendance on production so the new build-hours totals fill in, and set each season's build-hours target on the Season page.
 - Remind my parent (owner, October 27): a Student Home button that emails the linked parent about a FIRST registration, permission form or payment waiting on them, through the existing parent email service.
 
 ## Testing

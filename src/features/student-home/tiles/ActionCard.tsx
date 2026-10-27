@@ -56,7 +56,7 @@ function DueRow({ due, urgent }: { due: HighlightDue; urgent: boolean }) {
   const pill = due.state === 'overdue' ? copy.overdue
     : due.state === 'soon' ? (due.daysLeft <= 0 ? copy.dueToday : copy.dueOn(formatWeekday(due.at)))
     : copy.dueOn(formatMonthDay(due.at))
-  const line = due.state === 'overdue' ? copy.wasDue(formatShortDate(due.at)) : copy.dateLine(formatMonthDay(due.at), copy.daysLeft(due.daysLeft))
+  const line = due.state === 'overdue' ? copy.wasDue(formatShortDate(due.at)) : due.state === 'soon' ? copy.dateLine(formatMonthDay(due.at), copy.daysLeft(due.daysLeft)) : copy.daysLeft(due.daysLeft)
   return <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
     <StatusBadge tone={urgent ? 'urgentStrong' : 'calm'} className={cn(urgent && 'tracking-[0.03em] uppercase')}>{pill}</StatusBadge>
     <span className="text-[12px] text-vs-muted lg:text-[11px] lg:tracking-[0.02em]">{line}</span>
@@ -83,7 +83,7 @@ export function ActionCard({ action, fundraiserLinked, balanceDueCents }: { acti
       <span aria-hidden="true" className="hidden size-[54px] shrink-0 items-center justify-center rounded-[14px] border border-vs-border bg-vs-inset-raised text-vs-purple lg:inline-flex dark:border-[color-mix(in_srgb,var(--vs-gold)_25%,transparent)] dark:bg-[color-mix(in_srgb,var(--vs-gold)_10%,transparent)] dark:text-vs-gold"><Icon size={28} strokeWidth={2} /></span>
     </div>
 
-    {(content.text || amount !== null) && <div className={cn(inset, 'mt-3.5 px-3.5 py-[11px] lg:mt-[18px] lg:flex lg:min-h-[120px] lg:flex-1 lg:flex-col lg:justify-center lg:rounded-xl lg:px-[18px] lg:py-4')}>
+    {(content.text || amount !== null) && <div className={cn(inset, 'mt-3.5 px-3.5 py-[11px] lg:mt-[18px] lg:flex lg:flex-col lg:self-start lg:rounded-xl lg:px-[18px] lg:py-4')}>
       {content.text && <p className="text-[15px] leading-[1.45] text-vs-text-2 lg:max-w-[46ch] lg:text-[17px]">{content.text}</p>}
       {amount !== null && <div className={cn(content.text && 'mt-3 border-t border-vs-border-subtle pt-3 lg:mt-4 lg:pt-4')}>
         <p className={eyebrow}>{copy.payment.amount}</p>

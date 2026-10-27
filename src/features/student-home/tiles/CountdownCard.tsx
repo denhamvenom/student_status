@@ -25,7 +25,8 @@ export function CountdownCard({ target, summary, now }: { target: CountdownTarge
     <p className="mt-3 flex flex-col items-center text-center lg:mt-0 lg:flex-row lg:items-center lg:gap-4 lg:text-left">
       <span className="font-heading text-[64px] leading-none text-vs-purple lg:text-[96px] lg:tracking-[-0.01em] dark:text-vs-gold dark:drop-shadow-[0_0_24px_color-mix(in_srgb,var(--vs-gold)_25%,transparent)]">{value}</span>
       <span className="mt-1.5 text-[11px] font-bold tracking-[0.12em] text-vs-muted uppercase lg:mt-0 lg:max-w-[18ch] lg:font-heading lg:text-[20px] lg:leading-[1.2] lg:font-normal lg:tracking-[0.08em]">
-        {copy.unit(unit, value)} {target.kind === 'kickoff' ? copy.toKickoff : copy.toEvent(target.name)}
+        {copy.unit(unit, value)} {target.kind === 'kickoff' ? copy.toKickoff : copy.toGo}
+        {target.kind === 'competition' && <span className="mt-0.5 block text-[10px] font-semibold tracking-[0.06em] normal-case lg:max-w-none lg:font-sans lg:text-[12px] lg:tracking-normal">{target.name}</span>}
       </span>
     </p>
 

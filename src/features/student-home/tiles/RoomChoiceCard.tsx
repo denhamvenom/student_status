@@ -33,7 +33,7 @@ export function RoomChoiceCard({ room, now }: { room: RoomChoice; now: number })
       <div className="min-w-0">
         {view !== null && deadline !== null && <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <StatusBadge tone={urgent ? 'urgentStrong' : 'calm'} className={cn(urgent && 'tracking-[0.03em] uppercase')}>{pill}</StatusBadge>
-          <span className="text-[12px] text-vs-muted lg:text-[11px] lg:tracking-[0.02em]">{copy.dateLine(formatMonthDay(deadline), copy.daysLeft(view.daysLeft))}</span>
+          <span className="text-[12px] text-vs-muted lg:text-[11px] lg:tracking-[0.02em]">{urgent ? copy.dateLine(formatMonthDay(deadline), copy.daysLeft(view.daysLeft)) : copy.daysLeft(view.daysLeft)}</span>
         </div>}
         <h2 id={titleId} className="mt-2.5! mb-0! font-heading! text-[28px]! leading-[1.05]! font-normal! tracking-normal! text-vs-heading lg:mt-2! lg:text-[30px]! lg:tracking-[0.01em]!">{copy.title}</h2>
         <p className="mt-1 text-[13px] text-vs-muted">{copy.eventLine(room.eventName, formatDateRange(room.startsAt, room.endsAt))}</p>
@@ -42,7 +42,7 @@ export function RoomChoiceCard({ room, now }: { room: RoomChoice; now: number })
     </div>
 
     {/* Group and invitations side by side from 1280px (as drawn); stacked below that, where the hero is narrow. */}
-    <div className={cn(inset, 'mt-3.5 px-3.5 py-[11px] lg:mt-[18px] lg:min-h-[120px] lg:flex-1 lg:rounded-xl lg:px-[18px] lg:py-4 xl:grid xl:grid-cols-2')}>
+    <div className={cn(inset, 'mt-3.5 px-3.5 py-[11px] lg:mt-[18px] lg:self-start lg:rounded-xl lg:px-[18px] lg:py-4 xl:grid xl:grid-cols-2')}>
       <div className="min-w-0 xl:pr-5">
         <p className={eyebrow}>{copy.yourGroup}</p>
         <p className="mt-1 text-[15px] text-vs-text-2 lg:mt-2 lg:text-[17px] lg:font-medium">{groupText(room)}</p>

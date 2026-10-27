@@ -1,32 +1,34 @@
 # Handoff
 
-October 26, 2026 | Branch: docs/release-2026-10-25 (from main 7376a71)
+October 27, 2026 | Branch: feature/student-home-redesign (from main 7376a71)
 
 ## Venom Status (formerly Student Status)
 
-[v0.1.0-onboarding.19](https://github.com/denhamvenom/student_status/releases/tag/v0.1.0-onboarding.19) is live (main `7376a71`): Venom Status name, plain-language messages ([docs/LANGUAGE.md](docs/LANGUAGE.md)), one six-digit invitation code, Coach-only Contact admin, page-level error boundary, development-only developer sign-in.
-Production backend and both Workers were verified, and the live files match the local production build. No real-account production walkthrough, real Google join with a code, or real email send was done. [Release receipt](docs/releases/RELEASE_2026-10-25_VENOM_STATUS.md)
+[v0.1.0-onboarding.19](https://github.com/denhamvenom/student_status/releases/tag/v0.1.0-onboarding.19) is live (main `7376a71`). Production backend and both Workers were verified; no real-account production walkthrough or real email send was done. [Release receipt](docs/releases/RELEASE_2026-10-25_VENOM_STATUS.md)
 
 ## Timeclock
 
-Clocking, PIN controls, automatic closing, fixed event roster and historical attendance import remain implemented; Calendar checks run at 6 AM/3 PM Central plus manual refresh. This release's Timeclock rollout reached 100% and returned HTTP 200.
+Clocking, PIN controls, automatic closing, fixed event roster and historical import remain implemented; Calendar checks run at 6 AM/3 PM Central plus manual refresh. Rollout reached 100%.
 
 ## In progress
 
-Claude Code is project lead and integration owner; Codex sessions are helpers.
-Frontend redesign: a simpler bento interface with a dashboard per audience and details revealed on tap. Owner decisions are in docs/DECISIONS.md "Redesign dashboards"; every redesigned screen is written to docs/LANGUAGE.md.
-The owner chose **Student Home first** (students see it soonest), then Parent Home. Paste-ready Claude Design briefs, before screenshots and logos are outside Git in `Logistics Work\Claude Design Pack - Student Home` and `...\Claude Design Pack - Parent Home`. The owner is now trying 2–3 visual directions in Claude Design.
-Developer sign-in works only on development `third-bandicoot-18` (key in ignored `private-data/`; see docs/DEVELOPMENT.md). Current screenshots of every role are in ignored `test-results/smoke`.
+Student Home redesign (Claude Design "Student Home — chosen direction", October 26; the newest design folder is the reference, page background deep purple, never black). Built and committed locally through `8fd1051`, synced to development `third-bandicoot-18` only, not pushed. Owner decisions: docs/DECISIONS.md "Redesign dashboards"; wording: docs/LANGUAGE.md; scenarios: docs/DEVELOPMENT.md "Student Home scenarios".
+Open polish (in `src/features/student-home/`):
+- Countdown: for Competitions show "{n} days to go" with the event name on its own smaller line (keep "to kickoff"); update the LANGUAGE.md row.
+- Desktop: the inset panel in `tiles/ActionCard.tsx` and `tiles/RoomChoiceCard.tsx` shrinks to its content.
+- Date pill: no repeated date; 7 or more days out shows "Due {Mon D}".
+- Compact "Show more signups" target to at least 44px; add a `dotColumns` test (`src/components/dashboard/HeroStack.tsx`).
+Then: live scenarios (busyWeek, allDone, newStudent, reset) as the developer Student at 390/1440, light/dark, compared with `test-results/smoke` and the design renders (evidence outside Git in `Logistics Work\Student Home Redesign Evidence`); `bun run check`, `bun run check:timeclock`; remove helper worktrees `student-status-sh-d`…`sh-j` once merged (sh-d's uncommitted dev harness is not needed).
 
 ## Top open risks
 
-- **Exposed key fragments (October 25):** part of JWT_PRIVATE_KEY or TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_PRIVATE_KEY was printed into a working session (not published). Rotation awaits the owner's decision. Never list production settings with `cut`; list names only or use the dashboard.
-- Outstanding five-digit invitation codes stay valid until they expire (low risk).
-- Contact admin email has not been sent for real; one dev test send awaits owner approval.
+- **Exposed key fragments (October 25):** rotation awaits the owner's decision. List production settings by name only.
+- Build hours need Recalculate attendance on production before kickoff. [Backlog](docs/BACKLOG.md#product)
+- Contact admin email has not been sent for real; a dev test send awaits owner approval.
 - Signed-in transportation walkthrough, real PDF signing (deferred), backup/restore proof and security reviews remain open. [Backlog](docs/BACKLOG.md#testing)
-- Heavy tests (feeBulk, bulkInvites, financeExport, seasonTransition, calendarRefresh) time out intermittently in full runs in this OneDrive folder. [Testing](docs/BACKLOG.md#testing)
-- Coach Season overflows at 390px (deferred to the redesign).
+- Coach Season overflows at 390px (deferred to its redesign).
+- Heavy tests (feeBulk, bulkInvites and others) time out intermittently in full runs here; rerun alone. [Testing](docs/BACKLOG.md#testing)
 
 ## Next step
 
-When the owner brings back the chosen Claude Design direction, build Student Home on a new branch from main against development, with before/after screenshots (phone/desktop, light/dark) from the six developer accounts. No production action without the owner's explicit approval.
+Finish the Student Home polish list above, run typecheck, lint and targeted tests, and commit; then the live screenshot pass. No push, merge or production action without the owner's explicit approval.
