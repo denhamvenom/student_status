@@ -13,6 +13,7 @@ import type * as admin from "../admin.js";
 import type * as adminContact from "../adminContact.js";
 import type * as adultInviteEmail from "../adultInviteEmail.js";
 import type * as adultProfile from "../adultProfile.js";
+import type * as announcements from "../announcements.js";
 import type * as app from "../app.js";
 import type * as attendanceOperations from "../attendanceOperations.js";
 import type * as attendanceReportMaintenance from "../attendanceReportMaintenance.js";
@@ -156,6 +157,7 @@ declare const fullApi: ApiFromModules<{
   adminContact: typeof adminContact;
   adultInviteEmail: typeof adultInviteEmail;
   adultProfile: typeof adultProfile;
+  announcements: typeof announcements;
   app: typeof app;
   attendanceOperations: typeof attendanceOperations;
   attendanceReportMaintenance: typeof attendanceReportMaintenance;
