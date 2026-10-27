@@ -30,6 +30,7 @@ import financeLayoutStyles from './CoachFinanceTable.module.css'
 import { financeWorkspaceCopy } from './lib/finance-admin-copy'
 import { AdultProfile } from './AdultProfile'
 import { FamilyFundraiserLink, FundraiserLinkSettings } from './FundraiserLinks'
+import { FundraiserAnchor } from './features/student-home/FundraiserAnchor'
 import { ZeffySync } from './ZeffySync'
 import { DriverOwnerReconciliation } from './DriverOwnerReconciliation'
 import FeeAdministration from './FeeAdministration'
@@ -169,7 +170,7 @@ function FinancePage({studentId,showHeading=true,allowChargeEditing=false}:{stud
   const chargeGroups=Array.from(new Set(chargesPage.results.map(c=>c.eventId??'standalone')))
   return <>
     {showHeading&&<Heading title={familyCopy.finance.title} description={uiCopy.finance.description}/>}
-    {showHeading&&<FamilyFundraiserLink key={studentId} studentId={sid(studentId)}/>}
+    {showHeading&&<FundraiserAnchor><FamilyFundraiserLink key={studentId} studentId={sid(studentId)}/></FundraiserAnchor>}
     {data.state==='ready'?<><div className={familyStyles.financeMetrics}>
       <Box><span className="metric-label">{familyCopy.finance.due}</span><strong className="metric-value">{chargeCurrency(data.summary.dueCents)}</strong><p className="muted">{moneyMeanings.due}</p></Box>
 
