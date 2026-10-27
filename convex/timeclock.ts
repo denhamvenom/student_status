@@ -199,7 +199,10 @@ export const openOccurrence = mutation({
       const start = occurrence.allDay ? now : occurrence.scheduledStart;
       const end = occurrence.allDay ? args.allDayEnd : occurrence.scheduledEnd;
       if (start === undefined || end === undefined || !Number.isFinite(end) || end <= now || end <= start) return fail("INVALID_WINDOW");
-      const id = await ctx.db.insert("timeclockSessions", { occurrenceId: occurrence._id, seasonId: season._id, state: "open", scheduledStart: start, scheduledEnd: end, effectiveEnd: end, extensionMs: 0, revision: 1, openedAt: now, openedBy: actor._id, needsReview: false });
+      // A Coach can mark the linked Event as Outreach; that sets the session's override.
+      const claim = occurrence.source === "calendar" ? await ctx.db.query("eventCalendarClaims").withIndex("by_calendarEventId", q => q.eq("calendarEventId", occurrence.sourceKey)).unique() : null;
+      const linkedEvent = claim ? await ctx.db.get(claim.eventId) : null;
+      const id = await ctx.db.insert("timeclockSessions", { occurrenceId: occurrence._id, seasonId: season._id, state: "open", scheduledStart: start, scheduledEnd: end, effectiveEnd: end, extensionMs: 0, revision: 1, openedAt: now, openedBy: actor._id, needsReview: false, ...(linkedEvent?.isOutreach === true ? { outreachOverride: true } : {}) });
       await invalidateAttendanceSession(ctx, id);
       await ctx.scheduler.runAt(end, internal.timeclock.scheduledClose, { sessionId: id, expectedRevision: 1, expectedEnd: end });
       return good({ sessionId: id, existing: false });

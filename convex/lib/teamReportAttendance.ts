@@ -4,15 +4,16 @@ import { attendanceNamespace, reportAggregate, studentAttendanceNamespace } from
 import { kickoffBoundaryForCompetitionYear } from "./seasonCalendar";
 
 export async function teamReportAttendanceGate(ctx: QueryCtx, seasonId: Id<"seasons">, year: number) {
-  const [backfill, unclassifiedOutreach, unclassifiedBuild, pending, failed] = await Promise.all([
+  const [backfill, unclassifiedOutreach, unclassifiedBuild, unclassifiedRequired, pending, failed] = await Promise.all([
     ctx.db.query("attendanceReportBackfills").withIndex("by_seasonId", q => q.eq("seasonId", seasonId)).unique(),
     ctx.db.query("timeclockSessionReportStates").withIndex("by_seasonId_and_outreach", q => q.eq("seasonId", seasonId).eq("outreach", undefined)).first(),
     ctx.db.query("timeclockSessionReportStates").withIndex("by_seasonId_and_buildDay", q => q.eq("seasonId", seasonId).eq("buildDay", undefined)).first(),
+    ctx.db.query("timeclockSessionReportStates").withIndex("by_seasonId_and_required", q => q.eq("seasonId", seasonId).eq("required", undefined)).first(),
     reportAggregate.count(ctx, { namespace: attendanceNamespace(seasonId, "pending") }),
     reportAggregate.count(ctx, { namespace: attendanceNamespace(seasonId, "failed") }),
   ]);
   const kickoff = kickoffBoundaryForCompetitionYear(year);
-  const state = failed > 0 || backfill?.state === "failed" ? "failed" as const : backfill?.state !== "complete" || pending > 0 || unclassifiedOutreach || unclassifiedBuild ? "updating" as const : kickoff.state === "unavailable" ? "unknownKickoff" as const : "ready" as const;
+  const state = failed > 0 || backfill?.state === "failed" ? "failed" as const : backfill?.state !== "complete" || pending > 0 || unclassifiedOutreach || unclassifiedBuild || unclassifiedRequired ? "updating" as const : kickoff.state === "unavailable" ? "unknownKickoff" as const : "ready" as const;
   return { state, kickoff: kickoff.state === "verified" ? { date: kickoff.kickoffDate, at: kickoff.kickoffAt } : null, updatedAt: backfill?.updatedAt ?? null };
 }
 

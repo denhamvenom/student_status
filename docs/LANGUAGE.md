@@ -80,10 +80,30 @@ Owner-approved October 26–27 for the redesigned Student Home. Strings live in 
 | Signup sheet | When; Fee; No fee; Spots; {n} spots left; Full; What happens; You're signed up when you press Sign up. The fee is added to Money.; A Coach or Travel Lead reviews your signup. Any fee is charged when you're confirmed.; You'll join the waitlist.; A Coach assigns students to this event, so it has no signup. Ask a Coach if you still need to go.; You're signed up.; You're waitlisted.; Your signup is waiting for Coach or Travel Lead approval.; Close | Register |
 | What's left | What's left; {n} left for you; Nothing for you right now; {n} due soon; Due {Weekday, Mon D}; Show all; For you; Waiting for your parent; Waiting for Coach approval; Waiting for Coach or Travel Lead approval; {n} waiting for others; Nothing left. You're all set. Item names: Invite a parent, Finish your setup, Health information, FIRST registration, Balance due, Permission form, Choose your room, Your signup, Event records, Event requirement | Tasks not yet complete |
 | Balance due | Balance due; Your parent needs to review the payment due.; Fundraise (only when the Student has a fundraiser link); Available funds {amount}; Money is updating. Check back in a few minutes. | Pay now (on Home), Balance (alone) |
-| Participation | Participation; Meetings; Outreach; Build hours; {a} / {h} attended; of {n} events; {h}h; of {t} target; since kickoff; Starts at kickoff; No meetings yet; Updating; Participation shows here once meetings start. | practices, sessions |
+| Participation | Participation; Required meetings; Outreach; Build hours; {a} / {h} attended; of {n} events; {h}h; of {t} target; since kickoff; Starts at kickoff; No required meetings yet; Updating; Participation shows here once required meetings start. | practices, sessions, Meetings (alone) |
 | Errors | {Tile} could not load. Try again. If it keeps happening, contact a Coach. | Retry |
 | Student shell | VENOM STATUS; Team 8044 (account footer); Dark mode; Profile (avatar link) | |
 | Event status for Students and Parents | Signed up; Waiting for approval; Waitlisted; Not signed up; Withdrawn (staff keep Pending approval) | Confirmed, Pending, Waitlist, Not registered |
 | Parent invitations | Waiting for your parent to accept · expires {date} (Student); Waiting for the parent to accept · expires {date} (staff); Expired · {date}; Accepted · {date}; Revoked; Replaced by a newer invitation | pending (lowercase status) |
 | Announcements page (Coach, Travel Lead) | Announcements; Pin up to five messages to Student Home. Students see the newest pin first.; New announcement; Edit announcement; Title (optional); Message; {n} of 500 characters; Show until (optional); Pin to Student Home; Pinned ({n} of 5); Not pinned ({n}); Pin; Unpin; Edit; Remove; Five announcements are already pinned. Unpin one first. | |
 | Season page (Coach) | Build hours target; Hours each Student aims to log at Build meetings from kickoff. Shown on Student Home.; No target set.; Current target: {n} hours.; Enter whole hours from 1 to 2000, or leave the box empty to clear the target. | |
+
+## Attendance page (October 27)
+
+Students and Parents. Strings live in `src/features/attendance/copy.ts`. The page has four tiles; each opens a list, newest first.
+
+| Place | Words | Avoid |
+|---|---|---|
+| Page | Attendance; Your team's meetings and events this season, by type. | |
+| Tiles | Required meetings; Other meetings; Outreach; Build hours | Tuesday, Thursday, Meetings (alone) |
+| Required meetings tile | {n}%; {a} / {h} attended; No required meetings yet | |
+| Other meetings tile | {a}; of {h} meeting(s) attended; None yet | |
+| Outreach tile | {a}; of {n} event(s) | |
+| Build hours tile | {h}h; of {t} target; since kickoff; Starts at kickoff (same as Home) | |
+| Tile buttons | See meetings; See events; See build days | Details |
+| Updating | Updating; Attendance is updating. Check back in a few minutes. | |
+| List | Attended; Missed; {n} minute(s) (Build hours only); Loading…; Show more sessions; Nothing to show yet. Meetings show here after they end. | Load more |
+| List sheet titles | Required meetings; Other meetings; Outreach; Build hours. Descriptions: Every required meeting so far this season, newest first.; Optional meetings so far this season, newest first.; Outreach events so far this season, newest first.; Build meetings since kickoff, newest first. | |
+| Meeting with no title | Required meeting; Meeting (Other); Outreach event; Build meeting | Untitled |
+| No linked student | No student is linked to this account yet. | |
+| Event settings and New event (Coach) | Outreach event; Students see this event under Outreach on their Attendance page, not under Other meetings. | |

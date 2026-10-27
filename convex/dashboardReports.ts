@@ -2,7 +2,7 @@ import { publicErrorMessage } from './lib/publicErrors';
 import { publicErrorResult } from './lib/publicErrors';
 import { feeMaintenanceProjection, feeMaintenanceValidator } from "./lib/seasonFinance";
 import { ConvexError, v, type Infer } from "convex/values";
-import { paginationOptsValidator } from "convex/server";
+import { paginationOptsValidator, paginationResultValidator } from "convex/server";
 import { query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
@@ -10,7 +10,7 @@ import { activeSeason, requireRole, studentAccess, viewer, type AppUser } from "
 import { calculateStudentFinance, FINANCE_SUMMARY_VERSION } from "./lib/financeSummaries";
 import { financialAccount } from "./lib/financialSources";
 import { attendanceEvidence, outreachForSession, buildDayFromTitle } from "./lib/attendanceReports";
-import { attendanceNamespace, studentAttendanceNamespace, studentBuildMinutesNamespace, reportAggregate } from "./lib/reportAggregates";
+import { attendanceNamespace, studentAttendanceNamespace, studentBuildMinutesNamespace, reportAggregate, buildMinutesContribution } from "./lib/reportAggregates";
 import { kickoffBoundaryForCompetitionYear } from "./lib/seasonCalendar";
 import { teamReportAttendanceGate } from "./lib/teamReportAttendance";
 export { correctedIntervals } from "./lib/attendanceReports";
@@ -143,6 +143,10 @@ async function homeAttendanceStudent(ctx: QueryCtx, user: AppUser, studentId: Id
   return { student, season };
 }
 
+function studentBuildMinutes(ctx: QueryCtx, seasonId: Id<"seasons">, studentId: Id<"students">, kickoffAt: number | null) {
+  return kickoffAt === null ? Promise.resolve(0) : reportAggregate.sum(ctx, { namespace: studentBuildMinutesNamespace(seasonId, studentId), bounds: { lower: { key: kickoffAt, inclusive: true } } });
+}
+
 /** Participation rings for Student Home. Counts appear only when the season's attendance reports are ready. */
 export const homeAttendance = query({
   args: { studentId: v.id("students") }, returns: homeAttendanceValidator,
@@ -160,20 +164,89 @@ export const homeAttendance = query({
     // A pending or failed session withholds every count, as the family and team reports do.
     if (gate.state === "updating" || gate.state === "failed") return { state: "updating" as const, ...none, buildHours: { state: buildState, minutes: 0, targetHours }, kickoffAt };
     const [held, heldOutreach, attended, attendedOutreach, buildMinutes] = await Promise.all([
-      reportAggregate.count(ctx, { namespace: attendanceNamespace(season._id, "held") }),
+      reportAggregate.count(ctx, { namespace: attendanceNamespace(season._id, "held", "Required") }),
       reportAggregate.count(ctx, { namespace: attendanceNamespace(season._id, "held", "Outreach") }),
-      reportAggregate.count(ctx, { namespace: studentAttendanceNamespace(season._id, student._id) }),
+      reportAggregate.count(ctx, { namespace: studentAttendanceNamespace(season._id, student._id, "Required") }),
       reportAggregate.count(ctx, { namespace: studentAttendanceNamespace(season._id, student._id, "Outreach") }),
-      kickoffAt === null ? 0 : reportAggregate.sum(ctx, { namespace: studentBuildMinutesNamespace(season._id, student._id), bounds: { lower: { key: kickoffAt, inclusive: true } } }),
+      studentBuildMinutes(ctx, season._id, student._id, kickoffAt),
     ]);
-    // "all" includes Outreach sessions, so Meetings subtracts them.
+    // Meetings are Required meetings only; Other meetings appear in the breakdown.
     return {
       state: "ready" as const,
-      meetings: { attended: Math.max(0, attended - attendedOutreach), held: Math.max(0, held - heldOutreach) },
+      meetings: { attended, held },
       outreach: { attended: attendedOutreach, held: heldOutreach },
       buildHours: { state: buildState, minutes: buildMinutes, targetHours },
       kickoffAt,
     };
+  },
+});
+
+const breakdownValidator = v.object({
+  state: v.union(v.literal("ready"), v.literal("updating")), kickoffAt: nullableNumber,
+  required: attendedOfHeld, other: attendedOfHeld, outreach: attendedOfHeld,
+  buildHours: v.object({ minutes: v.number(), targetHours: nullableNumber }),
+});
+
+/** Required / Other / Outreach attended-of-held plus Build hours, for the Student Home breakdown. */
+export const attendanceBreakdown = query({
+  args: { studentId: v.id("students") }, returns: breakdownValidator,
+  handler: async (ctx, args): Promise<Infer<typeof breakdownValidator>> => {
+    const user = await viewer(ctx);
+    requireRole(user, "student", "parent", "coach");
+    const found = await homeAttendanceStudent(ctx, user, args.studentId);
+    const zero = { attended: 0, held: 0 };
+    if (!found) return { state: "updating", kickoffAt: null, required: zero, other: zero, outreach: zero, buildHours: { minutes: 0, targetHours: null } };
+    const { student, season } = found;
+    const gate = await teamReportAttendanceGate(ctx, season._id, season.year);
+    const kickoffAt = gate.kickoff?.at ?? null;
+    const targetHours = season.buildHoursTarget ?? null;
+    if (gate.state === "updating" || gate.state === "failed") return { state: "updating", kickoffAt, required: zero, other: zero, outreach: zero, buildHours: { minutes: 0, targetHours } };
+    const pair = async (category: "Required" | "Other" | "Outreach") => {
+      const [held, attended] = await Promise.all([
+        reportAggregate.count(ctx, { namespace: attendanceNamespace(season._id, "held", category) }),
+        reportAggregate.count(ctx, { namespace: studentAttendanceNamespace(season._id, student._id, category) }),
+      ]);
+      return { attended, held };
+    };
+    const [required, other, outreach, minutes] = await Promise.all([pair("Required"), pair("Other"), pair("Outreach"), studentBuildMinutes(ctx, season._id, student._id, kickoffAt)]);
+    return { state: "ready", kickoffAt, required, other, outreach, buildHours: { minutes, targetHours } };
+  },
+});
+
+const sessionRowValidator = v.object({ sessionId: v.id("timeclockSessions"), scheduledStart: v.number(), title: v.union(v.string(), v.null()), status: v.union(v.literal("attended"), v.literal("missed")), minutes: v.optional(v.number()) });
+const ATTENDANCE_PAGE_ROWS = 10;
+const emptyPage = { page: [], isDone: true, continueCursor: "" };
+
+/** Meeting-by-meeting drill-down for one category. Each call reads at most one page of rows; pages can be shorter than 10 when a row is not a held session. Reports that are still updating return no rows. */
+export const attendanceSessions = query({
+  args: { studentId: v.id("students"), kind: v.union(v.literal("required"), v.literal("other"), v.literal("outreach"), v.literal("build")), paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(sessionRowValidator),
+  handler: async (ctx, args) => {
+    const user = await viewer(ctx);
+    requireRole(user, "student", "parent", "coach");
+    if (args.paginationOpts.numItems > ATTENDANCE_PAGE_ROWS) throw new ConvexError("Attendance shows up to 10 meetings at a time. Reload the page and try again.");
+    const found = await homeAttendanceStudent(ctx, user, args.studentId);
+    if (!found) return emptyPage;
+    const { student, season } = found;
+    const gate = await teamReportAttendanceGate(ctx, season._id, season.year);
+    if (gate.state === "updating" || gate.state === "failed") return emptyPage;
+    const opts = { ...args.paginationOpts, maximumRowsRead: Math.min(args.paginationOpts.maximumRowsRead ?? 50, 50) };
+    if (args.kind === "build") {
+      if (gate.kickoff === null) return emptyPage;
+      const kickoffAt = gate.kickoff.at;
+      const result = await ctx.db.query("timeclockAttendanceSummaries").withIndex("by_studentId_and_scheduledStart", q => q.eq("studentId", student._id).gte("scheduledStart", kickoffAt)).order("desc").paginate(opts);
+      const page = result.page.filter(row => row.buildDay).map(row => { const minutes = buildMinutesContribution(row); return { sessionId: row.sessionId, scheduledStart: row.scheduledStart, title: row.occurrenceTitle ?? null, status: row.sessionState === "closed" && !row.needsReview && row.totalMs > 0 ? "attended" as const : "missed" as const, minutes }; });
+      return { ...result, page };
+    }
+    const outreach = args.kind === "outreach", required = args.kind === "required";
+    const result = await ctx.db.query("timeclockSessionReportStates").withIndex("by_seasonId_and_outreach_and_required_and_scheduledStart", q => q.eq("seasonId", season._id).eq("outreach", outreach).eq("required", outreach ? false : required)).order("desc").paginate(opts);
+    const held = result.page.filter(report => report.state === "ready" && report.sessionState === "closed" && !report.needsReview);
+    const page = await Promise.all(held.map(async report => {
+      const row = await ctx.db.query("timeclockAttendanceSummaries").withIndex("by_sessionId_and_studentId", q => q.eq("sessionId", report.sessionId).eq("studentId", student._id)).unique();
+      const attended = row !== null && row.qualifies && row.sessionState === "closed" && !row.needsReview && row.reportGeneration === report.reportGeneration;
+      return { sessionId: report.sessionId, scheduledStart: report.scheduledStart, title: report.occurrenceTitle ?? null, status: attended ? "attended" as const : "missed" as const, ...(attended ? { minutes: Math.floor(row.totalMs / 60000) } : {}) };
+    }));
+    return { ...result, page };
   },
 });
 

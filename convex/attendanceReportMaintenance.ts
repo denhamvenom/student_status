@@ -4,7 +4,7 @@ import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { activeSeason, requireRole, viewer } from "./lib/access";
-import { buildDayFromTitle, discoverReportMember, invalidateAttendanceSession, projectAttendanceMember } from "./lib/attendanceReports";
+import { buildDayFromTitle, discoverReportMember, invalidateAttendanceSession, projectAttendanceMember, requiredForSession, outreachForSession } from "./lib/attendanceReports";
 import { updateSessionAggregate } from "./lib/reportAggregates";
 
 const phase=v.union(v.literal("originals"),v.literal("corrections"),v.literal("verify"));
@@ -32,7 +32,7 @@ export const processSessionPage=internalMutation({
     const session=await ctx.db.get(args.sessionId);
     if(!state||!session||state.state!=="rebuilding"||state.reportGeneration!==args.expectedGeneration||state.sessionRevision!==args.expectedSessionRevision||session.revision!==args.expectedSessionRevision||state.phase!==args.expectedPhase||state.cursor!==args.expectedCursor)return null;
     const occurrence=await ctx.db.get(session.occurrenceId);if(!occurrence)throw new Error("Attendance source event is unavailable.");
-    if(state.occurrenceTitle!==occurrence.title||state.buildDay!==buildDayFromTitle(occurrence.title,session.scheduledStart)){await invalidateAttendanceSession(ctx,session._id);return null;}
+    if(state.occurrenceTitle!==occurrence.title||state.buildDay!==buildDayFromTitle(occurrence.title,session.scheduledStart)||state.required!==await requiredForSession(ctx,session,outreachForSession(session,occurrence.title))){await invalidateAttendanceSession(ctx,session._id);return null;}
       let nextPhase=state.phase,nextCursor:string|null,done=false,processed=state.processed;
       if(state.phase==="originals"){
         const page=await ctx.db.query("timeclockIntervals").withIndex("by_sessionId_and_studentId",q=>q.eq("sessionId",session._id)).paginate({numItems:20,cursor:state.cursor});

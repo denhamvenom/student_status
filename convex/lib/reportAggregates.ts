@@ -55,8 +55,8 @@ export async function readFundraiserAggregates(ctx: QueryCtx | MutationCtx, fund
 }
 
 export type AttendanceWeekday = "Tuesday" | "Thursday" | "other";
-type AttendanceCategory = AttendanceWeekday | "Outreach" | "BuildWeekday" | "BuildSaturday" | "BuildSunday" | "all";
-const attendanceCategories = (row: {weekday: AttendanceWeekday;outreach?:boolean;buildDay?:"weekday"|"saturday"|"sunday"|null}): AttendanceCategory[] => ["all", row.weekday, ...(row.outreach ? ["Outreach" as const] : []), ...(row.buildDay === "weekday" ? ["BuildWeekday" as const] : row.buildDay === "saturday" ? ["BuildSaturday" as const] : row.buildDay === "sunday" ? ["BuildSunday" as const] : [])];
+type AttendanceCategory = AttendanceWeekday | "Outreach" | "Required" | "Other" | "BuildWeekday" | "BuildSaturday" | "BuildSunday" | "all";
+const attendanceCategories = (row: {weekday: AttendanceWeekday;outreach?:boolean;required?:boolean;buildDay?:"weekday"|"saturday"|"sunday"|null}): AttendanceCategory[] => ["all", row.weekday, ...(row.outreach ? ["Outreach" as const] : []), ...(row.required === true ? ["Required" as const] : row.required === false && !row.outreach ? ["Other" as const] : []), ...(row.buildDay === "weekday" ? ["BuildWeekday" as const] : row.buildDay === "saturday" ? ["BuildSaturday" as const] : row.buildDay === "sunday" ? ["BuildSunday" as const] : [])];
 export const attendanceNamespace = (season: Id<"seasons">, metric: "held" | "pending" | "failed", weekday: AttendanceCategory = "all") => `attendance:${season}:${metric}:${weekday}`;
 export const studentAttendanceNamespace = (season: Id<"seasons">, student: Id<"students">, weekday: AttendanceCategory = "all") => `attendance:${season}:${student}:qualified:${weekday}`;
 

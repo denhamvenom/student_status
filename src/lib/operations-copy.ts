@@ -190,6 +190,8 @@ export const operationsCopy = {
     "promote": "Promote",
     "eventSettings": "Event settings",
     "saveSettings": "Save settings",
+    "outreachEvent": "Outreach event",
+    "outreachEventHint": "Students see this event under Outreach on their Attendance page, not under Other meetings.",
     "customRequirements": "Custom requirements",
     "edit": "Edit",
     "remove": "Remove",

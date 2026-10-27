@@ -122,13 +122,13 @@ describe("Student Home participation rings", () => {
     const f = await fixture();
     await season(f);
     const result = await f.student.query(api.dashboardReports.homeAttendance, { studentId: f.ids.sid });
-    // Held: Tuesday, pre-kickoff Build, Saturday Build, weekday Build, Thursday (the needs-review meeting is not held yet).
-    expect(result).toEqual({ state: "ready", meetings: { attended: 4, held: 5 }, outreach: { attended: 1, held: 2 }, buildHours: { state: "ready", minutes: 240 + 20, targetHours: null }, kickoffAt });
+    // Meetings are Required only: the Tuesday and the pre-kickoff Tuesday Build meeting. Post-kickoff Tuesday, Thursday and Saturday are Other.
+    expect(result).toEqual({ state: "ready", meetings: { attended: 2, held: 2 }, outreach: { attended: 1, held: 2 }, buildHours: { state: "ready", minutes: 240 + 20, targetHours: null }, kickoffAt });
     expect(await f.parent.query(api.dashboardReports.homeAttendance, { studentId: f.ids.sid })).toEqual(result);
     expect(await f.coach.query(api.dashboardReports.homeAttendance, { studentId: f.ids.sid })).toEqual(result);
     // The pre-kickoff Build meeting is stored but sits before the kickoff bound.
     expect(await minutesFor(f)).toBe(120 + 240 + 20);
-    expect(await f.otherStudent.query(api.dashboardReports.homeAttendance, { studentId: f.ids.otherSid })).toMatchObject({ meetings: { attended: 0, held: 5 }, outreach: { attended: 0, held: 2 }, buildHours: { minutes: 0 } });
+    expect(await f.otherStudent.query(api.dashboardReports.homeAttendance, { studentId: f.ids.otherSid })).toMatchObject({ meetings: { attended: 0, held: 2 }, outreach: { attended: 0, held: 2 }, buildHours: { minutes: 0 } });
   });
 
   it("maintains Build minutes through corrections, review, cancellation and closing", async () => {
@@ -200,7 +200,7 @@ describe("Student Home participation rings", () => {
     await season(f);
     await f.coach.mutation(api.seasonAdmin.setBuildHoursTarget, { hours: 80 });
     await f.t.run(ctx => ctx.db.patch(f.ids.season, { year: 2099 }));
-    expect(await f.student.query(api.dashboardReports.homeAttendance, { studentId: f.ids.sid })).toEqual({ state: "ready", meetings: { attended: 4, held: 5 }, outreach: { attended: 1, held: 2 }, buildHours: { state: "kickoffUnknown", minutes: 0, targetHours: 80 }, kickoffAt: null });
+    expect(await f.student.query(api.dashboardReports.homeAttendance, { studentId: f.ids.sid })).toEqual({ state: "ready", meetings: { attended: 2, held: 2 }, outreach: { attended: 1, held: 2 }, buildHours: { state: "kickoffUnknown", minutes: 0, targetHours: 80 }, kickoffAt: null });
   });
 
   it("refuses other families, Mentors and Travel Leads, and reports old or inactive records as unavailable", async () => {
@@ -228,13 +228,13 @@ describe("Student Home participation rings", () => {
       const metrics = await ctx.meta.getTransactionMetrics();
       return { state: result.state, held: result.meetings.held, documentsRead: metrics.documentsRead.used, databaseQueries: metrics.databaseQueries.used };
     });
-    // Measured at 19 documents and 31 queries for both samples; the bounds leave a little room for gate changes.
+    // Measured at about 19 documents and 32 queries for both samples; the bounds leave a little room for gate changes.
     const budget = { documentsRead: 25, databaseQueries: 40 };
     const first = await measure();
     // Counts come from aggregates, so more held meetings must not mean more reads.
-    for (let week = 0; week < 6; week++) { const at = Date.parse("2027-02-02T23:00:00Z") + week * 7 * 24 * hour; await meeting(f, { title: "Build meeting", at, visits: full(at) }); }
+    for (let week = 0; week < 6; week++) { const at = Date.parse("2027-02-01T23:00:00Z") + week * 7 * 24 * hour; await meeting(f, { title: "Build meeting", at, visits: full(at) }); }
     const later = await measure();
-    for (const [sample, held] of [[first, 5], [later, 11]] as const) {
+    for (const [sample, held] of [[first, 2], [later, 8]] as const) {
       expect(sample).toMatchObject({ state: "ready", held });
       expect(sample.documentsRead, `documents read with ${held} held`).toBeLessThanOrEqual(budget.documentsRead);
       expect(sample.databaseQueries, `queries with ${held} held`).toBeLessThanOrEqual(budget.databaseQueries);
@@ -265,7 +265,7 @@ describe("Student Home participation rings", () => {
       fromKickoff: await reportAggregate.sum(ctx, { namespace, bounds: { lower: { key: kickoffAt, inclusive: true } } }),
     }));
     expect(split).toEqual({ total: 120, beforeKickoff: 120 - shown, fromKickoff: shown });
-    expect(await f.student.query(api.dashboardReports.homeAttendance, { studentId: f.ids.sid })).toMatchObject({ state: "ready", meetings: { attended: 1, held: 1 }, buildHours: { state: "ready", minutes: shown } });
+    expect(await f.student.query(api.dashboardReports.homeAttendance, { studentId: f.ids.sid })).toMatchObject({ state: "ready", meetings: shown ? { attended: 0, held: 0 } : { attended: 1, held: 1 }, buildHours: { state: "ready", minutes: shown } });
   });
 });
 

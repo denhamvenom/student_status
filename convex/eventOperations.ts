@@ -1,6 +1,7 @@
 import { requireSeasonFinanceReady } from "./lib/seasonFinance";
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { invalidateAttendanceSession } from "./lib/attendanceReports";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { activeSeason, audit, viewer } from "./lib/access";
@@ -79,7 +80,7 @@ export const reviewSignup = mutation({
 });
 
 export const updateSettings = mutation({
-  args: { eventId: v.id("events"), capacity: v.optional(v.union(v.number(), v.null())), signupClosesAt: v.optional(v.union(v.number(), v.null())), roomDeadline: v.optional(v.union(v.number(), v.null())), allowWithdrawal: v.optional(v.boolean()) }, returns: v.null(),
+  args: { eventId: v.id("events"), capacity: v.optional(v.union(v.number(), v.null())), signupClosesAt: v.optional(v.union(v.number(), v.null())), roomDeadline: v.optional(v.union(v.number(), v.null())), allowWithdrawal: v.optional(v.boolean()), isOutreach: v.optional(v.boolean()) }, returns: v.null(),
   handler: async (ctx, args) => {
     await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const user = await viewer(ctx);
@@ -105,6 +106,17 @@ export const updateSettings = mutation({
       patch.roomDeadline = args.roomDeadline ?? undefined;
     }
     if (args.allowWithdrawal !== undefined) patch.allowWithdrawal = args.allowWithdrawal;
+    if (args.isOutreach !== undefined && args.isOutreach !== (event.isOutreach ?? false)) {
+      patch.isOutreach = args.isOutreach;
+      // Carry the change to an already-created session so attendance is recalculated.
+      const claim = event.calendarEventId ? await ctx.db.query("eventCalendarClaims").withIndex("by_calendarEventId", q => q.eq("calendarEventId", event.calendarEventId!)).unique() : null;
+      const occurrence = claim ? await ctx.db.query("timeclockOccurrences").withIndex("by_source_and_sourceKey", q => q.eq("source", "calendar").eq("sourceKey", claim.calendarEventId)).unique() : null;
+      const session = occurrence ? await ctx.db.query("timeclockSessions").withIndex("by_occurrenceId", q => q.eq("occurrenceId", occurrence._id)).unique() : null;
+      if (session) {
+        await ctx.db.patch(session._id, { outreachOverride: args.isOutreach ? true : undefined });
+        await invalidateAttendanceSession(ctx, session._id);
+      }
+    }
     if (Object.keys(patch).length === 0) return null;
     await ctx.db.patch(event._id, patch);
     await audit(ctx, user, "events", event._id, "updateSettings", { capacity: event.capacity, signupClosesAt: event.signupClosesAt, roomDeadline: event.roomDeadline, allowWithdrawal: event.allowWithdrawal }, patch);
