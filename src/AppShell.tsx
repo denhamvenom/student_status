@@ -14,6 +14,7 @@ import { Button } from './components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './components/ui/sheet'
 import { readinessCopy as copy } from './features/design-review/readinessCopy'
 import styles from './features/design-review/ReadinessReview.module.css'
+import { StudentShell } from './components/student-shell/StudentShell'
 type ShellViewer = { user: { name: string; email: string } | null; season: { name: string } | null }
 export { menu }
 export const primaryPaths:Record<string,string[]>={student:['/','/events','/finances','/profile'],parent:['/','/events','/forms','/finances'],coach:['/','/events','/readiness','/finances'],travelLead:['/readiness','/events','/','/drivers'],mentor:['/','/report','/settings']}
@@ -39,6 +40,7 @@ export function AppShell({ children, viewer, familyContext, role = "coach" }: { 
     setTheme(next); setThemeError('')
     try { await saveTheme({ theme: next }) } catch (cause) { setTheme(theme ?? 'system'); setThemeError(userFacingError(cause, copy.themeFailed)) }
   }
+  if (role === 'student') return <StudentShell userName={viewer.user?.name} familyContext={familyContext} dark={resolvedTheme === 'dark'} onToggleTheme={() => void changeTheme()} onSignOut={() => void exit()} themeError={themeError} signOutError={signOutError}>{children}</StudentShell>
   const nav = navigationCopy.groups
   const groups: Record<string, [string, string][]> = {
     [nav.team]: [[nav.team, '/'], [nav.joinRequests, '/enroll'], [nav.attendance, '/attendance'], [nav.reports, '/reports']],
