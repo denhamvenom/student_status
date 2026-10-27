@@ -31,6 +31,7 @@ import { financeWorkspaceCopy } from './lib/finance-admin-copy'
 import { AdultProfile } from './AdultProfile'
 import { FamilyFundraiserLink, FundraiserLinkSettings } from './FundraiserLinks'
 import { FundraiserAnchor } from './features/student-home/FundraiserAnchor'
+import { StudentHome } from './features/student-home/StudentHome'
 import { ZeffySync } from './ZeffySync'
 import { DriverOwnerReconciliation } from './DriverOwnerReconciliation'
 import FeeAdministration from './FeeAdministration'
@@ -116,7 +117,7 @@ function Box({title,children}:{title?:string;children:React.ReactNode}){return <
 function State({children}:{children:React.ReactNode}){return <div className="card"><p>{children}</p></div>}
 
 
-function Home({viewer,studentId}:{viewer:Viewer;studentId:string|null}){const r=role(viewer);if(r==='mentor')return <AdultProfile/>;if(r==='coach'||r==='travelLead')return <Roster viewer={viewer}/>;if(!studentId)return <State>{liveCopy.states.noLinkedStudent}</State>;return <><p><Link className="button button-outline" to="/setup?edit=1">Edit profile</Link></p><DashboardPage studentId={studentId} viewerRole={r}/></>}
+function Home({viewer,studentId}:{viewer:Viewer;studentId:string|null}){const r=role(viewer);if(r==='mentor')return <AdultProfile/>;if(r==='coach'||r==='travelLead')return <Roster viewer={viewer}/>;if(!studentId)return <State>{liveCopy.states.noLinkedStudent}</State>;if(r==='student')return <StudentHome studentId={sid(studentId)}/>;return <><p><Link className="button button-outline" to="/setup?edit=1">Edit profile</Link></p><DashboardPage studentId={studentId} viewerRole={r}/></>}
 type WaitingTodo={eventName:string;label:string;responsible:'student'|'parent'|'coach'}
 function waitingSentence(todo:WaitingTodo,studentName:string,viewerRole:string){
   const student=viewerRole==='student'?'your':`${studentName}'s`

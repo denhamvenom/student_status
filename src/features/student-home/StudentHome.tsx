@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQueries } from 'convex/react'
-import { makeFunctionReference, type FunctionReturnType } from 'convex/server'
+import type { FunctionReturnType } from 'convex/server'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import type { HomeAttendance, PinnedAnnouncement, SignupAvailability, StudentHomeSummary } from './contract'
@@ -9,15 +9,10 @@ import { StudentHomeView } from './StudentHomeView'
 import type { HomeFinance, HomeTileSource, Loadable, StudentHomeHandlers } from './types'
 import { useNow } from './useNow'
 
-/*
- * The Student Home queries are built in parallel with this screen, so they are referenced by name
- * and typed with the shared contract. Once they exist in convex/_generated/api, these can switch
- * to api.studentHome.summary etc. without changing the screen.
- */
-const summaryQuery = makeFunctionReference<'query', { asOfDay: string }, StudentHomeSummary>('studentHome:summary')
-const homeAttendanceQuery = makeFunctionReference<'query', { studentId: Id<'students'> }, HomeAttendance>('dashboardReports:homeAttendance')
-const pinnedQuery = makeFunctionReference<'query', Record<string, never>, PinnedAnnouncement[]>('announcements:pinnedForHome')
-const availabilityQuery = makeFunctionReference<'query', { eventId: Id<'events'> }, SignupAvailability>('participation:signupAvailability')
+const summaryQuery = api.studentHome.summary
+const homeAttendanceQuery = api.dashboardReports.homeAttendance
+const pinnedQuery = api.announcements.pinnedForHome
+const availabilityQuery = api.participation.signupAvailability
 
 type FamilyFinance = FunctionReturnType<typeof api.dashboardReports.familyFinance>
 

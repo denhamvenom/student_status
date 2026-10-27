@@ -79,6 +79,8 @@ export type StudentHomeSummary = {
   initials: string
   season: { name: string; startsAt: number; kickoffAt: number | null }
   parentLinked: boolean
+  /** The Student has a fundraiser page link (Money shows the fundraiser section only then). */
+  fundraiserLinked: boolean
   whatsLeft: WhatsLeftItem[]
   openSignups: OpenSignup[]
   roomChoices: RoomChoice[]
@@ -93,7 +95,8 @@ export type SignupAvailability = {
   startsAt: number
   endsAt: number
   feeCents: number
-  signupMode: 'open' | 'approval'
+  /** 'assigned' only appears with outcome 'closed' (a Coach changed the event after Home loaded). */
+  signupMode: 'open' | 'approval' | 'assigned'
   signupClosesAt: number | null
   capacity: number | null
   spotsLeft: number | null
