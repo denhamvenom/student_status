@@ -35,6 +35,10 @@ export const familyCopy = {
   parent: {
     invitations: 'Invitations', loadingInvitations: 'Loading invitations…', noneInvitations: 'No invitations yet.',
     expired: 'Expired', expires: 'expires', revokeInvitation: 'Revoke invitation',
+    // Invitation status on the Student's Parents page (parentInvites.listStudentInvites status).
+    invitationWaiting: 'Waiting for your parent to accept', invitationAccepted: 'Accepted', invitationRevoked: 'Revoked', invitationReplaced: 'Replaced by a newer invitation',
+    // The same invitation status on the Coach's parent access review (Join requests).
+    invitationWaitingStaff: 'Waiting for the parent to accept',
     reinviteReason: 'Reason to allow a new invitation', allowReplacement: 'Allow replacement',
     access: 'Parent access', loadingParents: 'Loading linked parents…', noLinked: 'No parent accounts linked.',
     accessActive: 'Access active', accessRevoked: 'Access revoked', revokeAccess: 'Revoke access',

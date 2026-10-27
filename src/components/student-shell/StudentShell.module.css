@@ -1,0 +1,127 @@
+/*
+ * Student shell, from the Student Home artboards (DesktopDarkBusy, DesktopLightBusy, Direction1, Direction1Light).
+ * Colors come from the --vs-* tokens in src/shadcn.css. This file is unlayered on purpose: src/styles.css styles
+ * every a (color, weight, hover underline) without a layer, which beats Tailwind utilities on links.
+ */
+.shell{--bar-height:64px;min-height:100vh;min-height:100dvh;background:var(--vs-page);color:var(--vs-text)}
+/* Inside the app frame the public footer follows the shell; on phones it stays in view on short pages. */
+:global(.app-frame)>.shell{min-height:0}
+/* The footer that follows clears the bottom bar itself (student-pages.css), so the page needs no bar-sized gap. */
+:global(.app-frame)>.shell .main{padding-bottom:24px}
+.shell a,.shell button,.sheet a,.sheet button{touch-action:manipulation}
+.sidebar :is(a,button):focus-visible,.header :is(a,button):focus-visible,.bar :is(a,button):focus-visible,.sheet :is(a,button):focus-visible{outline:3px solid var(--vs-gold);outline-offset:2px;box-shadow:0 0 0 2px var(--vs-purple-deep)}
+.brand,.brand:hover,.sideLink:hover,.barItem:hover,.sheetLink:hover,.headerAvatar:hover{text-decoration:none}
+.brand{display:inline-flex;align-items:center;gap:10px;min-height:44px;color:var(--vs-gold)}
+
+/* Gold initials avatar (sidebar footer and phone header). */
+.avatar{display:grid;place-items:center;flex:none;width:34px;height:34px;border-radius:50%;background:var(--vs-gold);color:var(--vs-purple-deep);font:400 13px/1 Anton,Impact,sans-serif;letter-spacing:.02em}
+
+/* Theme switch track, shared by the sidebar and the More sheet. */
+.track{position:relative;flex:none;width:34px;height:20px;margin-left:auto;border:1px solid rgba(255,255,255,.32);border-radius:10px;background:rgba(255,255,255,.14)}
+.knob{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .15s ease}
+[aria-checked=true]>.track{border-color:var(--vs-gold);background:var(--vs-gold)}
+[aria-checked=true]>.track .knob{left:16px;background:var(--vs-purple-deep)}
+
+/* Desktop sidebar: 220px, always the dark purple gradient. */
+.sidebar{display:none}
+.sidebarInner{position:sticky;top:0;display:flex;flex-direction:column;height:100vh;height:100dvh;overflow-y:auto}
+.sidebarBrand{padding:16px 20px 12px;border-bottom:1px solid var(--vs-sidebar-border)}
+.sidebarLogo{display:block;flex:none;width:auto;height:30px}
+.sidebarWords{display:block;width:min-content;font:400 13px/1.15 Anton,Impact,sans-serif;letter-spacing:.14em;text-transform:uppercase}
+.sidebarNav{flex:1 0 auto;display:flex;flex-direction:column;gap:2px;padding:14px 10px}
+.sideLink{display:flex;align-items:center;gap:11px;min-height:44px;padding:0 13px;border:1px solid transparent;border-radius:12px;color:var(--vs-sidebar-muted);font-size:13px;font-weight:400;line-height:1.4}
+.sideLink svg{flex:none;width:17px;height:17px}
+.sideLink:hover{background:rgba(255,255,255,.05);color:var(--vs-sidebar-text)}
+.sideLink[aria-current=page]{border-color:rgba(253,208,35,.22);background:rgba(253,208,35,.12);color:var(--vs-gold);font-weight:700}
+:global(.dark) .sideLink[aria-current=page]{border-color:rgba(253,208,35,.2);background:rgba(253,208,35,.1)}
+.account{display:flex;flex-direction:column;gap:8px;padding:14px 18px 18px;border-top:1px solid var(--vs-sidebar-border)}
+.accountRow{display:flex;align-items:center;gap:10px;min-width:0;margin-bottom:4px}
+.accountText{min-width:0}
+.accountText p{margin:0}
+.accountName{color:var(--vs-sidebar-text);font-size:13px;font-weight:600;line-height:1.2;overflow-wrap:anywhere}
+.accountTeam{color:var(--vs-sidebar-muted);font-size:11px;line-height:1.4}
+.sideControl{display:flex;align-items:center;justify-content:flex-start;gap:10px;width:100%;min-height:44px;padding:0 12px;border:1px solid rgba(255,255,255,.12);border-radius:10px;background:rgba(255,255,255,.04);color:var(--vs-sidebar-text);font-size:13px;font-weight:600;line-height:1.2;text-align:left}
+.sideControl:hover{background:rgba(255,255,255,.09);color:var(--vs-sidebar-text)}
+.sideControl svg{flex:none;width:16px;height:16px}
+.sideError{margin:0;color:#ff8a80;font-size:12px;line-height:1.4}
+
+/* Phone header: 56px purple gradient, logo mark + VENOM STATUS, initials avatar. */
+.header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:10px;min-height:calc(56px + env(safe-area-inset-top));padding:env(safe-area-inset-top) max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left));background:var(--vs-header);box-shadow:0 2px 18px rgba(46,19,82,.35)}
+:global(.dark) .header{box-shadow:0 2px 18px rgba(0,0,0,.7)}
+.headerBrand{flex:1;min-width:0}
+.headerLogo{display:block;flex:none;width:auto;height:26px}
+.headerWords{overflow:hidden;font:400 15px/1 Anton,Impact,sans-serif;letter-spacing:.15em;text-transform:uppercase;text-overflow:ellipsis;white-space:nowrap}
+.headerAvatar{display:grid;place-items:center;flex:none;width:44px;height:44px;margin-right:-5px;border-radius:50%}
+.headerAvatar .avatar{box-shadow:0 0 0 2px rgba(253,208,35,.3),0 2px 10px rgba(253,208,35,.3)}
+
+/* Content column. */
+.column{display:flex;flex-direction:column;min-width:0}
+.development{margin:0;padding:3px 12px;border-bottom:1px solid rgba(230,188,15,.45);background:var(--gold-100);color:var(--vs-text);font-size:11px;font-weight:600;line-height:1.5;text-align:center}
+.phoneError{margin:12px 14px 0;padding:10px 12px;border:1px solid var(--vs-urgent-border);border-radius:10px;background:var(--vs-urgent-soft);color:var(--vs-urgent);font-size:13px;font-weight:600}
+.familyContext{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;padding:12px 14px 0}
+.familyContext:empty{display:none}
+.familyContext :global(.viewing){order:-1;margin:0;padding:0;background:transparent;color:inherit}
+.familyContext :global(.student-switch){margin:0 0 0 auto}
+.main{width:100%;min-width:0;padding:12px 14px calc(var(--bar-height) + env(safe-area-inset-bottom) + 24px)}
+/* Page headings keep the sizes they had in the previous shell. */
+.main h1,.main h2,.main h3{margin:0;font-family:Anton,Impact,sans-serif;font-weight:400;line-height:1.1}
+.main h1{font-size:clamp(28px,4vw,40px)}
+.main h2{font-size:22px}
+.main button,.main select{font:inherit}
+
+/* Phone bottom bar: Home, Events, Money, Profile, More. */
+.bar{position:fixed;right:0;bottom:0;left:0;z-index:40;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));min-height:calc(var(--bar-height) + env(safe-area-inset-bottom));padding:0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);border-top:1px solid var(--vs-bar-border);background:var(--vs-bar);box-shadow:0 -2px 12px rgba(70,29,124,.1)}
+:global(.dark) .bar{box-shadow:0 -3px 16px rgba(0,0,0,.6)}
+.barItem{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0;min-height:calc(var(--bar-height) - 1px);padding:4px 2px;border:0;border-radius:12px;background:transparent;color:var(--vs-bar-muted);font-size:11px;font-weight:400;line-height:1.2;text-align:center}
+.barItem svg{flex:none;width:22px;height:22px}
+.barItem span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.barItem[aria-current=page],.barItem[data-active]{color:var(--vs-bar-active);font-weight:700}
+
+/* More sheet (Base UI dialog, bottom side). */
+.sheet{gap:0;max-height:min(85vh,600px);overflow-y:auto;padding-bottom:env(safe-area-inset-bottom);border-top:1px solid var(--vs-border);border-radius:20px 20px 0 0;background:var(--vs-card);color:var(--vs-text);box-shadow:0 -8px 32px rgba(15,12,28,.3)}
+.sheetHeader{padding:18px 20px 8px}
+.sheetTitle{margin:0;color:var(--vs-heading);font:400 22px/1.2 Anton,Impact,sans-serif;letter-spacing:.01em}
+.sheetNav{display:flex;flex-direction:column;gap:2px;padding:0 12px}
+.sheetLink{display:flex;align-items:center;gap:12px;min-height:48px;padding:0 12px;border-radius:12px;color:var(--vs-text);font-size:15px;font-weight:600}
+.sheetLink svg{flex:none;width:20px;height:20px;color:var(--vs-muted)}
+.sheetLink:hover{background:var(--vs-inset);color:var(--vs-text)}
+.sheetLink[aria-current=page]{background:var(--vs-inset);color:var(--vs-bar-active);font-weight:700}
+.sheetLink[aria-current=page] svg{color:currentColor}
+.sheetActions{display:flex;flex-direction:column;gap:8px;margin-top:8px;padding:14px 16px 18px;border-top:1px solid var(--vs-border-subtle)}
+.sheetControl{display:flex;align-items:center;gap:12px;width:100%;min-height:48px;padding:0 14px;border:1px solid var(--vs-border);border-radius:12px;background:var(--vs-inset);color:var(--vs-text);font-size:15px;font-weight:600;text-align:left}
+.sheetControl:hover{background:var(--vs-inset-raised)}
+.sheetControl svg{flex:none;width:20px;height:20px;color:var(--vs-muted)}
+.sheetControl>.track{border-color:var(--vs-border);background:var(--vs-inset-raised)}
+.sheetControl>.track .knob{background:var(--vs-muted)}
+.sheetControl[aria-checked=true]>.track{border-color:var(--vs-gold);background:var(--vs-gold)}
+.sheetControl[aria-checked=true]>.track .knob{background:var(--vs-purple-deep)}
+.sheetError{margin:0;color:var(--vs-urgent);font-size:13px;font-weight:600}
+
+@media(min-width:1024px){
+  .shell,:global(.app-frame)>.shell{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:100vh;min-height:100dvh}
+  .sidebar{display:block;border-right:1px solid var(--vs-sidebar-border);background:var(--vs-sidebar)}
+  .header,.bar,.phoneError{display:none}
+  .familyContext{padding:20px 28px 0}
+  .main,:global(.app-frame)>.shell .main{max-width:1296px;margin:0 auto;padding:24px 28px 48px}
+}
+
+/*
+ * Inside the app frame on desktop screens, the frame itself is the two-column grid: the sidebar runs the
+ * full page height and the public footer sits under the page in the content column (student-pages.css
+ * lines it up with the page). The shell's own box steps aside so its parts join the frame's grid.
+ */
+@media screen and (min-width:1024px){
+  :global(.app-frame):has(>.shell){display:grid;grid-template-columns:220px minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto auto}
+  :global(.app-frame)>.shell{display:contents}
+  :global(.app-frame)>.shell>.sidebar{grid-column:1;grid-row:1 / -1}
+  :global(.app-frame)>.shell>.column{grid-column:2;grid-row:1}
+  /* Anything else beside the shell (the "Switching role…" status) goes under the page, above the footer. */
+  :global(.app-frame)>.shell~*{grid-column:2}
+  :global(.app-frame)>.shell~footer{grid-row:3}
+}
+
+@media print{
+  .sidebar,.header,.bar,.development,.phoneError{display:none!important}
+  .shell{display:block;min-height:0;background:#fff;color:#111}
+  .main,:global(.app-frame)>.shell .main{max-width:none;padding:0}
+}

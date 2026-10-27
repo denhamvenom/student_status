@@ -14,6 +14,7 @@ import { Button } from './components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './components/ui/sheet'
 import { readinessCopy as copy } from './features/design-review/readinessCopy'
 import styles from './features/design-review/ReadinessReview.module.css'
+import { StudentShell } from './components/student-shell/StudentShell'
 type ShellViewer = { user: { name: string; email: string } | null; season: { name: string } | null }
 export { menu }
 export const primaryPaths:Record<string,string[]>={student:['/','/events','/finances','/profile'],parent:['/','/events','/forms','/finances'],coach:['/','/events','/readiness','/finances'],travelLead:['/readiness','/events','/','/drivers'],mentor:['/','/report','/settings']}
@@ -21,6 +22,8 @@ export const primaryPaths:Record<string,string[]>={student:['/','/events','/fina
 export function AppShell({ children, viewer, familyContext, role = "coach" }: { children: ReactNode; viewer: ShellViewer; familyContext?: ReactNode; role?: string }) {
   const shellRef=useRef<HTMLDivElement>(null), headerRef=useRef<HTMLElement>(null)
   useLayoutEffect(()=>{if(shellRef.current&&headerRef.current)return observeStickyHeader(headerRef.current,shellRef.current)},[])
+  // Student screens use the redesign palette (src/shadcn.css); other roles keep theirs until their redesign.
+  useLayoutEffect(()=>{if(role!=='student')return;const root=document.documentElement;root.dataset.design='student';return()=>{delete root.dataset.design}},[role])
   const { theme, resolvedTheme, setTheme } = useTheme()
   const saveTheme = useMutation(api.app.setTheme)
   const { signOut } = useAuthActions()
@@ -37,10 +40,11 @@ export function AppShell({ children, viewer, familyContext, role = "coach" }: { 
     setTheme(next); setThemeError('')
     try { await saveTheme({ theme: next }) } catch (cause) { setTheme(theme ?? 'system'); setThemeError(userFacingError(cause, copy.themeFailed)) }
   }
+  if (role === 'student') return <StudentShell userName={viewer.user?.name} familyContext={familyContext} dark={resolvedTheme === 'dark'} onToggleTheme={() => void changeTheme()} onSignOut={() => void exit()} themeError={themeError} signOutError={signOutError}>{children}</StudentShell>
   const nav = navigationCopy.groups
   const groups: Record<string, [string, string][]> = {
     [nav.team]: [[nav.team, '/'], [nav.joinRequests, '/enroll'], [nav.attendance, '/attendance'], [nav.reports, '/reports']],
-    [nav.events]: [[nav.events, '/events'], ['Archived events', '/events/archive'], [nav.readiness, '/readiness'], [nav.permissionForms, '/permissions'], [nav.drivers, '/drivers'], [nav.withdrawals, '/withdrawals']],
+    [nav.events]: [[nav.events, '/events'], ['Archived events', '/events/archive'], [nav.readiness, '/readiness'], [nav.permissionForms, '/permissions'], [nav.drivers, '/drivers'], [nav.withdrawals, '/withdrawals'], [navigationCopy.labels.announcements, '/announcements']],
     [nav.money]: [[nav.money, '/finances'], [nav.fundraising, '/fundraising']],
     [nav.admin]: [[nav.users, '/adults'], [nav.season, '/season'], [nav.archived, '/retention'], ['Money tools', '/money-tools'], [nav.settings, '/settings']],
   }

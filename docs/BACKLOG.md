@@ -12,6 +12,12 @@ Read this only when the owner requests backlog work or the current task relates 
 - Production ownership, least privilege, branch protection and main-connected build settings need operational confirmation before relevant changes. A push to main can deploy both websites; local edits do not authorize a push, merge, deployment or data operation.
 - Retention, shared identities, holds, exports and responsible organization/contact policy are in [DECISIONS.md](DECISIONS.md#retention); disposal/backup coverage is not established.
 
+## Product
+
+- Fee due dates (owner, October 27): let a Coach set a due date on a fee so Highlights can flag a payment as past due before the event starts. Until then "past due" means unpaid after the event start. This is a money change; read DECISIONS.md first.
+- Student Home release prerequisites: before kickoff (January 9, 2027), and with owner approval, run Recalculate attendance on production so the new build-hours totals fill in, and set each season's build-hours target on the Season page.
+- Remind my parent (owner, October 27): a Student Home button that emails the linked parent about a FIRST registration, permission form or payment waiting on them, through the existing parent email service.
+
 ## Testing
 
 - October 23 transportation release: live synthetic development API checks and component tests passed, including both driver-assignment guards and switching modes. Remaining check: signed-in Coach event creation/settings at phone 390px and desktop 1440px in light/dark, dropdown save/reload and hidden ride controls; requires a development Coach session. Production asset/traffic verification is complete in v0.1.0-onboarding.16; no production test-data writes are needed.

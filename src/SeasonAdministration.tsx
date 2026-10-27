@@ -70,6 +70,38 @@ function DraftForm({plan, sourceYear}: {plan: Plan | null; sourceYear: number}) 
   </form>
 }
 
+/**
+ * Active season's Build hours goal for Student Home. An empty box clears it.
+ * Keyed by season; the box follows the saved value (including another Coach's save) until this Coach types an unsaved change.
+ */
+function BuildHoursTarget({ current }: { current: number | null }) {
+  const save = useMutation(api.seasonAdmin.setBuildHoursTarget)
+  const savedValue = current?.toString() ?? ''
+  // null while the box matches the saved value; otherwise the unsaved text.
+  const [draft, setDraft] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [saved, setSaved] = useState('')
+  const hours = draft ?? savedValue
+  const unchanged = hours.trim() === savedValue
+  const submit = async (event: FormEvent) => {
+    event.preventDefault()
+    if (busy || unchanged) return
+    setBusy(true); setError(''); setSaved('')
+    try { await save({ hours: hours.trim() === '' ? null : Number(hours) }); setDraft(null); setSaved(copy.saved) }
+    catch (cause) { setError(message(cause)) } finally { setBusy(false) }
+  }
+  return <form className={styles.section} onSubmit={event => void submit(event)}>
+    <div className={styles.targetRow}>
+      <label className={styles.field}>{copy.buildHoursTarget}<Input type="number" inputMode="numeric" min={1} max={2000} step={1} value={hours} onChange={event => { const next = event.target.value; setDraft(next === savedValue ? null : next); setSaved('') }} disabled={busy} aria-describedby="build-hours-target-help build-hours-target-current" /></label>
+      <Button type="submit" disabled={busy || unchanged}>{copy.save}</Button>
+    </div>
+    <p id="build-hours-target-help" className={styles.muted}>{copy.buildHoursHelp}</p>
+    <p id="build-hours-target-current" className={styles.muted}>{copy.buildHoursCurrent(current)}</p>
+    {error && <p className={styles.error} role="alert">{error}</p>}{saved && <p role="status">{saved}</p>}
+  </form>
+}
+
 function RosterReview({ plan }: { plan: Plan }) {
   const rows = usePaginatedQuery(api.seasonAdmin.rosterPage, { planId: plan.id }, { initialNumItems: 20 })
   const save = useMutation(api.seasonAdmin.saveRosterDecision)
@@ -114,6 +146,7 @@ export function SeasonAdministration() {
   return <div className={styles.page}>
     {completed && <p role="status">Season transition complete. {view.source.name} is now active; historical records remain preserved.</p>}
     <header className={styles.heading}><h1>{copy.title}</h1><p>{copy.description}</p></header>
+    <BuildHoursTarget key={view.source.id} current={view.source.buildHoursTarget} />
     <p className={styles.notice}>Save each choice before you confirm. Old records stay with the season they came from.</p>
     <nav className={styles.steps} aria-label="Season transition steps">{steps.map((label, index) => <Button key={label} type="button" variant={step === index ? 'default' : 'outline'} disabled={!plan && index > 0 || !!plan && plan.state !== 'draft'} onClick={() => setStep(index)}>{index + 1}. {label}</Button>)}</nav>
     <p className={styles.muted}>{copy.activeSeason}: {view.source.name}</p>

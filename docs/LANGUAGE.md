@@ -62,3 +62,28 @@ Write every new or changed user-facing string to this page. Rewrite screen by sc
 | Signing in | sign in (verb), sign-in (noun) | Same | log in, login |
 | Team reports | (not shown) | Reports (Coach, Travel Lead); Team report (Mentor); menu label matches heading | Report (alone) |
 | Attendance | Attendance; meetings | Attendance; meetings | sessions, practices, Attendance fixes (as a menu name) |
+
+## Student Home (October 27)
+
+Owner-approved October 26–27 for the redesigned Student Home. Strings live in `src/features/student-home/copy.ts`; this table records the words, not every sentence.
+
+| Place | Words | Avoid |
+|---|---|---|
+| Greeting | Hey, {first name}; {Weekday, Mon D} — Here's what needs your attention; {Weekday, Mon D} — You're all set (desktop); {Weekday, Mon D} · Hey, {first name} (phone) | Season · Week N |
+| Done state | You're all set | Paid up, All clear, All caught up |
+| Top card stack | Highlights (screen-reader name); Previous card, Next card, Show card {n} of {m}; Nothing new from the team right now. | Coach's tile (in the app) |
+| Highlights to-do cards | Invite a parent; Remind your parent to finish FIRST registration and Consent & Release.; Finish FIRST registration; The fee for {event} is past due. Your parent needs to review the payment due.; Remind your parent to complete the permission form for {event}.; Open event; Open Money; Overdue; Due {weekday} (under 7 days); Due {Mon D} (7 or more days); Due today | Tasks, To-do |
+| Room choice card | Room choice; Closes {weekday}; Closes today; {n} days left (with the date after it only when the pill shows a weekday); Last day; Your room group; Not chosen yet; Start a group, accept an invitation or ask to be assigned.; Assignment requested; Final; Invitations; {name} invited you; Waiting for your reply; No changes after the {Mon D} deadline; Choose your room | Pick your room type, Pending your reply |
+| Announcement card | Coach announcement; Travel Lead announcement; Show full message | |
+| Countdown card | Countdown; {n} days to kickoff; {n} hours to kickoff; {n} days to go (the Competition name on its own line below); Now; Kickoff · {Mon D}; Upcoming milestones | Weeks to kickoff, Pre-season |
+| Open signups | Open signups; {n} closing soon; {n} open; Closes {Weekday, Mon D}; Closes today; Starts {Weekday, Mon D}; Show more signups; No open signups right now. New events show up here. | sign-up (noun) |
+| Signup sheet | When; Fee; No fee; Spots; {n} spots left; Full; What happens; You're signed up when you press Sign up. The fee is added to Money.; A Coach or Travel Lead reviews your signup. Any fee is charged when you're confirmed.; You'll join the waitlist.; A Coach assigns students to this event, so it has no signup. Ask a Coach if you still need to go.; You're signed up.; You're waitlisted.; Your signup is waiting for Coach or Travel Lead approval.; Close | Register |
+| What's left | What's left; {n} left for you; Nothing for you right now; {n} due soon; Due {Weekday, Mon D}; Show all; For you; Waiting for your parent; Waiting for Coach approval; Waiting for Coach or Travel Lead approval; {n} waiting for others; Nothing left. You're all set. Item names: Invite a parent, Finish your setup, Health information, FIRST registration, Balance due, Permission form, Choose your room, Your signup, Event records, Event requirement | Tasks not yet complete |
+| Balance due | Balance due; Your parent needs to review the payment due.; Fundraise (only when the Student has a fundraiser link); Available funds {amount}; Money is updating. Check back in a few minutes. | Pay now (on Home), Balance (alone) |
+| Participation | Participation; Meetings; Outreach; Build hours; {a} / {h} attended; of {n} events; {h}h; of {t} target; since kickoff; Starts at kickoff; No meetings yet; Updating; Participation shows here once meetings start. | practices, sessions |
+| Errors | {Tile} could not load. Try again. If it keeps happening, contact a Coach. | Retry |
+| Student shell | VENOM STATUS; Team 8044 (account footer); Dark mode; Profile (avatar link) | |
+| Event status for Students and Parents | Signed up; Waiting for approval; Waitlisted; Not signed up; Withdrawn (staff keep Pending approval) | Confirmed, Pending, Waitlist, Not registered |
+| Parent invitations | Waiting for your parent to accept · expires {date} (Student); Waiting for the parent to accept · expires {date} (staff); Expired · {date}; Accepted · {date}; Revoked; Replaced by a newer invitation | pending (lowercase status) |
+| Announcements page (Coach, Travel Lead) | Announcements; Pin up to five messages to Student Home. Students see the newest pin first.; New announcement; Edit announcement; Title (optional); Message; {n} of 500 characters; Show until (optional); Pin to Student Home; Pinned ({n} of 5); Not pinned ({n}); Pin; Unpin; Edit; Remove; Five announcements are already pinned. Unpin one first. | |
+| Season page (Coach) | Build hours target; Hours each Student aims to log at Build meetings from kickoff. Shown on Student Home.; No target set.; Current target: {n} hours.; Enter whole hours from 1 to 2000, or leave the box empty to clear the target. | |

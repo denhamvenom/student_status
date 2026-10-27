@@ -1,11 +1,12 @@
 import { requireSeasonFinanceReady } from "./lib/seasonFinance";
-import { ConvexError, v } from "convex/values";
-import { mutation } from "./_generated/server";
+import { ConvexError, v, type Infer } from "convex/values";
+import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
+import type { SignupAvailability } from "../src/features/student-home/contract";
 import { activeSeason, audit, ownStudent, viewer } from "./lib/access";
 import { addCharge } from "./lib/money";
-import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
+import { enrollmentPending, requireEnrollmentComplete } from "./lib/eventEnrollmentState";
 
 async function reserved(ctx: MutationCtx, eventId: Id<"events">) {
   const rows = await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", eventId)).take(501);
@@ -35,6 +36,40 @@ export const signUp = mutation({
     if (status === "confirmed" && event.feeCents > 0) await addCharge(ctx, user, student._id, event.name, event.feeCents, event.startsAt, `eventFee:${event._id}:${student._id}`, event._id);
     await audit(ctx, user, "participants", `${event._id}:${student._id}`, "signup", prior?.status ?? null, status);
     return status;
+  },
+});
+
+const availabilityResult = v.object({
+  eventId: v.id("events"), name: v.string(), startsAt: v.number(), endsAt: v.number(), feeCents: v.number(),
+  signupMode: v.union(v.literal("open"), v.literal("approval"), v.literal("assigned")),
+  signupClosesAt: v.union(v.number(), v.null()),
+  capacity: v.union(v.number(), v.null()),
+  spotsLeft: v.union(v.number(), v.null()),
+  outcome: v.union(v.literal("signedUp"), v.literal("waitlisted"), v.literal("waitingForApproval"), v.literal("closed")),
+});
+// Compile-time guard: the return validator and the shared screen contract must stay identical.
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+const _availabilityMatchesContract: Same<Infer<typeof availabilityResult>, SignupAvailability> = true;
+
+/**
+ * What pressing Sign up would do right now, with signUp's rules except the close time (the browser checks that). Counts only, never names.
+ * An event this season that was archived, canceled or switched to Coach-assigned after Home loaded reports "closed" so the sheet can say so.
+ */
+export const signupAvailability = query({
+  args: { eventId: v.id("events") }, returns: availabilityResult,
+  handler: async (ctx, args): Promise<SignupAvailability> => {
+    const user = await viewer(ctx); const student = await ownStudent(ctx, user);
+    const event = await ctx.db.get(args.eventId);
+    if (!event || event.seasonId !== student.seasonId) throw new ConvexError("This event is no longer available. Reload to see current events.");
+    const prior = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
+    const signedUp = !!prior && prior.status !== "withdrawn";
+    const withdrew = !signedUp && (await ctx.db.query("withdrawalRequests").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(100)).some(x => x.status === "approved");
+    const rows = await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(501);
+    const counted = rows.length <= 500;
+    const reserved = rows.filter(p => p.status === "confirmed" || p.status === "pending").length;
+    const full = rows.some(p => p.status === "waitlist") || event.capacity !== undefined && reserved >= event.capacity;
+    const outcome = event.archived || event.cancelled || event.signupMode === "assigned" || enrollmentPending(event) || signedUp || withdrew || !counted ? "closed" as const : full ? "waitlisted" as const : event.signupMode === "approval" ? "waitingForApproval" as const : "signedUp" as const;
+    return { eventId: event._id, name: event.name, startsAt: event.startsAt, endsAt: event.endsAt, feeCents: event.feeCents, signupMode: event.signupMode, signupClosesAt: event.signupClosesAt ?? null, capacity: event.capacity ?? null, spotsLeft: event.capacity === undefined || !counted ? null : Math.max(0, event.capacity - reserved), outcome };
   },
 });
 

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { Suspense, lazy } from 'react'
 import ReactDOM from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router'
 import { ConvexReactClient } from 'convex/react'
@@ -15,6 +15,8 @@ import '@fontsource/anton/latin-400.css'
 import './styles.css'
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL
+// Development-only Student Home preview with synthetic fixtures; Vite drops this chunk from production builds.
+const StudentHomePreview = import.meta.env.DEV ? lazy(() => import('./features/student-home/preview/StudentHomePreview')) : null
 const client = convexUrl ? new ConvexReactClient(convexUrl) : null
 class AppErrorBoundary extends React.Component<{children:React.ReactNode},{error:unknown}> {
   state={error:null as unknown}
@@ -26,6 +28,7 @@ const router = createBrowserRouter([
   {path:'/about',element:<AppErrorBoundary><AboutPage /></AppErrorBoundary>},
   {path:'/privacy',element:<AppErrorBoundary><PrivacyPage /></AppErrorBoundary>},
   {path:'/terms',element:<AppErrorBoundary><TermsPage /></AppErrorBoundary>},
+  ...(StudentHomePreview?[{path:'/__student-home-preview',element:<AppErrorBoundary><Suspense fallback={null}><StudentHomePreview /></Suspense></AppErrorBoundary>}]:[]),
   {path:'*',element:<AppErrorBoundary>{app}</AppErrorBoundary>},
 ])
 ReactDOM.createRoot(document.getElementById('root')!).render(

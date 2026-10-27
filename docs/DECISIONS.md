@@ -65,6 +65,15 @@ Read this before changing parent linking, consent/PDF, finance, rooms/waitlists 
 
 - Admin contact (owner decision October 25): Coach-only setup errors offer Contact admin; requests are recorded and emailed to admin@team8044.org; no student data.
 
+## Redesign dashboards
+
+- October 25 owner decisions for the planned redesign. Mentors keep Profile as their landing page until the redesign, which gives them a small dashboard. A Parent with staff access who has switched to Mentor or Travel Lead sees a "{Student's name} needs you" badge when Parent-side items are waiting (needs a new query). Parents see signups as view-only ("{Student's name} can sign up until…"); only the student signs up or withdraws, which keeps that responsibility with the student.
+- October 26–27 owner decisions for Student Home (Claude Design "Student Home — chosen direction", October 26). The design's colors replace the old palette on Student screens first; other roles follow in their own redesigns. Phone and desktop light artboards differ and are kept as drawn; only small text that missed WCAG AA is adjusted. Brand: logo mark and "VENOM STATUS".
+- Student Home tiles: Highlights (the swipeable card stack at the top), Open signups, What's left, Balance due and Participation. No Parents tile and no Your events tile.
+- Highlights (named October 27) leads with the most important things to do, at most three cards, in this order: Invite a parent (while none is connected; parent-side reminders fold into it), FIRST registration (remind your parent, or finish it yourself at 18+), an overdue fee (past the event start until fee due dates exist), a permission form your parent has not completed, other event forms you complete, then Room choice. Within a type the soonest due comes first; urgent styling only when overdue or due within 7 days. Everything stays in What's left too. After the to-do cards come up to five pinned announcements from a Coach or Travel Lead (newest pin first, optional show-until date), then the countdown: Kickoff before kickoff, the next Competition after it, in days and then hours inside 48 hours.
+- Signing up from Home opens a sheet with the fee, spots left (counts only, never names) and what happens next. "Fundraise" replaces "Pay now" on Home and opens the fundraiser section of Money; the Money page's fundraiser card keeps "Pay Now" (October 27: same link).
+- Participation rings: Meetings counts held meetings this season (from August, excluding Outreach) and resets with a new season; Outreach is attended of held this season; Build hours is clocked time at Build meetings from kickoff, against a per-season target a Coach sets on the Season page.
+
 ## Retention
 
 - Five years runs from the latest archival after reactivation and triggers review, not automatic erasure. Automatic deletion remains unauthorized.

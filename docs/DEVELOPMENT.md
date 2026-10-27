@@ -97,3 +97,13 @@ bunx convex run --deployment dev developerSignIn:ensurePersonas
 Keep the key outside Git (for example in the ignored `private-data/` folder) and paste it into the panel; the panel remembers it only for the current browser tab. Rerunning `ensurePersonas` restores the fictional accounts' grants, the Dev Student profile link, both family links and the two Parents' verified-parent records (needed for Profile and Permission forms) after testing changes them; it never touches other accounts. The fictional accounts use the reserved `developer.example.invalid` domain, cannot accept invitations, and stop working as soon as either setting is removed. Never set either value on production.
 
 This does not test Google or parent-email sign-in. Before releasing authentication changes, still sign in once for real.
+
+## Student Home scenarios
+
+`developerScenarios:apply` puts the developer Student into a named state for screenshots. It refuses to run unless the backend is the development URL, developer sign-in is enabled and a season is active, and it touches only records it created (prefixed `SCENARIO`). Confirm `.env.local` names `dev:third-bandicoot-18` first.
+
+```powershell
+bunx convex run developerScenarios:apply '{"scenario":"busyWeek"}'   # also allDone, newStudent; reset when finished
+```
+
+While a scenario is active the fictional teammate Jordan is enrolled in Whole Team events. The development season has no verified kickoff, so the before-kickoff countdown is checked on the local fixture page `/__student-home-preview` (development builds only). Screenshots go outside Git with the student-status-prototype-verification skill; compare with `test-results/smoke`.

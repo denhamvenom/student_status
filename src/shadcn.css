@@ -150,3 +150,236 @@
     @apply font-sans;
     }
 }
+
+/*
+ * Student redesign tokens (Claude Design "Student Home - chosen direction", 2026-10-26).
+ * Values come from the artboards; small text is lightened or darkened only where the
+ * drawn color missed WCAG AA (4.5:1). Phone (<1024px) and desktop (>=1024px) artboards
+ * differ in light mode: lavender cards with gold buttons on phone, white cards with
+ * purple buttons on desktop. Dark mode is the same deep purple at both widths.
+ * The --vs-* tokens are always defined; existing app variables are remapped only while
+ * a Student is signed in (AppShell sets data-design="student" on <html>).
+ */
+@theme inline {
+    --color-vs-page: var(--vs-page);
+    --color-vs-card: var(--vs-card);
+    --color-vs-compact: var(--vs-compact);
+    --color-vs-inset: var(--vs-inset);
+    --color-vs-inset-raised: var(--vs-inset-raised);
+    --color-vs-heading: var(--vs-heading);
+    --color-vs-text: var(--vs-text);
+    --color-vs-text-2: var(--vs-text-2);
+    --color-vs-muted: var(--vs-muted);
+    --color-vs-border: var(--vs-border);
+    --color-vs-border-subtle: var(--vs-border-subtle);
+    --color-vs-gold: var(--vs-gold);
+    --color-vs-gold-hover: var(--vs-gold-hover);
+    --color-vs-on-gold: var(--vs-on-gold);
+    --color-vs-purple: var(--vs-purple);
+    --color-vs-purple-deep: var(--vs-purple-deep);
+    --color-vs-primary: var(--vs-primary);
+    --color-vs-primary-hover: var(--vs-primary-hover);
+    --color-vs-on-primary: var(--vs-on-primary);
+    --color-vs-urgent: var(--vs-urgent);
+    --color-vs-urgent-fill: var(--vs-urgent-fill);
+    --color-vs-on-urgent: var(--vs-on-urgent);
+    --color-vs-urgent-soft: var(--vs-urgent-soft);
+    --color-vs-urgent-border: var(--vs-urgent-border);
+    --color-vs-warning: var(--vs-warning);
+    --color-vs-success: var(--vs-success);
+    --color-vs-success-fill: var(--vs-success-fill);
+    --color-vs-success-soft: var(--vs-success-soft);
+    --color-vs-success-border: var(--vs-success-border);
+    --color-vs-accent: var(--vs-accent);
+    --color-vs-accent-text: var(--vs-accent-text);
+    --color-vs-ring-track: var(--vs-ring-track);
+    --color-vs-sidebar-text: var(--vs-sidebar-text);
+    --color-vs-sidebar-muted: var(--vs-sidebar-muted);
+    --color-vs-sidebar-border: var(--vs-sidebar-border);
+    --color-vs-bar: var(--vs-bar);
+    --color-vs-bar-border: var(--vs-bar-border);
+    --color-vs-bar-active: var(--vs-bar-active);
+    --color-vs-bar-muted: var(--vs-bar-muted);
+    --shadow-vs-card: var(--vs-shadow-card);
+    --shadow-vs-hero: var(--vs-shadow-hero);
+    --shadow-vs-compact: var(--vs-shadow-compact);
+    --radius-tile: 16px;
+    --radius-hero: 18px;
+    --radius-inset: 10px;
+}
+
+/* Gradient-capable fills: use these instead of bg-vs-card when the drawn surface is a gradient. */
+@utility bg-vs-card-fill { background: var(--vs-card-fill); }
+@utility bg-vs-hero-fill { background: var(--vs-hero-fill); }
+@utility bg-vs-primary-fill { background: var(--vs-primary-fill); }
+@utility bg-vs-sidebar { background: var(--vs-sidebar); }
+@utility bg-vs-header { background: var(--vs-header); }
+@utility bg-vs-hero-bar { background: linear-gradient(90deg, #fdd023, #f59e0b, #fdd023); }
+@utility bg-vs-coach-bar { background: linear-gradient(90deg, #7c3aed, #a78bfa); }
+
+/* Light, phone artboards (Direction1Light, Direction1QuietLight). */
+:root {
+    --vs-page: #ede8f5;
+    --vs-card: #faf8ff;
+    --vs-card-fill: linear-gradient(155deg, #faf8ff 0%, #f4eeff 100%);
+    --vs-hero-fill: linear-gradient(155deg, #faf8ff 0%, #f4eeff 100%);
+    --vs-compact: #faf8ff;
+    --vs-inset: #ede8f8;
+    --vs-inset-raised: #e8e2f2;
+    --vs-heading: #3b1572;
+    --vs-text: #2a1a5e;
+    --vs-text-2: #2a1a5e;
+    --vs-muted: #6b52a0;
+    --vs-border: #d8cef0;
+    --vs-border-subtle: #d0c4ec;
+    --vs-gold: #fdd023;
+    --vs-gold-hover: #e6bc0f;
+    --vs-on-gold: #161616;
+    --vs-purple: #461d7c;
+    --vs-purple-deep: #2e1352;
+    --vs-primary: #fdd023;
+    --vs-primary-hover: #e6bc0f;
+    --vs-on-primary: #161616;
+    --vs-primary-fill: linear-gradient(180deg, #ffe044, #fdd023);
+    --vs-urgent: #c81e1e;
+    --vs-urgent-fill: #b3261e;
+    --vs-on-urgent: #ffffff;
+    --vs-urgent-soft: #fce8e8;
+    --vs-urgent-border: #f5c6c6;
+    --vs-warning: #a16207;
+    --vs-success: #065f46;
+    --vs-success-fill: #10b981;
+    --vs-success-soft: #f0fdf4;
+    --vs-success-border: #bbf7d0;
+    --vs-accent: #7c3aed;
+    --vs-accent-text: #5b21b6;
+    --vs-ring-track: rgba(70, 29, 124, 0.08);
+    --vs-header: linear-gradient(135deg, #2e1352, #461d7c);
+    --vs-sidebar: linear-gradient(180deg, #2e1352 0%, #1c0d3a 100%);
+    --vs-sidebar-text: rgba(255, 255, 255, 0.88);
+    --vs-sidebar-muted: #a99fc6;
+    --vs-sidebar-border: rgba(255, 255, 255, 0.08);
+    --vs-bar: #f4eeff;
+    --vs-bar-border: #d0c4ec;
+    --vs-bar-active: #8a5a00;
+    --vs-bar-muted: #6f5fa3;
+    --vs-shadow-card: 0 2px 14px rgba(70, 29, 124, 0.09);
+    --vs-shadow-hero: 0 4px 24px rgba(70, 29, 124, 0.12);
+    --vs-shadow-compact: 0 2px 8px rgba(46, 19, 82, 0.07);
+}
+
+/* Light, desktop artboards (DesktopLightBusy, DesktopLightQuiet). */
+@media (min-width: 1024px) {
+    :root:not(.dark) {
+        --vs-card: #ffffff;
+        --vs-card-fill: #ffffff;
+        --vs-hero-fill: #ffffff;
+        --vs-compact: #ffffff;
+        --vs-inset: #f5f0ff;
+        --vs-inset-raised: #ede8f5;
+        --vs-heading: #1c0d3a;
+        --vs-text: #1c0d3a;
+        --vs-text-2: #1c0d3a;
+        --vs-border: rgba(70, 29, 124, 0.13);
+        --vs-border-subtle: rgba(107, 82, 160, 0.12);
+        --vs-primary: #461d7c;
+        --vs-primary-hover: #2e1352;
+        --vs-on-primary: #ffffff;
+        --vs-primary-fill: #461d7c;
+        --vs-urgent-fill: #dc2626;
+        --vs-urgent-soft: rgba(220, 38, 38, 0.08);
+        --vs-urgent-border: rgba(220, 38, 38, 0.18);
+        --vs-success-fill: #059669;
+        --vs-success-soft: rgba(5, 150, 105, 0.1);
+        --vs-success-border: rgba(5, 150, 105, 0.2);
+        --vs-accent: #461d7c;
+        --vs-accent-text: #461d7c;
+        --vs-shadow-card: 0 3px 14px rgba(46, 19, 82, 0.08);
+        --vs-shadow-hero: 0 4px 20px rgba(46, 19, 82, 0.1);
+    }
+}
+
+/* Dark artboards (Direction1, Direction1Quiet, DesktopDarkBusy, DesktopDarkQuiet): deep purple, never black. */
+:root.dark {
+    --vs-page: #0f0c1c;
+    --vs-card: #1e1b32;
+    --vs-card-fill: linear-gradient(150deg, #1e1b32 0%, #161428 100%);
+    --vs-hero-fill: linear-gradient(150deg, #201c35 0%, #161326 100%);
+    --vs-compact: #140f28;
+    --vs-inset: #110e20;
+    --vs-inset-raised: #181530;
+    --vs-heading: #e8e2fa;
+    --vs-text: #e8e2fa;
+    --vs-text-2: #d8d0f0;
+    --vs-muted: #9080c8;
+    --vs-border: rgba(120, 80, 200, 0.22);
+    --vs-border-subtle: rgba(120, 80, 200, 0.16);
+    --vs-primary: #fdd023;
+    --vs-primary-hover: #e6bc0f;
+    --vs-on-primary: #161616;
+    --vs-primary-fill: linear-gradient(180deg, #ffe044, #fdd023);
+    --vs-urgent: #f25c5c;
+    --vs-urgent-fill: #dc2626;
+    --vs-on-urgent: #ffffff;
+    --vs-urgent-soft: rgba(239, 68, 68, 0.1);
+    --vs-urgent-border: rgba(239, 68, 68, 0.22);
+    --vs-warning: #f59e0b;
+    --vs-success: #4ade80;
+    --vs-success-fill: #34d399;
+    --vs-success-soft: rgba(74, 222, 128, 0.1);
+    --vs-success-border: rgba(74, 222, 128, 0.2);
+    --vs-accent: #8b5cf6;
+    --vs-accent-text: #a78bfa;
+    --vs-ring-track: rgba(255, 255, 255, 0.06);
+    --vs-sidebar: linear-gradient(180deg, #1c0d3a 0%, #120a2e 100%);
+    --vs-sidebar-text: #e8e2fa;
+    --vs-sidebar-muted: #9585c8;
+    --vs-sidebar-border: rgba(120, 80, 200, 0.2);
+    --vs-bar: #16112a;
+    --vs-bar-border: rgba(100, 70, 180, 0.25);
+    --vs-bar-active: #fdd023;
+    --vs-bar-muted: #8f7fc4;
+    --vs-shadow-card: 0 4px 18px rgba(0, 0, 0, 0.5);
+    --vs-shadow-hero: 0 6px 28px rgba(0, 0, 0, 0.55);
+    --vs-shadow-compact: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+@media (min-width: 1024px) {
+    :root.dark { --vs-primary-fill: #fdd023; }
+}
+
+/* While a Student is signed in, existing pages and shadcn primitives use the redesign palette. */
+:root[data-design="student"] {
+    color-scheme: light;
+    --surface-page: var(--vs-page);
+    --surface-card: var(--vs-card);
+    --surface-metal: var(--vs-inset);
+    --text-body: var(--vs-text);
+    --text-muted: var(--vs-muted);
+    --text-link: var(--vs-purple);
+    --accent-text: var(--vs-accent-text);
+    --border-default: var(--vs-border);
+    --background: var(--vs-page);
+    --foreground: var(--vs-text);
+    --card: var(--vs-card);
+    --card-foreground: var(--vs-text);
+    --popover: var(--vs-card);
+    --popover-foreground: var(--vs-text);
+    --primary: var(--vs-primary);
+    --primary-foreground: var(--vs-on-primary);
+    --secondary: var(--vs-purple);
+    --secondary-foreground: #ffffff;
+    --muted: var(--vs-inset);
+    --muted-foreground: var(--vs-muted);
+    --accent: var(--vs-inset-raised);
+    --accent-foreground: var(--vs-text);
+    --destructive: var(--vs-urgent);
+    --border: var(--vs-border);
+    --input: var(--vs-border);
+    --ring: var(--vs-accent-text);
+}
+:root.dark[data-design="student"] {
+    color-scheme: dark;
+    --text-link: var(--vs-gold);
+    --purple-100: #2a2147;
+    --gold-100: #3a3216;
+}
