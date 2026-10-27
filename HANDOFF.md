@@ -12,19 +12,16 @@ Clocking, PIN controls, automatic closing, fixed event roster and historical imp
 
 ## In progress
 
-Student Home redesign (Claude Design "Student Home — chosen direction", October 26; the newest design folder is the reference, page background deep purple, never black). Built and committed locally through `8fd1051`, synced to development `third-bandicoot-18` only, not pushed. Owner decisions: docs/DECISIONS.md "Redesign dashboards"; wording: docs/LANGUAGE.md; scenarios: docs/DEVELOPMENT.md "Student Home scenarios".
-Polish done (2261a09): countdown "days to go", desktop panels shrink, date pill "Due {Mon D}", 44px signup target + `dotColumns` test.
-Then: live scenarios (busyWeek, allDone, newStudent, reset) as the developer Student at 390/1440, light/dark, compared with `test-results/smoke` and the design renders (evidence outside Git in `Logistics Work\Student Home Redesign Evidence`); `bun run check`, `bun run check:timeclock`; remove helper worktrees `student-status-sh-d`…`sh-j` once merged (sh-d's uncommitted dev harness is not needed).
+Student Home redesign (Claude Design "Student Home — chosen direction", October 26; newest design folder is the reference). Built and polished locally through `2261a09`, `868fadc`, `046563a`, synced to development `third-bandicoot-18` only, not pushed. Polish includes "Closes today", "Due {Mon D}" within seven days, and the muted desktop second Sign up matching the design. Owner kept "{n} open" badge wording; key fragments will not be rotated. References: docs/DECISIONS.md "Redesign dashboards", docs/LANGUAGE.md, docs/DEVELOPMENT.md "Student Home scenarios".
+Live scenarios passed at 390/1440 in light/dark on development. `bun run check` passed except intermittent heavy timeouts in bulkInvites and feeBulk (each passes alone); `bun run check:timeclock` passed. Contact admin test send will not be done.
+Then: obtain owner approval for push/PR/merge; after merge, remove helper worktrees `student-status-sh-d`…`sh-j`, then start Parent Home.
 
 ## Top open risks
 
-- **Exposed key fragments (October 25):** rotation awaits the owner's decision. List production settings by name only.
-- Build hours need Recalculate attendance on production before kickoff. [Backlog](docs/BACKLOG.md#product)
-- Contact admin email has not been sent for real; a dev test send awaits owner approval.
+- Build hours need a signed-in Coach to click Recalculate attendance once on production before kickoff (Coach-only action). [Backlog](docs/BACKLOG.md#product)
 - Signed-in transportation walkthrough, real PDF signing (deferred), backup/restore proof and security reviews remain open. [Backlog](docs/BACKLOG.md#testing)
 - Coach Season overflows at 390px (deferred to its redesign).
-- Heavy tests (feeBulk, bulkInvites and others) time out intermittently in full runs here; rerun alone. [Testing](docs/BACKLOG.md#testing)
 
 ## Next step
 
-Run the live scenario/screenshot pass, then `bun run check` and `bun run check:timeclock`, then remove the helper worktrees. No push, merge or production action without the owner's explicit approval.
+Get owner approval for push/PR/merge. After merge, remove helper worktrees `student-status-sh-d`…`sh-j`, then begin Parent Home. A signed-in Coach still needs to recalculate attendance once on production.
