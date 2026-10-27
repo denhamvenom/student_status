@@ -5,7 +5,7 @@ import type { HomeAttendance, OpenSignup, PinnedAnnouncement, RoomChoice, Studen
 import { homeCopy } from './copy'
 import { at } from './fixtures'
 import { formatDateRange } from './format'
-import { calendarDaysUntil, countdownTarget, countdownValue, heroCards, highlightActions, HOUR_MS, isWithinSoon, openSignupsSummary, participationView, percentAttended, roomDeadlineView, SOON_MS, upcomingMilestones, whatsLeftSummary } from './logic'
+import { calendarDaysUntil, countdownTarget, countdownValue, heroCards, highlightActions, HOUR_MS, isWithinSoon, openSignupsSummary, participationView, percentAttended, roomDeadlineView, signupDateLine, SOON_MS, upcomingMilestones, whatsLeftSummary } from './logic'
 import { actionContent } from './tiles/ActionCard'
 
 const NOW = at('2026-10-26T12:00')
@@ -294,5 +294,15 @@ describe('event dates in Chicago', () => {
     { name: 'one evening that ends after midnight UTC', start: '2026-11-19T17:30', end: '2026-11-19T22:30', text: 'Nov 19' },
   ])('$name', ({ start, end, text }) => {
     expect(formatDateRange(at(start), at(end))).toBe(text)
+  })
+})
+
+describe('signup date line', () => {
+  it.each([
+    { name: 'closes later today', closesAt: at('2026-10-26T23:59'), line: 'Closes today' },
+    { name: 'closes tomorrow', closesAt: at('2026-10-27T09:00'), line: 'Closes Tue, Oct 27' },
+    { name: 'never closes', closesAt: null, line: 'Starts Fri, Nov 20' },
+  ])('$name', ({ closesAt, line }) => {
+    expect(signupDateLine({ signupClosesAt: closesAt, startsAt: at('2026-11-20T09:00') }, NOW)).toBe(line)
   })
 })

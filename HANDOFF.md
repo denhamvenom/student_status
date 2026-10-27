@@ -13,11 +13,7 @@ Clocking, PIN controls, automatic closing, fixed event roster and historical imp
 ## In progress
 
 Student Home redesign (Claude Design "Student Home — chosen direction", October 26; the newest design folder is the reference, page background deep purple, never black). Built and committed locally through `8fd1051`, synced to development `third-bandicoot-18` only, not pushed. Owner decisions: docs/DECISIONS.md "Redesign dashboards"; wording: docs/LANGUAGE.md; scenarios: docs/DEVELOPMENT.md "Student Home scenarios".
-Open polish (in `src/features/student-home/`):
-- Countdown: for Competitions show "{n} days to go" with the event name on its own smaller line (keep "to kickoff"); update the LANGUAGE.md row.
-- Desktop: the inset panel in `tiles/ActionCard.tsx` and `tiles/RoomChoiceCard.tsx` shrinks to its content.
-- Date pill: no repeated date; 7 or more days out shows "Due {Mon D}".
-- Compact "Show more signups" target to at least 44px; add a `dotColumns` test (`src/components/dashboard/HeroStack.tsx`).
+Polish done (2261a09): countdown "days to go", desktop panels shrink, date pill "Due {Mon D}", 44px signup target + `dotColumns` test.
 Then: live scenarios (busyWeek, allDone, newStudent, reset) as the developer Student at 390/1440, light/dark, compared with `test-results/smoke` and the design renders (evidence outside Git in `Logistics Work\Student Home Redesign Evidence`); `bun run check`, `bun run check:timeclock`; remove helper worktrees `student-status-sh-d`…`sh-j` once merged (sh-d's uncommitted dev harness is not needed).
 
 ## Top open risks
@@ -31,4 +27,4 @@ Then: live scenarios (busyWeek, allDone, newStudent, reset) as the developer Stu
 
 ## Next step
 
-Finish the Student Home polish list above, run typecheck, lint and targeted tests, and commit; then the live screenshot pass. No push, merge or production action without the owner's explicit approval.
+Run the live scenario/screenshot pass, then `bun run check` and `bun run check:timeclock`, then remove the helper worktrees. No push, merge or production action without the owner's explicit approval.

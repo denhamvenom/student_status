@@ -112,6 +112,7 @@ export const homeCopy = {
     closingSoon: (count: number) => `${count} closing soon`,
     open: (count: number) => `${count} open`,
     closes: (date: string) => `Closes ${date}`,
+    closesToday: 'Closes today',
     starts: (date: string) => `Starts ${date}`,
     signUp: 'Sign up',
     signUpFor: (name: string) => `Sign up for ${name}`,

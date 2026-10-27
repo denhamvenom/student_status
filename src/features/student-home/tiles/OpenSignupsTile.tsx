@@ -6,8 +6,7 @@ import { StatusBadge } from '@/components/dashboard/StatusBadge'
 import { dashboardButtonVariants, inset, warningText } from '@/components/dashboard/styles'
 import type { OpenSignup } from '../contract'
 import { homeCopy } from '../copy'
-import { formatShortDate } from '../format'
-import { isWithinSoon, openSignupsSummary } from '../logic'
+import { isWithinSoon, openSignupsSummary, signupDateLine } from '../logic'
 import type { StudentHomeHandlers } from '../types'
 import { SignupSheet } from './SignupSheet'
 
@@ -20,7 +19,7 @@ function SignupRow({ signup, now, onSignUp }: { signup: OpenSignup; now: number;
     <div className="min-w-0 flex-1">
       <p className="truncate text-[14px] font-medium text-vs-text-2 lg:text-[13px]">{signup.name}</p>
       <p className={cn('mt-0.5 text-[12px] lg:text-[11px]', soon ? cn('font-semibold', warningText) : 'text-vs-muted')}>
-        {signup.signupClosesAt !== null ? copy.closes(formatShortDate(signup.signupClosesAt)) : copy.starts(formatShortDate(signup.startsAt))}
+        {signupDateLine(signup, now)}
       </p>
     </div>
     {/* Desktop draws calm rows with a softer button; phones keep the primary button. */}

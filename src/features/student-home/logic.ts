@@ -1,6 +1,7 @@
 import type { Id } from '../../../convex/_generated/dataModel'
 import type { HomeAttendance, OpenSignup, PinnedAnnouncement, RoomChoice, StudentHomeSummary, UpcomingCompetition, WhatsLeftItem } from './contract'
-import { chicagoDateKey } from './format'
+import { chicagoDateKey, formatShortDate } from './format'
+import { homeCopy } from './copy'
 
 /*
  * Pure Student Home rules. Every "soon" or "past" decision takes the browser's `now`
@@ -34,6 +35,13 @@ export function calendarDaysUntil(epoch: number, now: number) {
 /** Still ahead and no more than seven days away. */
 export function isWithinSoon(at: number | null, now: number) {
   return at !== null && at > now && at - now <= SOON_MS
+}
+
+/** The signup row's second line: "Closes today", "Closes Tue, Oct 27", or "Starts Wed, Oct 28" when it never closes. */
+export function signupDateLine(signup: Pick<OpenSignup, 'signupClosesAt' | 'startsAt'>, now: number) {
+  const copy = homeCopy.signups
+  if (signup.signupClosesAt === null) return copy.starts(formatShortDate(signup.startsAt))
+  return calendarDaysUntil(signup.signupClosesAt, now) === 0 ? copy.closesToday : copy.closes(formatShortDate(signup.signupClosesAt))
 }
 
 // Room choice ---------------------------------------------------------------
