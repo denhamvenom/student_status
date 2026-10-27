@@ -29,6 +29,7 @@ import type * as consentProfileV2Schema from "../consentProfileV2Schema.js";
 import type * as consentRehearsal from "../consentRehearsal.js";
 import type * as crons from "../crons.js";
 import type * as dashboardReports from "../dashboardReports.js";
+import type * as developerScenarios from "../developerScenarios.js";
 import type * as developerSignIn from "../developerSignIn.js";
 import type * as developmentRehearsal from "../developmentRehearsal.js";
 import type * as eventArchive from "../eventArchive.js";
@@ -174,6 +175,7 @@ declare const fullApi: ApiFromModules<{
   consentRehearsal: typeof consentRehearsal;
   crons: typeof crons;
   dashboardReports: typeof dashboardReports;
+  developerScenarios: typeof developerScenarios;
   developerSignIn: typeof developerSignIn;
   developmentRehearsal: typeof developmentRehearsal;
   eventArchive: typeof eventArchive;
