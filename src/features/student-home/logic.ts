@@ -159,6 +159,9 @@ export function highlightDue(dueAt: number | null, now: number): HighlightDue | 
   return { state: state === 'soon' ? 'soon' : 'later', at: dueAt, daysLeft: calendarDaysUntil(dueAt, now) }
 }
 
+/** Seven or more calendar days out the pill names the date ("Due Nov 3"), since a weekday would repeat today's. */
+export const dueShowsDate = (due: Extract<HighlightDue, { daysLeft: number }>) => due.state === 'later' || due.daysLeft >= 7
+
 /** Used when the summary says no parent is connected but sends no Invite a parent item. */
 const inviteParentItem: WhatsLeftItem = { key: 'inviteParent', kind: 'inviteParent', owner: 'student', eventId: null, eventName: null, label: null, dueAt: null, href: '/parents' }
 

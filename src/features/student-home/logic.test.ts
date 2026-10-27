@@ -5,7 +5,7 @@ import type { HomeAttendance, OpenSignup, PinnedAnnouncement, RoomChoice, Studen
 import { homeCopy } from './copy'
 import { at } from './fixtures'
 import { formatDateRange } from './format'
-import { calendarDaysUntil, countdownTarget, countdownValue, heroCards, highlightActions, HOUR_MS, isWithinSoon, openSignupsSummary, participationView, percentAttended, roomDeadlineView, signupDateLine, SOON_MS, upcomingMilestones, whatsLeftSummary } from './logic'
+import { calendarDaysUntil, countdownTarget, countdownValue, dueShowsDate, heroCards, highlightActions, HOUR_MS, isWithinSoon, openSignupsSummary, participationView, percentAttended, roomDeadlineView, signupDateLine, SOON_MS, upcomingMilestones, whatsLeftSummary } from './logic'
 import { actionContent } from './tiles/ActionCard'
 
 const NOW = at('2026-10-26T12:00')
@@ -144,6 +144,18 @@ describe('Highlights order', () => {
   ])('urgency: $name', ({ kind, dueAt, urgent, state }) => {
     const [action] = highlightActions(summary({ whatsLeft: [todo('item', kind, 'student', dueAt)] }), NOW)
     expect({ urgent: action.urgent, state: action.due?.state ?? null }).toEqual({ urgent, state })
+  })
+})
+
+describe('due pill date', () => {
+  it.each([
+    { name: 'six days ahead names the weekday', dueAt: NOW + 6 * DAY, state: 'soon', date: false },
+    { name: 'seven days ahead names the date, still urgent', dueAt: NOW + 7 * DAY, state: 'soon', date: true },
+    { name: 'eight days ahead names the date', dueAt: NOW + 8 * DAY, state: 'later', date: true },
+  ])('$name', ({ dueAt, state, date }) => {
+    const [action] = highlightActions(summary({ whatsLeft: [todo('item', 'requirement', 'student', dueAt)] }), NOW)
+    expect(action.due?.state).toBe(state)
+    expect(action.due && action.due.state !== 'overdue' && dueShowsDate(action.due)).toBe(date)
   })
 })
 

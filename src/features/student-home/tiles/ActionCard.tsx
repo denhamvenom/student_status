@@ -7,7 +7,7 @@ import { StatusBadge } from '@/components/dashboard/StatusBadge'
 import { dashboardButtonVariants, eyebrow, inset } from '@/components/dashboard/styles'
 import { homeCopy } from '../copy'
 import { formatMoney, formatMonthDay, formatShortDate, formatWeekday } from '../format'
-import type { HighlightAction, HighlightDue, HighlightKind } from '../logic'
+import { dueShowsDate, type HighlightAction, type HighlightDue, type HighlightKind } from '../logic'
 import { FUNDRAISER_PATH } from './BalanceTile'
 
 const copy = homeCopy.highlights
@@ -54,9 +54,9 @@ export function actionContent(action: HighlightAction, fundraiserLinked: boolean
 /** The pill and the line beside it, as on the room choice card. */
 function DueRow({ due, urgent }: { due: HighlightDue; urgent: boolean }) {
   const pill = due.state === 'overdue' ? copy.overdue
-    : due.state === 'soon' ? (due.daysLeft <= 0 ? copy.dueToday : copy.dueOn(formatWeekday(due.at)))
-    : copy.dueOn(formatMonthDay(due.at))
-  const line = due.state === 'overdue' ? copy.wasDue(formatShortDate(due.at)) : due.state === 'soon' ? copy.dateLine(formatMonthDay(due.at), copy.daysLeft(due.daysLeft)) : copy.daysLeft(due.daysLeft)
+    : dueShowsDate(due) ? copy.dueOn(formatMonthDay(due.at))
+    : due.daysLeft <= 0 ? copy.dueToday : copy.dueOn(formatWeekday(due.at))
+  const line = due.state === 'overdue' ? copy.wasDue(formatShortDate(due.at)) : dueShowsDate(due) ? copy.daysLeft(due.daysLeft) : copy.dateLine(formatMonthDay(due.at), copy.daysLeft(due.daysLeft))
   return <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
     <StatusBadge tone={urgent ? 'urgentStrong' : 'calm'} className={cn(urgent && 'tracking-[0.03em] uppercase')}>{pill}</StatusBadge>
     <span className="text-[12px] text-vs-muted lg:text-[11px] lg:tracking-[0.02em]">{line}</span>
