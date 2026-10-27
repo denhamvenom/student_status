@@ -41,7 +41,7 @@ export const signUp = mutation({
 
 const availabilityResult = v.object({
   eventId: v.id("events"), name: v.string(), startsAt: v.number(), endsAt: v.number(), feeCents: v.number(),
-  signupMode: v.union(v.literal("open"), v.literal("approval")),
+  signupMode: v.union(v.literal("open"), v.literal("approval"), v.literal("assigned")),
   signupClosesAt: v.union(v.number(), v.null()),
   capacity: v.union(v.number(), v.null()),
   spotsLeft: v.union(v.number(), v.null()),
@@ -51,15 +51,16 @@ const availabilityResult = v.object({
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 const _availabilityMatchesContract: Same<Infer<typeof availabilityResult>, SignupAvailability> = true;
 
-/** What pressing Sign up would do right now, with signUp's rules except the close time (the browser checks that). Counts only, never names. */
+/**
+ * What pressing Sign up would do right now, with signUp's rules except the close time (the browser checks that). Counts only, never names.
+ * An event this season that was archived, canceled or switched to Coach-assigned after Home loaded reports "closed" so the sheet can say so.
+ */
 export const signupAvailability = query({
   args: { eventId: v.id("events") }, returns: availabilityResult,
   handler: async (ctx, args): Promise<SignupAvailability> => {
     const user = await viewer(ctx); const student = await ownStudent(ctx, user);
     const event = await ctx.db.get(args.eventId);
     if (!event || event.seasonId !== student.seasonId) throw new ConvexError("This event is no longer available. Reload to see current events.");
-    if (event.archived) throw new ConvexError("This event has ended and moved to Past events. Any balance due for it stays in Money.");
-    if (event.signupMode === "assigned") throw new ConvexError("A Coach assigns students to this event, so it has no signup. Ask a Coach if you need to go.");
     const prior = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
     const signedUp = !!prior && prior.status !== "withdrawn";
     const withdrew = !signedUp && (await ctx.db.query("withdrawalRequests").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(100)).some(x => x.status === "approved");
@@ -67,7 +68,7 @@ export const signupAvailability = query({
     const counted = rows.length <= 500;
     const reserved = rows.filter(p => p.status === "confirmed" || p.status === "pending").length;
     const full = rows.some(p => p.status === "waitlist") || event.capacity !== undefined && reserved >= event.capacity;
-    const outcome = event.cancelled || enrollmentPending(event) || signedUp || withdrew || !counted ? "closed" as const : full ? "waitlisted" as const : event.signupMode === "approval" ? "waitingForApproval" as const : "signedUp" as const;
+    const outcome = event.archived || event.cancelled || event.signupMode === "assigned" || enrollmentPending(event) || signedUp || withdrew || !counted ? "closed" as const : full ? "waitlisted" as const : event.signupMode === "approval" ? "waitingForApproval" as const : "signedUp" as const;
     return { eventId: event._id, name: event.name, startsAt: event.startsAt, endsAt: event.endsAt, feeCents: event.feeCents, signupMode: event.signupMode, signupClosesAt: event.signupClosesAt ?? null, capacity: event.capacity ?? null, spotsLeft: event.capacity === undefined || !counted ? null : Math.max(0, event.capacity - reserved), outcome };
   },
 });

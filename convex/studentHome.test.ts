@@ -128,6 +128,23 @@ describe("Student Home summary", () => {
     }
   });
 
+  it("reports a fundraiser link exactly when the Money page shows the fundraiser", async () => {
+    const f = await fixture();
+    const cases: { name: string; url: string | undefined; linked: boolean }[] = [
+      { name: "no link", url: undefined, linked: false },
+      { name: "link set", url: "https://example.invalid/fundraiser/riley", linked: true },
+      { name: "blank link", url: "", linked: false },
+    ];
+    for (const item of cases) {
+      await f.t.run(ctx => ctx.db.patch(f.ids.riley, { fundraiserUrl: item.url }));
+      const home = await summary(f.riley);
+      expect(home.fundraiserLinked, item.name).toBe(item.linked);
+      // The Money page renders the fundraiser section only when this query returns a link.
+      expect(home.fundraiserLinked, item.name).toBe(!!await f.riley.query(api.fundraiserLinks.forStudent, { studentId: f.ids.riley }));
+      expect(JSON.stringify(home), item.name).not.toContain("example.invalid/fundraiser");
+    }
+  });
+
   it("lists open signups the Student can still join, soonest close first", async () => {
     const f = await fixture();
     const make = async (name: string, fields: EventFields, status?: Status) => { const id = await f.event({ name, ...fields }); if (status) await f.join(id, f.ids.riley, status); return id; };
@@ -186,6 +203,30 @@ describe("Student Home summary", () => {
     }
   });
 
+  it("leaves out room invitations that can no longer be answered", async () => {
+    const f = await fixture();
+    const trip = await f.event({ name: "Overnight trip", overnight: true, roomingEnabled: true });
+    for (const id of [f.ids.riley, f.ids.casey]) await f.join(trip, id, "confirmed");
+    const caseyGroup = await f.t.run(async ctx => {
+      const groupId = await ctx.db.insert("roomGroups", { eventId: trip, category: "Girls", name: "Casey's room", finalized: false, adultFifthException: false, needsReview: false, createdBy: f.ids.coach });
+      await ctx.db.insert("roomMemberships", { eventId: trip, groupId, studentId: f.ids.casey, joinedAt: 1 });
+      await ctx.db.insert("roomInvites", { eventId: trip, groupId, studentId: f.ids.riley, invitedBy: f.ids.casey, status: "pending", createdAt: 2 });
+      return groupId;
+    });
+    // rooms.respond refuses an invitation from a group that is final or removed, so Home must not offer it.
+    const cases: { name: string; change: (ctx: MutationCtx) => Promise<unknown>; shown: boolean }[] = [
+      { name: "group still choosing", change: async () => null, shown: true },
+      { name: "group finalized", change: ctx => ctx.db.patch(caseyGroup, { finalized: true }), shown: false },
+      { name: "group reopened by a Coach", change: ctx => ctx.db.patch(caseyGroup, { finalized: false }), shown: true },
+      { name: "group removed", change: ctx => ctx.db.delete(caseyGroup), shown: false },
+    ];
+    for (const item of cases) {
+      await f.t.run(item.change);
+      const [room] = (await summary(f.riley)).roomChoices;
+      expect(room.invitations, item.name).toEqual(item.shown ? [{ inviteId: expect.any(String), fromName: "Casey L.", initials: "CL" }] : []);
+    }
+  });
+
   it("names the Student by the preferred name", async () => {
     const f = await fixture();
     const cases: { name: string; fields: Partial<Doc<"students">>; expected: { greetingName: string; displayName: string; initials: string } }[] = [
@@ -196,6 +237,28 @@ describe("Student Home summary", () => {
     for (const item of cases) {
       await f.t.run(ctx => ctx.db.patch(f.ids.riley, item.fields));
       expect(await summary(f.riley), item.name).toMatchObject(item.expected);
+    }
+  });
+
+  it("takes the last name from the last name field before the legal name and drops an unclear initial", async () => {
+    const f = await fixture();
+    const trip = await f.event({ name: "Overnight trip", overnight: true, roomingEnabled: true });
+    for (const id of [f.ids.riley, f.ids.jordan]) await f.join(trip, id, "confirmed");
+    await f.t.run(async ctx => {
+      const groupId = await ctx.db.insert("roomGroups", { eventId: trip, category: "Girls", name: "Synthetic suite", finalized: false, adultFifthException: false, needsReview: false, createdBy: f.ids.coach });
+      for (const studentId of [f.ids.riley, f.ids.jordan]) await ctx.db.insert("roomMemberships", { eventId: trip, groupId, studentId, joinedAt: 1 });
+    });
+    const cases: { name: string; fields: Partial<Doc<"students">>; teammate: string; own: { displayName: string; initials: string } }[] = [
+      { name: "suffixed legal name, last name not yet reviewed", fields: { legalName: "Jordan Avery Williams Jr.", lastName: "Williams", structuredNameReviewed: false }, teammate: "Jordan W.", own: { displayName: "Jordan Williams", initials: "JW" } },
+      { name: "suffixed legal name, no last name", fields: { legalName: "Jordan Avery Williams Jr.", lastName: undefined, structuredNameReviewed: false }, teammate: "Jordan", own: { displayName: "Jordan", initials: "J" } },
+      { name: "last name differs from the legal name's last word", fields: { legalName: "Jordan Avery Williams", lastName: "Avery-Williams", structuredNameReviewed: false }, teammate: "Jordan A.", own: { displayName: "Jordan Avery-Williams", initials: "JA" } },
+      { name: "legal name only", fields: { legalName: "Jordan Avery Williams", lastName: undefined, structuredNameReviewed: false }, teammate: "Jordan W.", own: { displayName: "Jordan Williams", initials: "JW" } },
+      { name: "last name is only a suffix", fields: { legalName: "Jordan Avery Williams III", lastName: "III", structuredNameReviewed: true }, teammate: "Jordan", own: { displayName: "Jordan", initials: "J" } },
+    ];
+    for (const item of cases) {
+      await f.t.run(ctx => ctx.db.patch(f.ids.jordan, item.fields));
+      expect((await summary(f.riley)).roomChoices[0].memberNames, item.name).toEqual([item.teammate]);
+      expect(await summary(f.jordan), item.name).toMatchObject({ greetingName: "Jordan", ...item.own });
     }
   });
 
@@ -241,9 +304,12 @@ describe("Student Home summary", () => {
     const sooner = await f.event({ name: "District event", type: "Competition", signupMode: "assigned" });
     await f.event({ name: "Canceled competition", type: "Competition", cancelled: true });
     await f.event({ name: "Archived competition", type: "Competition", archived: true });
+    // Competitions that ended but are not archived yet must not push the next one out of the list.
+    const ended: Id<"events">[] = [];
+    for (let days = 12; days >= 1; days--) ended.push(await f.event({ name: `Ended scrimmage ${days}`, type: "Competition", startsAt: START - days * 24 * HOUR, endsAt: START - days * 24 * HOUR + 4 * HOUR }));
     const home = await summary(f.riley);
     expect(home.season).toEqual({ name: "2026–27", startsAt: Date.parse("2026-08-01T05:00:00Z"), kickoffAt: Date.parse("2027-01-09T06:00:00Z") });
-    expect(home.competitions.map(row => row.eventId)).toEqual([sooner, later]);
+    expect(home.competitions.map(row => row.eventId)).toEqual([...ended, sooner, later]);
     await f.t.run(ctx => ctx.db.patch(f.ids.season, { year: 2031 }));
     expect((await summary(f.riley)).season.kickoffAt).toBeNull();
   });
@@ -275,15 +341,16 @@ describe("Student Home summary", () => {
       return { result, documentsRead: metrics.documentsRead.used, databaseQueries: metrics.databaseQueries.used };
     });
     expect(sample.result.roomChoices).toHaveLength(3);
+    // Measured at 102 documents and 68 queries.
     expect(sample.documentsRead).toBeLessThanOrEqual(160);
-    console.info("studentHome.summary busy Student", { documentsRead: sample.documentsRead, databaseQueries: sample.databaseQueries });
+    expect(sample.databaseQueries).toBeLessThanOrEqual(100);
   });
 });
 
 describe("signup availability", () => {
   it("predicts what Sign up does and counts spots without names", async () => {
     const f = await fixture();
-    type Case = { name: string; event: EventFields; others: Status[]; own?: Status; withdrawal?: boolean; spotsLeft: number | null; outcome: string; signUp?: string };
+    type Case = { name: string; event: EventFields; others: Status[]; own?: Status; withdrawal?: boolean; spotsLeft: number | null; outcome: string; signUp?: string; refused?: string };
     const cases: Case[] = [
       { name: "open with room", event: { capacity: 3 }, others: ["confirmed", "pending"], spotsLeft: 1, outcome: "signedUp", signUp: "confirmed" },
       { name: "approval", event: { signupMode: "approval", capacity: 3, feeCents: 2500 }, others: ["confirmed"], spotsLeft: 2, outcome: "waitingForApproval", signUp: "pending" },
@@ -291,7 +358,10 @@ describe("signup availability", () => {
       { name: "someone already waitlisted", event: { capacity: 5 }, others: ["waitlist"], spotsLeft: 5, outcome: "waitlisted", signUp: "waitlist" },
       { name: "withdrawn teammates free their spots", event: { capacity: 1 }, others: ["withdrawn", "withdrawn"], spotsLeft: 1, outcome: "signedUp", signUp: "confirmed" },
       { name: "no capacity", event: {}, others: ["confirmed"], spotsLeft: null, outcome: "signedUp", signUp: "confirmed" },
-      { name: "canceled", event: { capacity: 3, cancelled: true }, others: [], spotsLeft: 3, outcome: "closed" },
+      { name: "canceled", event: { capacity: 3, cancelled: true }, others: [], spotsLeft: 3, outcome: "closed", refused: "You can't sign up" },
+      // A Coach archived the event or made it Coach-assigned after Home loaded: the sheet still opens and says signup is closed.
+      { name: "archived", event: { capacity: 3, archived: true }, others: ["confirmed"], spotsLeft: 2, outcome: "closed", refused: "You can't sign up" },
+      { name: "assigned by a Coach", event: { signupMode: "assigned" }, others: ["confirmed"], spotsLeft: null, outcome: "closed", refused: "You can't sign up" },
       { name: "already waiting for approval", event: { signupMode: "approval", capacity: 3 }, others: [], own: "pending", spotsLeft: 2, outcome: "closed" },
       { name: "withdrawal approved", event: {}, others: [], own: "withdrawn", withdrawal: true, spotsLeft: null, outcome: "closed" },
       { name: "withdrawn, may sign up again", event: {}, others: [], own: "withdrawn", spotsLeft: null, outcome: "signedUp", signUp: "confirmed" },
@@ -306,10 +376,18 @@ describe("signup availability", () => {
       const availability = await f.riley.query(api.participation.signupAvailability, { eventId });
       expect(availability, item.name).toEqual({ eventId, name: item.name, startsAt: START, endsAt: START + 4 * HOUR, feeCents: item.event.feeCents ?? 0, signupMode: item.event.signupMode ?? "open", signupClosesAt: null, capacity: item.event.capacity ?? null, spotsLeft: item.spotsLeft, outcome: item.outcome });
       if (item.signUp) expect(await f.riley.mutation(api.participation.signUp, { eventId }), item.name).toBe(item.signUp);
+      if (item.refused) await expect(f.riley.mutation(api.participation.signUp, { eventId }), item.name).rejects.toThrow(item.refused);
     }
-    const archived = await f.event({ archived: true });
-    await expect(f.riley.query(api.participation.signupAvailability, { eventId: archived })).rejects.toThrow("Past events");
-    const assigned = await f.event({ signupMode: "assigned" });
-    await expect(f.riley.query(api.participation.signupAvailability, { eventId: assigned })).rejects.toThrow("A Coach assigns");
+  });
+
+  it("refuses only an event that is gone or from another season", async () => {
+    const f = await fixture();
+    const removed = await f.event();
+    await f.t.run(ctx => ctx.db.delete(removed));
+    const earlier = await f.t.run(async ctx => {
+      const seasonId = await ctx.db.insert("seasons", { name: "2025–26", year: 2026, status: "archived", startsAt: 0, permissionVersion: "DRAFT", createdBy: f.ids.coach });
+      return ctx.db.insert("events", { seasonId, name: "Last season's event", type: "Team", startsAt: START, endsAt: START + HOUR, destination: "Synthetic venue", travel: "Bus", overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "open", allowWithdrawal: true, permissionRequired: false, firstRequired: false, archived: false });
+    });
+    for (const eventId of [removed, earlier]) await expect(f.riley.query(api.participation.signupAvailability, { eventId })).rejects.toThrow("no longer available");
   });
 });
