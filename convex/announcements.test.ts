@@ -130,11 +130,20 @@ describe("pinnedForHome", () => {
     expect(JSON.stringify(home)).not.toContain("@");
   });
 
-  it("is readable by active accounts in the season, but not by a Student off the roster, an inactive account or a signed-out visitor", async () => {
+  it("is readable by active accounts in the season, empty for a Student off the roster or with no active season, and refused to inactive or signed-out visitors", async () => {
     const f = await fixture();
     await f.insert({ pinned: true, pinnedAt: 1 });
-    for (const client of [f.student, f.parent, f.parentAsParent, f.mentor, f.lead, f.coach]) expect(await client.query(api.announcements.pinnedForHome, {})).toHaveLength(1);
-    await expect(f.offRoster.query(api.announcements.pinnedForHome, {})).rejects.toThrow("No student on this season's roster");
+    const pinned = (client: Fixture["coach"]) => client.query(api.announcements.pinnedForHome, {});
+    for (const client of [f.student, f.parent, f.parentAsParent, f.mentor, f.lead, f.coach]) expect(await pinned(client)).toHaveLength(1);
+    // Home shows no messages instead of an error when the Student is not on this season's roster.
+    expect(await pinned(f.offRoster)).toEqual([]);
+    await f.t.run(async ctx => {
+      const row = await ctx.db.query("students").withIndex("by_seasonId_and_userId", q => q.eq("seasonId", f.ids.season).eq("userId", f.ids.student.app)).unique();
+      await ctx.db.patch(row!._id, { active: false });
+    });
+    expect(await pinned(f.student)).toEqual([]);
+    await f.t.run(ctx => ctx.db.patch(f.ids.season, { status: "archived" }));
+    for (const client of [f.offRoster, f.parent, f.lead, f.coach]) expect(await pinned(client)).toEqual([]);
     await expect(f.t.query(api.announcements.pinnedForHome, {})).rejects.toThrow("not signed in");
     await f.t.run(ctx => ctx.db.patch(f.ids.parent.app, { active: false }));
     await expect(f.parent.query(api.announcements.pinnedForHome, {})).rejects.toThrow("inactive");

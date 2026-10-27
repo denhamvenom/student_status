@@ -38,6 +38,7 @@ const summaryResult = v.object({
   initials: v.string(),
   season: v.object({ name: v.string(), startsAt: v.number(), kickoffAt: v.union(v.number(), v.null()) }),
   parentLinked: v.boolean(),
+  fundraiserLinked: v.boolean(),
   whatsLeft: v.array(whatsLeftItem),
   openSignups: v.array(openSignup),
   roomChoices: v.array(roomChoice),
@@ -53,7 +54,6 @@ type RoomChoice = Infer<typeof roomChoice>;
 
 const EVENT_LIMIT = 200;
 const PARTICIPATION_LIMIT = 200;
-const COMPETITION_LIMIT = 10;
 const HOME_ERROR = "Home could not load. Reload the page and try again.";
 /** Readiness items that wait on Coach review of records rather than on the Student or a parent. */
 const STAFF_ITEMS = new Set(["Season fee maintenance is not complete", "Financial records require review or are updating", "Event financial records require review", "Event requirements require review", "Whole Team enrollment is not complete."]);
@@ -65,16 +65,24 @@ function asOfFromDay(day: string) {
   return at;
 }
 
-type NameFields = Pick<Doc<"students">, "legalName" | "preferredName" | "firstName" | "lastName" | "structuredNameReviewed">;
+type NameFields = Pick<Doc<"students">, "legalName" | "preferredName" | "firstName" | "lastName">;
 const words = (value: string | undefined) => (value ?? "").trim().split(/\s+/).filter(Boolean);
 const letter = (value: string | undefined) => (Array.from(value ?? "")[0] ?? "").toLocaleUpperCase("en-US");
 
-/** Family name used only for an initial or for the Student's own name: Coach-reviewed last name, then the legal name's last word. */
+/** Generational suffixes end some legal names ("Jordan Avery Williams Jr.") but are never a family name. */
+const NAME_SUFFIXES = new Set(["jr", "sr", "ii", "iii", "iv", "v", "vi", "2nd", "3rd", "4th"]);
+/** A usable family name starts with a letter and is not just a suffix; anything else gives no initial. */
+function cleanFamilyName(value: string | undefined) {
+  const name = value?.trim() ?? "";
+  if (!/^\p{L}/u.test(name) || NAME_SUFFIXES.has(name.replace(/[.,]/g, "").toLocaleLowerCase("en-US"))) return null;
+  return name;
+}
+/** Family name used only for an initial or for the Student's own name: the last name field (reviewed or not), then the legal name's last word. */
 function familyName(student: NameFields) {
-  const reviewed = student.structuredNameReviewed ? student.lastName?.trim() : undefined;
-  if (reviewed) return reviewed;
+  const recorded = cleanFamilyName(student.lastName);
+  if (recorded) return recorded;
   const legal = words(student.legalName);
-  return legal.length > 1 ? legal[legal.length - 1] : student.lastName?.trim() || null;
+  return legal.length > 1 ? cleanFamilyName(legal[legal.length - 1]) : null;
 }
 /** Preferred given name; a preferred name already ending in the family name ("Dev Student") is trimmed to "Dev". */
 function givenName(student: NameFields, family: string | null) {
@@ -209,10 +217,14 @@ export const summary = query({
     for (const { event, room } of rooms) {
       const status = room.membership && room.group?.finalized ? "final" : room.request ? "assignmentRequested" : room.membership ? "inGroup" : "notChosen";
       const members = await Promise.all(room.members.filter(member => member.studentId !== student._id).map(member => studentById(member.studentId)));
-      const invitations = await Promise.all(invites.filter(invite => invite.eventId === event._id && invite.status === "pending").map(async invite => {
+      const pending = invites.filter(invite => invite.eventId === event._id && invite.status === "pending");
+      const invitations = (await Promise.all(pending.map(async invite => {
+        // Answering fails once the inviting group is removed or final, so those invitations stay off Home.
+        const group = await ctx.db.get(invite.groupId);
+        if (!group || group.finalized) return [];
         const from = teammate(await studentById(invite.invitedBy));
-        return { inviteId: invite._id, fromName: from.name, initials: from.initials };
-      }));
+        return [{ inviteId: invite._id, fromName: from.name, initials: from.initials }];
+      }))).flat();
       roomChoices.push({ eventId: event._id, eventName: event.name, startsAt: event.startsAt, endsAt: event.endsAt, roomDeadline: event.roomDeadline ?? null, status, groupName: room.membership ? room.group?.name ?? null : null, memberNames: members.map(member => teammate(member).name), invitations });
     }
 
@@ -222,10 +234,13 @@ export const summary = query({
       ...ownNames(student),
       season: { name: season.name, startsAt: season.startsAt, kickoffAt: kickoff?.state === "verified" ? kickoff.kickoffAt : null },
       parentLinked: linked,
+      // Same test as the Money page's fundraiser section (fundraiserLinks.forStudent returns the link only when one is set).
+      fundraiserLinked: !!student.fundraiserUrl,
       whatsLeft: uniqueItems,
       openSignups,
       roomChoices,
-      competitions: events.filter(event => event.type === "Competition").slice(0, COMPETITION_LIMIT).map(event => ({ eventId: event._id, name: event.name, startsAt: event.startsAt, endsAt: event.endsAt })),
+      // Every fetched Competition, so ones that ended but are not archived yet cannot push out the next one; the browser picks by time.
+      competitions: events.filter(event => event.type === "Competition").map(event => ({ eventId: event._id, name: event.name, startsAt: event.startsAt, endsAt: event.endsAt })),
     };
   },
 });

@@ -2,7 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { activeSeason, audit, ownStudent, viewer, type AppUser } from "./lib/access";
+import { activeSeason, audit, viewer, type AppUser } from "./lib/access";
 
 /** Student Home shows at most this many pinned messages; pinning one more is refused. */
 const PIN_LIMIT = 5;
@@ -85,15 +85,23 @@ function authorNames(ctx: Ctx) {
   };
 }
 
-/** Pinned messages for Student Home, newest pin first. Expired messages are included; the browser hides them after showUntil. */
+/**
+ * Pinned messages for Student Home, newest pin first. Expired messages are included; the browser hides them after showUntil.
+ * With no active season, or for a Student not on this season's roster, there is nothing to show, so Home gets an empty list rather than an error.
+ */
 export const pinnedForHome = query({
   args: {},
   returns: v.array(pinnedAnnouncement),
   handler: async ctx => {
     const user = await viewer(ctx);
+    const season = await ctx.db.query("seasons").withIndex("by_status", q => q.eq("status", "active")).unique();
+    if (!season) return [];
     // A Student sees the messages only while on this season's roster; Parents and staff may preview.
-    const seasonId = user.role === "student" ? (await ownStudent(ctx, user)).seasonId : (await activeSeason(ctx))._id;
-    const rows = await ctx.db.query("teamAnnouncements").withIndex("by_seasonId_and_pinned_and_pinnedAt", q => q.eq("seasonId", seasonId).eq("pinned", true)).order("desc").take(PIN_LIMIT);
+    if (user.role === "student") {
+      const student = await ctx.db.query("students").withIndex("by_seasonId_and_userId", q => q.eq("seasonId", season._id).eq("userId", user._id)).unique();
+      if (!student?.active) return [];
+    }
+    const rows = await ctx.db.query("teamAnnouncements").withIndex("by_seasonId_and_pinned_and_pinnedAt", q => q.eq("seasonId", season._id).eq("pinned", true)).order("desc").take(PIN_LIMIT);
     const nameOf = authorNames(ctx);
     return await Promise.all(rows.filter(row => row.archivedAt === undefined).map(async row => ({
       id: row._id, title: row.title ?? null, body: row.body, authorName: await nameOf(row), authorRole: row.authorRole,

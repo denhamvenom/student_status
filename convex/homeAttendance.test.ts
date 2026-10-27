@@ -220,16 +220,51 @@ describe("Student Home participation rings", () => {
     expect(await f.otherParent.query(api.dashboardReports.homeAttendance, { studentId: f.ids.otherSid })).toEqual(unavailable);
   });
 
-  it("reads a bounded number of documents", async () => {
+  it("reads a bounded number of documents however many meetings were held", async () => {
     const f = await fixture();
     await season(f);
-    const measured = await f.student.run(async ctx => {
+    const measure = () => f.student.run(async ctx => {
       const result = await ctx.runQuery(api.dashboardReports.homeAttendance, { studentId: f.ids.sid });
       const metrics = await ctx.meta.getTransactionMetrics();
-      return { state: result.state, documentsRead: metrics.documentsRead.used, databaseQueries: metrics.databaseQueries.used };
+      return { state: result.state, held: result.meetings.held, documentsRead: metrics.documentsRead.used, databaseQueries: metrics.databaseQueries.used };
     });
-    expect(measured.state).toBe("ready");
-    console.info("homeAttendance synthetic reads", measured);
+    // Measured at 19 documents and 31 queries for both samples; the bounds leave a little room for gate changes.
+    const budget = { documentsRead: 25, databaseQueries: 40 };
+    const first = await measure();
+    // Counts come from aggregates, so more held meetings must not mean more reads.
+    for (let week = 0; week < 6; week++) { const at = Date.parse("2027-02-02T23:00:00Z") + week * 7 * 24 * hour; await meeting(f, { title: "Build meeting", at, visits: full(at) }); }
+    const later = await measure();
+    for (const [sample, held] of [[first, 5], [later, 11]] as const) {
+      expect(sample).toMatchObject({ state: "ready", held });
+      expect(sample.documentsRead, `documents read with ${held} held`).toBeLessThanOrEqual(budget.documentsRead);
+      expect(sample.databaseQueries, `queries with ${held} held`).toBeLessThanOrEqual(budget.databaseQueries);
+    }
+  });
+
+  it.each([
+    { name: "moved from before kickoff to after kickoff", from: buildBeforeKickoff, to: Date.parse("2027-01-26T23:00:00Z"), shown: 120 },
+    { name: "moved from after kickoff to before kickoff", from: Date.parse("2027-01-26T23:00:00Z"), to: buildBeforeKickoff, shown: 0 },
+  ])("counts a rescheduled Build meeting once, on its new side of kickoff: $name", async ({ from, to, shown }) => {
+    const f = await fixture();
+    const session = await meeting(f, { title: "Build meeting", at: from, visits: full(from) });
+    expect(await minutesFor(f)).toBe(120);
+    // The meeting moved to a new date and the Student clocked in at the new time.
+    await f.t.run(async ctx => {
+      const row = (await ctx.db.get(session))!;
+      await ctx.db.patch(session, { scheduledStart: to, scheduledEnd: to + 2 * hour, effectiveEnd: to + 2 * hour, openedAt: to, closedAt: to + 2 * hour, revision: row.revision + 1 });
+      const interval = await ctx.db.query("timeclockIntervals").withIndex("by_sessionId_and_studentId", q => q.eq("sessionId", session).eq("studentId", f.ids.sid)).unique();
+      await ctx.db.patch(interval!._id, { inAt: to, outAt: to + 2 * hour });
+      await invalidateAttendanceSession(ctx, session);
+    });
+    await settle(f.t, session);
+    const namespace = studentBuildMinutesNamespace(f.ids.season, f.ids.sid);
+    const split = await f.t.run(async ctx => ({
+      total: await reportAggregate.sum(ctx, { namespace }),
+      beforeKickoff: await reportAggregate.sum(ctx, { namespace, bounds: { upper: { key: kickoffAt, inclusive: false } } }),
+      fromKickoff: await reportAggregate.sum(ctx, { namespace, bounds: { lower: { key: kickoffAt, inclusive: true } } }),
+    }));
+    expect(split).toEqual({ total: 120, beforeKickoff: 120 - shown, fromKickoff: shown });
+    expect(await f.student.query(api.dashboardReports.homeAttendance, { studentId: f.ids.sid })).toMatchObject({ state: "ready", meetings: { attended: 1, held: 1 }, buildHours: { state: "ready", minutes: shown } });
   });
 });
 
