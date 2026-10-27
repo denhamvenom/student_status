@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { breakdownView, buildTotalLine, sessionRowView, type Breakdown, type SessionRow } from './logic'
+import { attendedOfHeld, breakdownView, buildTotalLine, dayTypeLine, shortHours, sessionRowView, type Breakdown, type SessionRow } from './logic'
 
 const KICKOFF = Date.parse('2027-01-09T12:00:00Z')
-const base: Breakdown = { state: 'ready', kickoffAt: KICKOFF, required: { attended: 3, held: 4 }, other: { attended: 1, held: 2 }, outreach: { attended: 0, held: 0 }, buildHours: { minutes: 90, targetHours: 30 } }
+const base: Breakdown = { state: 'ready', kickoffAt: KICKOFF, required: { attended: 3, held: 4 }, other: { attended: 1, held: 2 }, outreach: { attended: 0, held: 0 }, buildHours: { minutes: 90, targetHours: 30, weekday: { attended: 1, held: 2, minutes: 60 }, weekend: { attended: 1, held: 1, minutes: 30 } } }
 
 describe('breakdownView', () => {
   it.each([
@@ -48,5 +48,36 @@ describe('buildTotalLine', () => {
     [90, null, '1 hour 30 minutes'],
   ])('%s minutes, %s days', (minutes, days, line) => {
     expect(buildTotalLine(minutes, days)).toBe(line)
+  })
+})
+
+describe('Build day types', () => {
+  it.each([
+    [{ attended: 3, held: 4, minutes: 125 }, '3 of 4 days · 2 hours 5 minutes'],
+    [{ attended: 1, held: 1, minutes: 60 }, '1 of 1 day · 1 hour 0 minutes'],
+    [{ attended: 0, held: 0, minutes: 0 }, '0 of 0 days · 0 hours 0 minutes'],
+  ])('dayTypeLine %j', (day, line) => expect(dayTypeLine(day)).toBe(line))
+
+  it.each([
+    [3, 4, '3 / 4'],
+    [0, 0, '—'],
+  ])('attendedOfHeld %s of %s', (a, h, text) => expect(attendedOfHeld(a, h)).toBe(text))
+
+  it.each([
+    [125, '2h 5m'],
+    [0, '0h 0m'],
+    [59.9, '0h 59m'],
+  ])('shortHours %s', (m, text) => expect(shortHours(m)).toBe(text))
+
+  it('keeps weekday and weekend beside the total', () => {
+    const { build } = breakdownView(base, KICKOFF)
+    expect(build.weekday.minutes + build.weekend.minutes).toBe(base.buildHours.minutes)
+  })
+
+  it.each([
+    ['weekend', 'Weekend'],
+    ['weekday', 'Weekday'],
+  ] as const)('row tagged %s', (dayType, tag) => {
+    expect(sessionRowView({ sessionId: 's', scheduledStart: 0, title: null, status: 'missed', dayType }, 'build').dayType).toBe(tag)
   })
 })

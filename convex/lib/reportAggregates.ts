@@ -75,6 +75,8 @@ export async function updateSessionAggregate(ctx: MutationCtx, previous: Doc<"ti
 
 /** Per-student sum of whole clocked minutes at Build-day sessions, keyed by scheduledStart so readers can bound it at kickoff. */
 export const studentBuildMinutesNamespace = (season: Id<"seasons">, student: Id<"students">) => `attendance:${season}:${student}:buildMinutes`;
+/** The Saturday + Sunday share of the same minutes; Weekday minutes are the total minus this, so the two always sum to Build hours. */
+export const studentWeekendBuildMinutesNamespace = (season: Id<"seasons">, student: Id<"students">) => `attendance:${season}:${student}:buildMinutes:weekend`;
 /** All clocked time (early, scheduled and extended) at a closed, reviewed Build-day session counts; the session need not qualify. */
 export function buildMinutesContribution(row: Pick<Doc<"timeclockAttendanceSummaries">, "buildDay" | "sessionState" | "needsReview" | "totalMs">) {
   if (!row.buildDay || row.sessionState !== "closed" || row.needsReview || !Number.isFinite(row.totalMs)) return 0;
@@ -86,12 +88,17 @@ export async function updateStudentAttendanceAggregate(ctx: MutationCtx, previou
   if (previous) {
     for (const day of attendanceCategories(previous)) await reportAggregate.deleteIfExists(ctx,{namespace:studentAttendanceNamespace(previous.seasonId,previous.studentId,day),key:previous.scheduledStart,id:previous.sessionId});
     await reportAggregate.deleteIfExists(ctx,{namespace:studentBuildMinutesNamespace(previous.seasonId,previous.studentId),key:previous.scheduledStart,id:previous.sessionId});
+    await reportAggregate.deleteIfExists(ctx,{namespace:studentWeekendBuildMinutesNamespace(previous.seasonId,previous.studentId),key:previous.scheduledStart,id:previous.sessionId});
   }
   const buildMinutes = buildMinutesContribution(next);
   if (buildMinutes > 0) {
     // Replace rather than skip so a stray entry at this key can never keep a stale sum.
     const namespace = studentBuildMinutesNamespace(next.seasonId,next.studentId);
     await reportAggregate.replaceOrInsert(ctx,{namespace,key:next.scheduledStart,id:next.sessionId},{namespace,key:next.scheduledStart,sumValue:buildMinutes});
+    if (next.buildDay === "saturday" || next.buildDay === "sunday") {
+      const weekend = studentWeekendBuildMinutesNamespace(next.seasonId,next.studentId);
+      await reportAggregate.replaceOrInsert(ctx,{namespace:weekend,key:next.scheduledStart,id:next.sessionId},{namespace:weekend,key:next.scheduledStart,sumValue:buildMinutes});
+    }
   }
   if (next.sessionState !== "closed" || next.needsReview || !next.qualifies) return;
   for (const day of attendanceCategories(next)) await reportAggregate.insertIfDoesNotExist(ctx,{namespace:studentAttendanceNamespace(next.seasonId,next.studentId,day),key:next.scheduledStart,id:next.sessionId,sumValue:1});

@@ -1,6 +1,6 @@
 import type { Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
-import { attendanceNamespace, reportAggregate, studentAttendanceNamespace } from "./reportAggregates";
+import { attendanceNamespace, reportAggregate, studentAttendanceNamespace, studentBuildMinutesNamespace, studentWeekendBuildMinutesNamespace } from "./reportAggregates";
 import { kickoffBoundaryForCompetitionYear } from "./seasonCalendar";
 
 export async function teamReportAttendanceGate(ctx: QueryCtx, seasonId: Id<"seasons">, year: number) {
@@ -30,5 +30,24 @@ export async function teamReportAttendanceRow(ctx: QueryCtx, seasonId: Id<"seaso
     reportAggregate.count(ctx,{namespace:studentAttendanceNamespace(seasonId,studentId,"BuildSunday"),bounds:buildSeason}),
     reportAggregate.count(ctx,{namespace:studentAttendanceNamespace(seasonId,studentId,"Outreach"),bounds:buildSeason}),
   ]);
-  return { offTuesday, offThursday, offOutreach, buildWeekday, buildSaturday, buildSunday, buildOutreach };
+  const build = await buildDayTypeCounts(ctx, seasonId, studentId, kickoffAt);
+  return { offTuesday, offThursday, offOutreach, buildWeekday, buildSaturday, buildSunday, buildOutreach, buildWeekdayHeld: build.weekday.held, buildWeekendAttended: build.weekend.attended, buildWeekendHeld: build.weekend.held, buildMinutes: build.totalMinutes, buildWeekdayMinutes: build.weekday.minutes, buildWeekendMinutes: build.weekend.minutes };
+}
+
+/** Build-season days attended of held and clocked minutes by day type: Weekend is Saturday + Sunday, Weekday every other Build day. Minutes sum to the student's Build hours. */
+export async function buildDayTypeCounts(ctx: QueryCtx, seasonId: Id<"seasons">, studentId: Id<"students">, kickoffAt: number) {
+  const bounds = { lower: { key: kickoffAt, inclusive: true } };
+  const count = (namespace: string) => reportAggregate.count(ctx, { namespace, bounds });
+  const [weekdayHeld, weekdayAttended, satHeld, satAttended, sunHeld, sunAttended, totalMinutes, weekendMinutes] = await Promise.all([
+    count(attendanceNamespace(seasonId, "held", "BuildWeekday")), count(studentAttendanceNamespace(seasonId, studentId, "BuildWeekday")),
+    count(attendanceNamespace(seasonId, "held", "BuildSaturday")), count(studentAttendanceNamespace(seasonId, studentId, "BuildSaturday")),
+    count(attendanceNamespace(seasonId, "held", "BuildSunday")), count(studentAttendanceNamespace(seasonId, studentId, "BuildSunday")),
+    reportAggregate.sum(ctx, { namespace: studentBuildMinutesNamespace(seasonId, studentId), bounds }),
+    reportAggregate.sum(ctx, { namespace: studentWeekendBuildMinutesNamespace(seasonId, studentId), bounds }),
+  ]);
+  return {
+    weekday: { attended: weekdayAttended, held: weekdayHeld, minutes: totalMinutes - weekendMinutes },
+    weekend: { attended: satAttended + sunAttended, held: satHeld + sunHeld, minutes: weekendMinutes },
+    totalMinutes,
+  };
 }

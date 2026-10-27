@@ -12,7 +12,7 @@ import { financialAccount } from "./lib/financialSources";
 import { attendanceEvidence, outreachForSession, buildDayFromTitle } from "./lib/attendanceReports";
 import { attendanceNamespace, studentAttendanceNamespace, studentBuildMinutesNamespace, reportAggregate, buildMinutesContribution } from "./lib/reportAggregates";
 import { kickoffBoundaryForCompetitionYear } from "./lib/seasonCalendar";
-import { teamReportAttendanceGate } from "./lib/teamReportAttendance";
+import { buildDayTypeCounts, teamReportAttendanceGate } from "./lib/teamReportAttendance";
 export { correctedIntervals } from "./lib/attendanceReports";
 
 const nullableNumber = v.union(v.number(), v.null());
@@ -181,10 +181,11 @@ export const homeAttendance = query({
   },
 });
 
+const dayTypeValidator = v.object({ attended: v.number(), held: v.number(), minutes: v.number() });
 const breakdownValidator = v.object({
   state: v.union(v.literal("ready"), v.literal("updating")), kickoffAt: nullableNumber,
   required: attendedOfHeld, other: attendedOfHeld, outreach: attendedOfHeld,
-  buildHours: v.object({ minutes: v.number(), targetHours: nullableNumber }),
+  buildHours: v.object({ minutes: v.number(), targetHours: nullableNumber, weekday: dayTypeValidator, weekend: dayTypeValidator }),
 });
 
 /** Required / Other / Outreach attended-of-held plus Build hours, for the Student Home breakdown. */
@@ -195,12 +196,13 @@ export const attendanceBreakdown = query({
     requireRole(user, "student", "parent", "coach");
     const found = await homeAttendanceStudent(ctx, user, args.studentId);
     const zero = { attended: 0, held: 0 };
-    if (!found) return { state: "updating", kickoffAt: null, required: zero, other: zero, outreach: zero, buildHours: { minutes: 0, targetHours: null } };
+    const noDays = { weekday: { ...zero, minutes: 0 }, weekend: { ...zero, minutes: 0 } };
+    if (!found) return { state: "updating", kickoffAt: null, required: zero, other: zero, outreach: zero, buildHours: { minutes: 0, targetHours: null, ...noDays } };
     const { student, season } = found;
     const gate = await teamReportAttendanceGate(ctx, season._id, season.year);
     const kickoffAt = gate.kickoff?.at ?? null;
     const targetHours = season.buildHoursTarget ?? null;
-    if (gate.state === "updating" || gate.state === "failed") return { state: "updating", kickoffAt, required: zero, other: zero, outreach: zero, buildHours: { minutes: 0, targetHours } };
+    if (gate.state === "updating" || gate.state === "failed") return { state: "updating", kickoffAt, required: zero, other: zero, outreach: zero, buildHours: { minutes: 0, targetHours, ...noDays } };
     const pair = async (category: "Required" | "Other" | "Outreach") => {
       const [held, attended] = await Promise.all([
         reportAggregate.count(ctx, { namespace: attendanceNamespace(season._id, "held", category) }),
@@ -208,12 +210,12 @@ export const attendanceBreakdown = query({
       ]);
       return { attended, held };
     };
-    const [required, other, outreach, minutes] = await Promise.all([pair("Required"), pair("Other"), pair("Outreach"), studentBuildMinutes(ctx, season._id, student._id, kickoffAt)]);
-    return { state: "ready", kickoffAt, required, other, outreach, buildHours: { minutes, targetHours } };
+    const [required, other, outreach, build] = await Promise.all([pair("Required"), pair("Other"), pair("Outreach"), kickoffAt === null ? Promise.resolve(null) : buildDayTypeCounts(ctx, season._id, student._id, kickoffAt)]);
+    return { state: "ready", kickoffAt, required, other, outreach, buildHours: { minutes: build?.totalMinutes ?? 0, targetHours, weekday: build?.weekday ?? noDays.weekday, weekend: build?.weekend ?? noDays.weekend } };
   },
 });
 
-const sessionRowValidator = v.object({ sessionId: v.id("timeclockSessions"), scheduledStart: v.number(), title: v.union(v.string(), v.null()), status: v.union(v.literal("attended"), v.literal("missed")), minutes: v.optional(v.number()) });
+const sessionRowValidator = v.object({ sessionId: v.id("timeclockSessions"), scheduledStart: v.number(), title: v.union(v.string(), v.null()), status: v.union(v.literal("attended"), v.literal("missed")), minutes: v.optional(v.number()), dayType: v.optional(v.union(v.literal("weekday"), v.literal("weekend"))) });
 const ATTENDANCE_PAGE_ROWS = 10;
 const emptyPage = { page: [], isDone: true, continueCursor: "" };
 
@@ -243,7 +245,7 @@ export const attendanceSessions = query({
       const fresh = row !== null && row.reportGeneration === report.reportGeneration;
       const attended = fresh && (args.kind === "build" ? row.totalMs > 0 : row.qualifies) && row.sessionState === "closed" && !row.needsReview;
       const minutes = fresh && args.kind === "build" ? buildMinutesContribution(row) : fresh && attended ? Math.floor(row.totalMs / 60000) : undefined;
-      return { sessionId: report.sessionId, scheduledStart: report.scheduledStart, title: report.occurrenceTitle ?? null, status: attended ? "attended" as const : "missed" as const, ...(minutes !== undefined ? { minutes } : {}) };
+      return { sessionId: report.sessionId, scheduledStart: report.scheduledStart, title: report.occurrenceTitle ?? null, status: attended ? "attended" as const : "missed" as const, ...(minutes !== undefined ? { minutes } : {}), ...(args.kind === "build" ? { dayType: report.buildDay === "saturday" || report.buildDay === "sunday" ? "weekend" as const : "weekday" as const } : {}) };
     }));
     return { ...result, page };
   },

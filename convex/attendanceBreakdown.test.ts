@@ -95,7 +95,7 @@ describe("attendance breakdown", () => {
     const f = await fixture();
     await season(f);
     const result = await f.student.query(api.dashboardReports.attendanceBreakdown, { studentId: f.ids.sid });
-    expect(result).toEqual({ state: "ready", kickoffAt: Date.parse("2027-01-09T06:00:00Z"), required: { attended: 4, held: 12 }, other: { attended: 1, held: 2 }, outreach: { attended: 1, held: 2 }, buildHours: { minutes: 0, targetHours: null } });
+    expect(result).toEqual({ state: "ready", kickoffAt: Date.parse("2027-01-09T06:00:00Z"), required: { attended: 4, held: 12 }, other: { attended: 1, held: 2 }, outreach: { attended: 1, held: 2 }, buildHours: { minutes: 0, targetHours: null, weekday: { attended: 0, held: 0, minutes: 0 }, weekend: { attended: 0, held: 0, minutes: 0 } } });
     const home = await f.student.query(api.dashboardReports.homeAttendance, { studentId: f.ids.sid });
     expect(home).toMatchObject({ state: "ready", meetings: result.required, outreach: result.outreach, buildHours: { minutes: result.buildHours.minutes } });
   });
@@ -150,6 +150,35 @@ describe("attendance breakdown", () => {
     expect(list.page.reduce((sum, row) => sum + (row.minutes ?? 0), 0)).toBe(210);
     expect(home.buildHours.minutes).toBe(210);
     expect(breakdown.buildHours.minutes).toBe(210);
+  });
+
+  it.each([
+    { name: "Monday through Friday are weekday", days: ["2027-01-11", "2027-01-12", "2027-01-13", "2027-01-14", "2027-01-15"], weekend: false },
+    { name: "Saturday and Sunday are weekend", days: ["2027-01-16", "2027-01-17"], weekend: true },
+  ])("$name", async ({ days, weekend }) => {
+    const f = await fixture();
+    for (const day of days) await meeting(f, { title: "Build day", at: at(day), attended: true, visitMs: 60 * 60_000 });
+    const list = await f.student.query(api.dashboardReports.attendanceSessions, { studentId: f.ids.sid, kind: "build", paginationOpts: paging });
+    expect(list.page.map(row => row.dayType)).toEqual(days.map(() => weekend ? "weekend" : "weekday"));
+    const { weekday: wd, weekend: we, minutes } = (await f.student.query(api.dashboardReports.attendanceBreakdown, { studentId: f.ids.sid })).buildHours;
+    const mine = { attended: days.length, held: days.length, minutes: days.length * 60 }, none = { attended: 0, held: 0, minutes: 0 };
+    expect(wd).toEqual(weekend ? none : mine);
+    expect(we).toEqual(weekend ? mine : none);
+    expect(wd.minutes + we.minutes).toBe(minutes);
+  });
+
+  it("counts never-clocked Build days as held, splits minutes by day type, and feeds the team report", async () => {
+    const f = await fixture();
+    await meeting(f, { title: "Build Monday", at: mondayAfterKickoff, attended: true });
+    await meeting(f, { title: "Build Wednesday", at: at("2027-01-13") }); // never clocked
+    await meeting(f, { title: "Saturday build", at: at("2027-01-16"), attended: true, visitMs: 90 * 60_000 });
+    await meeting(f, { title: "Sunday build", at: at("2027-01-17") }); // never clocked
+    const { buildHours } = await f.student.query(api.dashboardReports.attendanceBreakdown, { studentId: f.ids.sid });
+    expect(buildHours).toMatchObject({ minutes: 210, weekday: { attended: 1, held: 2, minutes: 120 }, weekend: { attended: 1, held: 2, minutes: 90 } });
+    const team = await f.coach.query(api.teamReports.list, { paginationOpts: paging, asOf: at("2027-02-01") });
+    expect(team.page.find(row => row.studentId === f.ids.sid)?.attendance).toMatchObject({ buildWeekday: 1, buildWeekdayHeld: 2, buildWeekendAttended: 1, buildWeekendHeld: 2, buildMinutes: 210, buildWeekdayMinutes: 120, buildWeekendMinutes: 90 });
+    await expect(f.parent.query(api.teamReports.list, { paginationOpts: paging, asOf: at("2027-02-01") })).rejects.toThrow(/Coach or Travel Lead/);
+    await expect(f.student.query(api.teamReports.list, { paginationOpts: paging, asOf: at("2027-02-01") })).rejects.toThrow(/Coach or Travel Lead/);
   });
 
   it("reports updating when a session has no Build flag yet", async () => {
