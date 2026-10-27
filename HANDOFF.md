@@ -1,6 +1,6 @@
 # Handoff
 
-October 27, 2026 | Branch: feature/student-home-redesign (from main 7376a71)
+October 27, 2026 | Branch: docs/release-2026-10-27-student-home (from main 6937fa2)
 
 ## Venom Status (formerly Student Status)
 
@@ -10,11 +10,13 @@ October 27, 2026 | Branch: feature/student-home-redesign (from main 7376a71)
 
 Clocking, PIN controls, automatic closing, fixed event roster and historical import remain implemented; Calendar checks run at 6 AM/3 PM Central plus manual refresh. Rollout reached 100%.
 
-## In progress
+## Student Home (released)
 
-Student Home redesign (Claude Design "Student Home — chosen direction", October 26; newest design folder is the reference). Built and polished locally through `2261a09`, `868fadc`, `046563a`, synced to development `third-bandicoot-18` only, not pushed. Polish includes "Closes today", "Due {Mon D}" within seven days, and the muted desktop second Sign up matching the design. Owner kept "{n} open" badge wording; key fragments will not be rotated. References: docs/DECISIONS.md "Redesign dashboards", docs/LANGUAGE.md, docs/DEVELOPMENT.md "Student Home scenarios".
-Live scenarios passed at 390/1440 in light/dark on development. `bun run check` passed except intermittent heavy timeouts in bulkInvites and feeBulk (each passes alone); `bun run check:timeclock` passed. Contact admin test send will not be done.
-Then: obtain owner approval for push/PR/merge; after merge, remove helper worktrees `student-status-sh-d`…`sh-j`, then start Parent Home.
+Student Home redesign, Student shell, pinned announcements and build hours target are live: PR #48 merged as main `6937fa2` (source head `d89ded8`); production Convex synced first (additive schema). Not verified: signed-in production walkthrough; Worker version IDs not recorded. [Release receipt](docs/releases/RELEASE_2026-10-27_STUDENT_HOME.md)
+
+## Next
+
+Remove helper worktrees `student-status-sh-d`…`sh-j` (no longer needed), then start Parent Home.
 
 ## Top open risks
 
@@ -24,4 +26,4 @@ Then: obtain owner approval for push/PR/merge; after merge, remove helper worktr
 
 ## Next step
 
-Get owner approval for push/PR/merge. After merge, remove helper worktrees `student-status-sh-d`…`sh-j`, then begin Parent Home. A signed-in Coach still needs to recalculate attendance once on production.
+Remove helper worktrees `student-status-sh-d`…`sh-j`, then begin Parent Home. A signed-in Coach still needs to click Recalculate attendance once on production.
