@@ -17,13 +17,23 @@ import type { HomeTileSource, StudentHomeHandlers, StudentHomeViewProps } from '
 
 const copy = homeCopy
 
-function Guard({ title, source, handlers, surface, children }: { title: string; source: HomeTileSource; handlers: StudentHomeHandlers; surface?: 'tile' | 'hero' | 'compact'; children: ReactNode }) {
-  return <TileErrorBoundary title={title} message={copy.states.tileFailed(title)} retryLabel={copy.states.tryAgain} surface={surface} onRetry={() => handlers.retry(source)}>{children}</TileErrorBoundary>
+type Sources = HomeTileSource | readonly HomeTileSource[]
+
+/** "Try again" re-subscribes every source the tile reads. */
+const retryAll = (handlers: StudentHomeHandlers, sources: Sources) => {
+  for (const source of typeof sources === 'string' ? [sources] : sources) handlers.retry(source)
 }
 
-function failed(title: string, source: HomeTileSource, handlers: StudentHomeHandlers, surface: 'tile' | 'hero' | 'compact' = 'tile', message = copy.states.tileFailed(title)) {
-  return <TileError title={title} message={message} retryLabel={copy.states.tryAgain} surface={surface} onRetry={() => handlers.retry(source)} />
+function Guard({ title, source, handlers, surface, children }: { title: string; source: Sources; handlers: StudentHomeHandlers; surface?: 'tile' | 'hero' | 'compact'; children: ReactNode }) {
+  return <TileErrorBoundary title={title} message={copy.states.tileFailed(title)} retryLabel={copy.states.tryAgain} surface={surface} onRetry={() => retryAll(handlers, source)}>{children}</TileErrorBoundary>
 }
+
+function failed(title: string, source: Sources, handlers: StudentHomeHandlers, surface: 'tile' | 'hero' | 'compact' = 'tile', message = copy.states.tileFailed(title)) {
+  return <TileError title={title} message={message} retryLabel={copy.states.tryAgain} surface={surface} onRetry={() => retryAll(handlers, source)} />
+}
+
+/** The hero reads the summary (room choice, countdown) and the pinned messages. */
+const heroSources = ['summary', 'announcements'] as const
 
 function Greeting({ summary, now }: { summary: StudentHomeViewProps['summary']; now: number }) {
   const date = formatLongDate(now)
@@ -44,24 +54,27 @@ function Hero({ summary, announcements, now, handlers }: Pick<StudentHomeViewPro
   if (summary === undefined || announcements === undefined) return <TileSkeleton surface="hero" rows={3} label={copy.states.loading(copy.hero.region)} className="h-full" />
   // Pinned messages are secondary: if they fail, Home still shows room choice and the countdown.
   const pinned = announcements instanceof Error ? [] : announcements
-  if (summary instanceof Error && pinned.length === 0) return failed(copy.hero.region, 'summary', handlers, 'hero')
+  if (summary instanceof Error && pinned.length === 0) return failed(copy.hero.region, announcements instanceof Error ? heroSources : 'summary', handlers, 'hero')
   const cards: HeroCard[] = summary instanceof Error
     ? visibleAnnouncements(pinned, now).map(announcement => ({ kind: 'announcement', key: `pin:${announcement.id}`, announcement }))
     : heroCards(summary, pinned, now)
   if (cards.length === 0) return <DashboardTile surface="hero" tone="quiet" aria-label={copy.hero.region} className="justify-center"><p className="m-0 text-[14px] text-vs-muted">{copy.hero.empty}</p></DashboardTile>
+  // Each card has its own boundary, so one broken card leaves the others (and the controls) in place.
   const slides: HeroSlide[] = cards.map(card => ({
     key: card.key,
-    node: card.kind === 'room' ? <RoomChoiceCard room={card.room} now={now} />
-      : card.kind === 'announcement' ? <AnnouncementCard announcement={card.announcement} />
-      : summary instanceof Error ? null : <CountdownCard target={card.target} summary={summary} now={now} />,
+    node: card.kind === 'room' ? <Guard title={copy.room.title} source="summary" handlers={handlers} surface="hero"><RoomChoiceCard room={card.room} now={now} /></Guard>
+      : card.kind === 'announcement' ? <Guard title={card.announcement.authorRole === 'coach' ? copy.announcement.coach : copy.announcement.travelLead} source="announcements" handlers={handlers} surface="hero"><AnnouncementCard announcement={card.announcement} /></Guard>
+      : summary instanceof Error ? null : <Guard title={copy.countdown.label} source="summary" handlers={handlers} surface="hero"><CountdownCard target={card.target} summary={summary} now={now} /></Guard>,
   }))
   return <HeroStack slides={slides} labels={copy.hero} />
 }
 
-function Balance({ finance, handlers }: Pick<StudentHomeViewProps, 'finance' | 'handlers'>) {
+function Balance({ finance, summary, handlers }: Pick<StudentHomeViewProps, 'finance' | 'summary' | 'handlers'>) {
   if (finance === undefined) return <TileSkeleton surface="compact" rows={0} label={copy.states.loading(copy.balance.label)} />
   if (finance instanceof Error || finance.state === 'failed') return failed(copy.balance.label, 'finance', handlers, 'compact', copy.balance.failed)
-  return <Guard title={copy.balance.label} source="finance" handlers={handlers} surface="compact"><BalanceTile finance={finance} /></Guard>
+  // "Fundraise" needs the fundraiser link from the summary; without it the tile still shows what is due.
+  const fundraiserLinked = summary !== undefined && !(summary instanceof Error) && summary.fundraiserLinked
+  return <Guard title={copy.balance.label} source="finance" handlers={handlers} surface="compact"><BalanceTile finance={finance} fundraiserLinked={fundraiserLinked} /></Guard>
 }
 
 /**
@@ -83,18 +96,19 @@ export function StudentHomeView({ summary, attendance, announcements, finance, n
 
   return <div className="flex min-w-0 flex-col gap-2.5 font-sans text-vs-text lg:gap-4">
     <Greeting summary={summary} now={now} />
-    <div className="flex min-w-0 flex-col gap-2.5 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:gap-4">
+    {/* 2fr / 1fr as drawn at 1280px; the right column keeps at least 300px so its rows stay readable at 1024px. */}
+    <div className="flex min-w-0 flex-col gap-2.5 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)] lg:gap-4">
       <div className="flex min-w-0 flex-col [&>*]:flex-1">
-        <Guard title={copy.hero.region} source="summary" handlers={handlers} surface="hero"><Hero summary={summary} announcements={announcements} now={now} handlers={handlers} /></Guard>
+        <Guard title={copy.hero.region} source={heroSources} handlers={handlers} surface="hero"><Hero summary={summary} announcements={announcements} now={now} handlers={handlers} /></Guard>
       </div>
       <div className="flex min-w-0 flex-col gap-2.5 lg:gap-[14px]">
         {signups}
         {whatsLeft}
         {/* Balance due sits in the right column on desktop and last on phones; only one copy is ever displayed. */}
-        <div className="hidden lg:block"><Balance finance={finance} handlers={handlers} /></div>
+        <div className="hidden lg:block"><Balance finance={finance} summary={summary} handlers={handlers} /></div>
       </div>
       <div className="min-w-0 lg:col-span-2">{participation}</div>
-      <div className="lg:hidden"><Balance finance={finance} handlers={handlers} /></div>
+      <div className="lg:hidden"><Balance finance={finance} summary={summary} handlers={handlers} /></div>
     </div>
   </div>
 }

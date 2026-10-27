@@ -6,6 +6,8 @@
 .shell{--bar-height:64px;min-height:100vh;min-height:100dvh;background:var(--vs-page);color:var(--vs-text)}
 /* Inside the app frame the public footer follows the shell; on phones it stays in view on short pages. */
 :global(.app-frame)>.shell{min-height:0}
+/* The footer that follows clears the bottom bar itself (student-pages.css), so the page needs no bar-sized gap. */
+:global(.app-frame)>.shell .main{padding-bottom:24px}
 .shell a,.shell button,.sheet a,.sheet button{touch-action:manipulation}
 .sidebar :is(a,button):focus-visible,.header :is(a,button):focus-visible,.bar :is(a,button):focus-visible,.sheet :is(a,button):focus-visible{outline:3px solid var(--vs-gold);outline-offset:2px;box-shadow:0 0 0 2px var(--vs-purple-deep)}
 .brand,.brand:hover,.sideLink:hover,.barItem:hover,.sheetLink:hover,.headerAvatar:hover{text-decoration:none}
@@ -100,11 +102,26 @@
   .sidebar{display:block;border-right:1px solid var(--vs-sidebar-border);background:var(--vs-sidebar)}
   .header,.bar,.phoneError{display:none}
   .familyContext{padding:20px 28px 0}
-  .main{max-width:1296px;margin:0 auto;padding:24px 28px 48px}
+  .main,:global(.app-frame)>.shell .main{max-width:1296px;margin:0 auto;padding:24px 28px 48px}
+}
+
+/*
+ * Inside the app frame on desktop screens, the frame itself is the two-column grid: the sidebar runs the
+ * full page height and the public footer sits under the page in the content column (student-pages.css
+ * lines it up with the page). The shell's own box steps aside so its parts join the frame's grid.
+ */
+@media screen and (min-width:1024px){
+  :global(.app-frame):has(>.shell){display:grid;grid-template-columns:220px minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto auto}
+  :global(.app-frame)>.shell{display:contents}
+  :global(.app-frame)>.shell>.sidebar{grid-column:1;grid-row:1 / -1}
+  :global(.app-frame)>.shell>.column{grid-column:2;grid-row:1}
+  /* Anything else beside the shell (the "Switching role…" status) goes under the page, above the footer. */
+  :global(.app-frame)>.shell~*{grid-column:2}
+  :global(.app-frame)>.shell~footer{grid-row:3}
 }
 
 @media print{
   .sidebar,.header,.bar,.development,.phoneError{display:none!important}
   .shell{display:block;min-height:0;background:#fff;color:#111}
-  .main{max-width:none;padding:0}
+  .main,:global(.app-frame)>.shell .main{max-width:none;padding:0}
 }

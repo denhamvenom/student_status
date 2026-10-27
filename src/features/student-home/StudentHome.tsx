@@ -21,16 +21,30 @@ function toHomeFinance(result: Loadable<FamilyFinance>): Loadable<HomeFinance> {
   return result.state === 'ready' ? { state: 'ready', dueCents: result.dueCents, availableCents: result.travelBalanceCents } : { state: result.state }
 }
 
+const noSources: ReadonlySet<HomeTileSource> = new Set()
+
+/**
+ * Keeps showing the last summary while the next one loads (the summary is re-read for the new day
+ * after Chicago midnight), so the tiles do not flash back to skeletons. An error clears it, so
+ * "Try again" after a failure shows the loading state rather than older data.
+ */
+function useSteadySummary(current: Loadable<StudentHomeSummary>): Loadable<StudentHomeSummary> {
+  const [last, setLast] = useState<StudentHomeSummary | undefined>(undefined)
+  const next = current instanceof Error ? undefined : current ?? last
+  if (next !== last) setLast(next)
+  return current === undefined ? last : current
+}
+
 /**
  * Loads every Home source without throwing (useQueries reports errors as values), so one failed
- * query only breaks its own tile. "Try again" drops that one subscription for a tick and
- * subscribes again, which asks the server to run the query afresh.
+ * query only breaks its own tile. "Try again" drops the tile's subscriptions for a tick and
+ * subscribes again, which asks the server to run the queries afresh.
  */
 function useStudentHomeData(studentId: Id<'students'>, asOfDay: string) {
-  const [paused, setPaused] = useState<HomeTileSource | null>(null)
+  const [paused, setPaused] = useState(noSources)
   useEffect(() => {
-    if (!paused) return
-    const timer = window.setTimeout(() => setPaused(null), 0)
+    if (paused.size === 0) return
+    const timer = window.setTimeout(() => setPaused(noSources), 0)
     return () => window.clearTimeout(timer)
   }, [paused])
   const queries = useMemo(() => {
@@ -40,12 +54,14 @@ function useStudentHomeData(studentId: Id<'students'>, asOfDay: string) {
       announcements: { query: pinnedQuery, args: {} },
       finance: { query: api.dashboardReports.familyFinance, args: { studentId } },
     }
-    return Object.fromEntries(Object.entries(all).filter(([source]) => source !== paused))
+    return Object.fromEntries(Object.entries(all).filter(([source]) => !paused.has(source as HomeTileSource)))
   }, [studentId, asOfDay, paused])
   const results = useQueries(queries)
-  const retry = useCallback((source: HomeTileSource) => setPaused(source), [])
+  // A tile can retry several sources in one go (the hero reads the summary and the pinned messages).
+  const retry = useCallback((source: HomeTileSource) => setPaused(previous => previous.has(source) ? previous : new Set([...previous, source])), [])
+  const summary = useSteadySummary(results.summary as Loadable<StudentHomeSummary>)
   return {
-    summary: results.summary as Loadable<StudentHomeSummary>,
+    summary,
     attendance: results.attendance as Loadable<HomeAttendance>,
     announcements: results.announcements as Loadable<PinnedAnnouncement[]>,
     finance: toHomeFinance(results.finance as Loadable<FamilyFinance>),

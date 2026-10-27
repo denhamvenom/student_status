@@ -45,6 +45,23 @@ export function isRoomUrgent(room: RoomChoice, now: number) {
   return isRoomOpen(room, now) && isWithinSoon(room.roomDeadline, now)
 }
 
+export type RoomDeadlineView = {
+  urgent: boolean
+  /** Whole Chicago calendar days left; 0 on the deadline day. */
+  daysLeft: number
+  /** The pill: the deadline day, the weekday when urgent ("Fri"), or the date ("Feb 19"). */
+  closes: { kind: 'today' } | { kind: 'weekday'; at: number } | { kind: 'date'; at: number }
+}
+
+/** What the room choice card says about its deadline; null when there is no deadline. */
+export function roomDeadlineView(room: RoomChoice, now: number): RoomDeadlineView | null {
+  if (room.roomDeadline === null) return null
+  const urgent = isRoomUrgent(room, now)
+  const daysLeft = calendarDaysUntil(room.roomDeadline, now)
+  const closes = daysLeft === 0 ? { kind: 'today' as const } : { kind: urgent ? 'weekday' as const : 'date' as const, at: room.roomDeadline }
+  return { urgent, daysLeft, closes }
+}
+
 // Hero stack ----------------------------------------------------------------
 
 export type CountdownTarget =

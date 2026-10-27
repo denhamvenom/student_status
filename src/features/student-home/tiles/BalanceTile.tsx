@@ -14,8 +14,11 @@ export const FUNDRAISER_PATH = '/finances#fundraiser'
 
 const labelClass = cn(eyebrow, 'm-0! font-sans! text-[10px]! leading-[1.4]! font-semibold! tracking-[0.07em]!')
 
-/** Compact Balance due card. A parent reviews the payment; the Student can fundraise. */
-export function BalanceTile({ finance }: { finance: Exclude<HomeFinance, { state: 'failed' }> }) {
+/**
+ * Compact Balance due card. A parent reviews the payment; a Student with a fundraiser page also gets
+ * "Fundraise" (Money shows the fundraiser section only when the page is linked).
+ */
+export function BalanceTile({ finance, fundraiserLinked }: { finance: Exclude<HomeFinance, { state: 'failed' }>; fundraiserLinked: boolean }) {
   const titleId = useId()
   if (finance.state === 'updating') return <DashboardTile surface="compact" aria-labelledby={titleId}>
     <h2 id={titleId} className={labelClass}>{copy.label}</h2>
@@ -30,7 +33,7 @@ export function BalanceTile({ finance }: { finance: Exclude<HomeFinance, { state
         <p className={cn('mt-1 font-heading text-[28px] leading-none lg:text-[30px]', due ? 'text-vs-urgent' : 'text-vs-muted')}>{formatMoney(Math.max(0, finance.dueCents))}</p>
       </div>
       {due
-        ? <Link to={FUNDRAISER_PATH} className={cn(dashboardButtonVariants({ tone: 'urgent', size: 'sm' }), 'px-4')}>{copy.fundraise}</Link>
+        ? fundraiserLinked && <Link to={FUNDRAISER_PATH} className={cn(dashboardButtonVariants({ tone: 'urgent', size: 'sm' }), 'px-4')}>{copy.fundraise}</Link>
         : <StatusBadge tone="success" className="min-h-7 px-3 py-[5px] text-[12px] font-semibold lg:min-h-[27px] lg:px-3 lg:py-[5px] lg:text-[11px] lg:font-bold">{copy.allSet}</StatusBadge>}
     </div>
     {due && <p className="mt-2.5 text-[12px] leading-normal text-vs-text-2">{copy.parentReview}</p>}

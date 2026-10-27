@@ -3,7 +3,15 @@
  * (set by AppShell while a Student is signed in), so Parent and staff screens are unchanged.
  */
 
+/* The public footer (About, Privacy, Terms) uses the Student page gutters: 14px on phones. */
+:root[data-design="student"] .app-frame > footer { padding-left: 14px; padding-right: 14px; }
+
 /* The phone bottom bar grows by the home-indicator inset; keep the public footer links above it. */
 @media (max-width: 1023px) {
     :root[data-design="student"] .app-frame footer { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+}
+
+/* On desktop the footer sits in the content column (StudentShell.module.css), lined up with the page (28px gutters, 1296px wide). */
+@media (min-width: 1024px) {
+    :root[data-design="student"] .app-frame > footer { padding-left: max(28px, calc((100% - 1296px) / 2 + 28px)); padding-right: max(28px, calc((100% - 1296px) / 2 + 28px)); }
 }

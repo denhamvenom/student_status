@@ -41,7 +41,8 @@ export function StudentShell({ children, userName, familyContext, dark, onToggle
   const icon = (path: string) => { const Icon = icons[path] ?? UserRound; return <Icon aria-hidden="true" strokeWidth={path === active ? 2.2 : 2}/> }
 
   return <div ref={shellRef} className={styles.shell}>
-    <aside className={styles.sidebar}>
+    {/* A plain wrapper: the nav and the account section inside carry their own labels (an <aside> here would be an unlabeled complementary landmark around the main menu). */}
+    <div className={styles.sidebar}>
       <div className={styles.sidebarInner}>
         <div className={styles.sidebarBrand}><Link to="/" className={styles.brand}><img src={logo} alt="" className={styles.sidebarLogo}/><span className={styles.sidebarWords}>{copy.product}</span></Link></div>
         <nav className={styles.sidebarNav} aria-label={copy.main}>
@@ -55,7 +56,7 @@ export function StudentShell({ children, userName, familyContext, dark, onToggle
           {errors.map(error => <p key={error} role="alert" className={styles.sideError}>{error}</p>)}
         </section>
       </div>
-    </aside>
+    </div>
 
     <header ref={headerRef} className={styles.header}>
       <Link to="/" className={`${styles.brand} ${styles.headerBrand}`}><img src={logo} alt="" className={styles.headerLogo}/><span className={styles.headerWords}>{copy.product}</span></Link>

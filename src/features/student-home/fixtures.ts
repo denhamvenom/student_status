@@ -57,7 +57,7 @@ const readyAttendance = (attended: number, held: number, outreach: [number, numb
 })
 
 const summaryBase = (overrides: Partial<StudentHomeSummary>): StudentHomeSummary => ({
-  studentId, greetingName: 'Dev', displayName: 'Dev Student', initials: 'DS', season: season2027, parentLinked: true,
+  studentId, greetingName: 'Dev', displayName: 'Dev Student', initials: 'DS', season: season2027, parentLinked: true, fundraiserLinked: false,
   whatsLeft: [], openSignups: [], roomChoices: [], competitions, ...overrides,
 })
 
@@ -66,11 +66,14 @@ const busySignups = [
   signup('glacier', 'Glacier Peak Classic', 'Competition', '2026-11-14T08:00', '2026-11-02T09:00', 8500),
   signup('oregon', 'Oregon State Scrimmage', 'Competition', '2026-12-05T08:00', '2026-11-13T23:59', 4000, 'approval'),
   signup('stem-night', 'Community STEM Night', 'Outreach', '2026-11-19T17:30', '2026-11-18T12:00', 0),
+  // A Coach made this event assigned after Home loaded: the sheet explains there is no signup.
+  signup('showcase', 'Library Robot Showcase', 'Outreach', '2026-12-03T16:00', '2026-11-20T23:59', 0),
 ]
 const busyWeek: StudentHomeFixture = {
   label: 'Busy week',
   now: at('2026-10-26T12:00'),
   summary: summaryBase({
+    fundraiserLinked: true,
     roomChoices: [{
       eventId: eventId('pri'), eventName: 'Pacific Robotics Invitational', startsAt: at('2026-11-21T08:00'), endsAt: at('2026-11-23T17:00'),
       roomDeadline: at('2026-10-30T23:59'), status: 'notChosen', groupName: null, memberNames: [],
@@ -97,6 +100,7 @@ const busyWeek: StudentHomeFixture = {
     [eventId('glacier')]: availabilityFor(busySignups[0], 24, 6, 'signedUp'),
     [eventId('oregon')]: availabilityFor(busySignups[1], 30, 0, 'waitlisted'),
     [eventId('stem-night')]: availabilityFor(busySignups[2], null, null, 'signedUp'),
+    [eventId('showcase')]: { ...availabilityFor(busySignups[3], null, null, 'closed'), signupMode: 'assigned' },
   },
   failingSignups: [eventId('stem-night')],
 }
@@ -119,7 +123,7 @@ const allDone: StudentHomeFixture = {
   availability: { [eventId('demo-day')]: availabilityFor(demoDay, 40, 22, 'waitingForApproval') },
 }
 
-// New student: no parent linked yet, nothing signed up.
+// New student: no parent linked yet (so nothing waits on a parent), no fundraiser page, nothing signed up.
 const newSignups = [
   signup('glacier', 'Glacier Peak Classic', 'Competition', '2026-11-14T08:00', '2026-11-02T09:00', 8500),
   signup('demo-day', 'Spring Demo Day', 'Outreach', '2026-12-12T10:00', '2026-11-16T23:59', 0),
@@ -130,10 +134,7 @@ const newStudent: StudentHomeFixture = {
   summary: summaryBase({
     greetingName: 'Riley', displayName: 'Riley Student', initials: 'RS', parentLinked: false,
     openSignups: newSignups,
-    whatsLeft: [
-      item('invite', 'inviteParent', 'student', { href: '/parents' }),
-      item('health', 'healthProfile', 'parent'),
-    ],
+    whatsLeft: [item('invite', 'inviteParent', 'student', { href: '/parents' })],
   }),
   attendance: readyAttendance(1, 2, [0, 0], { state: 'beforeKickoff', minutes: 0, targetHours: null }),
   announcements: [],
@@ -157,7 +158,10 @@ const beforeKickoff: StudentHomeFixture = {
   availability: {},
 }
 
-// Build season: counting down to the next Competition; build hours are adding up.
+// Build season: counting down to the next Competition; build hours are adding up. A fee is due but
+// the Student has no fundraiser page, so Balance due has no Fundraise button. The open signup has no
+// availability entry, so its sheet shows the load error.
+const openHouse = signup('open-house', 'Robotics Open House', 'Outreach', '2027-02-20T10:00', '2027-02-13T23:59', 0)
 const buildSeason: StudentHomeFixture = {
   label: 'Build season',
   now: at('2027-02-01T16:00'),
@@ -166,16 +170,18 @@ const buildSeason: StudentHomeFixture = {
       eventId: eventId('lonestar'), eventName: 'Lone Star Central Regional', startsAt: at('2027-03-04T08:00'), endsAt: at('2027-03-06T18:00'),
       roomDeadline: at('2027-02-19T23:59'), status: 'inGroup', groupName: 'Room 4', memberNames: ['Jordan W.', 'Sam K.'], invitations: [],
     }],
+    openSignups: [openHouse],
     whatsLeft: [
       item('inspection', 'requirement', 'student', { eventId: eventId('lonestar'), eventName: 'Lone Star Central Regional', label: 'Robot safety quiz', dueAt: at('2027-02-05T23:59'), href: `/events/${eventId('lonestar')}` }),
       item('permission', 'permissionReview', 'coach', { eventId: eventId('lonestar'), eventName: 'Lone Star Central Regional' }),
+      item('payment', 'requiredPayment', 'parent', { eventId: eventId('lonestar'), eventName: 'Lone Star Central Regional' }),
     ],
   }),
   attendance: { ...readyAttendance(41, 48, [5, 7], { state: 'ready', minutes: 46 * 60 + 30, targetHours: 120 }), kickoffAt: season2027.kickoffAt },
   announcements: [
     { id: pinId('shop'), title: null, body: 'The shop is open until 9 PM every weeknight during build season. Sign the clock in and out each time.', authorName: 'Coach Rivera', authorRole: 'coach', pinnedAt: at('2027-01-12T08:00'), showUntil: null },
   ],
-  finance: { state: 'ready', dueCents: 0, availableCents: 2500 },
+  finance: { state: 'ready', dueCents: 12000, availableCents: 2500 },
   availability: {},
 }
 
