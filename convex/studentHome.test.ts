@@ -332,6 +332,9 @@ describe("Student Home summary", () => {
         if (overnight) {
           const groupId = await ctx.db.insert("roomGroups", { eventId, category: "Girls", name: `Room ${index}`, finalized: false, adultFifthException: false, needsReview: false, createdBy: f.ids.coach });
           for (const member of [f.ids.riley, ...others]) await ctx.db.insert("roomMemberships", { eventId, groupId, studentId: member, joinedAt: 1 });
+          // A pending invitation from another group on every overnight event, so Home reads each inviting group; the first group is final and stays off Home.
+          const invitingGroup = await ctx.db.insert("roomGroups", { eventId, category: "Girls", name: `Other room ${index}`, finalized: index === 0, adultFifthException: false, needsReview: false, createdBy: f.ids.coach });
+          await ctx.db.insert("roomInvites", { eventId, groupId: invitingGroup, studentId: f.ids.riley, invitedBy: others[index % others.length], status: "pending", createdAt: 1 });
         }
       }
     });
@@ -341,7 +344,8 @@ describe("Student Home summary", () => {
       return { result, documentsRead: metrics.documentsRead.used, databaseQueries: metrics.databaseQueries.used };
     });
     expect(sample.result.roomChoices).toHaveLength(3);
-    // Measured at 102 documents and 68 queries.
+    expect(sample.result.roomChoices.map(room => room.invitations.length)).toEqual([0, 1, 1]);
+    // Measured at 108 documents and 71 queries, including one inviting-group read per pending invitation.
     expect(sample.documentsRead).toBeLessThanOrEqual(160);
     expect(sample.databaseQueries).toBeLessThanOrEqual(100);
   });
