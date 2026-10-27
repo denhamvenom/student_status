@@ -19,5 +19,7 @@
 .choices { display: flex; flex-wrap: wrap; gap: .35rem; }
 .choices button { flex: 1 1 auto; }
 .actions { position: sticky; bottom: 0; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .6rem; padding: .8rem 0; background: var(--surface-page); border-top: 1px solid var(--border-default); }
+.targetRow { display: flex; flex-wrap: wrap; align-items: end; gap: .6rem; }
+.targetRow .field { flex: 0 1 14rem; }
 .error { color: var(--text-body); background: var(--gold-100); border: 1px solid var(--gold-600); border-radius: .35rem; padding: .65rem; }
 @media (max-width: 42rem) { .page { padding-bottom: 8rem; } .section { padding: 1rem; } .fields { grid-template-columns: 1fr; } .actions { bottom: 64px; } }
