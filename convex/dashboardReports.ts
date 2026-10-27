@@ -1,17 +1,18 @@
 import { publicErrorMessage } from './lib/publicErrors';
 import { publicErrorResult } from './lib/publicErrors';
 import { feeMaintenanceProjection, feeMaintenanceValidator } from "./lib/seasonFinance";
-import { ConvexError, v } from "convex/values";
+import { ConvexError, v, type Infer } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
-import { activeSeason, requireRole, studentAccess, viewer } from "./lib/access";
+import { activeSeason, requireRole, studentAccess, viewer, type AppUser } from "./lib/access";
 import { calculateStudentFinance, FINANCE_SUMMARY_VERSION } from "./lib/financeSummaries";
 import { financialAccount } from "./lib/financialSources";
 import { attendanceEvidence, outreachForSession, buildDayFromTitle } from "./lib/attendanceReports";
-import { attendanceNamespace, studentAttendanceNamespace, reportAggregate } from "./lib/reportAggregates";
+import { attendanceNamespace, studentAttendanceNamespace, studentBuildMinutesNamespace, reportAggregate } from "./lib/reportAggregates";
 import { kickoffBoundaryForCompetitionYear } from "./lib/seasonCalendar";
+import { teamReportAttendanceGate } from "./lib/teamReportAttendance";
 export { correctedIntervals } from "./lib/attendanceReports";
 
 const nullableNumber = v.union(v.number(), v.null());
@@ -116,6 +117,63 @@ export const familyAttendance=query({
     const updatedAt=Math.max(backfill.updatedAt,latest?.updatedAt??0);
     const phases=kickoff.state==="verified"?{offseason:await phaseCounts(ctx,student.seasonId,student._id,kickoff.kickoffAt,"offseason",updatedAt),buildSeason:await phaseCounts(ctx,student.seasonId,student._id,kickoff.kickoffAt,"buildSeason",updatedAt)}:null;
     return publicErrorResult({...shared,phases,state:"ready" as const,verified:{sessionsHeld,sessionsAttended,tuesdayHeld,tuesdayAttended,tuesdayPercent:tuesdayHeld?Math.round(100*tuesdayAttended/tuesdayHeld):null,thursdayAttended,outreachAttended,updatedAt:Math.max(backfill.updatedAt,latest?.updatedAt??0)}});
+  },
+});
+
+const attendedOfHeld = v.object({ attended: v.number(), held: v.number() });
+/** Matches HomeAttendance in src/features/student-home/contract.ts. The query never returns "beforeKickoff": it cannot read the clock, so the browser compares kickoffAt with now. */
+const homeAttendanceValidator = v.object({
+  state: v.union(v.literal("ready"), v.literal("updating"), v.literal("unavailable")),
+  meetings: attendedOfHeld,
+  outreach: attendedOfHeld,
+  buildHours: v.object({ state: v.union(v.literal("beforeKickoff"), v.literal("kickoffUnknown"), v.literal("ready")), minutes: v.number(), targetHours: nullableNumber }),
+  kickoffAt: nullableNumber,
+});
+
+/** Family access is checked before season status, so another family's student is refused rather than reported as unavailable. */
+async function homeAttendanceStudent(ctx: QueryCtx, user: AppUser, studentId: Id<"students">) {
+  const student = await ctx.db.get(studentId);
+  if (!student) throw new ConvexError("This student was not found. Reload to see the current roster.");
+  const link = user.role === "parent" ? await ctx.db.query("familyLinks").withIndex("by_parentUserId_and_studentId", q => q.eq("parentUserId", user._id).eq("studentId", studentId)).unique() : null;
+  const owns = user.role === "coach" || (user.role === "student" && student.userId === user._id) || link?.active === true;
+  if (!owns) throw new ConvexError("You don't have permission for this student's record. Ask a Coach if this is wrong.");
+  const season = await ctx.db.query("seasons").withIndex("by_status", q => q.eq("status", "active")).unique();
+  if (!season || !student.active || student.seasonId !== season._id) return null;
+  await studentAccess(ctx, user, studentId);
+  return { student, season };
+}
+
+/** Participation rings for Student Home. Counts appear only when the season's attendance reports are ready. */
+export const homeAttendance = query({
+  args: { studentId: v.id("students") }, returns: homeAttendanceValidator,
+  handler: async (ctx, args): Promise<Infer<typeof homeAttendanceValidator>> => {
+    const user = await viewer(ctx);
+    requireRole(user, "student", "parent", "coach");
+    const found = await homeAttendanceStudent(ctx, user, args.studentId);
+    const none = { meetings: { attended: 0, held: 0 }, outreach: { attended: 0, held: 0 } };
+    if (!found) return { state: "unavailable" as const, ...none, buildHours: { state: "kickoffUnknown" as const, minutes: 0, targetHours: null }, kickoffAt: null };
+    const { student, season } = found;
+    const gate = await teamReportAttendanceGate(ctx, season._id, season.year);
+    const kickoffAt = gate.kickoff?.at ?? null;
+    const targetHours = season.buildHoursTarget ?? null;
+    const buildState = kickoffAt === null ? "kickoffUnknown" as const : "ready" as const;
+    // A pending or failed session withholds every count, as the family and team reports do.
+    if (gate.state === "updating" || gate.state === "failed") return { state: "updating" as const, ...none, buildHours: { state: buildState, minutes: 0, targetHours }, kickoffAt };
+    const [held, heldOutreach, attended, attendedOutreach, buildMinutes] = await Promise.all([
+      reportAggregate.count(ctx, { namespace: attendanceNamespace(season._id, "held") }),
+      reportAggregate.count(ctx, { namespace: attendanceNamespace(season._id, "held", "Outreach") }),
+      reportAggregate.count(ctx, { namespace: studentAttendanceNamespace(season._id, student._id) }),
+      reportAggregate.count(ctx, { namespace: studentAttendanceNamespace(season._id, student._id, "Outreach") }),
+      kickoffAt === null ? 0 : reportAggregate.sum(ctx, { namespace: studentBuildMinutesNamespace(season._id, student._id), bounds: { lower: { key: kickoffAt, inclusive: true } } }),
+    ]);
+    // "all" includes Outreach sessions, so Meetings subtracts them.
+    return {
+      state: "ready" as const,
+      meetings: { attended: Math.max(0, attended - attendedOutreach), held: Math.max(0, held - heldOutreach) },
+      outreach: { attended: attendedOutreach, held: heldOutreach },
+      buildHours: { state: buildState, minutes: buildMinutes, targetHours },
+      kickoffAt,
+    };
   },
 });
 

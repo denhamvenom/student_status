@@ -42,4 +42,8 @@ export const seasonAdminCopy = {
   pendingReview: 'Later archive, balance, carryover and confirmation steps require a separate review before the season can close.',
   changeConflict: 'This draft or student changed. Refresh the review before saving again.',
   retry: 'Try again',
+  buildHoursTarget: 'Build hours target',
+  buildHoursHelp: 'Hours each Student aims to log at Build meetings from kickoff. Shown on Student Home.',
+  buildHoursCurrent: (hours: number | null) => hours === null ? 'No target set.' : `Current target: ${hours} ${hours === 1 ? 'hour' : 'hours'}.`,
+  save: 'Save',
 } as const;

@@ -68,13 +68,28 @@ async function draft(ctx: Ctx, planId: Doc<"seasonTransitionPlans">["_id"], expe
 }
 
 export const overview = query({
-  args: {}, returns: v.object({ source: v.object({ id: v.id("seasons"), name: v.string(), year: v.number() }), plan: v.union(planSummary, v.null()), kickoff: v.union(kickoff, v.null()) }),
+  args: {}, returns: v.object({ source: v.object({ id: v.id("seasons"), name: v.string(), year: v.number(), buildHoursTarget: v.union(v.number(), v.null()) }), plan: v.union(planSummary, v.null()), kickoff: v.union(kickoff, v.null()) }),
   handler: async ctx => {
     requireRole(await viewer(ctx), "coach");
     const source = await activeSeason(ctx);
     const plan = await openPlan(ctx, source._id);
-    return { source: { id: source._id, name: source.name, year: source.year }, plan: plan ? summary(plan) : null,
+    return { source: { id: source._id, name: source.name, year: source.year, buildHoursTarget: source.buildHoursTarget ?? null }, plan: plan ? summary(plan) : null,
       kickoff: plan ? kickoffForCompetitionYear(plan.targetCompetitionYear) : null };
+  },
+});
+
+/** The active season's Build hours goal shown on Student Home; null clears it. */
+export const setBuildHoursTarget = mutation({
+  args: { hours: v.union(v.number(), v.null()) }, returns: v.union(v.number(), v.null()),
+  handler: async (ctx, args) => {
+    const actor = await viewer(ctx); requireRole(actor, "coach");
+    if (args.hours !== null && (!Number.isSafeInteger(args.hours) || args.hours < 1 || args.hours > 2000)) throw new ConvexError("Enter whole hours from 1 to 2000, or leave the box empty to clear the target.");
+    const season = await activeSeason(ctx);
+    const before = season.buildHoursTarget ?? null;
+    if (before === args.hours) return before;
+    await ctx.db.patch("seasons", season._id, { buildHoursTarget: args.hours ?? undefined });
+    await audit(ctx, actor, "seasons", season._id, "setBuildHoursTarget", { buildHoursTarget: before }, { buildHoursTarget: args.hours });
+    return args.hours;
   },
 });
 
