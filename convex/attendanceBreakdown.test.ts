@@ -36,7 +36,7 @@ async function fixture() {
   return { t, ids, coach: as(ids.coach), parent: as(ids.parent), stranger: as(ids.stranger), student: as(ids.student), other: as(ids.other) };
 }
 type Fixture = Awaited<ReturnType<typeof fixture>>;
-type Spec = { title: string; at: number; attended?: boolean; outreachOverride?: boolean; requiredOverride?: boolean };
+type Spec = { title: string; at: number; attended?: boolean; visitMs?: number; outreachOverride?: boolean; requiredOverride?: boolean };
 
 async function settle(f: Fixture, sessionId: Id<"timeclockSessions">) {
   for (let step = 0; step < 100; step++) {
@@ -53,7 +53,7 @@ async function meeting(f: Fixture, spec: Spec) {
     const occurrenceId = await ctx.db.insert("timeclockOccurrences", { seasonId: f.ids.season, source: "manual", sourceKey: `bd-${spec.at}-${spec.title}`, title: spec.title, allDay: false, cancelled: false, observedAt: spec.at, revision: 1, needsReview: false });
     const end = spec.at + 2 * hour;
     const id = await ctx.db.insert("timeclockSessions", { seasonId: f.ids.season, occurrenceId, state: "closed", scheduledStart: spec.at, scheduledEnd: end, effectiveEnd: end, extensionMs: 0, revision: 1, openedAt: spec.at, openedBy: f.ids.coach.id, closedAt: end, needsReview: false, ...(spec.outreachOverride !== undefined ? { outreachOverride: spec.outreachOverride } : {}), ...(spec.requiredOverride !== undefined ? { requiredOverride: spec.requiredOverride } : {}) });
-    if (spec.attended) await ctx.db.insert("timeclockIntervals", { sessionId: id, studentId: f.ids.sid, inAt: spec.at, outAt: end, openedBy: f.ids.coach.id, openCommandKey: `bd-${spec.at}`, scheduleRevision: 1 });
+    if (spec.attended) await ctx.db.insert("timeclockIntervals", { sessionId: id, studentId: f.ids.sid, inAt: spec.at, outAt: spec.at + (spec.visitMs ?? 2 * hour), openedBy: f.ids.coach.id, openCommandKey: `bd-${spec.at}`, scheduleRevision: 1 });
     await invalidateAttendanceSession(ctx, id);
     return id;
   });
@@ -133,6 +133,34 @@ describe("attendance breakdown", () => {
     await season(f);
     await expect(as(f).query(api.dashboardReports.attendanceBreakdown, { studentId: f.ids.sid })).rejects.toThrow(/permission/);
     await expect(as(f).query(api.dashboardReports.attendanceSessions, { studentId: f.ids.sid, kind: "required", paginationOpts: paging })).rejects.toThrow(/permission/);
+  });
+
+  it("lists every Build day from kickoff, including never-clocked ones, and the minutes add up to Build hours", async () => {
+    const f = await fixture();
+    await meeting(f, { title: "Build meeting", at: at("2026-12-15"), attended: true }); // before kickoff: not listed or counted
+    await meeting(f, { title: "Build Monday", at: mondayAfterKickoff, attended: true });
+    await meeting(f, { title: "Saturday build", at: at("2027-01-16") });
+    await meeting(f, { title: "Sunday build", at: at("2027-01-17"), attended: true, visitMs: 30_000 });
+    await meeting(f, { title: "Build Wednesday", at: at("2027-01-13"), attended: true, visitMs: 90 * 60_000 });
+    await meeting(f, { title: "Thursday work", at: thursday, attended: true }); // not a Build day
+    const list = await f.parent.query(api.dashboardReports.attendanceSessions, { studentId: f.ids.sid, kind: "build", paginationOpts: paging });
+    expect(list.page.map(row => [row.title, row.status, row.minutes])).toEqual([["Sunday build", "attended", 0], ["Saturday build", "missed", undefined], ["Build Wednesday", "attended", 90], ["Build Monday", "attended", 120]]);
+    const home = await f.student.query(api.dashboardReports.homeAttendance, { studentId: f.ids.sid });
+    const breakdown = await f.student.query(api.dashboardReports.attendanceBreakdown, { studentId: f.ids.sid });
+    expect(list.page.reduce((sum, row) => sum + (row.minutes ?? 0), 0)).toBe(210);
+    expect(home.buildHours.minutes).toBe(210);
+    expect(breakdown.buildHours.minutes).toBe(210);
+  });
+
+  it("reports updating when a session has no Build flag yet", async () => {
+    const f = await fixture();
+    await meeting(f, { title: "Build Monday", at: mondayAfterKickoff, attended: true });
+    await f.t.run(async ctx => {
+      const row = await ctx.db.query("timeclockSessionReportStates").withIndex("by_seasonId_and_build", q => q.eq("seasonId", f.ids.season).eq("build", true)).first();
+      await ctx.db.patch(row!._id, { build: undefined });
+    });
+    expect(await f.student.query(api.dashboardReports.attendanceBreakdown, { studentId: f.ids.sid })).toMatchObject({ state: "updating" });
+    expect((await f.student.query(api.dashboardReports.attendanceSessions, { studentId: f.ids.sid, kind: "build", paginationOpts: paging })).page).toEqual([]);
   });
 
   it("reports updating and lists nothing while a session is not yet classified as Required", async () => {

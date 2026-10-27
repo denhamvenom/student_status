@@ -87,10 +87,14 @@ describe("Outreach flag on events", () => {
   });
 
   it.each([
-    { name: "a Travel Lead cannot create an Outreach-marked event", run: (f: Fixture) => f.lead.mutation(api.admin.createEvent, eventArgs("Lead day", true)) },
-    { name: "a Mentor cannot change the flag", run: async (f: Fixture) => { const { eventId } = await linked(f, {}); return f.mentor.mutation(api.eventOperations.updateSettings, { eventId, isOutreach: true }); } },
-  ])("$name", async ({ run }) => {
+    { name: "a Travel Lead can create an Outreach-marked event", run: (f: Fixture) => f.lead.mutation(api.admin.createEvent, eventArgs("Lead day", true)), allowed: true },
+    { name: "a Travel Lead can mark an event Outreach", run: async (f: Fixture) => { const { eventId } = await linked(f, {}); return f.lead.mutation(api.eventOperations.updateSettings, { eventId, isOutreach: true }); }, allowed: true },
+    { name: "a Travel Lead still cannot edit other event settings", run: async (f: Fixture) => { const { eventId } = await linked(f, {}); return f.lead.mutation(api.eventOperations.updateSettings, { eventId, isOutreach: true, capacity: 5 }); }, allowed: false, message: /Only a Coach can edit/ },
+    { name: "a Mentor cannot create an Outreach-marked event", run: (f: Fixture) => f.mentor.mutation(api.admin.createEvent, eventArgs("Mentor day", true)), allowed: false, message: /Only a Coach or Travel Lead/ },
+    { name: "a Mentor cannot change the flag", run: async (f: Fixture) => { const { eventId } = await linked(f, {}); return f.mentor.mutation(api.eventOperations.updateSettings, { eventId, isOutreach: true }); }, allowed: false, message: /Only a Coach or Travel Lead/ },
+  ])("$name", async ({ run, allowed, message }) => {
     const f = await fixture();
-    await expect(run(f)).rejects.toThrow(/Only a Coach/);
+    if (allowed) await expect(run(f)).resolves.not.toThrow();
+    else await expect(run(f)).rejects.toThrow(message);
   });
 });

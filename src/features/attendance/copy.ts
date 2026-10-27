@@ -49,6 +49,8 @@ export const attendanceCopy = {
   statusAttended: 'Attended',
   statusMissed: 'Missed',
   minutes: (minutes: number) => `${minutes} ${plural(minutes, 'minute', 'minutes')}`,
+  hoursMinutes: (hours: number, minutes: number) => `${hours} ${plural(hours, 'hour', 'hours')} ${minutes} ${plural(minutes, 'minute', 'minutes')}`,
+  fromDays: (days: number) => `from ${days} ${plural(days, 'day', 'days')}`,
   loading: 'Loading…',
   empty: 'Nothing to show yet. Meetings show here after they end.',
   showMore: 'Show more sessions',

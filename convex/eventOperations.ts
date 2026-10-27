@@ -84,7 +84,9 @@ export const updateSettings = mutation({
   handler: async (ctx, args) => {
     await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const user = await viewer(ctx);
-    if (user.role !== "coach") throw new ConvexError("Only a Coach can edit event settings.");
+    // A Travel Lead may only mark or unmark Outreach; every other setting stays with Coaches.
+    const outreachOnly = Object.keys(args).every(key => key === "eventId" || key === "isOutreach");
+    if (user.role !== "coach" && !(outreachOnly && user.role === "mentor" && user.travelLead)) throw new ConvexError(outreachOnly ? "Only a Coach or Travel Lead can mark an event as Outreach." : "Only a Coach can edit event settings.");
     const event = await currentEvent(ctx, args.eventId);
     requireEnrollmentComplete(event);
     const patch: Partial<Doc<"events">> = {};

@@ -56,6 +56,7 @@ export function EventOperations({ eventId, coach=false }: { eventId: Id<"events"
   const confirmed = participants.filter(p => p.status === "confirmed");
   const submitSettings = (e: FormEvent) => {
     e.preventDefault();
+    if (!canEdit) { if (outreach !== null) void act(() => settings({ eventId, isOutreach: outreach }), operationsCopy.event.eventSettingsSaved); return; }
     const parsed = capacityValue.trim() ? Number(capacityValue) : null;
     const signup = signupValue ? Date.parse(signupValue) : null;
     const room = roomValue ? Date.parse(roomValue) : null;
@@ -79,9 +80,9 @@ export function EventOperations({ eventId, coach=false }: { eventId: Id<"events"
       {event.assignmentScope==="wholeTeam"&&<WholeTeamLeaveNotices eventId={eventId} coach={coach}/>}
     </CardContent></Card></div></details>
     <EventCalendarOperations eventId={eventId} coach={canEdit} event={event}/>
-    {canEdit && <details className={styles.disclosure}><summary><strong>{operationsCopy.event.eventSettings}</strong><span>{operationsText.event.signupCloses(when(event.signupClosesAt))}</span></summary><div className={styles.disclosureBody}><Card><CardHeader><CardTitle>{operationsCopy.event.eventSettings}</CardTitle></CardHeader><CardContent><form className="form-grid" onSubmit={submitSettings}>
-      {event.signupMode !== "assigned" && <><label>{operationsCopy.event.capacityNoLimit} <Input type="number" min="1" max="500" value={capacityValue} onChange={e => setCapacity(e.target.value)} /></label><label>{operationsCopy.event.signupClosesLocal} <Input type="datetime-local" value={signupValue} onChange={e => setSignupDeadline(e.target.value)} /></label></>}
-      {event.overnight && event.roomingEnabled && <label>{operationsCopy.event.roomDeadlineLocal} <Input type="datetime-local" value={roomValue} onChange={e => setRoomDeadline(e.target.value)} /></label>}
+    {<details className={styles.disclosure}><summary><strong>{operationsCopy.event.eventSettings}</strong><span>{operationsText.event.signupCloses(when(event.signupClosesAt))}</span></summary><div className={styles.disclosureBody}><Card><CardHeader><CardTitle>{operationsCopy.event.eventSettings}</CardTitle></CardHeader><CardContent><form className="form-grid" onSubmit={submitSettings}>
+      {canEdit && event.signupMode !== "assigned" && <><label>{operationsCopy.event.capacityNoLimit} <Input type="number" min="1" max="500" value={capacityValue} onChange={e => setCapacity(e.target.value)} /></label><label>{operationsCopy.event.signupClosesLocal} <Input type="datetime-local" value={signupValue} onChange={e => setSignupDeadline(e.target.value)} /></label></>}
+      {canEdit && event.overnight && event.roomingEnabled && <label>{operationsCopy.event.roomDeadlineLocal} <Input type="datetime-local" value={roomValue} onChange={e => setRoomDeadline(e.target.value)} /></label>}
       <label className="flex min-h-11 items-center gap-2"><Checkbox checked={outreachValue} onCheckedChange={checked => setOutreach(checked)} />{operationsCopy.event.outreachEvent}</label>
       <p className="text-sm text-muted-foreground">{operationsCopy.event.outreachEventHint}</p>
       <Button type="submit" disabled={busy}>{operationsCopy.event.saveSettings}</Button></form></CardContent></Card></div></details>}

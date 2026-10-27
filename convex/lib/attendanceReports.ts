@@ -58,7 +58,8 @@ export async function invalidateAttendanceSession(ctx: MutationCtx, sessionId: I
   const reportGeneration=(previous?.reportGeneration??0)+1;
   const occurrence=await ctx.db.get(session.occurrenceId);if(!occurrence)throw new Error("Attendance source event is unavailable.");
   const outreach=outreachForSession(session,occurrence.title);
-  const fields={required:await requiredForSession(ctx,session,outreach),buildDay:buildDayFromTitle(occurrence.title,session.scheduledStart),outreach,occurrenceTitle:occurrence.title,sessionId,seasonId:session.seasonId,scheduledStart:session.scheduledStart,weekday:attendanceWeekday(session.scheduledStart),sessionState:session.state,needsReview:session.needsReview,sessionRevision:session.revision,reportGeneration,state:session.state === "open" ? "ready" as const : "rebuilding" as const,phase:"originals" as const,cursor:null,processed:0,updatedAt:Date.now(),lastError:undefined};
+  const buildDay=buildDayFromTitle(occurrence.title,session.scheduledStart);
+  const fields={build:buildDay!==null,required:await requiredForSession(ctx,session,outreach),buildDay,outreach,occurrenceTitle:occurrence.title,sessionId,seasonId:session.seasonId,scheduledStart:session.scheduledStart,weekday:attendanceWeekday(session.scheduledStart),sessionState:session.state,needsReview:session.needsReview,sessionRevision:session.revision,reportGeneration,state:session.state === "open" ? "ready" as const : "rebuilding" as const,phase:"originals" as const,cursor:null,processed:0,updatedAt:Date.now(),lastError:undefined};
   const id=previous?previous._id:await ctx.db.insert("timeclockSessionReportStates",fields);
   if(previous) await ctx.db.patch(id,fields);
   const next=await ctx.db.get(id);if(!next) throw new Error("Attendance report state unavailable.");

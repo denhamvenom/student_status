@@ -106,7 +106,6 @@ export const createEvent = mutation({
     const user = await viewer(ctx);
     if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Only a Coach or Travel Lead can create events.");
     const season = await activeSeason(ctx);
-    if (args.isOutreach !== undefined && user.role !== "coach") throw new ConvexError("Only a Coach can mark an event as Outreach.");
     if (!args.name.trim() || args.endsAt < args.startsAt || !Number.isSafeInteger(args.feeCents) || args.feeCents < 0 || args.capacity !== undefined && (!Number.isSafeInteger(args.capacity) || args.capacity < 1)) throw new ConvexError("Check the event: it needs a name, an end after the start, a fee of $0 or more, and a capacity of at least 1 if set.");
     if (args.signupMode !== "assigned" && (args.assignmentScope || args.assignedStudentIds?.length)) throw new ConvexError("Students can be chosen in advance only for assigned events. Change the signup type or clear the chosen students.");
     if ((args.assignmentScope === "travelTeam" || args.assignmentScope === "wholeTeam") && user.role !== "coach") throw new ConvexError("Only a Coach can assign the Travel Team or Whole Team automatically.");

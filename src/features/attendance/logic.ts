@@ -40,3 +40,10 @@ export function sessionRowView(row: SessionRow, kind: Kind) {
     minutes: kind === 'build' && attended && row.minutes !== undefined && row.minutes > 0 ? attendanceCopy.minutes(row.minutes) : null,
   }
 }
+
+/** "2 hours 5 minutes from 3 days"; the day count is left off until every Build day has loaded. */
+export function buildTotalLine(totalMinutes: number, days: number | null) {
+  const whole = Math.max(0, Math.floor(totalMinutes))
+  const total = attendanceCopy.hoursMinutes(Math.floor(whole / 60), whole % 60)
+  return days === null ? total : `${total} ${attendanceCopy.fromDays(days)}`
+}

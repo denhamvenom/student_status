@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { breakdownView, sessionRowView, type Breakdown, type SessionRow } from './logic'
+import { breakdownView, buildTotalLine, sessionRowView, type Breakdown, type SessionRow } from './logic'
 
 const KICKOFF = Date.parse('2027-01-09T12:00:00Z')
 const base: Breakdown = { state: 'ready', kickoffAt: KICKOFF, required: { attended: 3, held: 4 }, other: { attended: 1, held: 2 }, outreach: { attended: 0, held: 0 }, buildHours: { minutes: 90, targetHours: 30 } }
@@ -37,5 +37,16 @@ describe('sessionRowView', () => {
     const view = sessionRowView(input, kind)
     expect([view.title, view.status, view.minutes]).toEqual([title, status, minutes])
     expect(view.date).toBe('Tue, Oct 20')
+  })
+})
+
+describe('buildTotalLine', () => {
+  it.each([
+    [125, 3, '2 hours 5 minutes from 3 days'],
+    [61, 1, '1 hour 1 minute from 1 day'],
+    [0, 0, '0 hours 0 minutes from 0 days'],
+    [90, null, '1 hour 30 minutes'],
+  ])('%s minutes, %s days', (minutes, days, line) => {
+    expect(buildTotalLine(minutes, days)).toBe(line)
   })
 })

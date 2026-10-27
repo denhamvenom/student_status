@@ -9,15 +9,17 @@ import { dashboardButtonVariants, inset } from '@/components/dashboard/styles'
 import { formatHours } from '../student-home/format'
 import { useNow } from '../student-home/useNow'
 import { attendanceCopy as copy, type Kind } from './copy'
-import { breakdownView, sessionRowView } from './logic'
+import { breakdownView, buildTotalLine, sessionRowView } from './logic'
 
 const PAGE_ROWS = 10
 
-function SessionList({ studentId, kind }: { studentId: Id<'students'>; kind: Kind }) {
+function SessionList({ studentId, kind, buildMinutes }: { studentId: Id<'students'>; kind: Kind; buildMinutes: number }) {
   const { results, status, loadMore } = usePaginatedQuery(api.dashboardReports.attendanceSessions, { studentId, kind }, { initialNumItems: PAGE_ROWS })
   if (status === 'LoadingFirstPage') return <p role="status" className="text-[13px] text-vs-muted">{copy.loading}</p>
   const done = status === 'Exhausted'
+  const days = results.filter(row => row.status === 'attended').length
   return <>
+    {kind === 'build' && <p className="m-0 mb-3 text-[14px] font-semibold text-vs-text-2">{buildTotalLine(buildMinutes, done ? days : null)}</p>}
     {results.length === 0 && done && <p className="text-[13px] text-vs-muted">{copy.empty}</p>}
     <ul className="m-0 flex list-none flex-col gap-2 p-0">
       {results.map(row => {
@@ -42,7 +44,7 @@ function SessionList({ studentId, kind }: { studentId: Id<'students'>; kind: Kin
 
 type Tile = { kind: Kind; label: string; value: string; text: boolean; detail: string | null; action: string }
 
-function SummaryTile({ tile, studentId, updating }: { tile: Tile; studentId: Id<'students'>; updating: boolean }) {
+function SummaryTile({ tile, studentId, updating, buildMinutes }: { tile: Tile; studentId: Id<'students'>; updating: boolean; buildMinutes: number }) {
   const titleId = useId()
   const [open, setOpen] = useState(false)
   return <DashboardTile tone="quiet" aria-labelledby={titleId}>
@@ -52,7 +54,7 @@ function SummaryTile({ tile, studentId, updating }: { tile: Tile; studentId: Id<
     {updating && <p role="status" className="m-0 mt-1.5 text-[13px] text-vs-muted">{copy.updatingNote}</p>}
     <button type="button" onClick={() => setOpen(true)} disabled={updating} aria-label={`${tile.action}: ${tile.label}`} className={cn(dashboardButtonVariants({ tone: 'soft', size: 'md' }), 'mt-4 self-start')}>{tile.action}</button>
     <DetailsSheet open={open} onOpenChange={setOpen} title={copy.sheetTitle[tile.kind]} description={copy.sheetDescription[tile.kind]}>
-      {open && <SessionList studentId={studentId} kind={tile.kind} />}
+      {open && <SessionList studentId={studentId} kind={tile.kind} buildMinutes={buildMinutes} />}
     </DetailsSheet>
   </DashboardTile>
 }
@@ -77,6 +79,6 @@ export function FamilyAttendanceBreakdown({ studentId }: { studentId: Id<'studen
       : { kind: 'build', label: copy.buildHours, value: copy.startsAtKickoff, text: true, detail: null, action: copy.seeBuildDays },
   ]
   return <div className="grid gap-4 sm:grid-cols-2">
-    {tiles.map(tile => <SummaryTile key={tile.kind} tile={tile} studentId={studentId} updating={data.state === 'updating'} />)}
+    {tiles.map(tile => <SummaryTile key={tile.kind} tile={tile} studentId={studentId} updating={data.state === 'updating'} buildMinutes={build.minutes} />)}
   </div>
 }

@@ -231,20 +231,19 @@ export const attendanceSessions = query({
     const gate = await teamReportAttendanceGate(ctx, season._id, season.year);
     if (gate.state === "updating" || gate.state === "failed") return emptyPage;
     const opts = { ...args.paginationOpts, maximumRowsRead: Math.min(args.paginationOpts.maximumRowsRead ?? 50, 50) };
-    if (args.kind === "build") {
-      if (gate.kickoff === null) return emptyPage;
-      const kickoffAt = gate.kickoff.at;
-      const result = await ctx.db.query("timeclockAttendanceSummaries").withIndex("by_studentId_and_scheduledStart", q => q.eq("studentId", student._id).gte("scheduledStart", kickoffAt)).order("desc").paginate(opts);
-      const page = result.page.filter(row => row.buildDay).map(row => { const minutes = buildMinutesContribution(row); return { sessionId: row.sessionId, scheduledStart: row.scheduledStart, title: row.occurrenceTitle ?? null, status: row.sessionState === "closed" && !row.needsReview && row.totalMs > 0 ? "attended" as const : "missed" as const, minutes }; });
-      return { ...result, page };
-    }
-    const outreach = args.kind === "outreach", required = args.kind === "required";
-    const result = await ctx.db.query("timeclockSessionReportStates").withIndex("by_seasonId_and_outreach_and_required_and_scheduledStart", q => q.eq("seasonId", season._id).eq("outreach", outreach).eq("required", outreach ? false : required)).order("desc").paginate(opts);
+    // Every kind lists held sessions from the season's report states; Build starts at kickoff and shows the same whole minutes that make up Build hours.
+    const states = ctx.db.query("timeclockSessionReportStates");
+    const result = args.kind === "build"
+      ? gate.kickoff === null ? null : await states.withIndex("by_seasonId_and_build_and_scheduledStart", q => q.eq("seasonId", season._id).eq("build", true).gte("scheduledStart", gate.kickoff!.at)).order("desc").paginate(opts)
+      : await states.withIndex("by_seasonId_and_outreach_and_required_and_scheduledStart", q => q.eq("seasonId", season._id).eq("outreach", args.kind === "outreach").eq("required", args.kind === "required")).order("desc").paginate(opts);
+    if (!result) return emptyPage;
     const held = result.page.filter(report => report.state === "ready" && report.sessionState === "closed" && !report.needsReview);
     const page = await Promise.all(held.map(async report => {
       const row = await ctx.db.query("timeclockAttendanceSummaries").withIndex("by_sessionId_and_studentId", q => q.eq("sessionId", report.sessionId).eq("studentId", student._id)).unique();
-      const attended = row !== null && row.qualifies && row.sessionState === "closed" && !row.needsReview && row.reportGeneration === report.reportGeneration;
-      return { sessionId: report.sessionId, scheduledStart: report.scheduledStart, title: report.occurrenceTitle ?? null, status: attended ? "attended" as const : "missed" as const, ...(attended ? { minutes: Math.floor(row.totalMs / 60000) } : {}) };
+      const fresh = row !== null && row.reportGeneration === report.reportGeneration;
+      const attended = fresh && (args.kind === "build" ? row.totalMs > 0 : row.qualifies) && row.sessionState === "closed" && !row.needsReview;
+      const minutes = fresh && args.kind === "build" ? buildMinutesContribution(row) : fresh && attended ? Math.floor(row.totalMs / 60000) : undefined;
+      return { sessionId: report.sessionId, scheduledStart: report.scheduledStart, title: report.occurrenceTitle ?? null, status: attended ? "attended" as const : "missed" as const, ...(minutes !== undefined ? { minutes } : {}) };
     }));
     return { ...result, page };
   },

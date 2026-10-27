@@ -104,6 +104,7 @@ Students and Parents. Strings live in `src/features/attendance/copy.ts`. The pag
 | Updating | Updating; Attendance is updating. Check back in a few minutes. | |
 | List | Attended; Missed; {n} minute(s) (Build hours only); Loading…; Show more sessions; Nothing to show yet. Meetings show here after they end. | Load more |
 | List sheet titles | Required meetings; Other meetings; Outreach; Build hours. Descriptions: Every required meeting so far this season, newest first.; Optional meetings so far this season, newest first.; Outreach events so far this season, newest first.; Build meetings since kickoff, newest first. | |
+| Build total (top of the Build hours list) | {h} hour(s) {m} minute(s) from {n} day(s) (days appear once every day has loaded) | |
 | Meeting with no title | Required meeting; Meeting (Other); Outreach event; Build meeting | Untitled |
 | No linked student | No student is linked to this account yet. | |
-| Event settings and New event (Coach) | Outreach event; Students see this event under Outreach on their Attendance page, not under Other meetings. | |
+| Event settings and New event (Coach, Travel Lead) | Outreach event; Students see this event under Outreach on their Attendance page, not under Other meetings. | |
