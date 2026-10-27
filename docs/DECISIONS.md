@@ -65,6 +65,10 @@ Read this before changing parent linking, consent/PDF, finance, rooms/waitlists 
 
 - Admin contact (owner decision October 25): Coach-only setup errors offer Contact admin; requests are recorded and emailed to admin@team8044.org; no student data.
 
+## Redesign dashboards
+
+- October 25 owner decisions for the planned redesign. Mentors keep Profile as their landing page until the redesign, which gives them a small dashboard. A Parent with staff access who has switched to Mentor or Travel Lead sees a "{Student's name} needs you" badge when Parent-side items are waiting (needs a new query). Parents see signups as view-only ("{Student's name} can sign up until…"); only the student signs up or withdraws, which keeps that responsibility with the student.
+
 ## Retention
 
 - Five years runs from the latest archival after reactivation and triggers review, not automatic erasure. Automatic deletion remains unauthorized.
