@@ -20,7 +20,7 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function outcomeText(availability: SignupAvailability) {
-  if (availability.outcome === 'closed') return copy.outcome.closed
+  if (availability.outcome === 'closed') return availability.signupMode === 'assigned' ? copy.outcome.assigned : copy.outcome.closed
   if (availability.outcome === 'waitlisted') return copy.outcome.waitlisted
   if (availability.outcome === 'waitingForApproval') return copy.outcome.waitingForApproval
   return availability.feeCents > 0 ? copy.outcome.signedUp : copy.outcome.signedUpNoFee

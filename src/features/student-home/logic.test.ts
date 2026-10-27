@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest'
 import type { GenericId } from 'convex/values'
 import type { Id } from '../../../convex/_generated/dataModel'
 import type { HomeAttendance, OpenSignup, PinnedAnnouncement, RoomChoice, StudentHomeSummary, WhatsLeftItem } from './contract'
+import { homeCopy } from './copy'
 import { at } from './fixtures'
 import { formatDateRange } from './format'
-import { calendarDaysUntil, countdownTarget, countdownValue, heroCards, HOUR_MS, isWithinSoon, openSignupsSummary, participationView, percentAttended, SOON_MS, upcomingMilestones, whatsLeftSummary } from './logic'
+import { calendarDaysUntil, countdownTarget, countdownValue, heroCards, HOUR_MS, isWithinSoon, openSignupsSummary, participationView, percentAttended, roomDeadlineView, SOON_MS, upcomingMilestones, whatsLeftSummary } from './logic'
 
 const NOW = at('2026-10-26T12:00')
 const event = (key: string) => key as Id<'events'>
@@ -53,6 +54,24 @@ describe('hero stack order', () => {
     },
   ])('$name', ({ input, pins, keys }) => {
     expect(heroCards(input, pins, NOW).map(card => card.key)).toEqual(keys)
+  })
+})
+
+describe('room choice deadline', () => {
+  it.each([
+    { name: 'exactly seven days before the deadline is urgent', now: NOW, deadline: NOW + SOON_MS, status: 'notChosen' as const, urgent: true, closes: 'weekday', left: '7 days left' },
+    { name: 'a minute more than seven days is calm', now: NOW, deadline: NOW + SOON_MS + 60_000, status: 'notChosen' as const, urgent: false, closes: 'date', left: '7 days left' },
+    { name: 'a final room inside the window is not urgent', now: NOW, deadline: NOW + 2 * 24 * HOUR_MS, status: 'final' as const, urgent: false, closes: 'date', left: '2 days left' },
+    { name: 'a group that is not final yet is still urgent', now: NOW, deadline: NOW + 2 * 24 * HOUR_MS, status: 'inGroup' as const, urgent: true, closes: 'weekday', left: '2 days left' },
+    { name: 'deadline later today: Closes today, Last day', now: NOW, deadline: at('2026-10-26T23:59'), status: 'notChosen' as const, urgent: true, closes: 'today', left: 'Last day' },
+    { name: 'deadline just after midnight counts as tomorrow', now: at('2026-10-26T23:00'), deadline: at('2026-10-27T00:30'), status: 'notChosen' as const, urgent: true, closes: 'weekday', left: '1 day left' },
+  ])('$name', ({ now, deadline, status, urgent, closes, left }) => {
+    const view = roomDeadlineView(room('pri', deadline, status), now)
+    expect(view && { urgent: view.urgent, closes: view.closes.kind, left: homeCopy.room.daysLeft(view.daysLeft) }).toEqual({ urgent, closes, left })
+  })
+
+  it('says nothing about a deadline when there is none', () => {
+    expect(roomDeadlineView(room('pri', null), NOW)).toBeNull()
   })
 })
 

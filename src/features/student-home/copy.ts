@@ -91,6 +91,8 @@ export const homeCopy = {
       waitingForApproval: "A Coach or Travel Lead reviews your signup. Any fee is charged when you're confirmed.",
       waitlisted: "You'll join the waitlist.",
       closed: 'Signup for this event has closed. Ask a Coach or Travel Lead if you still need to go.',
+      // Only a Coach can change signups on an assigned event (participation.setParticipation).
+      assigned: 'A Coach assigns students to this event, so it has no signup. Ask a Coach if you still need to go.',
     },
     signUp: 'Sign up',
     signingUp: 'Signing up…',

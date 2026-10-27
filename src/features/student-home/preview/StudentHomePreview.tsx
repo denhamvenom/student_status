@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { Link, UNSAFE_LocationContext as LocationContext, useLocation, useNavigationType, useSearchParams } from 'react-router'
 import { useTheme } from 'next-themes'
+import { PublicFooter } from '@/PublicFooter'
+import { StudentShell } from '@/components/student-shell/StudentShell'
 import type { Id } from '../../../../convex/_generated/dataModel'
 import type { SignupAvailability } from '../contract'
 import { studentHomeFixtures, type StudentHomeFixture } from '../fixtures'
@@ -11,8 +13,12 @@ import type { Loadable, SignUpResult, StudentHomeHandlers, StudentHomeViewProps 
  * Development-only preview of Student Home with synthetic fixtures (main.tsx loads this only when
  * import.meta.env.DEV). /__student-home-preview?state=busyWeek&theme=dark
  * States: the fixtures plus "loading" and "errors". No backend, no sign-in, nothing is saved.
- * The frame below is a stand-in for the Student shell, which is built separately.
+ * The page renders inside the real Student shell and public footer, like a signed-in Student sees it.
+ * The shell is told it is on "/" so Home is highlighted as it is for a Student; its links lead into
+ * the real app (which then asks to sign in), so links back to the preview use the full path.
  */
+
+const previewPath = '/__student-home-preview'
 
 const extraStates = ['loading', 'errors'] as const
 type PreviewState = keyof typeof studentHomeFixtures | typeof extraStates[number]
@@ -33,17 +39,22 @@ function previewHandlers(fixture: StudentHomeFixture): StudentHomeHandlers {
       if (loaded !== eventId) return undefined
       return fixture.availability[eventId] ?? new Error('No preview availability for this event.')
     },
-    retry: () => undefined,
+    // Nothing to re-subscribe here; the console shows which sources "Try again" would reload.
+    retry: source => console.info(`Student Home preview: Try again re-subscribes ${source}`),
   }
 }
 
 export default function StudentHomePreview() {
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const requested = params.get('state')
   const state: PreviewState = isState(requested) ? requested : 'busyWeek'
   const theme = params.get('theme') === 'light' ? 'light' : 'dark'
   const { setTheme } = useTheme()
+  const location = useLocation()
+  const navigationType = useNavigationType()
+  const shellLocation = useMemo(() => ({ location: { ...location, pathname: '/' }, navigationType }), [location, navigationType])
 
+  // The Student palette, as AppShell sets it for a signed-in Student.
   useLayoutEffect(() => {
     const root = document.documentElement
     root.dataset.design = 'student'
@@ -60,17 +71,17 @@ export default function StudentHomePreview() {
     : state === 'errors'
       ? { summary: failure, attendance: failure, announcements: failure, finance: { state: 'failed' }, now: fixture.now, handlers }
       : { summary: fixture.summary, attendance: fixture.attendance, announcements: fixture.announcements, finance: fixture.finance, now: fixture.now, handlers }
+  const link = (next: PreviewState, nextTheme = theme) => `${previewPath}?state=${next}&theme=${nextTheme}`
 
-  return <div className="relative min-h-screen bg-vs-page text-vs-text">
-    {/* Shell stand-ins with the artboards' sizes: 56px phone header, 220px desktop sidebar. */}
-    <div aria-hidden="true" className="sticky top-0 z-10 flex h-14 items-center bg-vs-header px-4 lg:hidden"><span className="font-heading text-[15px] tracking-[0.15em] text-vs-gold uppercase">Venom Status</span></div>
-    <div aria-hidden="true" className="absolute inset-y-0 left-0 hidden w-[220px] bg-vs-sidebar lg:block"><span className="block px-[30px] pt-[22px] font-heading text-[13px] tracking-[0.14em] text-vs-gold uppercase">Venom<br />Status</span></div>
-    <main className="px-[14px] pt-3 pb-10 lg:pt-6 lg:pr-7 lg:pb-8 lg:pl-[248px]">
+  // Same frame as main.tsx: the shell, then the public footer.
+  return <div className="app-frame">
+    <LocationContext.Provider value={shellLocation}><StudentShell userName={fixture.summary.displayName} dark={theme === 'dark'} onToggleTheme={() => setParams({ state, theme: theme === 'dark' ? 'light' : 'dark' })} onSignOut={() => undefined}>
       <StudentHomeView {...props} />
-      <nav aria-label="Preview states" className="mt-10 flex flex-wrap gap-2 border-t border-vs-border pt-4 text-[12px]">
-        {stateNames.map(name => <Link key={name} to={`?state=${name}&theme=${theme}`} aria-current={name === state ? 'page' : undefined} className="rounded-full border border-vs-border px-3 py-2 text-vs-text! aria-[current=page]:bg-vs-inset-raised">{name}</Link>)}
-        <Link to={`?state=${state}&theme=${theme === 'dark' ? 'light' : 'dark'}`} className="rounded-full border border-vs-border px-3 py-2 text-vs-text!">{theme === 'dark' ? 'Light' : 'Dark'}</Link>
+      <nav aria-label="Preview states" className="mt-10 flex flex-wrap gap-2 border-t border-dashed border-vs-border pt-4 text-[12px]">
+        {stateNames.map(name => <Link key={name} to={link(name)} aria-current={name === state ? 'page' : undefined} className="inline-flex min-h-11 items-center rounded-full border border-vs-border px-3 text-vs-text! aria-[current=page]:bg-vs-inset-raised">{name}</Link>)}
+        <Link to={link(state, theme === 'dark' ? 'light' : 'dark')} className="inline-flex min-h-11 items-center rounded-full border border-vs-border px-3 text-vs-text!">{theme === 'dark' ? 'Light' : 'Dark'}</Link>
       </nav>
-    </main>
+    </StudentShell></LocationContext.Provider>
+    <PublicFooter />
   </div>
 }

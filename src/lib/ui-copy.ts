@@ -14,7 +14,8 @@ export const uiCopy = {
     confirmed: reference.options.participationStatuses[0],
     pending: reference.options.participationStatuses[1],
     waitlist: reference.options.participationStatuses[2],
-    notRegistered: reference.options.participationStatuses[3],
+    // docs/LANGUAGE.md: "Not signed up" (the reference's "Not registered" is on the avoid list).
+    notSignedUp: 'Not signed up',
     withdrawn: 'Withdrawn',
     declined: 'Declined',
   },
@@ -29,7 +30,7 @@ export const uiCopy = {
 } as const
 
 export function statusLabel(value: string | null | undefined): string {
-  if (!value) return uiCopy.status.notRegistered
+  if (!value) return uiCopy.status.notSignedUp
   const labels: Record<string, string> = uiCopy.status
   return labels[value] ?? value.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, c => c.toUpperCase())
 }
