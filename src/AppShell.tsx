@@ -21,6 +21,8 @@ export const primaryPaths:Record<string,string[]>={student:['/','/events','/fina
 export function AppShell({ children, viewer, familyContext, role = "coach" }: { children: ReactNode; viewer: ShellViewer; familyContext?: ReactNode; role?: string }) {
   const shellRef=useRef<HTMLDivElement>(null), headerRef=useRef<HTMLElement>(null)
   useLayoutEffect(()=>{if(shellRef.current&&headerRef.current)return observeStickyHeader(headerRef.current,shellRef.current)},[])
+  // Student screens use the redesign palette (src/shadcn.css); other roles keep theirs until their redesign.
+  useLayoutEffect(()=>{if(role!=='student')return;const root=document.documentElement;root.dataset.design='student';return()=>{delete root.dataset.design}},[role])
   const { theme, resolvedTheme, setTheme } = useTheme()
   const saveTheme = useMutation(api.app.setTheme)
   const { signOut } = useAuthActions()
