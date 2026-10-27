@@ -12,6 +12,7 @@ import { calculateStudentFinance } from "./lib/financeSummaries";
 import { ensureFinancialAccount, financialAccount, saveFinancialAccount } from "./lib/financialSources";
 import { tokenHash } from "./lib/invitationIdentity";
 import { addCharge } from "./lib/money";
+import { markRoomCategoryReview } from "./lib/profileCorrections";
 import { roomSelectionComplete, roomSelectionState } from "./lib/readModels";
 import { requireSeasonFinanceReady } from "./lib/seasonFinance";
 import { teamTransportEnabled } from "./lib/transportation";
@@ -21,15 +22,19 @@ import { teamTransportEnabled } from "./lib/transportation";
  * Run on the development deployment only, for example:
  *   bunx convex run developerScenarios:apply '{"scenario":"busyWeek"}'
  * Every write goes through the same steps the app uses (fees through addCharge and the Coach's fee
- * cancellation worker, rooms, requirements, announcements and family links as their mutations write them).
+ * cancellation worker, rooms as rooms.ts writes them, Room type as admin.updateRoster writes it for a Coach,
+ * requirements, signups, announcements and family links as their mutations write them).
  * It touches only the Dev Student, the two Dev Parent family links, the Dev Coach's SCENARIO announcements
- * and records it creates itself, all named with SCENARIO_PREFIX.
+ * and records it creates itself, all named with SCENARIO_PREFIX. `forget` writes only its own audit marker.
  */
 
 /** Same hard binding as developmentRehearsal.ts, kept separate so loosening another guard never loosens this one. */
 const EXPECTED_DEV_URL = "https://third-bandicoot-18.convex.cloud";
 export const SCENARIO_PREFIX = "SCENARIO — ";
 export const SCENARIO_TEAMMATE_EMAIL = "scenario.jordan.writer@example.invalid";
+type RoomType = NonNullable<Doc<"students">["roomCategory"]>;
+/** Used only when neither the Dev Student nor the fictional teammate has a Room type yet. */
+export const DEFAULT_ROOM_TYPE: RoomType = "Boys";
 const MARKER_ENTITY = "developerScenarios";
 const REASON = "Owner-authorized fictional developer scenario on the development deployment; no real person, money or signature.";
 const PIN_LIMIT = 5;
@@ -38,16 +43,26 @@ const DAY = 24 * HOUR;
 const processFinancialOperation = makeFunctionReference<"mutation">("financialOperationsWorker:processPage");
 
 const PERSONAS_MISSING = "The fictional developer accounts are missing or changed. Run developerSignIn:ensurePersonas first. Nothing was changed.";
-const CHANGED = "SCENARIO records were changed outside this tool, so it stopped. Review them by hand. Nothing was changed.";
+const CHANGED = "SCENARIO records were changed outside this tool, so it stopped. Review them by hand, then run the forget scenario so the tool stops using them. Nothing was changed.";
+const TEAMMATE_CHANGED = `The fictional teammate (${SCENARIO_TEAMMATE_EMAIL}) was changed outside this tool, so it stopped. Review it by hand: its legal name must start with "${SCENARIO_PREFIX}" and it must have no sign-in account. The forget scenario does not release it. Nothing was changed.`;
 const PIN_NOTE = "Five other announcements are pinned, so a SCENARIO announcement stayed unpinned.";
 const PAST_FEE_NOTE = "A SCENARIO fee belongs to an event in Past events, so it can't be canceled and stays on the account.";
-const ROOM_TYPE_NOTE = "Dev Student has no Room type, so allDone asked to be assigned instead of accepting Jordan's invitation.";
 const OTHER_FEES_NOTE = "Balance due includes fees outside the SCENARIO events; this tool left them unchanged.";
+const roomTypeNote = (roomType: RoomType) => `The Dev Student had no Room type, so the tool set it to ${roomType} the way a Coach does on the student record. It stays after reset; a Coach can change it.`;
+const roomFallbackNote = (reason: string) => `Jordan's room invitation could not be accepted (${reason}), so the Dev Student asked to be assigned instead.`;
+const teammateEventsNote = (count: number) => `Jordan, the fictional teammate, is signed up for ${count} event${count === 1 ? "" : "s"} outside SCENARIO (listed in teammateOtherEvents). Whole Team events include every active student, Jordan too while active. This tool leaves those signups and their fees for a Coach to review.`;
+const TEAMMATE_EVENTS_LIMIT_NOTE = "Jordan has more than 100 signups; only the first 100 were checked for events outside SCENARIO.";
 const NOT_UNDONE = [
   "Money history stays: SCENARIO fees and their cancellations remain on the Dev Student's and the teammate's accounts, because money records are append-only.",
   "Audit entries for every scenario run stay.",
   "Canceled SCENARIO events stay listed as canceled until they end, then move to Past events with their signups, requirements and room groups.",
   "The fictional teammate stays on the roster as inactive.",
+  "A Room type the tool gave the Dev Student stays; a Coach can change it on the student record.",
+];
+const FORGET_NOTES = [
+  "The tool no longer remembers earlier SCENARIO events, room groups or announcements. The next busyWeek or allDone starts a fresh set; reset and newStudent leave the forgotten records alone.",
+  "Nothing else changed: forgotten SCENARIO events, fees, signups, room groups and announcements stay as they are and can still show on Home until a Coach cancels the events or archives the announcements in the app.",
+  "The fictional teammate is still found by its reserved email; forget does not release it.",
 ];
 
 const REQUIREMENTS = [
@@ -59,18 +74,21 @@ const ANNOUNCEMENTS = {
   reminder: { title: `${SCENARIO_PREFIX}Safety glasses`, body: "Bring safety glasses and wear closed-toe shoes to every build meeting." },
 } as const;
 
-const scenarioValidator = v.union(v.literal("busyWeek"), v.literal("allDone"), v.literal("newStudent"), v.literal("reset"));
+const scenarioValidator = v.union(v.literal("busyWeek"), v.literal("allDone"), v.literal("newStudent"), v.literal("reset"), v.literal("forget"));
 const summaryValidator = v.object({
   scenario: scenarioValidator,
-  /** The live SCENARIO events after this run; empty after reset and newStudent. */
+  /** The live SCENARIO events after this run; empty after reset, newStudent and forget. */
   eventIds: v.array(v.id("events")),
   created: v.object({ events: v.number(), requirements: v.number(), teammates: v.number(), roomGroups: v.number(), roomInvitations: v.number(), announcements: v.number(), fees: v.number() }),
   changed: v.object({
-    eventsCanceled: v.number(), feesCanceled: v.number(), canceledCents: v.number(), requirementsCompleted: v.number(), signupsClosed: v.number(),
+    eventsCanceled: v.number(), feesCanceled: v.number(), canceledCents: v.number(), requirementsCompleted: v.number(), signupsApproved: v.number(), signupsClosed: v.number(),
     announcementsPinned: v.number(), announcementsUnpinned: v.number(), announcementsArchived: v.number(),
-    parentLinksRestored: v.number(), parentLinksRemoved: v.number(), teammateRestored: v.number(), teammateDeactivated: v.number(),
+    parentLinksRestored: v.number(), parentLinksRemoved: v.number(), teammateRestored: v.number(), teammateDeactivated: v.number(), roomTypesSet: v.number(),
   }),
-  roomChoice: v.union(v.literal("invitationAccepted"), v.literal("assignmentRequested"), v.null()),
+  /** allDone only: what the Dev Student's room choice did. null when room choice does not apply. */
+  roomChoice: v.union(v.literal("invitationAccepted"), v.literal("assignmentRequested"), v.literal("alreadyChosen"), v.null()),
+  /** Jordan's signups for events whose names do not start with SCENARIO_PREFIX. Reported only; never changed. */
+  teammateOtherEvents: v.array(v.object({ eventId: v.id("events"), name: v.string(), status: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("waitlist")) })),
   /** The Dev Student's Balance due after this run; null while money records are updating. */
   balanceDueCents: v.union(v.number(), v.null()),
   notes: v.array(v.string()),
@@ -92,7 +110,7 @@ function present<T>(value: T | null): T {
 function note(out: Summary, text: string) { if (!out.notes.includes(text)) out.notes.push(text); }
 const isScenario = (name: string | undefined) => !!name?.startsWith(SCENARIO_PREFIX);
 
-/** All three guards must pass before anything is read for writing: the development URL, the developer sign-in switch and key, and an active season. */
+/** Every guard must pass before anything is read for writing: the development URL, the developer sign-in switch and key, an active season with no season change open, and season fees ready. */
 async function guard(ctx: MutationCtx) {
   if (env.CONVEX_CLOUD_URL !== EXPECTED_DEV_URL) throw new Error("Developer scenarios are development-only. Nothing was changed.");
   if (!developerSignInEnabled()) throw new Error("Developer sign-in is disabled on this deployment, so developer scenarios are too. Nothing was changed.");
@@ -120,13 +138,13 @@ async function loadPeople(ctx: MutationCtx, season: Doc<"seasons">): Promise<Peo
 }
 
 /** The fictional teammate is found by its reserved example.invalid email and is never a sign-in account. */
-async function findTeammate(ctx: MutationCtx, season: Doc<"seasons">) {
+async function findTeammate(ctx: MutationCtx, season: Doc<"seasons">): Promise<Doc<"students"> | null> {
   const rows = await ctx.db.query("students").withIndex("by_seasonId_and_email", q => q.eq("seasonId", season._id).eq("email", SCENARIO_TEAMMATE_EMAIL)).take(2);
-  if (rows.length > 1 || rows.some(row => row.userId !== undefined || !isScenario(row.legalName))) throw new Error(CHANGED);
+  if (rows.length > 1 || rows.some(row => row.userId !== undefined || !isScenario(row.legalName))) throw new Error(TEAMMATE_CHANGED);
   return rows[0] ?? null;
 }
 
-/** The latest run's audit entry records which SCENARIO records are current. */
+/** The latest run's audit entry records which SCENARIO records are current; a forget entry records none. */
 async function loadMarker(ctx: MutationCtx, season: Doc<"seasons">, people: People): Promise<{ phase: Phase | null; set: StoredSet | null }> {
   const latest = await ctx.db.query("audit").withIndex("by_entity_and_entityId", q => q.eq("entity", MARKER_ENTITY).eq("entityId", season._id)).order("desc").first();
   if (!latest) return { phase: null, set: null };
@@ -169,11 +187,18 @@ function liveSet(set: StoredSet | null): LiveSet | null {
 const participation = (ctx: MutationCtx, eventId: Id<"events">, studentId: Id<"students">) =>
   ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", eventId).eq("studentId", studentId)).unique();
 
-/** busyWeek reuses its records only while nobody has acted on them; any change (a signup, a room choice, a finished requirement, a fee change) gets a fresh set. */
+/** rooms.ts closes room choice once the deadline has passed (`Date.now() > roomDeadline`). */
+const roomChoiceOpen = (event: Doc<"events">, now: number) => event.roomDeadline === undefined || now <= event.roomDeadline;
+
+/**
+ * busyWeek reuses its records only while nobody has acted on them and they still match what this version creates;
+ * any change (a signup, a room choice, a finished requirement, a fee change, a Room type change) gets a fresh set.
+ */
 async function untouchedBusyWeek(ctx: MutationCtx, set: LiveSet, people: People, teammate: Doc<"students"> | null, now: number) {
   const { competition, outreach, team, group, invite } = set;
   const studentId = people.student._id;
-  if (!teammate?.active || group.finalized || invite.status !== "pending") return false;
+  if (!teammate?.active || teammate.travelTeam || group.finalized || invite.status !== "pending" || team.signupMode !== "approval") return false;
+  if (people.student.roomCategory !== group.category || teammate.roomCategory !== group.category) return false;
   if (competition.roomDeadline === undefined || competition.roomDeadline <= now) return false;
   if ([outreach, team].some(event => event.signupClosesAt === undefined || event.signupClosesAt <= now)) return false;
   if ((await participation(ctx, competition._id, studentId))?.status !== "confirmed") return false;
@@ -188,6 +213,13 @@ async function untouchedBusyWeek(ctx: MutationCtx, set: LiveSet, people: People,
   if (teammateRoom?.groupId !== group._id) return false;
   const fees = await ctx.db.query("charges").withIndex("by_eventId_and_studentId", q => q.eq("eventId", competition._id).eq("studentId", studentId)).take(5);
   return fees.length > 0 && fees.every(fee => (fee.cancelledCents ?? 0) === 0 && (fee.adjustedCents ?? 0) === 0);
+}
+
+/** allDone finishes the current set unless the Dev Student still has to choose a room after the room deadline (then neither accepting nor asking to be assigned is allowed). */
+async function allDoneCanFinish(ctx: MutationCtx, set: LiveSet, people: People, now: number) {
+  if ((await participation(ctx, set.competition._id, people.student._id))?.status !== "confirmed") return true;
+  if (roomChoiceOpen(set.competition, now)) return true;
+  return roomSelectionComplete(await roomSelectionState(ctx, set.competition._id, people.student._id));
 }
 
 /** Cancels the unpaid part of one fee the way chargeAdmin.correct does for a Coach: a cancellation job processed by the shared worker. */
@@ -273,30 +305,72 @@ async function retireSet(ctx: MutationCtx, set: StoredSet, people: People, teamm
   for (const row of [set.roomNotice, set.reminder]) if (row) await archiveAnnouncement(ctx, people.coach, row, out);
 }
 
-/** The fictional teammate shares the Dev Student's Room type so the invitation is one the app could send. */
-async function ensureTeammate(ctx: MutationCtx, season: Doc<"seasons">, people: People, existing: Doc<"students"> | null, out: Summary) {
-  const roomCategory = people.student.roomCategory ?? "Boys";
+/**
+ * admin.updateRoster as the Dev Coach: a changed Room type marks the student's room groups for review and locks the Room type,
+ * deactivating sets archivedAt, and every change adds one to the profile revision with an audit entry.
+ * Reactivating here also clears archivedAt and, unlike the Coach's roster reactivation, adds nobody to Whole Team events.
+ */
+async function updateRoster(ctx: MutationCtx, coach: Doc<"appUsers">, student: Doc<"students">, fields: { roomCategory?: RoomType; active?: boolean; travelTeam?: boolean }) {
+  if (fields.roomCategory !== undefined && fields.roomCategory !== student.roomCategory) await markRoomCategoryReview(ctx, student._id, student.seasonId, true);
+  const archivedAt = fields.active === false ? (student.active ? Date.now() : student.archivedAt) : fields.active === true ? undefined : student.archivedAt;
+  const changes = { ...fields, ...(fields.roomCategory !== undefined ? { roomCategoryLocked: true } : {}), archivedAt, profileRevision: (student.profileRevision ?? 0) + 1 };
+  await ctx.db.patch("students", student._id, changes);
+  await audit(ctx, coach, "students", student._id, "updateRoster",
+    { profileRevision: student.profileRevision ?? 0, active: student.active, travelTeam: student.travelTeam, roomCategory: student.roomCategory ?? null, legalName: student.legalName, archivedAt: student.archivedAt ?? null },
+    { ...changes, archivedAt: archivedAt ?? null }, REASON);
+  return present(await ctx.db.get("students", student._id));
+}
+
+/** The Dev Student needs a Room type before any room record is created, so every invitation is one rooms.respond accepts. */
+async function studentRoomType(ctx: MutationCtx, people: People, fallback: RoomType, out: Summary): Promise<RoomType> {
+  if (people.student.roomCategory) return people.student.roomCategory;
+  people.student = await updateRoster(ctx, people.coach, people.student, { roomCategory: fallback });
+  out.changed.roomTypesSet++;
+  note(out, roomTypeNote(fallback));
+  return fallback;
+}
+
+/**
+ * The fictional teammate shares the Dev Student's Room type so the invitation is one the app could send. It is not on the
+ * Travel Team, so Travel Team events never assign it; it is assigned to the SCENARIO Competition directly.
+ */
+async function ensureTeammate(ctx: MutationCtx, season: Doc<"seasons">, people: People, existing: Doc<"students"> | null, roomCategory: RoomType, out: Summary) {
   if (!existing) {
-    const id = await ctx.db.insert("students", { seasonId: season._id, legalName: `${SCENARIO_PREFIX}Jordan Writer`, preferredName: "Jordan", firstName: "Jordan", lastName: "Writer", structuredNameReviewed: true, email: SCENARIO_TEAMMATE_EMAIL, subteam: "Build", active: true, travelTeam: true, roomCategory, roomCategoryLocked: true, allergies: { state: "unknown" }, medications: { state: "unknown" } });
-    await audit(ctx, people.coach, "students", id, "createScenarioTeammate", null, { active: true, roomCategory }, REASON);
+    const id = await ctx.db.insert("students", { seasonId: season._id, legalName: `${SCENARIO_PREFIX}Jordan Writer`, preferredName: "Jordan", firstName: "Jordan", lastName: "Writer", structuredNameReviewed: true, email: SCENARIO_TEAMMATE_EMAIL, subteam: "Build", active: true, travelTeam: false, roomCategory, roomCategoryLocked: true, allergies: { state: "unknown" }, medications: { state: "unknown" } });
+    await audit(ctx, people.coach, "students", id, "createScenarioTeammate", null, { active: true, travelTeam: false, roomCategory }, REASON);
     out.created.teammates++;
     return present(await ctx.db.get("students", id));
   }
-  if (existing.active && existing.archivedAt === undefined && existing.roomCategory === roomCategory) return existing;
-  // Unlike the Coach's roster reactivation, this does not add the teammate to Whole Team events: those are not SCENARIO records.
-  await ctx.db.patch("students", existing._id, { active: true, archivedAt: undefined, roomCategory, roomCategoryLocked: true, profileRevision: (existing.profileRevision ?? 0) + 1 });
-  await audit(ctx, people.coach, "students", existing._id, "updateRoster", { active: existing.active, roomCategory: existing.roomCategory ?? null }, { active: true, roomCategory }, REASON);
+  const reactivate = !existing.active || existing.archivedAt !== undefined;
+  const recategorize = existing.roomCategory !== roomCategory || !existing.roomCategoryLocked;
+  if (!reactivate && !recategorize && !existing.travelTeam) return existing;
+  const row = await updateRoster(ctx, people.coach, existing, { active: true, travelTeam: false, ...(recategorize ? { roomCategory } : {}) });
   if (!existing.active) out.changed.teammateRestored++;
-  return present(await ctx.db.get("students", existing._id));
+  if (existing.roomCategory !== roomCategory) out.changed.roomTypesSet++;
+  return row;
 }
 
 /** admin.updateRoster with active false. Runs after the teammate's SCENARIO fees are canceled. */
 async function deactivateTeammate(ctx: MutationCtx, coach: Doc<"appUsers">, teammate: Doc<"students"> | null, out: Summary) {
-  if (!teammate?.active) return;
-  const now = Date.now();
-  await ctx.db.patch("students", teammate._id, { active: false, archivedAt: now, profileRevision: (teammate.profileRevision ?? 0) + 1 });
-  await audit(ctx, coach, "students", teammate._id, "updateRoster", { active: true }, { active: false, archivedAt: now }, REASON);
+  if (!teammate?.active) return teammate;
+  const row = await updateRoster(ctx, coach, teammate, { active: false });
   out.changed.teammateDeactivated++;
+  return row;
+}
+
+/** Jordan's signups for events outside SCENARIO, such as Whole Team events a Coach created while Jordan was active. Reported, never changed. */
+async function teammateOtherEvents(ctx: MutationCtx, teammate: Doc<"students"> | null, out: Summary) {
+  if (!teammate) return [];
+  const rows = await ctx.db.query("participants").withIndex("by_studentId", q => q.eq("studentId", teammate._id)).take(101);
+  const found: Summary["teammateOtherEvents"] = [];
+  for (const row of rows.slice(0, 100)) {
+    if (row.status === "withdrawn") continue;
+    const event = await ctx.db.get("events", row.eventId);
+    if (event && !isScenario(event.name)) found.push({ eventId: event._id, name: event.name, status: row.status });
+  }
+  if (found.length) note(out, teammateEventsNote(found.length));
+  if (rows.length > 100) note(out, TEAMMATE_EVENTS_LIMIT_NOTE);
+  return found;
 }
 
 /** admin.createEvent for an event without Team Calendar: assigned students are confirmed and charged through addCharge. */
@@ -325,8 +399,12 @@ async function createAnnouncement(ctx: MutationCtx, season: Doc<"seasons">, coac
   return present(await ctx.db.get("teamAnnouncements", id));
 }
 
-/** A fresh busy week: an overnight Competition four weeks out, two open signups and two messages. Times are whole hours from now. */
-async function createSet(ctx: MutationCtx, season: Doc<"seasons">, people: People, teammate: Doc<"students">, out: Summary): Promise<LiveSet> {
+/**
+ * A fresh busy week: an overnight Competition four weeks out, an open Outreach signup with a small fee and capacity,
+ * a Team signup that needs approval, and two messages. Times are whole hours from now.
+ */
+async function createSet(ctx: MutationCtx, season: Doc<"seasons">, people: People, teammate: Doc<"students">, roomCategory: RoomType, out: Summary): Promise<LiveSet> {
+  if (people.student.roomCategory !== roomCategory || teammate.roomCategory !== roomCategory) throw new Error("The Dev Student and the fictional teammate need the same Room type before a room is created. Nothing was changed.");
   const now = Date.now();
   const base = Math.ceil(now / HOUR) * HOUR;
   const competition = await createScenarioEvent(ctx, people.coach, season, {
@@ -342,15 +420,14 @@ async function createSet(ctx: MutationCtx, season: Doc<"seasons">, people: Peopl
   const team = await createScenarioEvent(ctx, people.coach, season, {
     name: `${SCENARIO_PREFIX}Team Build Day`, type: "Team", startsAt: base + 20 * DAY, endsAt: base + 20 * DAY + 6 * HOUR,
     destination: "Fictional build space", travel: "Provide your Own", overnight: false, roomingEnabled: false,
-    feeCents: 0, signupMode: "open", signupClosesAt: base + 17 * DAY, allowWithdrawal: true, permissionRequired: false, firstRequired: false,
+    feeCents: 0, signupMode: "approval", signupClosesAt: base + 17 * DAY, allowWithdrawal: true, permissionRequired: false, firstRequired: false,
   }, [], [], out);
 
   // rooms.createGroup and rooms.invite as the teammate would use them. The teammate has no account, so the Dev Coach is recorded as creator.
-  const category = teammate.roomCategory ?? "Boys";
   const groupName = `${SCENARIO_PREFIX}Jordan's room`;
-  const groupId = await ctx.db.insert("roomGroups", { eventId: competition._id, category, name: groupName, finalized: false, adultFifthException: false, needsReview: false, createdBy: people.coach._id });
+  const groupId = await ctx.db.insert("roomGroups", { eventId: competition._id, category: roomCategory, name: groupName, finalized: false, adultFifthException: false, needsReview: false, createdBy: people.coach._id });
   await ctx.db.insert("roomMemberships", { eventId: competition._id, groupId, studentId: teammate._id, joinedAt: now });
-  await audit(ctx, people.coach, "roomGroups", groupId, "create", null, { name: groupName, category }, REASON);
+  await audit(ctx, people.coach, "roomGroups", groupId, "create", null, { name: groupName, category: roomCategory }, REASON);
   const inviteId = await ctx.db.insert("roomInvites", { eventId: competition._id, groupId, studentId: people.student._id, invitedBy: teammate._id, status: "pending", createdAt: now });
   await audit(ctx, people.coach, "roomInvites", inviteId, "invite", null, "pending", REASON);
   out.created.roomGroups++;
@@ -364,54 +441,90 @@ async function createSet(ctx: MutationCtx, season: Doc<"seasons">, people: Peopl
   };
 }
 
-/** Room choice as the Dev Student would make it: accept Jordan's invitation (rooms.respond), or ask to be assigned (rooms.requestAssignment) when the Room type differs. */
+/** Why rooms.respond would refuse to accept Jordan's invitation, or null when it would accept it. */
+async function acceptRefusal(ctx: MutationCtx, invite: Doc<"roomInvites"> | null, group: Doc<"roomGroups"> | null, student: Doc<"students">) {
+  if (invite?.status !== "pending" || invite.studentId !== student._id) return "it was already answered or canceled";
+  if (!group) return "Jordan's room group was removed";
+  if (group.finalized) return "Jordan's room is final";
+  if (student.roomCategory !== group.category) return "the Dev Student's Room type differs from Jordan's room";
+  const members = await ctx.db.query("roomMemberships").withIndex("by_groupId", q => q.eq("groupId", group._id)).take(6);
+  if (members.length >= 4) return "Jordan's room is full";
+  return null;
+}
+
+/**
+ * The Dev Student's room choice, as the Dev Student would make it with rooms.ts: accept Jordan's invitation (rooms.respond),
+ * or, only when rooms.respond would refuse, decline it if it can still be answered and ask to be assigned (rooms.requestAssignment).
+ * The caller has checked the rooms.ts eligibility rules: confirmed for the Competition and before the room deadline.
+ */
 async function resolveRoom(ctx: MutationCtx, set: LiveSet, people: People, out: Summary) {
-  const { competition, group } = set;
+  const { competition } = set;
+  await studentRoomType(ctx, people, set.group.category, out);
   const student = people.student;
-  let room = await roomSelectionState(ctx, competition._id, student._id);
-  if (roomSelectionComplete(room)) return;
+  const room = await roomSelectionState(ctx, competition._id, student._id);
+  if (roomSelectionComplete(room)) { out.roomChoice = "alreadyChosen"; return; }
   const now = Date.now();
   const own = room.membership;
   if (own) {
-    // rooms.leave: alone in an unfinished group the Dev Student started during a demo.
+    // rooms.leave: alone in an unfinished group the Dev Student started during a demo (a final or shared group counts as chosen above).
     await ctx.db.delete("roomMemberships", own._id);
     await ctx.db.patch("roomGroups", own.groupId, { needsReview: true });
     const remaining = await ctx.db.query("roomMemberships").withIndex("by_groupId", q => q.eq("groupId", own.groupId)).take(1);
     if (!remaining.length) {
       const sent = await ctx.db.query("roomInvites").withIndex("by_groupId", q => q.eq("groupId", own.groupId)).take(101);
+      if (sent.length > 100) throw new Error("The Dev Student's own room group has too many invitations to update. Nothing was changed.");
       for (const invite of sent) if (invite.status === "pending") await ctx.db.patch("roomInvites", invite._id, { status: "cancelled" });
     }
     await audit(ctx, people.studentAccount, "roomGroups", own.groupId, "leave", { studentId: student._id }, null, REASON);
-    room = await roomSelectionState(ctx, competition._id, student._id);
   }
   const invite = await ctx.db.get("roomInvites", set.invite._id);
-  const members = await ctx.db.query("roomMemberships").withIndex("by_groupId", q => q.eq("groupId", group._id)).take(6);
-  if (invite?.status === "pending" && !group.finalized && student.roomCategory === group.category && members.length < 4) {
+  const group = await ctx.db.get("roomGroups", set.group._id);
+  const refusal = await acceptRefusal(ctx, invite, group, student);
+  if (refusal === null && invite && group) {
+    const members = await ctx.db.query("roomMemberships").withIndex("by_groupId", q => q.eq("groupId", group._id)).take(6);
     await ctx.db.insert("roomMemberships", { eventId: competition._id, groupId: group._id, studentId: student._id, joinedAt: now });
     const received = await ctx.db.query("roomInvites").withIndex("by_studentId", q => q.eq("studentId", student._id)).take(100);
+    if (received.length >= 100) throw new Error("The Dev Student has too many room invitations to update. Nothing was changed.");
     for (const other of received) if (other.eventId === competition._id && other.status === "pending") await ctx.db.patch("roomInvites", other._id, { status: other._id === invite._id ? "accepted" : "declined" });
+    if (members.length + 1 >= 4) {
+      const groupInvites = await ctx.db.query("roomInvites").withIndex("by_groupId", q => q.eq("groupId", group._id)).take(100);
+      for (const other of groupInvites) if (other.status === "pending") await ctx.db.patch("roomInvites", other._id, { status: "declined" });
+    }
     await audit(ctx, people.studentAccount, "roomGroups", group._id, "join", null, { studentId: student._id }, REASON);
     out.roomChoice = "invitationAccepted";
     return;
   }
-  if (!room.request) {
-    await ctx.db.insert("roomRequests", { eventId: competition._id, studentId: student._id, requestedAt: now });
-    await audit(ctx, people.studentAccount, "roomRequests", `${competition._id}:${student._id}`, "requestAssignment", null, true, REASON);
-  }
-  if (invite?.status === "pending") {
+  // rooms.respond with accept false needs a pending invitation from a group that still exists and is not final.
+  if (invite?.status === "pending" && invite.studentId === student._id && group && !group.finalized) {
     await ctx.db.patch("roomInvites", invite._id, { status: "declined" });
     await audit(ctx, people.studentAccount, "roomInvites", invite._id, "decline", "pending", "declined", REASON);
   }
+  if (!room.request) await ctx.db.insert("roomRequests", { eventId: competition._id, studentId: student._id, requestedAt: now });
+  await audit(ctx, people.studentAccount, "roomRequests", `${competition._id}:${student._id}`, "requestAssignment", null, true, REASON);
   out.roomChoice = "assignmentRequested";
-  if (!student.roomCategory) note(out, ROOM_TYPE_NOTE);
+  note(out, roomFallbackNote(refusal ?? "it can no longer be answered"));
 }
 
-/** allDone: a Coach records the requirements, the room is chosen, unpaid SCENARIO fees are canceled and the two signups close (eventOperations.updateSettings). */
+/** participation.setParticipation as the Dev Coach: a signup Waiting for approval becomes Signed up. */
+async function approveSignup(ctx: MutationCtx, coach: Doc<"appUsers">, event: Doc<"events">, row: Doc<"participants">, out: Summary) {
+  requireEnrollmentComplete(event);
+  await ctx.db.patch("participants", row._id, { status: "confirmed", updatedAt: Date.now() });
+  if (event.feeCents > 0) { await addCharge(ctx, coach, row.studentId, event.name, event.feeCents, event.startsAt, `eventFee:${event._id}:${row.studentId}`, event._id); out.created.fees++; }
+  await audit(ctx, coach, "participants", `${event._id}:${row.studentId}`, "setStatus", "pending", "confirmed", REASON);
+  out.changed.signupsApproved++;
+}
+
+/**
+ * allDone: a Coach approves a signup Waiting for approval and records the requirements, the room is chosen,
+ * unpaid SCENARIO fees are canceled and the two signups close (eventOperations.updateSettings).
+ */
 async function completeSet(ctx: MutationCtx, set: LiveSet, people: People, out: Summary) {
   const studentId = people.student._id;
   let roomApplies = false;
   for (const event of [set.competition, set.outreach, set.team]) {
-    if ((await participation(ctx, event._id, studentId))?.status !== "confirmed") continue;
+    const row = await participation(ctx, event._id, studentId);
+    if (row?.status === "pending") await approveSignup(ctx, people.coach, event, row, out);
+    else if (row?.status !== "confirmed") continue;
     if (event._id === set.competition._id) roomApplies = true;
     const requirements = await ctx.db.query("requirements").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(100);
     for (const requirement of requirements) {
@@ -466,16 +579,19 @@ function emptySummary(scenario: Scenario): Summary {
   return {
     scenario, eventIds: [],
     created: { events: 0, requirements: 0, teammates: 0, roomGroups: 0, roomInvitations: 0, announcements: 0, fees: 0 },
-    changed: { eventsCanceled: 0, feesCanceled: 0, canceledCents: 0, requirementsCompleted: 0, signupsClosed: 0, announcementsPinned: 0, announcementsUnpinned: 0, announcementsArchived: 0, parentLinksRestored: 0, parentLinksRemoved: 0, teammateRestored: 0, teammateDeactivated: 0 },
-    roomChoice: null, balanceDueCents: null, notes: [],
+    changed: { eventsCanceled: 0, feesCanceled: 0, canceledCents: 0, requirementsCompleted: 0, signupsApproved: 0, signupsClosed: 0, announcementsPinned: 0, announcementsUnpinned: 0, announcementsArchived: 0, parentLinksRestored: 0, parentLinksRemoved: 0, teammateRestored: 0, teammateDeactivated: 0, roomTypesSet: 0 },
+    roomChoice: null, teammateOtherEvents: [], balanceDueCents: null, notes: [],
   };
 }
 
 /**
- * busyWeek: what's left, two open signups, a room invitation from "Jordan W." and Balance due.
- * allDone: the same records finished; Balance due from SCENARIO fees is $0 and one message stays pinned.
+ * busyWeek: what's left, an open signup, a signup that needs approval, a room invitation from "Jordan W." and Balance due.
+ *   Gives the Dev Student a Room type first if it has none.
+ * allDone: the same records finished; the room is chosen by accepting Jordan's invitation (or, when rooms.respond would
+ *   refuse, by asking to be assigned; roomChoice says which), Balance due from SCENARIO fees is $0 and one message stays pinned.
  * newStudent: like reset, and both Dev Parent links removed, so Home asks to invite a parent.
  * reset: SCENARIO events canceled, messages removed, teammate inactive, Dev Parent links restored.
+ * forget: recovery after "changed outside this tool"; the tool forgets its earlier SCENARIO records and changes nothing else.
  * Each run is one transaction; running the same scenario again leaves the same state.
  */
 export const apply = internalMutation({
@@ -485,17 +601,25 @@ export const apply = internalMutation({
     const season = await guard(ctx);
     const people = await loadPeople(ctx, season);
     const out = emptySummary(args.scenario);
+    if (args.scenario === "forget") {
+      // Deliberately reads neither the earlier marker nor the teammate: either may be what stopped the tool.
+      for (const text of FORGET_NOTES) note(out, text);
+      await audit(ctx, people.coach, MARKER_ENTITY, season._id, "apply:forget", null, { phase: null, set: null, forgotten: true }, REASON);
+      return out;
+    }
     const marker = await loadMarker(ctx, season, people);
     let teammate = await findTeammate(ctx, season);
     let current: LiveSet | null = null;
     if (args.scenario === "busyWeek" || args.scenario === "allDone") {
       const live = liveSet(marker.set);
-      const reuse = live !== null && (args.scenario === "allDone" || (marker.phase === "busyWeek" && await untouchedBusyWeek(ctx, live, people, teammate, Date.now())));
+      const now = Date.now();
+      const reuse = live !== null && (args.scenario === "allDone" ? await allDoneCanFinish(ctx, live, people, now) : marker.phase === "busyWeek" && await untouchedBusyWeek(ctx, live, people, teammate, now));
       if (reuse) current = live;
       else {
         if (marker.set) await retireSet(ctx, marker.set, people, teammate, out);
-        teammate = await ensureTeammate(ctx, season, people, teammate, out);
-        current = await createSet(ctx, season, people, teammate, out);
+        const roomType = await studentRoomType(ctx, people, teammate?.roomCategory ?? DEFAULT_ROOM_TYPE, out);
+        teammate = await ensureTeammate(ctx, season, people, teammate, roomType, out);
+        current = await createSet(ctx, season, people, teammate, roomType, out);
       }
       if (args.scenario === "allDone") await completeSet(ctx, current, people, out);
       if (args.scenario === "busyWeek") await syncPins(ctx, season, people.coach, [current.roomNotice, current.reminder], [], out);
@@ -503,10 +627,11 @@ export const apply = internalMutation({
       await setParentLinks(ctx, season, people, true, out);
     } else {
       if (marker.set) await retireSet(ctx, marker.set, people, teammate, out);
-      await deactivateTeammate(ctx, people.coach, teammate, out);
+      teammate = await deactivateTeammate(ctx, people.coach, teammate, out);
       await setParentLinks(ctx, season, people, args.scenario === "reset", out);
       for (const text of NOT_UNDONE) note(out, text);
     }
+    out.teammateOtherEvents = await teammateOtherEvents(ctx, teammate, out);
     out.eventIds = current ? [current.competition._id, current.outreach._id, current.team._id] : [];
     out.balanceDueCents = await balanceDue(ctx, people.student._id);
     if (args.scenario === "allDone" && out.balanceDueCents) note(out, OTHER_FEES_NOTE);

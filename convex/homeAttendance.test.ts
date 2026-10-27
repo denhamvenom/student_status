@@ -244,11 +244,12 @@ describe("Student Home participation rings", () => {
   it.each([
     { name: "moved from before kickoff to after kickoff", from: buildBeforeKickoff, to: Date.parse("2027-01-26T23:00:00Z"), shown: 120 },
     { name: "moved from after kickoff to before kickoff", from: Date.parse("2027-01-26T23:00:00Z"), to: buildBeforeKickoff, shown: 0 },
-  ])("counts a rescheduled Build meeting once, on its new side of kickoff: $name", async ({ from, to, shown }) => {
+  ])("re-keys a Build meeting's minutes once, on its new side of kickoff, after its session start changes and the session is invalidated: $name", async ({ from, to, shown }) => {
     const f = await fixture();
     const session = await meeting(f, { title: "Build meeting", at: from, visits: full(from) });
     expect(await minutesFor(f)).toBe(120);
-    // The meeting moved to a new date and the Student clocked in at the new time.
+    // Checks aggregate re-keying only: the session row and visit are patched directly, then invalidated.
+    // It does not exercise the calendar reschedule path that moves a real meeting.
     await f.t.run(async ctx => {
       const row = (await ctx.db.get(session))!;
       await ctx.db.patch(session, { scheduledStart: to, scheduledEnd: to + 2 * hour, effectiveEnd: to + 2 * hour, openedAt: to, closedAt: to + 2 * hour, revision: row.revision + 1 });
