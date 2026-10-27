@@ -1,5 +1,6 @@
 import reference from './ui-copy.reference.json'
 import { readinessCopy } from '../features/design-review/readinessCopy'
+import { announcementsCopy } from '../features/announcements/copy'
 
 const student = reference.navigation.desktop.student
 const coach = reference.navigation.desktop.coachGroups as [string, string[]][]
@@ -13,7 +14,7 @@ export const navigationCopy = {
     usersRoles: readinessCopy.navigation.users, readiness: readinessCopy.navigation.readiness, drivers: coach[1][1][2],
     permissionForms: coach[1][1][3], fundraising: coach[2][1][1], reports: readinessCopy.navigation.reports,
     season: coach[4][1][1], myProfile: 'Profile', teamReport: 'Report',
-    withdrawals: readinessCopy.navigation.withdrawals,
+    withdrawals: readinessCopy.navigation.withdrawals, announcements: announcementsCopy.title,
   },
   main: 'Main navigation', mobile: 'Mobile navigation', more: 'More navigation',
   subSuffix: 'navigation', travelLeadRole: 'Travel Lead',
@@ -23,8 +24,8 @@ const n = navigationCopy.labels
 export const menu: Record<string, [string, string][]> = {
   student: [[n.status,'/'],[n.events,'/events'],[n.finances,'/finances'],[n.attendance,'/attendance'],[n.profileHealth,'/profile'],[n.parents,'/parents'],[n.settings,'/settings']],
   parent: [[n.status,'/'],[n.events,'/events'],[n.finances,'/finances'],[n.attendance,'/attendance'],[n.studentProfile,'/profile'],[n.permissionForm,'/forms'],[n.settings,'/settings']],
-  coach: [[n.team,'/'],[n.events,'/events'],['Archived events','/events/archive'],[n.readiness,'/readiness'],[n.withdrawals,'/withdrawals'],[n.drivers,'/drivers'],[n.finances,'/finances'],[n.fundraising,'/fundraising'],[n.permissionForms,'/permissions'],[n.reports,'/reports'],[n.joinRequests,'/enroll'],[n.usersRoles,'/adults'],[readinessCopy.navigation.attendance,'/attendance'],[n.season,'/season'],['Money tools','/money-tools'],[readinessCopy.navigation.archived,'/retention'],[n.myProfile,'/myprofile'],[n.settings,'/settings']],
-  travelLead: [[n.team,'/'],[n.joinRequests,'/enroll'],[n.events,'/events'],['Archived events','/events/archive'],[n.readiness,'/readiness'],[n.withdrawals,'/withdrawals'],[n.drivers,'/drivers'],[n.finances,'/finances'],[n.fundraising,'/fundraising'],[n.permissionForms,'/permissions'],[n.reports,'/reports'],['Money tools','/money-tools'],[n.myProfile,'/myprofile'],[n.settings,'/settings']],
+  coach: [[n.team,'/'],[n.events,'/events'],['Archived events','/events/archive'],[n.readiness,'/readiness'],[n.withdrawals,'/withdrawals'],[n.announcements,'/announcements'],[n.drivers,'/drivers'],[n.finances,'/finances'],[n.fundraising,'/fundraising'],[n.permissionForms,'/permissions'],[n.reports,'/reports'],[n.joinRequests,'/enroll'],[n.usersRoles,'/adults'],[readinessCopy.navigation.attendance,'/attendance'],[n.season,'/season'],['Money tools','/money-tools'],[readinessCopy.navigation.archived,'/retention'],[n.myProfile,'/myprofile'],[n.settings,'/settings']],
+  travelLead: [[n.team,'/'],[n.joinRequests,'/enroll'],[n.events,'/events'],['Archived events','/events/archive'],[n.readiness,'/readiness'],[n.withdrawals,'/withdrawals'],[n.announcements,'/announcements'],[n.drivers,'/drivers'],[n.finances,'/finances'],[n.fundraising,'/fundraising'],[n.permissionForms,'/permissions'],[n.reports,'/reports'],['Money tools','/money-tools'],[n.myProfile,'/myprofile'],[n.settings,'/settings']],
   mentor: [[n.myProfile,'/'],[n.teamReport,'/report'],[n.settings,'/settings']],
 }
 

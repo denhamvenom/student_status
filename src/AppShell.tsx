@@ -42,7 +42,7 @@ export function AppShell({ children, viewer, familyContext, role = "coach" }: { 
   const nav = navigationCopy.groups
   const groups: Record<string, [string, string][]> = {
     [nav.team]: [[nav.team, '/'], [nav.joinRequests, '/enroll'], [nav.attendance, '/attendance'], [nav.reports, '/reports']],
-    [nav.events]: [[nav.events, '/events'], ['Archived events', '/events/archive'], [nav.readiness, '/readiness'], [nav.permissionForms, '/permissions'], [nav.drivers, '/drivers'], [nav.withdrawals, '/withdrawals']],
+    [nav.events]: [[nav.events, '/events'], ['Archived events', '/events/archive'], [nav.readiness, '/readiness'], [nav.permissionForms, '/permissions'], [nav.drivers, '/drivers'], [nav.withdrawals, '/withdrawals'], [navigationCopy.labels.announcements, '/announcements']],
     [nav.money]: [[nav.money, '/finances'], [nav.fundraising, '/fundraising']],
     [nav.admin]: [[nav.users, '/adults'], [nav.season, '/season'], [nav.archived, '/retention'], ['Money tools', '/money-tools'], [nav.settings, '/settings']],
   }

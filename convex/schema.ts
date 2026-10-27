@@ -297,6 +297,9 @@ events: defineTable({ seasonId: v.id("seasons"), name: v.string(), type: v.union
     .index("by_seasonId", ["seasonId"]).index("by_seasonId_and_ownerAppUserId", ["seasonId", "ownerAppUserId"]),
   eventVehicles: defineTable({ eventId: v.id("events"), driverId: v.id("drivers"), seats: v.number(), notes: v.optional(v.string()) })
     .index("by_eventId", ["eventId"]).index("by_eventId_and_driverId", ["eventId", "driverId"]),
+  // Pinned Student Home messages from a Coach or Travel Lead. Archiving also unpins, so the pinned index never lists archived rows.
+  teamAnnouncements: defineTable({ seasonId: v.id("seasons"), title: v.optional(v.string()), body: v.string(), authorId: v.id("appUsers"), authorRole: v.union(v.literal("coach"), v.literal("travelLead")), pinned: v.boolean(), pinnedAt: v.optional(v.number()), showUntil: v.optional(v.number()), createdAt: v.number(), updatedAt: v.number(), archivedAt: v.optional(v.number()) })
+    .index("by_seasonId_and_pinned_and_pinnedAt", ["seasonId", "pinned", "pinnedAt"]).index("by_seasonId_and_archivedAt_and_createdAt", ["seasonId", "archivedAt", "createdAt"]),
   audit: defineTable({ actorId: v.id("appUsers"), entity: v.string(), entityId: v.string(), action: v.string(), beforeJson: v.optional(v.string()), afterJson: v.optional(v.string()), reason: v.optional(v.string()), at: v.number() })
     .index("by_entity_and_entityId", ["entity", "entityId"]).index("by_actorId_and_at", ["actorId", "at"]),
 });
