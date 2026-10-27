@@ -6,6 +6,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
+import { Checkbox } from "../../components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import styles from "./Operations.module.css";
 import { WholeTeamLeaveNotices } from "../../Withdrawals";
@@ -30,6 +31,7 @@ export function EventOperations({ eventId, coach=false }: { eventId: Id<"events"
   const [capacity, setCapacity] = useState<string | null>(null);
   const [signupDeadline, setSignupDeadline] = useState<string | null>(null);
   const [roomDeadline, setRoomDeadline] = useState<string | null>(null);
+  const [outreach, setOutreach] = useState<boolean | null>(null);
   const [key, setKey] = useState("");
   const [label, setLabel] = useState("");
   const [instructions, setInstructions] = useState("");
@@ -46,6 +48,7 @@ export function EventOperations({ eventId, coach=false }: { eventId: Id<"events"
   const capacityValue = capacity ?? (event.capacity?.toString() ?? "");
   const signupValue = signupDeadline ?? localDate(event.signupClosesAt);
   const roomValue = roomDeadline ?? localDate(event.roomDeadline);
+  const outreachValue = outreach ?? ((event as { isOutreach?: boolean }).isOutreach ?? false);
   const participants = data.participants as Row[];
   const waitlist = data.waitlist as Row[];
   const requirements = data.requirements as Requirement[];
@@ -53,11 +56,12 @@ export function EventOperations({ eventId, coach=false }: { eventId: Id<"events"
   const confirmed = participants.filter(p => p.status === "confirmed");
   const submitSettings = (e: FormEvent) => {
     e.preventDefault();
+    if (!canEdit) { if (outreach !== null) void act(() => settings({ eventId, isOutreach: outreach }), operationsCopy.event.eventSettingsSaved); return; }
     const parsed = capacityValue.trim() ? Number(capacityValue) : null;
     const signup = signupValue ? Date.parse(signupValue) : null;
     const room = roomValue ? Date.parse(roomValue) : null;
     if (parsed !== null && (!Number.isSafeInteger(parsed) || parsed < 1) || signup !== null && !Number.isFinite(signup) || room !== null && !Number.isFinite(room)) { setError(operationsCopy.event.enterValidCapacityAndDeadlines); return; }
-    void act(() => settings({ eventId, capacity: parsed, ...(event.signupMode !== "assigned" ? { signupClosesAt: signup } : {}), ...(event.overnight && event.roomingEnabled ? { roomDeadline: room } : {}) }), operationsCopy.event.eventSettingsSaved);
+    void act(() => settings({ eventId, capacity: parsed, ...(event.signupMode !== "assigned" ? { signupClosesAt: signup } : {}), ...(event.overnight && event.roomingEnabled ? { roomDeadline: room } : {}), ...(outreach !== null ? { isOutreach: outreach } : {}) }), operationsCopy.event.eventSettingsSaved);
   };
   const submitRequirement = (e: FormEvent) => {
     e.preventDefault();
@@ -76,9 +80,11 @@ export function EventOperations({ eventId, coach=false }: { eventId: Id<"events"
       {event.assignmentScope==="wholeTeam"&&<WholeTeamLeaveNotices eventId={eventId} coach={coach}/>}
     </CardContent></Card></div></details>
     <EventCalendarOperations eventId={eventId} coach={canEdit} event={event}/>
-    {canEdit && <details className={styles.disclosure}><summary><strong>{operationsCopy.event.eventSettings}</strong><span>{operationsText.event.signupCloses(when(event.signupClosesAt))}</span></summary><div className={styles.disclosureBody}><Card><CardHeader><CardTitle>{operationsCopy.event.eventSettings}</CardTitle></CardHeader><CardContent><form className="form-grid" onSubmit={submitSettings}>
-      {event.signupMode !== "assigned" && <><label>{operationsCopy.event.capacityNoLimit} <Input type="number" min="1" max="500" value={capacityValue} onChange={e => setCapacity(e.target.value)} /></label><label>{operationsCopy.event.signupClosesLocal} <Input type="datetime-local" value={signupValue} onChange={e => setSignupDeadline(e.target.value)} /></label></>}
-      {event.overnight && event.roomingEnabled && <label>{operationsCopy.event.roomDeadlineLocal} <Input type="datetime-local" value={roomValue} onChange={e => setRoomDeadline(e.target.value)} /></label>}
+    {<details className={styles.disclosure}><summary><strong>{operationsCopy.event.eventSettings}</strong><span>{operationsText.event.signupCloses(when(event.signupClosesAt))}</span></summary><div className={styles.disclosureBody}><Card><CardContent><form className="form-grid" onSubmit={submitSettings}>
+      {canEdit && event.signupMode !== "assigned" && <><label>{operationsCopy.event.capacityNoLimit} <Input type="number" min="1" max="500" value={capacityValue} onChange={e => setCapacity(e.target.value)} /></label><label>{operationsCopy.event.signupClosesLocal} <Input type="datetime-local" value={signupValue} onChange={e => setSignupDeadline(e.target.value)} /></label></>}
+      {canEdit && event.overnight && event.roomingEnabled && <label>{operationsCopy.event.roomDeadlineLocal} <Input type="datetime-local" value={roomValue} onChange={e => setRoomDeadline(e.target.value)} /></label>}
+      <div><label className="checkbox-label"><Checkbox checked={outreachValue} onCheckedChange={checked => setOutreach(checked)} />{operationsCopy.event.outreachEvent}</label>
+      <p className="muted">{operationsCopy.event.outreachEventHint}</p></div>
       <Button type="submit" disabled={busy}>{operationsCopy.event.saveSettings}</Button></form></CardContent></Card></div></details>}
     {canEdit && <details id="event-requirements" className={styles.disclosure}><summary><strong>{operationsCopy.event.customRequirements}</strong><span>{requirements.length} custom requirement{requirements.length === 1 ? '' : 's'}</span></summary><div className={styles.disclosureBody}><Card><CardHeader><CardTitle>{operationsCopy.event.customRequirements}</CardTitle></CardHeader><CardContent className="space-y-4"><div className={styles.sectionRows}>{requirements.map(r => <div className={styles.sectionRow} key={r.key}><span className="min-w-40">{r.label}{r.dueAt ? operationsText.event.due(when(r.dueAt)) : ""}</span><Button variant="outline" disabled={busy} onClick={() => { setKey(r.key); setLabel(r.label); setInstructions(r.instructions ?? ""); setUrl(r.url ?? ""); setDueAt(localDate(r.dueAt)); }}>{operationsCopy.event.edit}</Button><Button variant="outline" disabled={busy} onClick={() => void act(() => removeRequirement({ eventId, key: r.key }), operationsText.event.removedRequirement(r.label))}>{operationsCopy.event.remove}</Button></div>)}</div><form className="form-grid" onSubmit={submitRequirement}><label>{operationsCopy.event.requirementKey} <Input value={key} onChange={e => setKey(e.target.value)} pattern="[a-zA-Z0-9_-]{1,32}" aria-describedby="requirement-short-name-help" required /></label><p id="requirement-short-name-help" className="muted">A short code, like lunch-order. Use up to 32 letters, numbers, - or _. Do not change it later.</p><label>{operationsCopy.event.requirementLabel} <Input value={label} onChange={e => setLabel(e.target.value)} required /></label><label>{operationsCopy.event.requirementInstructions} <Input value={instructions} onChange={e => setInstructions(e.target.value)} /></label><label>{operationsCopy.event.requirementLink} <Input type="url" value={url} onChange={e => setUrl(e.target.value)} /></label><label>{operationsCopy.event.requirementDue} <Input type="datetime-local" value={dueAt} onChange={e => setDueAt(e.target.value)} /></label><Button type="submit" disabled={busy}>{operationsCopy.event.saveRequirement}</Button></form></CardContent></Card></div></details>}
     {error && <p role="alert" className="open-text">{error}</p>}{success && <p role="status" className="ready-text">{success}</p>}

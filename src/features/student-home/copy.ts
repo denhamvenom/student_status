@@ -199,20 +199,20 @@ export const homeCopy = {
 
   participation: {
     title: 'Participation',
-    meetings: 'Meetings',
+    meetings: 'Required meetings',
     outreach: 'Outreach',
     buildHours: 'Build hours',
     percent: (value: number) => `${value}%`,
     attended: (attended: number, held: number) => `${attended} / ${held} attended`,
-    noMeetings: 'No meetings yet',
+    noMeetings: 'No required meetings yet',
     ofEvents: (held: number) => `of ${held} ${plural(held, 'event', 'events')}`,
     hours: (value: string) => `${value}h`,
     ofTarget: (target: number) => `of ${target} target`,
     sinceKickoff: 'since kickoff',
     startsAtKickoff: 'Starts at kickoff',
     updating: 'Updating',
-    unavailable: 'Participation shows here once meetings start.',
-    ringsLabel: (meetings: string, outreach: string, build: string) => `Meetings ${meetings}. Outreach ${outreach}. Build hours ${build}.`,
+    unavailable: 'Participation shows here once required meetings start.',
+    ringsLabel: (meetings: string, outreach: string, build: string) => `Required meetings ${meetings}. Outreach ${outreach}. Build hours ${build}.`,
   },
 
   states: {

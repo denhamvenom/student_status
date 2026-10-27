@@ -8,7 +8,6 @@ import { Card, CardTitle } from './components/ui/card'
 import { Button } from './components/ui/button'
 import { familyCopy, moneyMeanings } from './lib/family-copy'
 import { reportCopy as copy } from './lib/report-copy'
-import { attendanceDuration, attendanceEligibilityText } from './lib/attendance-display'
 import styles from './DashboardReports.module.css'
 
 export function reportMoney(cents:number) {
@@ -44,10 +43,10 @@ function useReportTime(nextRefreshAt:number|null|undefined){
   },[nextRefreshAt,asOf])
   return asOf
 }
-function useAttendanceReport(studentId:Id<'students'>,includeHistory:boolean,cursor:string|null=null){
+function useAttendanceReport(studentId:Id<'students'>){
   const [nextRefreshAt,setNextRefreshAt]=useState<number|null>()
   const asOf=useReportTime(nextRefreshAt)
-  const data=useQuery(api.dashboardReports.familyAttendance,{studentId,asOf,includeHistory,...(includeHistory?{paginationOpts:{numItems:10,cursor}}:{})})
+  const data=useQuery(api.dashboardReports.familyAttendance,{studentId,asOf,includeHistory:false})
   useEffect(()=>setNextRefreshAt(data?.nextRefreshAt),[data?.nextRefreshAt])
   return data
 }
@@ -76,7 +75,7 @@ function AttendancePhaseCards({label,totals,build=false}:{label:string;totals:Ph
   </div>{build&&totals.buildSundayHeld>0&&<p className={styles.note}>{copy.buildSundaySeparate(totals.buildSundayHeld)}</p>}</section>
 }
 export function FamilyAttendanceSummary({studentId,compact=false,showDetailsBelow=false,headingLabel=copy.verified}:{studentId:Id<'students'>;compact?:boolean;showDetailsBelow?:boolean;headingLabel?:string}){
-  const data=useAttendanceReport(studentId,false)
+  const data=useAttendanceReport(studentId)
   return <AttendanceSummary data={data} compact={compact} showDetailsBelow={showDetailsBelow} headingLabel={headingLabel}/>
 }
 function AttendanceSummary({data,compact=false,showDetailsBelow=false,headingLabel=copy.verified}:{data:ReturnType<typeof useAttendanceReport>;compact?:boolean;showDetailsBelow?:boolean;headingLabel?:string}){
@@ -88,11 +87,6 @@ function AttendanceSummary({data,compact=false,showDetailsBelow=false,headingLab
   else if(compact){const build=data.phaseBoundary.currentPhase==='buildSeason';const totals=build?data.phases.buildSeason:data.phases.offseason;content=<><p className={styles.phaseLabel}>{build?copy.buildSeason:copy.offseason}</p>{build?<><div className="split-line"><span>{copy.buildWeekday}</span><strong>{totals.buildWeekdayAttended} / {totals.buildWeekdayHeld}</strong></div><div className="split-line"><span>{copy.buildSaturday}</span><strong>{totals.buildSaturdayAttended} / {totals.buildSaturdayHeld}</strong></div><p className={styles.note}>{copy.buildNamedEvents}</p>{totals.buildSundayHeld>0&&<p className={styles.note}>{copy.buildSundaySeparate(totals.buildSundayHeld)}</p>}</>:<><div className={styles.attendanceBig}><strong>{totals.tuesdayPercent===null?'Not counted yet':`${totals.tuesdayPercent}%`}</strong><span>{copy.tuesday}</span></div><div className="progress-track" role="progressbar" aria-label={copy.tuesday} aria-valuemin={0} aria-valuemax={100} aria-valuenow={totals.tuesdayPercent??undefined} aria-valuetext={totals.tuesdayPercent===null?'Not counted yet':undefined}><div style={{width:`${totals.tuesdayPercent??0}%`}}/><i/></div><div className="goal-row"><span>0%</span><span>{copy.goal}</span><span>100%</span></div><div className="split-line"><span>{copy.tuesday}</span><strong>{totals.tuesdayAttended} / {totals.tuesdayHeld}</strong></div><div className="split-line"><span>{copy.thursday}</span><strong>{totals.thursdayAttended}</strong></div></>}<div className="split-line"><span>{copy.outreach}</span><strong>{totals.outreachAttended}</strong></div><p className={styles.note}>{copy.kickoffBoundary(data.phaseBoundary.kickoffDate)}</p><p className={styles.note}>{copy.verifiedNote}</p></>}
   else content=<><p className={styles.note}>{copy.kickoffBoundary(data.phaseBoundary.kickoffDate)}</p><AttendancePhaseCards label={copy.offseason} totals={data.phases.offseason}/><AttendancePhaseCards label={copy.buildSeason} totals={data.phases.buildSeason} build/><p className={styles.note}>{copy.verifiedNote}</p>{data.verified.updatedAt!==null&&<p className={styles.note}>{copy.updated} {when(data.verified.updatedAt)}</p>}</>
   return compact?<Card className={styles.card}>{heading}{content}</Card>:<section className={styles.attendanceSection} aria-label={headingLabel}>{heading}{content}</section>
-}
-
-export function FamilyAttendancePage({studentId}:{studentId:Id<'students'>}){
-  const [cursor,setCursor]=useState<string|null>(null);const data=useAttendanceReport(studentId,true,cursor)
-  return <div className={styles.root}><AttendanceSummary data={data} showDetailsBelow/><Card className={styles.card}><CardTitle>{copy.legacy}</CardTitle><p className={styles.note}>{copy.legacyNote}</p>{!data?<p role="status">{copy.loading}</p>:<div className={styles.metrics}><Metric label={copy.tuesday} value={data.legacy.tuesdayPercent===null?copy.unavailable:`${data.legacy.tuesdayPercent}% (${data.legacy.tuesdayAttended}/${data.legacy.tuesdayHeld})`}/><Metric label={copy.thursday} value={data.legacy.thursdayAttended}/><Metric label={copy.outreach} value={data.legacy.outreachAttended}/></div>}</Card><h2 className={styles.sectionTitle}>{copy.sessions}</h2><p className={styles.note}>{copy.timezone} {copy.finalizedScope}</p>{!data?<p role="status">{copy.loading}</p>:!data.sessions.length?<Card className={styles.card}><p>{copy.noSessions}</p></Card>:<div className={styles.sessionGrid}>{data.sessions.map(session=><Card key={session.sessionId} className={styles.card}><h3 className={styles.sessionTitle}>{session.title}</h3><p className={styles.note}>{when(session.scheduledStart)}</p><div className={styles.statuses}><span className="badge badge-pending">{copy[session.state]}</span>{session.provisional&&<span className="badge badge-pending">{copy.provisional}</span>}{session.needsReview&&<span className="badge badge-todo">{copy.review}</span>}</div>{session.reportState!=='ready'?<p role="status">{session.reportState==='failed'?copy.attendanceFailed:copy.attendanceUpdating}</p>:<><dl className={styles.sessionMetrics}><div><dt>{copy.total}</dt><dd>{session.totalMs===null?copy.unavailable:attendanceDuration(session.totalMs)}</dd></div></dl><details><summary>{copy.timeDetails}</summary><dl className={styles.sessionMetrics}>{[[copy.scheduled,session.scheduledMs],[copy.early,session.earlyMs],[copy.extended,session.extendedMs],[copy.longest,session.longestScheduledMs]].map(([label,ms])=><div key={label}><dt>{label}</dt><dd>{ms===null?copy.unavailable:attendanceDuration(Number(ms))}</dd></div>)}</dl></details><strong className={session.state==='closed'&&!session.needsReview&&session.qualifies?'ready-text':'muted'}>{attendanceEligibilityText(session)}</strong></>}</Card>)}</div>}{data&&<div className="action-row">{cursor!==null&&<Button variant="outline" onClick={()=>setCursor(null)}>{copy.latestSessions}</Button>}{!data.isDone&&<Button variant="outline" onClick={()=>setCursor(data.continueCursor)}>{copy.olderSessions}</Button>}</div>}</div>
 }
 
 export function AttendanceReportRebuild(){

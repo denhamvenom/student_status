@@ -10,7 +10,7 @@ import { studentReadiness } from "./lib/readModels";
 import { enrollmentPending } from "./lib/eventEnrollmentState";
 
 const nullableNumber = v.union(v.number(), v.null());
-const attendanceCounts = v.object({offTuesday:v.number(),offThursday:v.number(),offOutreach:v.number(),buildWeekday:v.number(),buildSaturday:v.number(),buildSunday:v.number(),buildOutreach:v.number()});
+const attendanceCounts = v.object({offTuesday:v.number(),offThursday:v.number(),offOutreach:v.number(),buildWeekday:v.number(),buildSaturday:v.number(),buildSunday:v.number(),buildOutreach:v.number(),buildWeekdayHeld:v.number(),buildWeekendAttended:v.number(),buildWeekendHeld:v.number(),buildMinutes:v.number(),buildWeekdayMinutes:v.number(),buildWeekendMinutes:v.number()});
 const attendanceGate = v.object({state:v.union(v.literal("ready"),v.literal("updating"),v.literal("failed"),v.literal("unknownKickoff")),kickoff:v.union(v.null(),v.object({date:v.string(),at:v.number()})),updatedAt:nullableNumber});
 const financeValidator = v.object({state:v.union(v.literal("ready"),v.literal("updating"),v.literal("failed"),v.literal("uninitialized")),chargedCents:nullableNumber,paidCents:nullableNumber,dueCents:nullableNumber,raisedCents:nullableNumber,travelAccountCents:nullableNumber,updatedAt:nullableNumber});
 const selectedValidator = v.union(v.null(),v.object({participation:v.union(v.literal("confirmed"),v.literal("pending"),v.literal("waitlist"),v.literal("withdrawn"),v.null()),state:v.union(v.literal("ready"),v.literal("open"),v.literal("notApplicable"),v.literal("unknown")),outstanding:v.array(v.string())}));

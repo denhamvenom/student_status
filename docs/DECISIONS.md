@@ -74,6 +74,13 @@ Read this before changing parent linking, consent/PDF, finance, rooms/waitlists 
 - Signing up from Home opens a sheet with the fee, spots left (counts only, never names) and what happens next. "Fundraise" replaces "Pay now" on Home and opens the fundraiser section of Money; the Money page's fundraiser card keeps "Pay Now" (October 27: same link).
 - Participation rings: Meetings counts held meetings this season (from August, excluding Outreach) and resets with a new season; Outreach is attended of held this season; Build hours is clocked time at Build meetings from kickoff, against a per-season target a Coach sets on the Season page.
 
+## Attendance breakdown
+
+- October 27–28 owner decisions. Required meetings are non-Outreach sessions on Tuesdays before Build Season kickoff and Mondays from kickoff (America/Chicago); they drive Home's ring and are worded "Required meetings". Other meetings are the remaining non-Outreach sessions, listed by date and title when provided.
+- Outreach is a calendar title match or the Outreach event flag; Coach and Travel Lead can set it, and an explicit unmark wins over the title. Stored flags let a Coach change what counts later (no UI yet).
+- Build hours show on Attendance like Home once Build Season starts, listing every Build day (Attended/Missed, minutes). A Weekday vs Weekend split is kept for Travel Team decisions (Weekend = Saturday + Sunday, Build Season only).
+- The earlier-records tables were empty and unused; the earlier records page is removed.
+
 ## Retention
 
 - Five years runs from the latest archival after reactivation and triggers review, not automatic erasure. Automatic deletion remains unauthorized.
