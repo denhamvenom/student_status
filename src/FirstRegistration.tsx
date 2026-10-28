@@ -12,7 +12,7 @@ import { Input } from './components/ui/input'
 type Status = 'needsCompletion' | 'awaitingVerification' | 'verified'
 type Invitation = FunctionReturnType<typeof api.firstRegistration.invitationSettings>
 type StudentRegistration = FunctionReturnType<typeof api.firstRegistration.get>
-const officialInstructions = 'https://www.firstinspires.org/programs/youth-registration'
+export const officialInstructions = 'https://www.firstinspires.org/programs/youth-registration'
 const failure = (cause: unknown) => userFacingError(cause, 'The change could not be saved. Try again.')
 const when = (at: number) => new Intl.DateTimeFormat('en-US', {dateStyle:'medium',timeStyle:'short',timeZone:'America/Chicago'}).format(at)
 

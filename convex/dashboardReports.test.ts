@@ -98,7 +98,7 @@ describe("role-scoped dashboard reports", () => {
   });
   it("reconciles cancellation, applied payment and conserved transfer without inventing gross Raised", async () => {
     const f = await fixture();
-    const finance = await f.student.query(financeRef, { studentId: f.ids.sid });
+    const finance = await f.parent.query(financeRef, { studentId: f.ids.sid });
     expect(finance).toMatchObject({ chargedCents: 1000, paidCents: 1000, dueCents: 0, personalAvailableCents: 0, fundraisingAvailableCents: 1700, raisedCents: null, travelShareCents: 2000, transferredInCents: 0, updatedAt: 4 });
     const team = await f.coach.query(teamRef, {});
     expect(team).toMatchObject({ activeStudents: 1, inactiveStudents: 1, travelTeamStudents: 1, finance: { travelBalanceCents: 2000, travelShareCents: 2000, transferredInCents: 300 } });

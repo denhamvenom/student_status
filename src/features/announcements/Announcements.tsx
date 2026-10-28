@@ -12,11 +12,12 @@ import { Input } from '../../components/ui/input'
 import { Textarea } from '../../components/ui/textarea'
 import { chicagoInputTime, parseChicagoInput } from '../../lib/chicago-time'
 import { announcementsCopy as copy } from './copy'
+import { hasPinRoom, type Audience } from './audience'
 
 type StaffAnnouncement = FunctionReturnType<typeof api.announcements.listForStaff>['pinned'][number]
 type AnnouncementId = Id<'teamAnnouncements'>
 type ListName = 'pinned' | 'notPinned'
-type Values = { title?: string; body: string; showUntil?: number; pin: boolean }
+type Values = { title?: string; body: string; showUntil?: number; pin: boolean; audience: Audience }
 
 const TITLE_MAX = 80
 const BODY_MAX = 500
@@ -31,10 +32,12 @@ function endOfChicagoDay(date: string) {
 }
 const shortLabel = (row: StaffAnnouncement) => row.title ?? (row.body.length > 60 ? `${row.body.slice(0, 57).trimEnd()}…` : row.body)
 
-function AnnouncementForm({ initial, pinAvailable, submitLabel, onSubmit, onCancel }: {
-  initial: { title: string | null; body: string; showUntil: number | null }
+function AnnouncementForm({ initial, pinned, pinLimit, coach, submitLabel, onSubmit, onCancel }: {
+  initial: { title: string | null; body: string; showUntil: number | null; audience?: Audience }
   /** Set only when creating: whether another pin fits under the five-pin limit. */
-  pinAvailable?: boolean
+  pinned?: StaffAnnouncement[]
+  pinLimit: number
+  coach: boolean
   submitLabel: string
   onSubmit: (values: Values) => Promise<string>
   onCancel?: () => void
@@ -45,12 +48,14 @@ function AnnouncementForm({ initial, pinAvailable, submitLabel, onSubmit, onCanc
   const [body, setBody] = useState(initial.body)
   const [date, setDate] = useState(initialDate)
   const [pin, setPin] = useState(true)
+  const [audience, setAudience] = useState<Audience>(initial.audience ?? 'students')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState('')
   const titleInput = useRef<HTMLInputElement>(null)
   const editing = onCancel !== undefined
-  const creating = pinAvailable !== undefined
+  const creating = pinned !== undefined
+  const pinAvailable = pinned === undefined || hasPinRoom(pinned, audience, pinLimit)
   const willPin = creating && pin && pinAvailable === true
   useEffect(() => { if (editing) titleInput.current?.focus() }, [editing])
 
@@ -62,8 +67,8 @@ function AnnouncementForm({ initial, pinAvailable, submitLabel, onSubmit, onCanc
     if (showUntil !== undefined && Number.isNaN(showUntil)) { setError(copy.invalidDate); return }
     setBusy(true); setError(''); setDone('')
     try {
-      const message = await onSubmit({ title: title.trim() || undefined, body, showUntil, pin: willPin })
-      if (creating) { setTitle(''); setBody(''); setDate(''); setPin(true) }
+      const message = await onSubmit({ title: title.trim() || undefined, body, showUntil, pin: willPin, audience })
+      if (creating) { setTitle(''); setBody(''); setDate(''); setPin(true); setAudience('students') }
       setDone(message)
     } catch (cause) { setError(userFacingError(cause, copy.failed)) } finally { setBusy(false) }
   }
@@ -72,6 +77,7 @@ function AnnouncementForm({ initial, pinAvailable, submitLabel, onSubmit, onCanc
     <label className="grid gap-2 font-semibold">{copy.titleLabel}<Input ref={titleInput} value={title} maxLength={TITLE_MAX} disabled={busy} onChange={event => { setTitle(event.target.value); setDone('') }}/></label>
     <label className="grid gap-2 font-semibold">{copy.messageLabel}<Textarea value={body} required maxLength={BODY_MAX} rows={4} disabled={busy} aria-describedby={`${id}-count`} onChange={event => { setBody(event.target.value); setDone('') }}/></label>
     <p id={`${id}-count`} className="-mt-2 text-sm text-muted-foreground">{copy.characters(body.length, BODY_MAX)}</p>
+    {coach && <label className="grid gap-2 font-semibold">{copy.audienceLabel}<select className="min-h-11 rounded-md border border-input bg-background px-3 text-foreground" value={audience} disabled={busy} onChange={event => { setAudience(event.target.value as Audience); setDone('') }}><option value="students">{copy.audiences.students}</option><option value="parents">{copy.audiences.parents}</option><option value="both">{copy.audiences.both}</option></select></label>}
     <label className="grid gap-2 font-semibold">{copy.showUntilLabel}<Input type="date" value={date} min={date !== initialDate ? chicagoDate(Date.now()) : undefined} disabled={busy} aria-describedby={`${id}-until`} onChange={event => { setDate(event.target.value); setDone('') }}/></label>
     <p id={`${id}-until`} className="-mt-2 text-sm text-muted-foreground">{copy.showUntilHint}</p>
     {creating && <>
@@ -87,10 +93,12 @@ function AnnouncementForm({ initial, pinAvailable, submitLabel, onSubmit, onCanc
   </form>
 }
 
-function AnnouncementItem({ row, list, pinAvailable, editing, setEditing, onLeaving, onDone }: {
+function AnnouncementItem({ row, list, pinned, pinLimit, coach, editing, setEditing, onLeaving, onDone }: {
   row: StaffAnnouncement
   list: ListName
-  pinAvailable: boolean
+  pinned: StaffAnnouncement[]
+  pinLimit: number
+  coach: boolean
   editing: boolean
   setEditing: (editing: boolean) => void
   /** Called before a change that moves the message out of this list, so focus can follow. */
@@ -117,10 +125,10 @@ function AnnouncementItem({ row, list, pinAvailable, editing, setEditing, onLeav
 
   // Repeated buttons carry the message in their accessible name ("Edit: Kickoff").
   const context = <span className="sr-only">: {shortLabel(row)}</span>
-  if (editing) return <li className="grid gap-3 border-b border-border py-4 last:border-b-0">
+  if (editing && (coach || row.audience === 'students')) return <li className="grid gap-3 border-b border-border py-4 last:border-b-0">
     <h3 className="mb-0">{copy.editHeading}</h3>
-    <AnnouncementForm initial={row} submitLabel={copy.saveChanges} onCancel={() => setEditing(false)} onSubmit={async values => {
-      await update({ id: row.id, title: values.title, body: values.body, showUntil: values.showUntil })
+    <AnnouncementForm initial={row} coach={coach} pinLimit={pinLimit} submitLabel={copy.saveChanges} onCancel={() => setEditing(false)} onSubmit={async values => {
+      await update({ id: row.id, title: values.title, body: values.body, showUntil: values.showUntil, audience: values.audience })
       setEditing(false); onDone(copy.changesSaved)
       return ''
     }}/>
@@ -128,6 +136,7 @@ function AnnouncementItem({ row, list, pinAvailable, editing, setEditing, onLeav
 
   return <li className="grid gap-2 border-b border-border py-4 last:border-b-0">
     {row.title && <h3 className="mb-0">{row.title}</h3>}
+    <span className="badge badge-pending w-fit">{copy.audiences[row.audience]}</span>
     <p className="mb-0 whitespace-pre-line">{row.body}</p>
     <p className="mb-0 text-sm text-muted-foreground">
       {copy.by(row.authorName, copy.roles[row.authorRole])} · {row.pinnedAt !== null ? copy.pinnedOn(formatDate(row.pinnedAt)) : copy.posted(formatDate(row.createdAt))}
@@ -135,27 +144,29 @@ function AnnouncementItem({ row, list, pinAvailable, editing, setEditing, onLeav
     </p>
     {expired && row.showUntil !== null && <p className="mb-0 text-sm open-text">{copy.hiddenSince(formatDate(row.showUntil))}</p>}
     {error && <p role="alert" className="mb-0 open-text">{error}</p>}
-    <div className="flex flex-wrap gap-2">
+    {(coach || row.audience === 'students') && <div className="flex flex-wrap gap-2">
       {row.pinned
         ? <Button type="button" variant="outline" disabled={busy} onClick={() => void move(() => unpin({ id: row.id }), copy.unpinnedDone)}>{copy.unpin}{context}</Button>
-        : <Button type="button" variant="outline" disabled={busy || !pinAvailable} onClick={() => void move(() => pin({ id: row.id }), copy.pinnedDone)}>{copy.pin}{context}</Button>}
+        : <Button type="button" variant="outline" disabled={busy || !hasPinRoom(pinned, row.audience, pinLimit)} onClick={() => void move(() => pin({ id: row.id }), copy.pinnedDone)}>{copy.pin}{context}</Button>}
       <Button ref={editButton} type="button" variant="outline" disabled={busy} onClick={() => { setError(''); setEditing(true) }}>{copy.edit}{context}</Button>
       <ConfirmAction disabled={busy} description={copy.removeConfirm(shortLabel(row))} onConfirm={async () => {
         onDone(''); onLeaving(row.id, list)
         try { await archive({ id: row.id }) } catch (cause) { onLeaving(null, list); throw cause }
         onDone(copy.removedDone)
       }}>{copy.remove}{context}</ConfirmAction>
-    </div>
+    </div>}
   </li>
 }
 
-function AnnouncementList({ title, rows, list, empty, headingRef, pinAvailable, editingId, setEditingId, onLeaving, onDone, children }: {
+function AnnouncementList({ title, rows, list, empty, headingRef, pinned, pinLimit, coach, editingId, setEditingId, onLeaving, onDone, children }: {
   title: string
   rows: StaffAnnouncement[]
   list: ListName
   empty: string
   headingRef: RefObject<HTMLHeadingElement | null>
-  pinAvailable: boolean
+  pinned: StaffAnnouncement[]
+  pinLimit: number
+  coach: boolean
   editingId: AnnouncementId | null
   setEditingId: (id: AnnouncementId | null) => void
   onLeaving: (id: AnnouncementId | null, list: ListName) => void
@@ -163,12 +174,12 @@ function AnnouncementList({ title, rows, list, empty, headingRef, pinAvailable, 
   children?: ReactNode
 }) {
   return <Card><CardHeader><CardTitle ref={headingRef} tabIndex={-1} className="outline-none">{title}</CardTitle>{children}</CardHeader><CardContent>
-    {rows.length === 0 ? <p className="text-muted-foreground">{empty}</p> : <ul className="m-0 list-none p-0">{rows.map(row => <AnnouncementItem key={row.id} row={row} list={list} pinAvailable={pinAvailable} editing={editingId === row.id} setEditing={editing => setEditingId(editing ? row.id : null)} onLeaving={onLeaving} onDone={onDone}/>)}</ul>}
+    {rows.length === 0 ? <p className="text-muted-foreground">{empty}</p> : <ul className="m-0 list-none p-0">{rows.map(row => <AnnouncementItem key={row.id} row={row} list={list} pinned={pinned} pinLimit={pinLimit} coach={coach} editing={editingId === row.id} setEditing={editing => setEditingId(editing ? row.id : null)} onLeaving={onLeaving} onDone={onDone}/>)}</ul>}
   </CardContent></Card>
 }
 
 /** Coach and Travel Lead page for the messages pinned to Student Home. The route supplies the page heading. */
-export function Announcements() {
+export function Announcements({ coach }: { coach: boolean }) {
   const list = useQuery(api.announcements.listForStaff, {})
   const create = useMutation(api.announcements.create)
   const [editingId, setEditingId] = useState<AnnouncementId | null>(null)
@@ -186,19 +197,18 @@ export function Announcements() {
   }, [list])
 
   if (list === undefined) return <Card><CardContent><p role="status">{copy.loading}</p></CardContent></Card>
-  const pinAvailable = list.pinned.length < list.pinLimit
-  const shared = { pinAvailable, editingId, setEditingId, onLeaving, onDone: setStatus }
+  const shared = { pinned: list.pinned, pinLimit: list.pinLimit, coach, editingId, setEditingId, onLeaving, onDone: setStatus }
 
   return <div className="grid gap-5">
     <Card><CardHeader><CardTitle>{copy.newHeading}</CardTitle></CardHeader><CardContent>
-      <AnnouncementForm initial={{ title: null, body: '', showUntil: null }} pinAvailable={pinAvailable} submitLabel={copy.save} onSubmit={async values => {
+      <AnnouncementForm initial={{ title: null, body: '', showUntil: null }} pinned={list.pinned} pinLimit={list.pinLimit} coach={coach} submitLabel={copy.save} onSubmit={async values => {
         await create(values)
         return values.pin ? copy.savedPinned : copy.savedNotPinned
       }}/>
     </CardContent></Card>
     {status && <p role="status" className="ready-text">{status}</p>}
     <AnnouncementList {...shared} title={copy.pinnedHeading(list.pinned.length, list.pinLimit)} rows={list.pinned} list="pinned" empty={copy.noPinned} headingRef={pinnedHeading}>
-      {!pinAvailable && <CardDescription>{copy.limitReached}</CardDescription>}
+      {(!hasPinRoom(list.pinned, 'students', list.pinLimit) || !hasPinRoom(list.pinned, 'parents', list.pinLimit)) && <CardDescription>{copy.limitReached}</CardDescription>}
     </AnnouncementList>
     <AnnouncementList {...shared} title={copy.notPinnedHeading(list.notPinned.length)} rows={list.notPinned} list="notPinned" empty={copy.noNotPinned} headingRef={notPinnedHeading}>
       {list.moreNotPinned && <CardDescription>{copy.moreNotPinned(list.notPinned.length)}</CardDescription>}

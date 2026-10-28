@@ -86,7 +86,7 @@ export async function studentAccess(ctx: Ctx, user: AppUser, studentId: Id<"stud
   const season = await activeSeason(ctx);
   if (!student.active || student.seasonId !== season._id) throw new ConvexError("This student is unavailable in the active season. Reload to see the current roster.");
   if ("scheduler" in ctx) await requireSeasonProfileWritable(ctx, season._id);
-  if (user.role === "coach" || user.travelLead) return student;
+  if (user.role === "coach" || (user.role !== "parent" && user.travelLead)) return student;
   if (user.role === "student" && student.userId === user._id) return student;
   if (user.role === "parent") {
     const link = await ctx.db.query("familyLinks").withIndex("by_parentUserId_and_studentId", q => q.eq("parentUserId", user._id).eq("studentId", studentId)).unique();

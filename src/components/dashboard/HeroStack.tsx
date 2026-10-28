@@ -17,7 +17,7 @@ export type HeroStackLabels = {
 }
 
 /** Smallest dot target (WCAG 2.5.8); the largest is 44px. */
-const MIN_DOT = 24
+const MIN_DOT = 44
 
 /**
  * How many dots go in one row: all of them while each gets at least 24px, otherwise as few balanced rows
@@ -33,8 +33,8 @@ export function dotColumns(count: number, width: number) {
  * one card; with focus on a dot, the arrow keys move between cards and keep focus on the dots. No auto-advance; no smooth scrolling under prefers-reduced-motion.
  * At the first or last card, Previous / Next stay focusable (aria-disabled, pressing does nothing), so
  * keyboard focus never falls back to the page. Each dot is a target up to 44×44 that shares the space
- * between the buttons; when 24px each no longer fits (nine cards at 320px), the dots wrap into balanced
- * rows (each row centered) of 32px-high targets instead of spilling under the buttons.
+ * between the buttons; when 44px each no longer fits, the dots wrap into balanced
+ * rows (each row centered) instead of spilling under the buttons.
  * With one card there is no track and no controls. The stack fills its parent's height, so on
  * desktop Highlights match the right column.
  */
@@ -57,7 +57,6 @@ export function HeroStack({ slides, labels, className }: { slides: HeroSlide[]; 
     observer.observe(dots)
     return () => observer.disconnect()
   }, [count])
-  const wrapped = columns < count
 
   useEffect(() => {
     const track = trackRef.current
@@ -103,7 +102,7 @@ export function HeroStack({ slides, labels, className }: { slides: HeroSlide[]; 
     <div className="relative mt-1.5 flex items-center justify-between gap-2 lg:mt-3">
       <button type="button" className={control} aria-label={labels.previous} aria-disabled={atStart || undefined} onClick={() => { if (!atStart) go(current - 1) }}><ChevronLeft size={20} aria-hidden="true" /></button>
       <div ref={dotsRef} onKeyDown={onDotKeyDown} className="flex min-w-0 flex-1 flex-wrap items-center justify-center">
-        {slides.map((slide, position) => <button key={slide.key} type="button" aria-label={labels.showCard(position + 1, count)} aria-current={position === current ? 'true' : undefined} onClick={() => go(position)} style={{ width: `min(44px, ${100 / Math.max(1, columns)}%)` }} className={cn('group inline-flex shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0', wrapped ? 'h-8' : 'h-11', focusRing)}>
+        {slides.map((slide, position) => <button key={slide.key} type="button" aria-label={labels.showCard(position + 1, count)} aria-current={position === current ? 'true' : undefined} onClick={() => go(position)} style={{ width: `min(44px, ${100 / Math.max(1, columns)}%)` }} className={cn('group inline-flex h-11 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0', focusRing)}>
           <span aria-hidden="true" className={cn('block h-2 rounded-full transition-[width,background-color] motion-reduce:transition-none', position === current ? 'w-5 bg-vs-accent-text dark:bg-vs-gold' : 'w-2 bg-vs-muted/60 group-hover:bg-vs-muted')} />
         </button>)}
       </div>
