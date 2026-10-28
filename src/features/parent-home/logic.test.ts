@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { WhatsLeftItem } from '../student-home/contract'
 import type { ParentHomeSummary } from './contract'
-import { groupWork, paidPercent, parentAllSet, parentItemHref, upcomingEvent } from './logic'
+import { groupWork, paidPercent, parentAllSet, parentItemAction, parentItemHref, upcomingEvent } from './logic'
 
 const item = (owner: WhatsLeftItem['owner'], kind: WhatsLeftItem['kind'] = 'requirement'): WhatsLeftItem => ({ key: `${owner}:${kind}`, owner, kind, eventId: null, eventName: null, label: null, dueAt: null, href: null })
 
@@ -28,7 +28,14 @@ describe('Parent Home decisions', () => {
     expect(upcomingEvent({ ...summary, nextEvent: null }, 100)).toBeNull()
   })
 
-  it.each([['healthProfile', '/setup?edit=1'], ['firstRegistration', '/setup?edit=1'], ['permissionForm', '/forms'], ['requiredPayment', '/finances'] ] as const)('routes %s to the parent action', (kind, href) => {
-    expect(parentItemHref(item('parent', kind))).toBe(href)
+  it.each([
+    ['healthProfile', '/setup?edit=1&step=health&student=student-1', 'Fill in Health information'],
+    ['firstRegistration', '/setup?edit=1&step=first&student=student-1', 'Start FIRST registration'],
+    ['permissionForm', '/forms', 'Sign permission form'],
+    ['requiredPayment', '/finances', 'Review balance due'],
+    ['requirement', null, null],
+  ] as const)('routes %s to its action', (kind, href, action) => {
+    expect(parentItemHref(item('parent', kind), 'student-1')).toBe(href)
+    expect(parentItemAction(item('parent', kind))).toBe(action)
   })
 })

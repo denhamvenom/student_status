@@ -6,11 +6,12 @@ import { ProgressRings } from '@/components/dashboard/ProgressRings'
 import { TileError, TileErrorBoundary } from '@/components/dashboard/TileErrorBoundary'
 import { TileSkeleton } from '@/components/dashboard/TileSkeleton'
 import { dashboardButtonVariants, inset } from '@/components/dashboard/styles'
+import { officialInstructions } from '@/FirstRegistration'
 import { AnnouncementCard } from '../student-home/tiles/AnnouncementCard'
 import { formatLongDate, formatMoney, formatShortDate } from '../student-home/format'
 import type { WhatsLeftItem } from '../student-home/contract'
 import type { ParentHomeFinance, ParentHomeSummary, ParentPinnedAnnouncement } from './contract'
-import { groupWork, paidPercent, parentAllSet, parentItemHref, upcomingEvent } from './logic'
+import { groupWork, paidPercent, parentAllSet, parentItemAction, parentItemHref, upcomingEvent } from './logic'
 
 export type ParentHomeSource = 'summary' | 'announcements' | 'finance'
 type Loadable<T> = T | Error | undefined
@@ -18,13 +19,13 @@ export type ParentHomeViewProps = { studentName: string; now: number; summary: L
 const errorText = (title: string) => `${title} could not load. Try again. If it keeps happening, contact a Coach.`
 const labels = { region: 'Highlights', previous: 'Previous card', next: 'Next card', showCard: (n: number, total: number) => `Show card ${n} of ${total}`, slide: (n: number, total: number) => `${n} of ${total}` }
 
-function ItemLink({ item, help = false, studentName = 'your student' }: { item: WhatsLeftItem; help?: boolean; studentName?: string }) {
-  const href = help ? (item.owner === 'student' ? (item.eventId ? `/events/${item.eventId}` : '/events') : null) : parentItemHref(item)
+function ItemLink({ item, help = false, studentName = 'your student', studentId }: { item: WhatsLeftItem; help?: boolean; studentName?: string; studentId?: string }) {
+  const href = help ? (item.owner === 'student' && item.eventId ? `/events/${item.eventId}` : null) : parentItemHref(item, studentId)
   const label = item.kind === 'healthProfile' ? 'Health information' : item.kind === 'firstRegistration' || item.kind === 'firstVerification' ? 'FIRST registration' : item.kind === 'permissionForm' || item.kind === 'permissionReview' ? 'Permission form' : item.kind === 'requiredPayment' ? 'Balance due' : item.kind === 'studentSetup' ? 'Finish setup' : item.kind === 'roomChoice' ? 'Choose a room' : item.kind === 'signupApproval' ? 'Event signup' : item.label ?? 'Event requirement'
   const explanation = item.kind === 'firstRegistration' ? 'Create or finish the FIRST account and Consent & Release form.' : item.owner === 'student' && item.kind === 'roomChoice' ? `Ask ${studentName} to choose a room.` : null
   const content = <><span className="font-semibold">{label}</span>{item.eventName && <span className="text-vs-muted"> · {item.eventName}</span>}{item.dueAt && <span className="block text-[13px] text-vs-text-2">Due {formatShortDate(item.dueAt)}</span>}{explanation && <span className="block text-[13px] text-vs-text-2">{explanation}</span>}</>
-  const className = `${inset} block min-h-11 rounded-lg px-3 py-2 text-[13px] text-vs-text-2! no-underline!`
-  return href ? <Link to={href} className={className}>{content}</Link> : <div className={className}>{content}</div>
+  const className = `${inset} rounded-lg px-3 py-2 text-[13px] text-vs-text-2`
+  return <div className={className}>{content}{href && <div className="mt-2 flex flex-wrap gap-2"><Link to={href} className={dashboardButtonVariants({ tone: 'soft' })}>{help ? 'Open event' : parentItemAction(item) ?? 'Open event'}</Link>{!help && item.kind === 'firstRegistration' && <a href={officialInstructions} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center underline">FIRST registration site</a>}</div>}</div>
 }
 
 function SummarySlides({ summary, announcements, studentName, now }: { summary: ParentHomeSummary; announcements: ParentPinnedAnnouncement[]; studentName: string; now: number }) {
@@ -34,7 +35,7 @@ function SummarySlides({ summary, announcements, studentName, now }: { summary: 
     { key: 'parent', node: <DashboardTile surface="hero" tone={parent.length ? 'urgent' : 'done'} aria-label="Highlights" className="min-h-[235px] justify-center gap-3 lg:min-h-[275px] lg:px-8">
       <p className="m-0 text-[11px] font-bold tracking-wider text-vs-muted uppercase">Highlights</p>
       <h2 className="m-0! font-heading! text-[28px]! font-normal! text-vs-heading lg:text-[38px]!">{parent.length ? `${studentName} still needs…` : "You're all set"}</h2>
-      {parent.length ? <ul className="m-0 flex flex-col gap-2 p-0 list-none">{parent.map(item => <li key={item.key}><ItemLink item={item} /></li>)}</ul> : <p className="m-0 text-[14px] text-vs-muted">Nothing left for you right now.</p>}
+      {parent.length ? <ul className="m-0 flex flex-col gap-2 p-0 list-none">{parent.map(item => <li key={item.key}><ItemLink item={item} studentId={summary.studentId} /></li>)}</ul> : <p className="m-0 text-[14px] text-vs-muted">Nothing left for you right now.</p>}
       {next && <p className="m-0 text-[14px] text-vs-text-2">Next event: <Link to={`/events/${next.eventId}`} className="font-semibold">{next.name}</Link> · {formatShortDate(next.startsAt)}</p>}
     </DashboardTile> },
     ...(next ? [{ key: 'event', node: <DashboardTile surface="hero" tone="quiet" className="min-h-[235px] justify-center gap-3 lg:min-h-[275px] lg:px-8"><p className="m-0 text-[11px] font-bold tracking-wider text-vs-muted uppercase">Next event</p><h2 className="m-0! font-heading! text-[28px]! font-normal! text-vs-heading lg:text-[38px]!">{next.name}</h2><p className="m-0 text-[14px] text-vs-text-2">{formatShortDate(next.startsAt)} · {new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit' }).format(next.startsAt)}</p><p className="m-0 text-[13px] text-vs-muted">{next.status === 'confirmed' ? 'Signed up' : next.status === 'waitlist' ? 'Waitlisted' : 'Waiting for approval'}</p><Link to={`/events/${next.eventId}`} className={dashboardButtonVariants({ tone: 'soft' })}>Open event</Link></DashboardTile> }] : []),
