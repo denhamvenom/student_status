@@ -1,5 +1,7 @@
 # Handoff
 
+October 28, 2026 | Parent Home branch `feature/parent-home`: Parent Home and Coach announcement audiences (Students, Parents, Both) are implemented and reviewed. Local checks are recorded with this branch; neither feature has been synced or released. Release order after approval: sync production Convex first for the additive schema, then merge the frontend branch.
+
 October 27, 2026 | Branch: feature/attendance-breakdown (PR #50)
 
 ## Venom Status (formerly Student Status)

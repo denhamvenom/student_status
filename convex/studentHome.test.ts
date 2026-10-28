@@ -45,6 +45,43 @@ async function fixture() {
 }
 type Fixture = Awaited<ReturnType<typeof fixture>>;
 
+describe("Parent Home access", () => {
+  it("does not let a Parent's stored Travel Lead flag bypass family links", async () => {
+    const f = await fixture();
+    await f.t.run(ctx => ctx.db.patch(f.ids.parent, { travelLead: true }));
+    await expect(f.parent.query(api.studentHome.parentSummary, { studentId: f.ids.jordan, asOfDay: DAY, asOf: START - 1 })).rejects.toThrow("permission");
+    await f.t.run(ctx => ctx.db.patch(f.ids.link, { active: false }));
+    await expect(f.parent.query(api.studentHome.parentSummary, { studentId: f.ids.riley, asOfDay: DAY, asOf: START - 1 })).rejects.toThrow("permission");
+  });
+
+  it("finds the next event after more than 200 old participations", async () => {
+    const f = await fixture();
+    for (let i = 0; i < 201; i++) {
+      const old = await f.event({ startsAt: START - (202 - i) * HOUR, endsAt: START - (201 - i) * HOUR });
+      await f.join(old, f.ids.riley, "confirmed");
+    }
+    const upcoming = await f.event({ startsAt: START + HOUR });
+    await f.join(upcoming, f.ids.riley, "confirmed");
+    const home = await f.parent.query(api.studentHome.parentSummary, { studentId: f.ids.riley, asOfDay: DAY, asOf: START });
+    expect(home.nextEvent?.eventId).toBe(upcoming);
+  });
+
+  it("returns only a linked student's items and next signed-up event", async () => {
+    const f = await fixture();
+    const eventId = await f.event({ startsAt: START, destination: "Synthetic venue" });
+    await f.join(eventId, f.ids.riley, "confirmed");
+    const args = { studentId: f.ids.riley, asOfDay: DAY, asOf: START - 1 };
+    const home = await f.parent.query(api.studentHome.parentSummary, args);
+    expect(home.studentId).toBe(f.ids.riley);
+    expect(home.nextEvent).toMatchObject({ eventId, name: "Synthetic event", location: "Synthetic venue", status: "confirmed" });
+    expect(home.whatsLeft.some(item => item.kind === "healthProfile")).toBe(true);
+    await expect(f.parent.query(api.studentHome.parentSummary, { ...args, studentId: f.ids.jordan })).rejects.toThrow("permission");
+    await expect(f.riley.query(api.studentHome.parentSummary, args)).rejects.toThrow("Parent Home");
+    await f.t.run(ctx => ctx.db.patch(f.ids.link, { active: false }));
+    await expect(f.parent.query(api.studentHome.parentSummary, args)).rejects.toThrow("permission");
+  });
+});
+
 /** Student setup, the parent's health and contact profile, and FIRST all done, so only event items remain. */
 async function settle(f: Fixture, studentId: Id<"students">) {
   await f.t.run(async ctx => {

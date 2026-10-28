@@ -3,7 +3,8 @@ import { query } from "./_generated/server";
 import type { QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { StudentHomeSummary } from "../src/features/student-home/contract";
-import { activeSeason, ownStudent, viewer } from "./lib/access";
+import type { ParentHomeSummary } from "../src/features/parent-home/contract";
+import { activeSeason, ownStudent, studentAccess, viewer } from "./lib/access";
 import { enrollmentPending } from "./lib/eventEnrollmentState";
 import { coverageFor } from "./lib/permissionCoverage";
 import { roomSelectionState, studentReadiness, type RoomSelectionState } from "./lib/readModels";
@@ -131,14 +132,9 @@ function eventItem(key: string, kind: WhatsLeftItem["kind"], owner: WhatsLeftIte
   return { key: `${key}:${event._id}${fields.keySuffix ? `:${fields.keySuffix}` : ""}`, kind, owner, eventId: event._id, eventName: event.name, label: fields.label ?? null, dueAt: fields.dueAt ?? event.startsAt, href: fields.href ?? null };
 }
 
-/** studentHome.summary: the signed-in Student's own Home. Students only; the student comes from the session, never an argument. */
-export const summary = query({
-  args: { asOfDay: v.string() },
-  returns: summaryResult,
-  handler: async (ctx, args): Promise<StudentHomeSummary> => {
-    const user = await viewer(ctx);
-    const student = await ownStudent(ctx, user);
-    const asOf = asOfFromDay(args.asOfDay);
+/** Shared projection; entry points authorize the student before reaching it. */
+async function buildSummary(ctx: QueryCtx, student: Doc<"students">, asOfDay: string): Promise<StudentHomeSummary> {
+    const asOf = asOfFromDay(asOfDay);
     const season = await activeSeason(ctx);
     const events = (await ctx.db.query("events").withIndex("by_seasonId_and_archived_and_endsAt", q => q.eq("seasonId", season._id).eq("archived", false)).take(EVENT_LIMIT))
       .filter(event => !event.cancelled)
@@ -242,5 +238,35 @@ export const summary = query({
       // Every fetched Competition, so ones that ended but are not archived yet cannot push out the next one; the browser picks by time.
       competitions: events.filter(event => event.type === "Competition").map(event => ({ eventId: event._id, name: event.name, startsAt: event.startsAt, endsAt: event.endsAt })),
     };
+}
+
+/** The signed-in Student's own Home. */
+export const summary = query({
+  args: { asOfDay: v.string() }, returns: summaryResult,
+  handler: async (ctx, args) => buildSummary(ctx, await ownStudent(ctx, await viewer(ctx)), args.asOfDay),
+});
+
+const nextEvent = v.union(v.null(), v.object({ eventId: v.id("events"), name: v.string(), startsAt: v.number(), location: v.union(v.string(), v.null()), status: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("waitlist")) }));
+const parentSummaryResult = v.object({ studentId: v.id("students"), whatsLeft: v.array(whatsLeftItem), nextEvent });
+const _parentSummaryMatchesContract: Same<Infer<typeof parentSummaryResult>, ParentHomeSummary> = true;
+
+/** One linked student's Parent Home data. */
+export const parentSummary = query({
+  args: { studentId: v.id("students"), asOfDay: v.string(), asOf: v.number() },
+  returns: parentSummaryResult,
+  handler: async (ctx, args) => {
+    const user = await viewer(ctx);
+    if (user.role !== "parent" && user.role !== "coach" && !user.travelLead) throw new ConvexError("Parent Home requires a linked parent or staff account.");
+    const student = await studentAccess(ctx, user, args.studentId);
+    const home = await buildSummary(ctx, student, args.asOfDay);
+    // Walk future events in start order. A fixed slice of old participations can
+    // hide the next event for a student with a long participation history.
+    for await (const event of ctx.db.query("events").withIndex("by_seasonId_and_startsAt", q => q.eq("seasonId", student.seasonId).gte("startsAt", args.asOf))) {
+      if (event.archived || event.cancelled) continue;
+      const participation = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
+      if (!participation || participation.status === "withdrawn") continue;
+      return { studentId: student._id, whatsLeft: home.whatsLeft, nextEvent: { eventId: event._id, name: event.name, startsAt: event.startsAt, location: event.destination || null, status: participation.status } };
+    }
+    return { studentId: student._id, whatsLeft: home.whatsLeft, nextEvent: null };
   },
 });
