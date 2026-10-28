@@ -45,8 +45,8 @@ function SummarySlides({ summary, announcements, studentName, now }: { summary: 
 
 function StudentWork({ items, studentName }: { items: WhatsLeftItem[]; studentName: string }) {
   const id = useId()
-  const { student, coach } = groupWork(items)
-  return <DashboardTile tone="quiet" aria-labelledby={id} className="gap-3"><TileTitle id={id}>What {studentName} needs to do</TileTitle>{student.length ? <ul className="m-0 flex flex-col gap-2 p-0 list-none">{student.map(item => <li key={item.key}><ItemLink item={item} help studentName={studentName} /></li>)}</ul> : <p className="m-0 text-[13px] text-vs-muted">Nothing left for {studentName} right now.</p>}{coach.length > 0 && <div className="border-t border-vs-border pt-3"><p className="m-0 mb-2 text-[13px] font-semibold text-vs-text-2">Waiting for Coach approval</p><p className="m-0 mb-2 text-[13px] text-vs-text-2">Nothing to do while a Coach reviews it.</p><ul className="m-0 flex flex-col gap-2 p-0 list-none">{coach.map(item => <li key={item.key}><ItemLink item={item} help /></li>)}</ul></div>}</DashboardTile>
+  const { student, coach, parent } = groupWork(items)
+  return <DashboardTile tone="quiet" aria-labelledby={id} className="gap-3"><TileTitle id={id}>What {studentName} needs to do</TileTitle>{student.length ? <ul className="m-0 flex flex-col gap-2 p-0 list-none">{student.map(item => <li key={item.key}><ItemLink item={item} help studentName={studentName} /></li>)}</ul> : <p className="m-0 text-[13px] text-vs-muted">{parent.length ? `Nothing for ${studentName} to do right now. Your items are in Highlights.` : `Nothing left for ${studentName} right now.`}</p>}{coach.length > 0 && <div className="border-t border-vs-border pt-3"><p className="m-0 mb-2 text-[13px] font-semibold text-vs-text-2">Waiting for Coach approval</p><p className="m-0 mb-2 text-[13px] text-vs-text-2">Nothing to do while a Coach reviews it.</p><ul className="m-0 flex flex-col gap-2 p-0 list-none">{coach.map(item => <li key={item.key}><ItemLink item={item} help /></li>)}</ul></div>}</DashboardTile>
 }
 
 function Finance({ finance, retry }: { finance: ParentHomeFinance; retry: () => void }) {
