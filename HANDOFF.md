@@ -1,6 +1,6 @@
 # Handoff
 
-October 28, 2026 | Parent Home branch `feature/parent-home`: Parent Home and Coach announcement audiences (Students, Parents, Both) are implemented and reviewed. Local checks are recorded with this branch; neither feature has been synced or released. Release order after approval: sync production Convex first for the additive schema, then merge the frontend branch.
+October 28, 2026 | Parent Home and Coach announcement audiences (Students, Parents, Both) are released: PR #52 merged as main `bcda86a` (source head `1b43843`); production Convex `amicable-eel-413` synced first (additive optional `teamAnnouncements.audience`). Not verified: signed-in production walkthrough; Worker version IDs not recorded. [Release receipt](docs/releases/RELEASE_2026-10-28_PARENT_HOME.md)
 
 October 27, 2026 | Branch: feature/attendance-breakdown (PR #50)
 
@@ -22,7 +22,7 @@ Ready on `feature/attendance-breakdown` / PR #50. Release order after owner appr
 
 ## Next
 
-Release attendance breakdown on approval, remove helper worktrees `student-status-sh-d`…`sh-j`, then start Parent Home.
+Release attendance breakdown on approval, remove helper worktrees `student-status-sh-d`…`sh-j`, and have a Coach/Parent do a signed-in production check of Parent Home (permission and balance action links are unit-tested only).
 
 ## Top open risks
 
@@ -32,4 +32,4 @@ Release attendance breakdown on approval, remove helper worktrees `student-statu
 
 ## Next step
 
-Get owner approval for the attendance breakdown release, remove helper worktrees `student-status-sh-d`…`sh-j`, then begin Parent Home.
+Get owner approval for the attendance breakdown release, remove helper worktrees `student-status-sh-d`…`sh-j`, then do the signed-in production Parent Home walkthrough.
