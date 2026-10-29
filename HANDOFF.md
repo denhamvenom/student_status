@@ -22,9 +22,15 @@ Student Home redesign, Student shell, pinned announcements and build hours targe
 
 Clocking, PIN controls, automatic closing, fixed event roster and historical import remain implemented; Calendar checks run at 6 AM/3 PM Central plus manual refresh. Rollout reached 100%.
 
+## Repository cleanup (October 29, 2026)
+
+- Closed draft PRs #2–#9; all their work is in main (PR #6 Timeclock frontend commits match main `59f58d3`, `314a4a9`, `a7aa5e0`).
+- Removed sibling worktrees; `student-status-app` is the only checkout. Branches remain on GitHub; operations' uncommitted drafts are on `wip/operations-salvage-2026-10-29` (superseded by main, nothing to port).
+- Ignored local files from those worktrees (env settings, test results, release-check scripts, design reference) are archived in ignored `private-data/worktree-archive-2026-10-29/`; `apps/timeclock/.env.local` now exists in this checkout.
+
 ## Next
 
-A Coach or Parent does a signed-in production check of Parent Home; decide on draft PR #6 (`feature/timeclock-frontend`, 4 commits not in main); decide on leftover worktrees `student-status-operations` (uncommitted changes on `feature/student-status-design-audit`), `student-status-timeclock-ui`, `student-status-event-display` and `student-status-parent-home`.
+A Coach or Parent does a signed-in production check of Parent Home.
 
 ## Top open risks
 
