@@ -63,6 +63,7 @@ import type * as lib_authRedirect from "../lib/authRedirect.js";
 import type * as lib_calendarAuth from "../lib/calendarAuth.js";
 import type * as lib_calendarDates from "../lib/calendarDates.js";
 import type * as lib_calendarNormalize from "../lib/calendarNormalize.js";
+import type * as lib_calendarSchedule from "../lib/calendarSchedule.js";
 import type * as lib_chargeCorrection from "../lib/chargeCorrection.js";
 import type * as lib_chargeObligation from "../lib/chargeObligation.js";
 import type * as lib_consentSnapshot from "../lib/consentSnapshot.js";
@@ -193,6 +194,7 @@ declare const fullApi: ApiFromModules<{
   "lib/calendarAuth": typeof lib_calendarAuth;
   "lib/calendarDates": typeof lib_calendarDates;
   "lib/calendarNormalize": typeof lib_calendarNormalize;
+  "lib/calendarSchedule": typeof lib_calendarSchedule;
   "lib/chargeCorrection": typeof lib_chargeCorrection;
   "lib/chargeObligation": typeof lib_chargeObligation;
   "lib/consentSnapshot": typeof lib_consentSnapshot;
