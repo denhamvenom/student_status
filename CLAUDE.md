@@ -2,7 +2,7 @@
 
 # Claude session notes
 
-- Repository root: `C:\Users\frc80\OneDrive\Documents\2026 - 2027\Denham Venom\Logistics Work\Development Version\student-status-app`. The enclosing Logistics Work folder is not the app repository.
+- Repository root: `C:\dev\denham-venom\student-status-app`. The enclosing `C:\dev\denham-venom` folder holds this repository plus sibling worktrees and is not itself the app repository.
 - Start-of-session reading order: HANDOFF.md, this file, `docs/REPOSITORY.md`, `docs/DEVELOPMENT.md`. Read `docs/DECISIONS.md` before parent linking, consent, finance, rooms or retention changes; consult `docs/BACKLOG.md` only for related work. CHANGELOG.md and `docs/releases/` are history.
 - Session role (owner decision, 2026-10-25): the main Claude session is the project lead and integration owner. It may delegate to subagents; subagents are helpers that must not stage, commit, push, merge or synchronize Convex, and must report changed files back to the main session. Codex sessions, if used, are helpers under the same rules. Integration ownership still grants no production, main-merge, publish or deploy authority; those need the owner's explicit approval each time.
 - Project skills live in `.agents/skills/` (tracked). When this file names a skill, read its `SKILL.md` there and follow it: `student-status-context-checkpoint` (handoff/new window) and `student-status-prototype-verification` (visual evidence). The `convex-*` bundles in `.agents/skills/` and `.claude/skills/` are ignored vendor copies.

@@ -1,8 +1,10 @@
 # Handoff
 
-October 29, 2026 | main `2449718`: Parent permission signing switch released via PR #54; production defaults Off, hiding parent sign prompts until a Coach or Travel Lead turns it On. [Release receipt](docs/releases/RELEASE_2026-10-29_PERMISSION_SIGNING_SWITCH.md)
+October 29, 2026 | main `316039e`
 
-October 28, 2026 | main `bcda86a`
+## Permission signing switch (released)
+
+Parent permission signing switch is live: PR #54 merged as main `2449718`; production defaults Off, hiding parent sign prompts until a Coach or Travel Lead turns it On. Release docs PR #55 merged as main `316039e`. [Release receipt](docs/releases/RELEASE_2026-10-29_PERMISSION_SIGNING_SWITCH.md)
 
 ## Parent Home (released)
 
@@ -22,7 +24,7 @@ Clocking, PIN controls, automatic closing, fixed event roster and historical imp
 
 ## Next
 
-A Coach or Parent does a signed-in production check of Parent Home; merge docs PRs #51 and #53; remove helper worktrees `student-status-sh-d`…`sh-j`.
+A Coach or Parent does a signed-in production check of Parent Home; decide on draft PR #6 (`feature/timeclock-frontend`, 4 commits not in main); decide on leftover worktrees `student-status-operations` (uncommitted changes on `feature/student-status-design-audit`), `student-status-timeclock-ui`, `student-status-event-display` and `student-status-parent-home`.
 
 ## Top open risks
 
