@@ -1,5 +1,7 @@
 # Handoff
 
+October 29, 2026 | main `2449718`: Parent permission signing switch released via PR #54; production defaults Off, hiding parent sign prompts until a Coach or Travel Lead turns it On. [Release receipt](docs/releases/RELEASE_2026-10-29_PERMISSION_SIGNING_SWITCH.md)
+
 October 28, 2026 | main `bcda86a`
 
 ## Parent Home (released)
