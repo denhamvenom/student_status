@@ -7,6 +7,14 @@ export const SYNTHETIC_CONSENT_CLOUD_URL = "https://third-bandicoot-18.convex.cl
 export type PermissionSigningMode = "synthetic" | "real" | "closed";
 /** Shown when signing is closed; the Parent screen shows the same words before the server is asked. */
 export const PERMISSION_SIGNING_CLOSED = "Permission forms can't be signed here yet. Ask a Coach how to complete this student's form.";
+export const PERMISSION_SIGNING_PAUSED = "Parent permission signing is off. A Coach or Travel Lead will turn it on when forms are ready.";
+export async function permissionSigningPaused(ctx: QueryCtx | MutationCtx) {
+  const season = await ctx.db.query("seasons").withIndex("by_status", q => q.eq("status", "active")).unique();
+  return season?.permissionSigningPaused !== false;
+}
+export async function requireParentSigningOn(ctx: QueryCtx | MutationCtx) {
+  if (await permissionSigningPaused(ctx)) throw new ConvexError(PERMISSION_SIGNING_PAUSED);
+}
 
 export function resolvePermissionSigningMode(config: {
   cloudUrl?: string;
@@ -29,6 +37,7 @@ export function permissionSigningMode(): PermissionSigningMode {
 
 type Ctx = QueryCtx | MutationCtx;
 export async function v2SigningAllowed(ctx: Ctx, studentId: Id<"students">, parentId?: Id<"appUsers">) {
+  if (parentId && await permissionSigningPaused(ctx)) return false;
   const mode = permissionSigningMode();
   if (mode === "real") return true;
   if (mode !== "synthetic") return false;
@@ -37,6 +46,7 @@ export async function v2SigningAllowed(ctx: Ctx, studentId: Id<"students">, pare
 }
 
 export async function requireV2Signing(ctx: Ctx, studentId: Id<"students">, parentId?: Id<"appUsers">) {
+  if (parentId) await requireParentSigningOn(ctx);
   const mode = permissionSigningMode();
   if (!await v2SigningAllowed(ctx, studentId, parentId)) throw new ConvexError(mode === "synthetic" ? "Only registered fictional development subjects may use consent." : PERMISSION_SIGNING_CLOSED);
   return mode;

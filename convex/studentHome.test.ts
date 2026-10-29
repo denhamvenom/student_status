@@ -46,6 +46,15 @@ async function fixture() {
 type Fixture = Awaited<ReturnType<typeof fixture>>;
 
 describe("Parent Home access", () => {
+  it("hides permission tasks while signing is off and restores them when enabled", async () => {
+    const f = await fixture();
+    const eventId = await f.event({permissionRequired:true});
+    await f.join(eventId,f.ids.riley,"confirmed");
+    const args={studentId:f.ids.riley,asOfDay:DAY,asOf:START-1};
+    expect((await f.parent.query(api.studentHome.parentSummary,args)).whatsLeft.some(item=>item.kind==='permissionForm')).toBe(false);
+    await f.coach.mutation(api.permissions.setSigningPaused,{paused:false});
+    expect((await f.parent.query(api.studentHome.parentSummary,args)).whatsLeft.some(item=>item.kind==='permissionForm')).toBe(true);
+  });
   it("does not let a Parent's stored Travel Lead flag bypass family links", async () => {
     const f = await fixture();
     await f.t.run(ctx => ctx.db.patch(f.ids.parent, { travelLead: true }));
@@ -301,6 +310,7 @@ describe("Student Home summary", () => {
 
   it("maps each event's open readiness items to an owner and keeps keys unique", async () => {
     const f = await fixture();
+    await f.coach.mutation(api.permissions.setSigningPaused,{paused:false});
     await settle(f, f.ids.riley);
     expect((await summary(f.riley)).whatsLeft).toEqual([]);
     const dueAt = START - 24 * HOUR;

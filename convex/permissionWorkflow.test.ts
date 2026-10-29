@@ -36,6 +36,7 @@ async function fixture() {
   const as = (auth: typeof ids.coach.auth) => t.withIdentity({subject: `${auth}|session`});
   const f = {t, ids, coach: as(ids.coach.auth), parent: as(ids.parent.auth), other: as(ids.other.auth), lead: as(ids.lead.auth), ungranted: as(ids.ungranted.auth), mentor: as(ids.mentor.auth), student: as(ids.studentUser.auth)};
   await f.coach.mutation(api.permissionVersions.createVersion, wording);
+  await f.coach.mutation(api.permissions.setSigningPaused, {paused:false});
   return f;
 }
 async function sign(f: Awaited<ReturnType<typeof fixture>>, eventIds = f.ids.events.slice(0, 2)) {
@@ -51,6 +52,17 @@ async function review(f: Awaited<ReturnType<typeof fixture>>, submissionId: (Awa
 const accepted = (f: Awaited<ReturnType<typeof fixture>>, eventId = f.ids.events[0]) => f.t.run(ctx => permissionAccepted(ctx, f.ids.student, eventId));
 
 describe("synthetic versioned permission workflow", () => {
+  it("defaults off, rejects unauthorized changes, and resumes parent signing when enabled", async () => {
+    const f = await fixture();
+    await f.coach.mutation(api.permissions.setSigningPaused, {paused:true});
+    await expect(f.parent.mutation(api.permissions.setSigningPaused, {paused:false})).rejects.toThrow("Coach or Travel Lead");
+    expect((await f.parent.query(api.permissions.workspace,{studentId:f.ids.student})).canSign).toBe(false);
+    await expect(f.parent.mutation(api.permissions.prepare,{studentId:f.ids.student,eventIds:[f.ids.events[0]]})).rejects.toThrow("signing is off");
+    await expect(f.coach.mutation(api.permissions.requestNewSignature,{studentId:f.ids.student,eventIds:[f.ids.events[0]],expectedCoverage:[{eventId:f.ids.events[0],revision:0}],reason:"Fictional change"})).rejects.toThrow("signing is off");
+    await f.lead.mutation(api.permissions.setSigningPaused,{paused:false});
+    expect((await f.parent.query(api.permissions.workspace,{studentId:f.ids.student})).canSign).toBe(true);
+    await expect(f.parent.mutation(api.permissions.prepare,{studentId:f.ids.student,eventIds:[f.ids.events[0]]})).resolves.toHaveProperty("draftId");
+  });
   it("captures immutable full electronic evidence, explicit choices, review and retry", async () => {
     const f = await fixture(); const {draft, submissionId} = await sign(f);
     expect(draft.snapshot.choices).toBeNull(); expect(draft.snapshot.acknowledged).toBe(false);
