@@ -12,9 +12,24 @@ import { consentEventValidator, consentSnapshotValidator, correctionFieldValidat
 import { compareCoverage, controlledCoverage, coverageFor, expectedCoverage, sealedSnapshot, setPendingCoverage } from "./lib/permissionCoverage";
 import { consentSnapshotV2Validator } from "./lib/consentSnapshotV2";
 import { sealedSnapshotV2 } from "./permissionsV2";
-import { PERMISSION_SIGNING_CLOSED, permissionSigningMode, v2SigningAllowed } from "./lib/permissionSigningMode";
+import { PERMISSION_SIGNING_CLOSED, PERMISSION_SIGNING_PAUSED, permissionSigningMode, permissionSigningPaused, requireParentSigningOn, v2SigningAllowed } from "./lib/permissionSigningMode";
 
 type Ctx = QueryCtx | MutationCtx;
+export const signingSettings = query({ args: {}, returns: v.object({ paused: v.boolean(), changedAt: v.union(v.number(), v.null()) }), handler: async ctx => {
+  const actor = await viewer(ctx); operations(actor);
+  const season = await activeSeason(ctx);
+  return { paused: season.permissionSigningPaused !== false, changedAt: season.permissionSigningChangedAt ?? null };
+} });
+export const setSigningPaused = mutation({ args: { paused: v.boolean() }, returns: v.null(), handler: async (ctx, args) => {
+  const actor = await viewer(ctx); operations(actor);
+  const season = await activeSeason(ctx);
+  const before = season.permissionSigningPaused !== false;
+  if (before === args.paused) return null;
+  const changedAt = Date.now();
+  await ctx.db.patch(season._id, { permissionSigningPaused: args.paused, permissionSigningChangedBy: actor._id, permissionSigningChangedAt: changedAt });
+  await audit(ctx, actor, "seasons", season._id, "setPermissionSigningPaused", { paused: before }, { paused: args.paused, changedAt });
+  return null;
+} });
 const DEV_URL = "https://third-bandicoot-18.convex.cloud";
 const stateValidator = v.union(v.literal("required"), v.literal("pending"), v.literal("accepted"), v.literal("correction"));
 const sourceValidator = v.union(v.literal("electronic"), v.literal("paper"));
@@ -28,7 +43,7 @@ export const workspaceValidator = v.object({
   actor: v.object({name: v.string(), email: v.string(), role: v.union(v.literal("coach"), v.literal("mentor"), v.literal("parent"), v.literal("student")), travelLead: v.boolean(), healthExport: v.boolean()}),
   version: v.union(v.object({...versionValidator.fields, formFormat: v.union(v.literal(1), v.literal(2))}), v.null()), events: v.array(consentEventValidator),
   coverage: v.array(v.object({eventId: v.id("events"), state: stateValidator, revision: v.number(), submissionId: nullableId, reviewId: v.union(v.id("permissionReviews"), v.null()), reason: v.union(v.string(), v.null()), field: v.union(correctionFieldValidator, v.null()), signatureRequestedAt: v.union(v.number(), v.null())})),
-  receipts: v.array(receiptSummaryValidator), signingMode: v.union(v.literal("synthetic"), v.literal("real"), v.literal("closed")), canSign: v.boolean(), canRecordPaper: v.boolean(), canReview: v.boolean(), canHealthExport: v.boolean(), gateReason: v.union(v.string(), v.null()),
+  receipts: v.array(receiptSummaryValidator), signingMode: v.union(v.literal("synthetic"), v.literal("real"), v.literal("closed")), signingPaused: v.boolean(), canSign: v.boolean(), canRecordPaper: v.boolean(), canReview: v.boolean(), canHealthExport: v.boolean(), gateReason: v.union(v.string(), v.null()),
 });
 const paperFields = { studentId: v.id("students"), eventIds: v.array(v.id("events")), signerName: v.string(), signerEmail: v.optional(v.string()), paperSignedAt: v.number(), paperReference: v.string() };
 const paperPreviewValidator = v.object({snapshot: consentSnapshotValidator, versionId: v.id("permissionVersions"), expectedProfileRevision: v.number(), eventFingerprint: v.string(), expectedCoverage: v.array(expectedCoverageValidator)});
@@ -99,10 +114,11 @@ export const workspace = query({
     const who = actor.role === "parent" ? await verifiedParent(ctx) : null;
     const v2 = version?.formFormat === 2;
     const signingMode = v2 ? permissionSigningMode() : "synthetic";
-    const canSign = !!who && who.authUserId === actor.authUserId && (v2 ? await v2SigningAllowed(ctx, student._id, actor._id) : await syntheticAllowed(ctx, student._id, actor._id));
+    const paused = await permissionSigningPaused(ctx);
+    const canSign = !paused && !!who && who.authUserId === actor.authUserId && (v2 ? await v2SigningAllowed(ctx, student._id, actor._id) : await syntheticAllowed(ctx, student._id, actor._id));
     const canRecordPaper = (v2 ? actor.role === "coach" || actor.role === "mentor" && actor.travelLead && actor.healthExport === true : canReview) && (v2 ? await v2SigningAllowed(ctx, student._id) : await syntheticAllowed(ctx, student._id));
     const projected = privateStudent(student);
-    return {student: {studentId: student._id, legalName: student.legalName, preferredName: student.preferredName, profileRevision: student.profileRevision ?? 0, emergencyName: projected.emergencyName, emergencyRelationship: projected.emergencyRelationship, emergencyPhone: projected.emergencyPhone, allergies: projected.allergies, medications: projected.medications}, actor: {name: who?.name ?? actor.name, email: who?.email ?? actor.email, role: actor.role, travelLead: actor.travelLead, healthExport: actor.healthExport ?? false}, version: version ? {...publicVersion(version), formFormat: version.formFormat === 2 ? 2 as const : 1 as const} : null, events, coverage, receipts: await Promise.all((await familyVisibleSubmissions(ctx, actor, submissions)).map(submission => summary(ctx, submission))), signingMode, canSign, canRecordPaper, canReview, canHealthExport: actor.role === "coach" || actor.role === "mentor" && actor.travelLead && (actor.healthExport ?? false), gateReason: canSign || canRecordPaper ? null : signingMode === "synthetic" ? "Only registered fictional development subjects may use consent." : PERMISSION_SIGNING_CLOSED};
+    return {student: {studentId: student._id, legalName: student.legalName, preferredName: student.preferredName, profileRevision: student.profileRevision ?? 0, emergencyName: projected.emergencyName, emergencyRelationship: projected.emergencyRelationship, emergencyPhone: projected.emergencyPhone, allergies: projected.allergies, medications: projected.medications}, actor: {name: who?.name ?? actor.name, email: who?.email ?? actor.email, role: actor.role, travelLead: actor.travelLead, healthExport: actor.healthExport ?? false}, version: version ? {...publicVersion(version), formFormat: version.formFormat === 2 ? 2 as const : 1 as const} : null, events, coverage, receipts: await Promise.all((await familyVisibleSubmissions(ctx, actor, submissions)).map(submission => summary(ctx, submission))), signingMode, signingPaused: paused, canSign, canRecordPaper, canReview, canHealthExport: actor.role === "coach" || actor.role === "mentor" && actor.travelLead && (actor.healthExport ?? false), gateReason: actor.role === "parent" && paused ? PERMISSION_SIGNING_PAUSED : canSign || canRecordPaper ? null : signingMode === "synthetic" ? "Only registered fictional development subjects may use consent." : PERMISSION_SIGNING_CLOSED};
   },
 });
 
@@ -117,7 +133,7 @@ export const receipt = query({
 export const prepare = mutation({
   args: {studentId: v.id("students"), eventIds: v.array(v.id("events"))}, returns: v.object({draftId: v.id("permissionDrafts"), expiresAt: v.number(), snapshot: consentSnapshotValidator, expectedCoverage: v.array(expectedCoverageValidator)}),
   handler: async (ctx, args) => {
-    const actor = await viewer(ctx); const who = await signer(ctx, actor); const student = await studentAccess(ctx, actor, args.studentId); await syntheticGate(ctx, student._id, actor._id);
+    const actor = await viewer(ctx); const who = await signer(ctx, actor); const student = await studentAccess(ctx, actor, args.studentId); await requireParentSigningOn(ctx); await syntheticGate(ctx, student._id, actor._id);
     const prepared = await buildSnapshot(ctx, student, actor, args.eventIds, {source: "electronic", accountId: actor._id, name: who.name, email: who.email, recordedBy: actor._id});
     const snapshotJson = JSON.stringify(prepared.snapshot); const expiresAt = Date.now() + 30 * 60000;
     const draftId = await ctx.db.insert("permissionDrafts", {studentId: student._id, seasonId: student.seasonId, parentId: actor._id, versionId: prepared.version._id, snapshotJson, snapshotHash: await snapshotHash(prepared.snapshot), profileRevision: student.profileRevision ?? 0, eventFingerprint: prepared.eventFingerprint, expectedCoverage: prepared.expected, createdAt: Date.now(), expiresAt});
@@ -146,7 +162,7 @@ async function insertSealed(ctx: MutationCtx, actor: Doc<"appUsers">, student: D
 export const submitDraft = mutation({
   args: {draftId: v.id("permissionDrafts"), typedName: v.string(), acknowledged: v.boolean(), choices: medicationChoicesValidator}, returns: v.id("permissionSubmissions"),
   handler: async (ctx, args) => {
-    const actor = await viewer(ctx); const who = await signer(ctx, actor); const draft = await ctx.db.get(args.draftId);
+    const actor = await viewer(ctx); const who = await signer(ctx, actor); await requireParentSigningOn(ctx); const draft = await ctx.db.get(args.draftId);
     if (!draft || draft.parentId !== actor._id) throw new ConvexError("This permission form isn't available for your account. Prepare it again.");
     const student = await studentAccess(ctx, actor, draft.studentId); await syntheticGate(ctx, student._id, actor._id);
     if (!args.acknowledged || args.typedName.trim() !== who.name.trim()) throw new ConvexError("Your typed name is your signature, so it must match the name on your account exactly. Type it as shown and check the box to agree.");
@@ -227,7 +243,7 @@ export const review = mutation({
 export const requestNewSignature = mutation({
   args: {studentId: v.id("students"), eventIds: v.array(v.id("events")), expectedCoverage: v.array(expectedCoverageValidator), reason: v.string()}, returns: v.null(),
   handler: async (ctx, args) => {
-    const actor = await viewer(ctx); operations(actor); const student = await studentAccess(ctx, actor, args.studentId);
+    const actor = await viewer(ctx); operations(actor); await requireParentSigningOn(ctx); const student = await studentAccess(ctx, actor, args.studentId);
     boundedText(args.reason, 1000, "New-signature reason"); await selectedEvents(ctx, student, args.eventIds); await compareCoverage(ctx, student._id, args.expectedCoverage, args.eventIds);
     const prior = await Promise.all(args.expectedCoverage.map(async item => ({...item, submissionId: (await coverageFor(ctx, student._id, item.eventId))?.latestSubmissionId})));
     const now = Date.now(); const requestId = await ctx.db.insert("permissionSignatureRequests", {studentId: student._id, seasonId: student.seasonId, eventIds: [...args.eventIds].sort(), requestedBy: actor._id, requestedAt: now, reason: args.reason.trim(), priorCoverage: prior});

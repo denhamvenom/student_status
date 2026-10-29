@@ -45,6 +45,7 @@ async function fixture() {
   const as = (auth: typeof ids.coach.auth) => t.withIdentity({subject: `${auth}|session`});
   const actors = {coach: as(ids.coach.auth), parent: as(ids.parent.auth), other: as(ids.other.auth), ungranted: as(ids.ungranted.auth)};
   await actors.coach.mutation(api.permissionVersions.selectApprovedFieldTripTemplate, {});
+  await actors.coach.mutation(api.permissions.setSigningPaused, {paused:false});
   return {t, ids, ...actors};
 }
 
