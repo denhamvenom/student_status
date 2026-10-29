@@ -1,6 +1,6 @@
 # Student Status design drift audit — October 12, 2026
 
-**Consolidated audit for Coach approval. Corrections have not been made.** Available live screens show recurring drift in shared components, navigation, mobile layout and information hierarchy. Several reference workflows are unfinished. This report separates functional gaps from presentation fixes. It is not a blanket visual pass, production acceptance or evidence that every role and state was available.
+**Consolidated audit for Coach approval. No corrections are accepted or published.** Available live screens show recurring drift in shared components, navigation, mobile layout and information hierarchy. Several reference workflows are unfinished. This report separates functional gaps from presentation fixes. It is not a blanket visual pass, production acceptance or evidence that every role and state was available.
 
 ## Scope and reference authority
 
@@ -130,6 +130,6 @@ Legacy tokens, typography, card recipe and breakpoints provide a foundation. Con
 
 Paused family Attendance/reducer and Who’s Going work was preserved at owner-reported local checkpoint d47d85d, tag pre-design-fix-2026-10-12, on feature/student-status-design-audit, without publication at that checkpoint. This is not feature acceptance; focused tests before the pause do not replace interrupted full validation.
 
-This audit makes no product corrections, domain-record changes, role changes, backend sync, real consent submission, Timeclock changes, production deployment or main merge. Temporary appearance preferences were changed for comparison and restored to System; Coach authentication and temporary viewport overrides were restored. No new application-check result is asserted for this documentation-only work.
+The audit itself made no product corrections, domain-record changes, role changes, backend sync, real consent submission, Timeclock changes, production deployment or main merge. A subsequent resumed pass prematurely created local frontend correction drafts. Those drafts remain unpublished and unaccepted; the usage-reset continuation was not approval to begin corrections. Findings below describe the audited baseline, not acceptance of those drafts. Temporary appearance preferences were changed for comparison and restored to System; Coach authentication and temporary viewport overrides were restored. No new application-check result is asserted for this documentation-only work.
 
 **Coach approval is required before corrections.** Approve or revise presentation priorities, intentional differences and deferred functional items. After approved corrections, repeat affected role/screen comparisons at both widths/themes and relevant states, retaining named limitations. Only then can visual conformance be accepted; this audit does not claim it.

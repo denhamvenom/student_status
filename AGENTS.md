@@ -28,6 +28,15 @@ Convex agent skills for common tasks can be installed by running
 - Maintain accurate GitHub version history throughout development: follow docs/REPOSITORY.md, commit focused reviewed checkpoints, push and verify development-branch updates, and keep PR descriptions, validation evidence and project documentation current. One integration owner coordinates Git writes for parallel agents. Preserve published history and existing merge/release/production boundaries; never claim a local-only checkpoint is published.
 - Keep docs/DEVELOPMENT_CHECKLIST.md current as the human-readable progress guide. Check off only implemented and verified work, distinguish agreed decisions from built features, and update it with each relevant milestone alongside the technical plan.
 
+## Design conformance
+
+- Follow `design-drift-report.md` and the immutable `design-reference/` prototype for appearance. Latest explicit user decisions override older reference behavior; use Flow index v2, prototype, shared UI copy, then design tokens for remaining design decisions.
+- Use shared labels derived from `source/ui-copy.json`, semantic tokens and shared Base UI components. Preserve dynamic data and do not invent fields, options, permissions or completed workflows.
+- Added features inherit the prototype's typography, palette, spacing and responsive patterns. Do not create a separate visual system for operations.
+- Compare affected screens at 390px and 1440px in both themes before claiming visual completion. Record unavailable states and invalid captures honestly.
+- Frontend design corrections must not change backend code, contracts, authorization or financial/consent logic. Escalate functional dependencies separately.
+- Preserve these existing instructions when extending guidance. The local audit ancestry contains paused backend drafts; publish only reviewed frontend changes on a clean candidate based on the published operations/docs baseline.
+
 ## Shared Timeclock workspace ownership
 
 Timeclock frontend work is scoped to `apps/timeclock/` in a separate branch/worktree. Student Status remains at root. Read `docs/TIMECLOCK_BACKEND_HANDOFF.md` for implemented contracts and verified baseline. Only this Student Status integration owner edits/synchronizes shared Convex, generated files, root dependency/tooling/lockfile or auth/calendar contracts. Frontend-only chats use `bun run dev:timeclock`, never a Convex watcher. Coordinate root dependency changes. No production or main merge authorization is implied by the development scaffold.

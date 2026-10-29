@@ -1,0 +1,27 @@
+.stack { display: grid; gap: 20px; min-width: 0; }
+.section { min-width: 0; }
+.section h3 { margin: 24px 0 12px; font: 400 22px/1.15 Anton, Impact, sans-serif; }
+.section :global(.form-grid) { margin-block: 16px 20px; }
+.section :global(.simple-list) { margin-block: 12px 20px; }
+.section :global(.split-line) { flex-wrap: wrap; min-width: 0; }
+.section :global(.split-line) > span { min-width: 0; overflow-wrap: anywhere; }
+.section :global(.checkbox-label) { max-width: 100%; }
+.section :global([data-slot="native-select-wrapper"]) { width: 100%; }
+.section :global(button) { white-space: normal; }
+.formSection { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--border-default); }
+.formSection h3 { margin-top: 0; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-width: 0; }
+.row > span { min-width: 0; overflow-wrap: anywhere; }
+.tableCards { min-width: 0; }
+@media (max-width: 767px) {
+  .stack { gap: 16px; }
+  .section :global(.form-grid) { grid-template-columns: minmax(0, 1fr); }
+  .section :global(.form-grid) > button { justify-self: start; }
+  .section :global(.split-line) { align-items: flex-start; }
+  .section :global(.split-line) > button { flex: none; }
+  .tableCards table, .tableCards tbody, .tableCards tr, .tableCards td { display: block; }
+  .tableCards tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
+  .tableCards td { min-width: 0; overflow-wrap: anywhere; }
+  .tableCards td::before { content: attr(data-label); display: block; color: var(--text-muted); font-size: 12px; font-weight: 600; }
+  .tableCards td:first-child { grid-column: 1 / -1; }
+}
