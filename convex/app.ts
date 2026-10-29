@@ -8,6 +8,7 @@ import { attendanceFor, financeFor, studentReadiness } from "./lib/readModels";
 import { coverageFor } from "./lib/permissionCoverage";
 import { fieldTripApproved } from "../src/lib/field-trip-approved";
 import { v2SigningAllowed } from "./lib/permissionSigningMode";
+import { permissionSigningPaused } from "./lib/permissionSigningMode";
 import { transportSummary } from "./travel";
 import { age18, firstStatus } from "./firstRegistration";
 import { studentSetupCompleteFor } from "./setupWizard";
@@ -69,7 +70,8 @@ export const eventDetail = query({
     if (!args.studentId) return { event, participation: null, requirements, readiness: null };
     const student = await studentAccess(ctx, user, args.studentId);
     const readiness = await studentReadiness(ctx, event, student);
-    return { event, participation: readiness.participation, requirements, readiness };
+    const visibleReadiness = user.role === "parent" && await permissionSigningPaused(ctx) && readiness.state === "open" ? {...readiness, open: readiness.open.filter(item => item !== "Permission accepted"), state: readiness.open.every(item => item === "Permission accepted") ? "notApplicable" as const : readiness.state} : readiness;
+    return { event, participation: readiness.participation, requirements, readiness: visibleReadiness };
   },
 });
 
@@ -101,6 +103,7 @@ export const studentDashboard = query({
     const parentProfileComplete = !!student.consentProfileV2CompletedAt;
     const activeVersion = season.activePermissionVersionId ? await ctx.db.get(season.activePermissionVersionId) : null;
     const signingAvailable = user.role === "parent" && activeVersion?.formFormat === 2 && activeVersion.version === fieldTripApproved.templateVersion && await v2SigningAllowed(ctx, student._id, user._id);
+    const signingPaused = await permissionSigningPaused(ctx);
     if (!studentSetupComplete) todos.push({eventId: null, eventName: "Student setup", label: user.role === "student" ? "Finish your student setup" : "Student setup needs to be finished by the student", dueAt: null, href: user.role === "student" ? "/setup" : null, responsible: "student", blocked: user.role !== "student"});
     if (!parentProfileComplete) todos.push({eventId: null, eventName: "Profile & health", label: user.role === "parent" ? "Finish the health and contact profile" : "A parent or legal guardian needs to finish the health and contact profile", dueAt: null, href: user.role === "parent" ? "/setup" : null, responsible: "parent", blocked: user.role !== "parent"});
     const firstRegistrationState = await firstStatus(ctx, student._id);
@@ -113,12 +116,14 @@ export const studentDashboard = query({
       const participation = participations.find(x => x.eventId === event._id)?.status ?? null;
       if (event.archived || event.cancelled || (!participation && event.signupMode === "assigned")) continue;
       const readiness = await studentReadiness(ctx, event, student);
-      rows.push({ event, participation, readiness });
+      const visibleReadiness = user.role === "parent" && await permissionSigningPaused(ctx) && readiness.state === "open" ? {...readiness, open: readiness.open.filter(item => item !== "Permission accepted"), state: readiness.open.every(item => item === "Permission accepted") ? "notApplicable" as const : readiness.state} : readiness;
+      rows.push({ event, participation, readiness: visibleReadiness });
       if (participation === "confirmed" && readiness.state === "open") {
         const custom = await ctx.db.query("requirements").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(100);
         for (const item of readiness.open) {
           if (event.type === "Competition" && item === "FIRST registration and Consent & Release") continue;
           if (item === "Permission accepted") {
+            if (signingPaused && user.role === "parent") continue;
             const coverage = await coverageFor(ctx, student._id, event._id);
             const waiting = coverage?.state === "pending" && coverage.signatureRequestedAt === undefined;
             const readyToPrepare = studentSetupComplete && parentProfileComplete && !waiting && signingAvailable;

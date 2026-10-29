@@ -38,6 +38,7 @@ async function fixture() {
 describe("server boundaries", () => {
   it("shows role-appropriate setup and permission next steps only for confirmed events", async () => {
     const f = await fixture();
+    await f.coach.mutation(api.permissions.setSigningPaused,{paused:false});
     await f.t.run(ctx => ctx.db.patch(f.ids.event, {permissionRequired: true}));
     const initialParent = await f.parent.query(api.app.studentDashboard, {studentId: f.ids.student});
     expect(initialParent.todos.map(item => item.label)).toContain("Finish the health and contact profile");

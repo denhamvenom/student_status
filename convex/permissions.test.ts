@@ -67,6 +67,7 @@ it("allows Coach and Travel Lead to request a new signature, but not an ordinary
   const mentor = f.t.withIdentity({subject: `${ids.mentorAuth}|session`});
   const request = (revision:number) => ({studentId: f.ids.student, eventIds: [ids.eventId], expectedCoverage: [{eventId: ids.eventId, revision}], reason: "Fictional updated details"});
   await expect(mentor.mutation(api.permissions.requestNewSignature, request(0))).rejects.toThrow("Coach or Travel Lead");
+  await f.coach.mutation(api.permissions.setSigningPaused, {paused:false});
   await expect(f.coach.mutation(api.permissions.requestNewSignature, request(0))).resolves.toBeNull();
   await expect(lead.mutation(api.permissions.requestNewSignature, request(1))).resolves.toBeNull();
   const requests = await f.t.run(ctx => ctx.db.query("permissionSignatureRequests").withIndex("by_studentId", q => q.eq("studentId", f.ids.student)).take(3));

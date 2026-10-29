@@ -7,6 +7,7 @@ import type { ParentHomeSummary } from "../src/features/parent-home/contract";
 import { activeSeason, ownStudent, studentAccess, viewer } from "./lib/access";
 import { enrollmentPending } from "./lib/eventEnrollmentState";
 import { coverageFor } from "./lib/permissionCoverage";
+import { permissionSigningPaused } from "./lib/permissionSigningMode";
 import { roomSelectionState, studentReadiness, type RoomSelectionState } from "./lib/readModels";
 import { kickoffBoundaryForCompetitionYear } from "./lib/seasonCalendar";
 import { feeMaintenanceProjection } from "./lib/seasonFinance";
@@ -136,6 +137,7 @@ function eventItem(key: string, kind: WhatsLeftItem["kind"], owner: WhatsLeftIte
 async function buildSummary(ctx: QueryCtx, student: Doc<"students">, asOfDay: string): Promise<StudentHomeSummary> {
     const asOf = asOfFromDay(asOfDay);
     const season = await activeSeason(ctx);
+    const signingPaused = await permissionSigningPaused(ctx);
     const events = (await ctx.db.query("events").withIndex("by_seasonId_and_archived_and_endsAt", q => q.eq("seasonId", season._id).eq("archived", false)).take(EVENT_LIMIT))
       .filter(event => !event.cancelled)
       .sort((a, b) => a.startsAt - b.startsAt);
@@ -180,6 +182,7 @@ async function buildSummary(ctx: QueryCtx, student: Doc<"students">, asOfDay: st
         else if (item === "Required payment") whatsLeft.push(eventItem("payment", "requiredPayment", "parent", event));
         else if (item === "Room selection") whatsLeft.push(eventItem("room", "roomChoice", "student", event, { dueAt: event.roomDeadline ?? event.startsAt, href: `/events/${event._id}/rooming` }));
         else if (item === "Permission accepted") {
+          if (signingPaused) continue;
           const coverage = await coverageFor(ctx, student._id, event._id);
           const submitted = coverage?.state === "pending" && coverage.signatureRequestedAt === undefined;
           whatsLeft.push(eventItem("permission", submitted ? "permissionReview" : "permissionForm", submitted ? "coach" : "parent", event));
