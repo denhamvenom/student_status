@@ -9,7 +9,7 @@ Verify the active checkout in ../HANDOFF.md first; update the example path if th
 Run the absolute path to `start.ps1`, for example:
 
 ```powershell
-& 'C:\Users\frc80\OneDrive\Documents\2026 - 2027\Denham Venom\Logistics Work\Development Version\student-status-readiness-design\start.ps1' -Mode Review
+& 'C:\dev\denham-venom\student-status-app\start.ps1' -Mode Review
 ```
 
 The launcher installs locked dependencies and starts the frontend. Visit http://localhost:5173/?review=student (also parent, coach, travelLead, mentor). Review data is fictional, memory-only and explicitly marked; it does not test live authorization. Production builds cannot enable the review switch. No shell profile or PATH changes are needed for this command.

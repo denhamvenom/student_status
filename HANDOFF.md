@@ -1,8 +1,10 @@
 # Handoff
 
-October 29, 2026 | main `2449718`: Parent permission signing switch released via PR #54; production defaults Off, hiding parent sign prompts until a Coach or Travel Lead turns it On. [Release receipt](docs/releases/RELEASE_2026-10-29_PERMISSION_SIGNING_SWITCH.md)
+October 29, 2026 | main `316039e`
 
-October 28, 2026 | main `bcda86a`
+## Permission signing switch (released)
+
+Parent permission signing switch is live: PR #54 merged as main `2449718`; production defaults Off, hiding parent sign prompts until a Coach or Travel Lead turns it On. Release docs PR #55 merged as main `316039e`. [Release receipt](docs/releases/RELEASE_2026-10-29_PERMISSION_SIGNING_SWITCH.md)
 
 ## Parent Home (released)
 
@@ -20,9 +22,15 @@ Student Home redesign, Student shell, pinned announcements and build hours targe
 
 Clocking, PIN controls, automatic closing, fixed event roster and historical import remain implemented; Calendar checks run at 6 AM/3 PM Central plus manual refresh. Rollout reached 100%.
 
+## Repository cleanup (October 29, 2026)
+
+- Closed draft PRs #2–#9; all their work is in main (PR #6 Timeclock frontend commits match main `59f58d3`, `314a4a9`, `a7aa5e0`).
+- Removed sibling worktrees; `student-status-app` is the only checkout. Branches remain on GitHub; operations' uncommitted drafts are on `wip/operations-salvage-2026-10-29` (superseded by main, nothing to port).
+- Ignored local files from those worktrees (env settings, test results, release-check scripts, design reference) are archived in ignored `private-data/worktree-archive-2026-10-29/`; `apps/timeclock/.env.local` now exists in this checkout.
+
 ## Next
 
-A Coach or Parent does a signed-in production check of Parent Home; merge docs PRs #51 and #53; remove helper worktrees `student-status-sh-d`…`sh-j`.
+A Coach or Parent does a signed-in production check of Parent Home.
 
 ## Top open risks
 
