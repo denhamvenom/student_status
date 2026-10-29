@@ -49,6 +49,58 @@ async function fixture() {
 type Fixture = Awaited<ReturnType<typeof fixture>>;
 type Client = Fixture["coach"] | Fixture["t"];
 
+describe("parent announcement audience", () => {
+  it("requires an active family link for a Parent with a stored Travel Lead flag", async () => {
+    const f = await fixture();
+    await f.t.run(ctx => ctx.db.patch(f.ids.parent.app, { travelLead: true }));
+    await f.coach.mutation(api.announcements.create, { body: "Synthetic parent notice", audience: "parents", pin: true });
+    await expect(f.parent.query(api.announcements.pinnedForParentHome, {})).rejects.toThrow("active student link");
+    // A separately selected, genuine staff session retains its staff preview.
+    expect((await f.parentAsLead.query(api.announcements.pinnedForParentHome, {})).length).toBe(1);
+  });
+
+  it("routes each audience to its destinations, including legacy rows", async () => {
+    const f = await fixture();
+    const cases = [
+      { audience: undefined, student: true, parent: false },
+      { audience: "students" as const, student: true, parent: false },
+      { audience: "parents" as const, student: false, parent: true },
+      { audience: "both" as const, student: true, parent: true },
+    ];
+    for (const item of cases) {
+      const id = await f.coach.mutation(api.announcements.create, { body: "Synthetic notice", audience: item.audience, pin: true });
+      expect((await f.student.query(api.announcements.pinnedForHome, {})).some(row => row.id === id)).toBe(item.student);
+      expect((await f.coach.query(api.announcements.pinnedForParentHome, {})).some(row => row.id === id)).toBe(item.parent);
+    }
+    expect((await f.coach.query(api.announcements.listForStaff, {})).pinned.map(row => row.audience)).toEqual(["both", "parents", "students", "students"]);
+    await expect(f.student.query(api.announcements.pinnedForParentHome, {})).rejects.toThrow("unavailable");
+    await expect(f.parent.query(api.announcements.pinnedForParentHome, {})).rejects.toThrow("active student link");
+    await f.t.run(async ctx => {
+      const student = await ctx.db.query("students").withIndex("by_seasonId_and_userId", q => q.eq("seasonId", f.ids.season).eq("userId", f.ids.student.app)).unique();
+      await ctx.db.insert("familyLinks", { parentUserId: f.ids.parent.app, studentId: student!._id, seasonId: f.ids.season, active: true, createdBy: f.ids.coach.app });
+    });
+    expect((await f.parent.query(api.announcements.pinnedForParentHome, {})).map(row => row.body)).toEqual(["Synthetic notice", "Synthetic notice"]);
+  });
+
+  it("reserves parent and Both writes for Coaches, including audience changes", async () => {
+    const f = await fixture();
+    for (const audience of ["parents", "both"] as const) {
+      const id = await f.coach.mutation(api.announcements.create, { body: "Synthetic notice", audience, pin: true });
+      await expect(f.lead.mutation(api.announcements.create, { body: "Blocked", audience, pin: false })).rejects.toThrow("Only a Coach");
+      for (const operation of [
+        () => f.lead.mutation(api.announcements.update, { id, body: "Blocked" }),
+        () => f.lead.mutation(api.announcements.pin, { id }),
+        () => f.lead.mutation(api.announcements.unpin, { id }),
+        () => f.lead.mutation(api.announcements.archive, { id }),
+      ]) await expect(operation()).rejects.toThrow("Only a Coach");
+    }
+    const studentId = await f.lead.mutation(api.announcements.create, { body: "Student notice", pin: false });
+    for (const audience of ["parents", "both"] as const) {
+      await expect(f.lead.mutation(api.announcements.update, { id: studentId, body: "Blocked", audience })).rejects.toThrow("Only a Coach");
+    }
+  });
+});
+
 describe("announcement management access", () => {
   it("refuses Students, Parents, plain Mentors and signed-out visitors on every write and on the staff list", async () => {
     const f = await fixture();
@@ -93,6 +145,41 @@ describe("announcement management access", () => {
 });
 
 describe("five-pin limit", () => {
+  it.each(["students", "parents"] as const)("counts %s pins independently and blocks Both when that destination is full", async destination => {
+    const f = await fixture();
+    for (let index = 0; index < 5; index++) await f.coach.mutation(api.announcements.create, { body: `Pinned ${index}`, audience: destination, pin: true });
+    const other = destination === "students" ? "parents" : "students";
+    await f.coach.mutation(api.announcements.create, { body: "Fits elsewhere", audience: other, pin: true });
+    await expect(f.coach.mutation(api.announcements.create, { body: "Both is full", audience: "both", pin: true })).rejects.toThrow(sixthPin);
+    const waiting = await f.coach.mutation(api.announcements.create, { body: "Waiting", audience: "both", pin: false });
+    await expect(f.coach.mutation(api.announcements.pin, { id: waiting })).rejects.toThrow(sixthPin);
+    expect((await f.coach.query(api.announcements.pinnedForHome, {})).length).toBe(destination === "students" ? 5 : 1);
+    expect((await f.coach.query(api.announcements.pinnedForParentHome, {})).length).toBe(destination === "parents" ? 5 : 1);
+  });
+
+  it("keeps the five newest pins for each destination when ten distinct rows are pinned", async () => {
+    const f = await fixture();
+    for (let index = 0; index < 10; index++) await f.coach.mutation(api.announcements.create, { body: `Pin ${index}`, audience: index % 2 ? "parents" : "students", pin: true });
+    expect((await f.coach.query(api.announcements.pinnedForHome, {})).map(row => row.body)).toEqual(["Pin 8", "Pin 6", "Pin 4", "Pin 2", "Pin 0"]);
+    expect((await f.coach.query(api.announcements.pinnedForParentHome, {})).map(row => row.body)).toEqual(["Pin 9", "Pin 7", "Pin 5", "Pin 3", "Pin 1"]);
+    expect((await f.coach.query(api.announcements.listForStaff, {})).pinned).toHaveLength(10);
+  });
+
+  it("checks newly reached destinations when updating a pinned audience", async () => {
+    const f = await fixture();
+    const id = await f.coach.mutation(api.announcements.create, { body: "Switchable", audience: "students", pin: true });
+    const parentPins = [];
+    for (let index = 0; index < 5; index++) parentPins.push(await f.coach.mutation(api.announcements.create, { body: `Parent ${index}`, audience: "parents", pin: true }));
+    await expect(f.coach.mutation(api.announcements.update, { id, body: "Switchable", audience: "both" })).rejects.toThrow(sixthPin);
+    expect((await f.get(id))?.audience).toBe("students");
+    await f.coach.mutation(api.announcements.unpin, { id: parentPins[0] });
+    await f.coach.mutation(api.announcements.update, { id, body: "Switchable", audience: "both" });
+    expect((await f.coach.query(api.announcements.pinnedForParentHome, {})).some(row => row.id === id)).toBe(true);
+    await f.coach.mutation(api.announcements.update, { id, body: "Switchable", audience: "parents" });
+    expect((await f.coach.query(api.announcements.pinnedForHome, {})).some(row => row.id === id)).toBe(false);
+    expect((await f.get(id))?.audience).toBe("parents");
+  });
+
   it("refuses a sixth pin, ignores earlier seasons and frees a slot on unpin or remove", async () => {
     const f = await fixture();
     await f.insert({ seasonId: f.ids.oldSeason, pinned: true, pinnedAt: 5 });
@@ -206,6 +293,6 @@ describe("listForStaff", () => {
     expect(list.pinned.map(row => row.id)).toEqual([secondPin, firstPin]);
     expect(list.notPinned.map(row => row.id)).toEqual(unpinned.slice(2).reverse());
     expect(list).toMatchObject({ moreNotPinned: true, pinLimit: 5 });
-    expect(list.notPinned[0]).toEqual({ id: unpinned[21], title: null, body: "Note 22", authorName: "Casey Coach", authorRole: "coach", pinned: false, pinnedAt: null, showUntil: null, createdAt: 22, updatedAt: 1 });
+    expect(list.notPinned[0]).toEqual({ id: unpinned[21], audience: "students", title: null, body: "Note 22", authorName: "Casey Coach", authorRole: "coach", pinned: false, pinnedAt: null, showUntil: null, createdAt: 22, updatedAt: 1 });
   });
 });

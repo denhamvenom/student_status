@@ -17,7 +17,7 @@ Scope: PR #50 (`feature/attendance-breakdown`): Required/Other/Outreach meeting 
 3. PR #50 merged immediately after the sync. The planned Coach Recalculate before the merge was skipped by owner decision.
 4. Both Workers auto-deployed from `7c14129`.
 
-Until a signed-in Coach runs Recalculate attendance on production, the Home ring and Attendance tiles show "updating".
+A Coach ran Recalculate attendance on production (owner-confirmed October 28/29, 2026).
 
 ## Validation done
 
