@@ -8,7 +8,7 @@ Parent Home and Coach announcement audiences (Students, Parents, Both) are live:
 
 ## Attendance breakdown (released)
 
-PR #50 merged as main `7c14129` (source head `637353f`); production Convex synced first (additive schema). Home ring and Attendance tiles show "updating" until a Coach runs Recalculate attendance on production (VERIFY whether this has been done). Not verified: signed-in production walkthrough. [Release receipt](docs/releases/RELEASE_2026-10-28_ATTENDANCE_BREAKDOWN.md)
+PR #50 merged as main `7c14129` (source head `637353f`); production Convex synced first (additive schema). A Coach ran Recalculate attendance on production (owner-confirmed October 28/29, 2026). Not verified: signed-in production walkthrough. [Release receipt](docs/releases/RELEASE_2026-10-28_ATTENDANCE_BREAKDOWN.md)
 
 ## Student Home (released)
 
@@ -24,6 +24,6 @@ A Coach or Parent does a signed-in production check of Parent Home; merge docs P
 
 ## Top open risks
 
-- Recalculate attendance must be run by a signed-in Coach on production (Coach-only), and again after any kickoff change. [Backlog](docs/BACKLOG.md#product)
+- Recalculate attendance must be run again after any kickoff change (Coach-only). [Backlog](docs/BACKLOG.md#product)
 - Signed-in transportation walkthrough, real PDF signing (deferred), backup/restore proof and security reviews remain open. [Backlog](docs/BACKLOG.md#testing)
 - Coach Season overflows at 390px (deferred to its redesign).
