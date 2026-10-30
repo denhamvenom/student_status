@@ -1,5 +1,5 @@
 import { scheduleEventArchive } from "./eventArchive";
-import { teamTransportEnabled } from "./lib/transportation";
+import { onsiteLocation, teamTransportEnabled } from "./lib/transportation";
 import { normalizeEmail, normalizePhone } from "./lib/contactValidation";
 import { requireSeasonFinanceReady } from "./lib/seasonFinance";
 import { ConvexError, v } from "convex/values";
@@ -13,6 +13,7 @@ import { markRoomCategoryReview } from "./lib/profileCorrections";
 import { syncWholeTeamMembership } from "./lib/wholeTeam";
 import { subteamOptions } from "../src/lib/subteams";
 import { allocateInvitationCode } from "./lib/invitationCodes";
+import { checkShiftSettings } from "./lib/eventSignupExtras";
 
 export const listJoinRequests = query({
   args: {}, returns: v.any(),
@@ -100,7 +101,7 @@ export const approveJoin = mutation({
 });
 
 export const createEvent = mutation({
-  args: { isOutreach: v.optional(v.boolean()), name: v.string(), type: v.union(v.literal("Competition"), v.literal("Outreach"), v.literal("Team")), startsAt: v.number(), endsAt: v.number(), destination: v.string(), travel: v.string(), overnight: v.boolean(), roomingEnabled: v.boolean(), roomDeadline: v.optional(v.number()), feeCents: v.number(), signupMode: v.union(v.literal("assigned"), v.literal("open"), v.literal("approval")), assignmentScope: v.optional(v.union(v.literal("selected"), v.literal("travelTeam"), v.literal("wholeTeam"))), assignedStudentIds: v.optional(v.array(v.id("students"))), capacity: v.optional(v.number()), signupClosesAt: v.optional(v.number()), allowWithdrawal: v.boolean(), permissionRequired: v.boolean(), firstRequired: v.boolean(), mediaSupportRequested: v.optional(v.boolean()), calendarChoice: v.optional(v.union(v.object({ kind: v.literal("create") }), v.object({ kind: v.literal("link"), eventId: v.string() }))), requirements: v.array(v.object({ key: v.string(), label: v.string(), instructions: v.optional(v.string()), url: v.optional(v.string()), dueAt: v.optional(v.number()) })) }, returns: v.id("events"),
+  args: { isOutreach: v.optional(v.boolean()), onsite: v.optional(v.boolean()), name: v.string(), type: v.union(v.literal("Competition"), v.literal("Outreach"), v.literal("Team"), v.literal("Fundraiser")), startsAt: v.number(), endsAt: v.number(), destination: v.string(), travel: v.string(), overnight: v.boolean(), roomingEnabled: v.boolean(), roomDeadline: v.optional(v.number()), feeCents: v.number(), signupMode: v.union(v.literal("assigned"), v.literal("open"), v.literal("approval")), assignmentScope: v.optional(v.union(v.literal("selected"), v.literal("travelTeam"), v.literal("wholeTeam"))), assignedStudentIds: v.optional(v.array(v.id("students"))), capacity: v.optional(v.number()), signupClosesAt: v.optional(v.number()), allowWithdrawal: v.boolean(), permissionRequired: v.boolean(), firstRequired: v.boolean(), mediaSupportRequested: v.optional(v.boolean()), shiftsEnabled: v.optional(v.boolean()), maxShiftsPerStudent: v.optional(v.number()), minShiftsPerStudent: v.optional(v.number()), calendarChoice: v.optional(v.union(v.object({ kind: v.literal("create") }), v.object({ kind: v.literal("link"), eventId: v.string() }))), requirements: v.array(v.object({ key: v.string(), label: v.string(), instructions: v.optional(v.string()), url: v.optional(v.string()), dueAt: v.optional(v.number()) })) }, returns: v.id("events"),
   handler: async (ctx, args) => {
     await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const user = await viewer(ctx);
@@ -110,8 +111,13 @@ export const createEvent = mutation({
     if (args.signupMode !== "assigned" && (args.assignmentScope || args.assignedStudentIds?.length)) throw new ConvexError("Students can be chosen in advance only for assigned events. Change the signup type or clear the chosen students.");
     if ((args.assignmentScope === "travelTeam" || args.assignmentScope === "wholeTeam") && user.role !== "coach") throw new ConvexError("Only a Coach can assign the Travel Team or Whole Team automatically.");
     if (args.assignmentScope === "wholeTeam" && (args.capacity !== undefined || args.assignedStudentIds?.length)) throw new ConvexError("Whole Team events include every active member. Leave capacity blank and don't choose students.");
+    checkShiftSettings(args);
+    if (args.onsite && (args.overnight || args.roomingEnabled || teamTransportEnabled({ travel: args.travel }))) throw new ConvexError("On-site events happen at the DSHS STEM Center, so they can't be overnight or use team transport. Turn off overnight and choose no transportation.");
+    if (args.onsite && args.roomDeadline !== undefined) throw new ConvexError("On-site events have no rooms, so they can't have a room deadline. Clear the room deadline.");
     if (args.calendarChoice?.kind === "link" && (!args.calendarChoice.eventId || args.calendarChoice.eventId.length > 512)) throw new ConvexError("Choose a Calendar entry from the list, then try again.");
-    const { requirements, assignedStudentIds, calendarChoice, ...eventFields } = args;
+    const { requirements, assignedStudentIds, calendarChoice, onsite, ...fields } = args;
+    // A Fundraiser counts as Outreach only when the flag is set, so the title-based Outreach fallback never applies.
+    const eventFields = { ...fields, ...(onsite ? { onsite: true, destination: onsiteLocation, travel: onsiteLocation } : {}), ...(args.type === "Fundraiser" ? { isOutreach: args.isOutreach ?? false } : {}) };
     let assigned = [...new Set(assignedStudentIds ?? [])];
     if (args.assignmentScope === "travelTeam" || args.assignmentScope === "wholeTeam") {
       const students = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(501);
@@ -121,7 +127,7 @@ export const createEvent = mutation({
     if (assigned.length > (args.assignmentScope === "wholeTeam" ? 500 : 100)) throw new ConvexError("Choose up to 100 students when creating an event. Add more after it is created.");
     if (args.capacity !== undefined && assigned.length > args.capacity) throw new ConvexError("More students are chosen than the event's capacity. Choose fewer students or raise the capacity.");
     for (const studentId of assigned) { const student = await ctx.db.get(studentId); if (!student || !student.active || student.seasonId !== season._id) throw new ConvexError("A chosen student is no longer on the current roster. Reload and choose again."); }
-    const id = await ctx.db.insert("events", { ...eventFields, transportEnabled: teamTransportEnabled(args), name: args.name.trim(), seasonId: season._id, archived: false, ...(calendarChoice ? { calendarChoice: calendarChoice.kind, calendarEventId: calendarChoice.kind === "link" ? calendarChoice.eventId : undefined, calendarSyncState: "pending" as const, calendarRevision: 1, calendarActorId: user._id } : {}), ...(args.assignmentScope === "wholeTeam" ? { wholeTeamParticipantCount: 0, enrollmentState: "running" as const } : {}) });
+    const id = await ctx.db.insert("events", { ...eventFields, transportEnabled: teamTransportEnabled(eventFields), name: args.name.trim(), seasonId: season._id, archived: false, ...(calendarChoice ? { calendarChoice: calendarChoice.kind, calendarEventId: calendarChoice.kind === "link" ? calendarChoice.eventId : undefined, calendarSyncState: "pending" as const, calendarRevision: 1, calendarActorId: user._id } : {}), ...(args.assignmentScope === "wholeTeam" ? { wholeTeamParticipantCount: 0, enrollmentState: "running" as const } : {}) });
     if (calendarChoice?.kind === "link") {
       const claim = await ctx.db.query("eventCalendarClaims").withIndex("by_calendarEventId", q => q.eq("calendarEventId", calendarChoice.eventId)).unique();
       if (claim) throw new ConvexError("This Calendar entry is already connected to another event. Choose a different entry.");

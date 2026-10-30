@@ -1,0 +1,29 @@
+.stack{display:flex;flex-direction:column;gap:14px;min-width:0}
+.intro{margin:0;color:var(--text-muted);font-size:14px}
+.itemMeta{display:block;margin-top:2px;color:var(--text-muted);font-size:13px;font-weight:400}
+.itemActions{display:flex;flex-wrap:wrap;gap:8px}
+.panel{display:flex;flex-direction:column;gap:12px;min-width:0;padding:14px;border:1px solid var(--border-default);border-radius:8px;background:var(--surface-metal)}
+.panel>h3{margin:0!important}
+.panel label{display:flex;flex-direction:column;gap:4px;min-width:0;font-size:14px;font-weight:600}
+.panel input,.panel select,.panel textarea{width:100%;min-height:44px;font-size:16px}
+.panel :global([data-slot=native-select-wrapper]){width:100%}
+.panel .check{flex-direction:row;align-items:center;gap:10px;min-height:44px;font-weight:600}
+.panel .check>button{flex:none}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:12px;align-items:start}
+.hint{margin:0;color:var(--text-muted);font-size:13px;font-weight:400}
+.options{display:flex;flex-direction:column;gap:8px;min-width:0;margin:0;padding:0;border:0}
+.options legend{margin-bottom:4px;padding:0;font-size:14px;font-weight:600}
+.optionRow{display:flex;align-items:center;gap:8px;min-width:0}
+.optionRow input{flex:1 1 auto;min-width:0}
+.optionRow button{flex:none}
+.formActions{display:flex;flex-wrap:wrap;gap:8px}
+.locked{margin:0;padding:10px 12px;border-left:3px solid var(--gold-500);background:var(--surface-card);font-size:14px}
+.rosterGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:10px}
+.rosterCard{min-width:0;padding:12px 14px;border:1px solid var(--border-default);border-radius:8px;background:var(--surface-card)}
+.rosterCard h4{margin:0;font-size:15px;overflow-wrap:anywhere}
+.rosterCard p{margin:2px 0 8px;color:var(--text-muted);font-size:13px}
+.rosterCard ul{margin:0}
+.answers td{overflow-wrap:anywhere;white-space:pre-line}
+.answers th{white-space:normal;min-width:120px}
+@media(max-width:767px){.optionRow{align-items:stretch}.formActions>*{flex:1 1 auto}}
+.list{padding-left:0!important;list-style:none}

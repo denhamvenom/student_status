@@ -48,6 +48,23 @@ describe("travel operations", () => {
     expect((await f.coach.query(api.travel.eventTransport, { eventId })).summary.state).toBe(travel === "Provide your Own" ? "notApplicable" : "ready");
   });
 
+  it.each([false, true])("creates an on-site Fundraiser with no transport (Outreach flag %s)", async outreach => {
+    const f = await fixture();
+    const eventId = await f.coach.mutation(api.admin.createEvent, { name: "Synthetic bake sale", type: "Fundraiser", onsite: true, ...(outreach ? { isOutreach: true } : {}), startsAt: Date.now() + 86_400_000, endsAt: Date.now() + 86_400_000 + 3_600_000, destination: "On site", travel: "On site", overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "open", allowWithdrawal: true, permissionRequired: false, firstRequired: false, shiftsEnabled: true, requirements: [] });
+    expect(await f.t.run(ctx => ctx.db.get(eventId))).toMatchObject({ type: "Fundraiser", onsite: true, destination: "On site", travel: "On site", transportEnabled: false, overnight: false, roomingEnabled: false, isOutreach: outreach });
+    expect((await f.coach.query(api.travel.eventTransport, { eventId })).summary.state).toBe("notApplicable");
+    await expect(f.coach.mutation(api.travel.setEventTransport, { eventId, travel: "Charter Bus", transportEnabled: true, busSeats: 0, additionalAdults: 0, trailerRequired: false })).rejects.toThrow("on site");
+  });
+
+  it.each([
+    ["overnight", { travel: "On site", overnight: true, roomingEnabled: false }],
+    ["rooming", { travel: "On site", overnight: true, roomingEnabled: true }],
+    ["team transport", { travel: "Charter Bus", overnight: false, roomingEnabled: false }],
+  ])("rejects an on-site event with %s", async (_label, fields) => {
+    const f = await fixture();
+    await expect(f.coach.mutation(api.admin.createEvent, { name: "Synthetic on-site event", type: "Team", onsite: true, startsAt: Date.now() + 86_400_000, endsAt: Date.now() + 2 * 86_400_000, destination: "On site", ...fields, feeCents: 0, signupMode: "open", allowWithdrawal: true, permissionRequired: false, firstRequired: false, requirements: [] })).rejects.toThrow("On-site events");
+  });
+
   it("disables ride management for own transportation and preserves prior records", async () => {
     const f = await fixture();
     const driver = await f.coach.mutation(api.travel.saveDriver, { name: "Test Driver", email: "transport@example.invalid", phone: "(202) 555-0100", vehicleName: "Van", seats: 3, approved: true, towCapable: false, active: true });

@@ -7,6 +7,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { activeSeason, audit, viewer } from "./lib/access";
 import { addCharge } from "./lib/money";
 import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
+import { activeQuestions, activeShifts, clearShifts } from "./lib/eventSignupExtras";
 
 function requireOperations(user: Doc<"appUsers">) {
   if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Only a Coach or Travel Lead can manage events.");
@@ -39,7 +40,8 @@ export const workspace = query({
     if (requirements.length > 100) throw new ConvexError("This event has too many requirements to show here. Contact a Coach.");
     const reserved = participants.filter(p => p.status === "pending" || p.status === "confirmed").length;
     const waitlist = students.filter(p => p.status === "waitlist").sort((a, b) => a.signedUpAt - b.signedUpAt || a.participantId.localeCompare(b.participantId));
-    return { event, canEdit: user.role === "coach", reserved, available: event.capacity === undefined ? null : Math.max(0, event.capacity - reserved), participants: students.filter(p => p.status !== "waitlist").sort((a, b) => a.name.localeCompare(b.name)), waitlist, requirements };
+    const shiftSettings = { shiftsEnabled: event.shiftsEnabled ?? false, maxShiftsPerStudent: event.maxShiftsPerStudent ?? null, minShiftsPerStudent: event.minShiftsPerStudent ?? 1, shiftCount: (await activeShifts(ctx, event._id)).length };
+    return { event, canEdit: user.role === "coach", shiftSettings, questionCount: (await activeQuestions(ctx, event._id)).length, reserved, available: event.capacity === undefined ? null : Math.max(0, event.capacity - reserved), participants: students.filter(p => p.status !== "waitlist").sort((a, b) => a.name.localeCompare(b.name)), waitlist, requirements };
   },
 });
 
@@ -61,6 +63,7 @@ export const reviewSignup = mutation({
       if (participant.status !== "pending" && participant.status !== "waitlist") throw new ConvexError("Only signups Waiting for approval or Waitlisted can be declined. Reload to see the latest.");
       if (!args.reason?.trim()) throw new ConvexError("Enter a reason to decline this signup.");
       await ctx.db.patch(participant._id, { status: "withdrawn", updatedAt: Date.now() });
+      await clearShifts(ctx, event._id, participant.studentId);
       await audit(ctx, user, "participants", participant._id, "declineSignup", participant.status, "withdrawn", args.reason.trim());
       return null;
     }

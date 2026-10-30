@@ -1,4 +1,4 @@
-import { teamTransportEnabled } from "./transportation";
+import { eventLocation, teamTransportEnabled } from "./transportation";
 import { ConvexError } from 'convex/values';
 import { v, type Infer } from "convex/values";
 import { consentProfileV2Validator, type ConsentProfileV2 } from "../consentProfileV2Schema";
@@ -12,7 +12,7 @@ import { fieldTripApproved } from "../../src/lib/field-trip-approved";
 
 export const consentVersionV2Validator = v.object({ versionId: v.id("permissionVersions"), version: v.string(), title: v.string(), wording: v.string(), schoolName: v.string(), teamName: v.string(), acknowledgmentText: v.string() });
 export const consentEventV2Validator = v.object({
-  eventId: v.id("events"), name: v.string(), type: v.union(v.literal("Competition"), v.literal("Outreach"), v.literal("Team")), startsAt: v.number(), endsAt: v.number(), destination: v.string(), travel: v.string(), overnight: v.boolean(), feeCents: v.number(), independentTravel: v.boolean(), transportEnabled: v.boolean(), busSeats: v.union(v.number(), v.null()), additionalAdults: v.union(v.number(), v.null()), trailerRequired: v.boolean(), signupMode: v.union(v.literal("assigned"), v.literal("open"), v.literal("approval")), capacity: v.union(v.number(), v.null()), signupClosesAt: v.union(v.number(), v.null()), roomingEnabled: v.boolean(), roomDeadline: v.union(v.number(), v.null()), permissionRequired: v.boolean(), firstRequired: v.boolean(), sponsorName: v.union(v.string(), v.null()), sponsorPhone: v.union(v.string(), v.null()), lodging: v.union(v.string(), v.null()),
+  eventId: v.id("events"), name: v.string(), type: v.union(v.literal("Competition"), v.literal("Outreach"), v.literal("Team"), v.literal("Fundraiser")), startsAt: v.number(), endsAt: v.number(), destination: v.string(), travel: v.string(), overnight: v.boolean(), feeCents: v.number(), independentTravel: v.boolean(), transportEnabled: v.boolean(), busSeats: v.union(v.number(), v.null()), additionalAdults: v.union(v.number(), v.null()), trailerRequired: v.boolean(), signupMode: v.union(v.literal("assigned"), v.literal("open"), v.literal("approval")), capacity: v.union(v.number(), v.null()), signupClosesAt: v.union(v.number(), v.null()), roomingEnabled: v.boolean(), roomDeadline: v.union(v.number(), v.null()), permissionRequired: v.boolean(), firstRequired: v.boolean(), sponsorName: v.union(v.string(), v.null()), sponsorPhone: v.union(v.string(), v.null()), lodging: v.union(v.string(), v.null()),
 });
 export const consentSnapshotV2Validator = v.object({
   format: v.literal(2), synthetic: v.boolean(), templateVersion: v.union(v.literal("field-trip-v2"), v.literal("field-trip-original-v1")), version: consentVersionV2Validator,
@@ -62,7 +62,7 @@ export async function selectedEventsV2(ctx: Ctx, student: Doc<"students">, event
     requireEnrollmentComplete(event);
     const participant = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", eventId).eq("studentId", student._id)).unique();
     if (participant?.status !== "confirmed") throw new ConvexError("Permission forms cover confirmed event participation only.");
-    result.push({ eventId, name: event.name, type: event.type, startsAt: event.startsAt, endsAt: event.endsAt, destination: event.destination, travel: event.travel, overnight: event.overnight, feeCents: event.feeCents, independentTravel: participant.independentTravel ?? false, transportEnabled: teamTransportEnabled(event), busSeats: event.busSeats ?? null, additionalAdults: event.additionalAdults ?? null, trailerRequired: event.trailerRequired ?? false, signupMode: event.signupMode, capacity: event.capacity ?? null, signupClosesAt: event.signupClosesAt ?? null, roomingEnabled: event.roomingEnabled, roomDeadline: event.roomDeadline ?? null, permissionRequired: event.permissionRequired, firstRequired: event.firstRequired, sponsorName: null, sponsorPhone: null, lodging: null });
+    result.push({ eventId, name: event.name, type: event.type, startsAt: event.startsAt, endsAt: event.endsAt, destination: eventLocation(event), travel: event.travel, overnight: event.overnight, feeCents: event.feeCents, independentTravel: participant.independentTravel ?? false, transportEnabled: teamTransportEnabled(event), busSeats: event.busSeats ?? null, additionalAdults: event.additionalAdults ?? null, trailerRequired: event.trailerRequired ?? false, signupMode: event.signupMode, capacity: event.capacity ?? null, signupClosesAt: event.signupClosesAt ?? null, roomingEnabled: event.roomingEnabled, roomDeadline: event.roomDeadline ?? null, permissionRequired: event.permissionRequired, firstRequired: event.firstRequired, sponsorName: null, sponsorPhone: null, lodging: null });
   }
   return result;
 }

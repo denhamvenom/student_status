@@ -51,7 +51,7 @@ async function reportRow(ctx: QueryCtx, student: Doc<"students">, attendance: Aw
   return {studentId:student._id,name:student.legalName||student.preferredName,subteam:student.subteam,travelTeam:student.travelTeam,fundraiserConnected:!!student.fundraiserUrl,finance,attendance:counts,eventsCount,selectedEvent:selected};
 }
 
-const eventChoice = v.object({eventId:v.id("events"),name:v.string(),startsAt:v.number(),type:v.union(v.literal("Competition"),v.literal("Outreach"),v.literal("Team"))});
+const eventChoice = v.object({eventId:v.id("events"),name:v.string(),startsAt:v.number(),type:v.union(v.literal("Competition"),v.literal("Outreach"),v.literal("Team"),v.literal("Fundraiser"))});
 export const context = query({args:{asOf:v.number()},returns:v.object({seasonId:v.id("seasons"),attendance:attendanceGate,eventsCoverage:v.union(v.literal("complete"),v.literal("unknown"))}),handler:async(ctx,args)=>{
   await requireViewer(ctx);
   if (!Number.isSafeInteger(args.asOf)) throw new ConvexError("This report could not load. Reload the page and try again.");

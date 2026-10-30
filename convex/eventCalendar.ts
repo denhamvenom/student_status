@@ -8,6 +8,7 @@ import { activeSeason, audit, viewer } from "./lib/access";
 import { hashId, serviceToken } from "./lib/calendarAuth";
 import { chicagoDate, chicagoMidnight } from "./lib/calendarDates";
 import { timeclockTransitionLocked } from "./lib/timeclockTransition";
+import { eventLocation } from "./lib/transportation";
 
 const calendarBase = "https://www.googleapis.com/calendar/v3/calendars/";
 const mediaMarker = "Media Support Requested";
@@ -163,6 +164,7 @@ export const update = mutation({
     const name = args.name?.trim() ?? event.name, destination = args.destination?.trim() ?? event.destination;
     const startsAt = args.startsAt ?? event.startsAt, endsAt = args.endsAt ?? event.endsAt;
     if (!name || name.length > 250 || destination.length > 500 || !Number.isFinite(startsAt) || !Number.isFinite(endsAt) || endsAt <= startsAt) throw new ConvexError("Enter a title up to 250 characters, a place up to 500, and an end time after the start.");
+    if (event.onsite && destination !== event.destination && destination !== eventLocation(event)) throw new ConvexError("This event is on site at the DSHS STEM Center, so its location stays On site. Change the title or schedule instead.");
     if (!event.calendarChoice && (args.name !== undefined || args.destination !== undefined || args.startsAt !== undefined || args.endsAt !== undefined)) throw new ConvexError("Connect this event to Team Calendar before changing its title, place or schedule.");
     if (event.calendarChoice === "link" && !event.calendarEtag && (args.name !== undefined || args.destination !== undefined || args.startsAt !== undefined || args.endsAt !== undefined)) throw new ConvexError("Wait for the Team Calendar connection to finish before changing the title, place or schedule.");
     const material = name !== event.name || destination !== event.destination || startsAt !== event.startsAt || endsAt !== event.endsAt || (args.cancelled ?? event.cancelled ?? false) !== (event.cancelled ?? false);
@@ -200,13 +202,15 @@ export const finishPush = internalMutation({ args: { eventId: v.id("events"), re
   if (args.error) await ctx.db.patch(event._id, { calendarSyncState: args.conflict ? "conflict" : "failed", calendarSyncError: args.error, calendarLinkReplaceable: args.replaceable ?? false });
   else {
     const observed = args.observed;
-    if (observed && (observed.title !== event.name || observed.location !== event.destination || observed.startsAt !== event.startsAt || observed.endsAt !== event.endsAt || observed.cancelled !== (event.cancelled ?? false))) await invalidatePermissionCoverage(ctx, event, event.calendarActorId!);
+    // On-site events keep their school location even if the linked Calendar entry lists another place.
+    const observedLocation = observed && !event.onsite ? observed.location : event.destination;
+    if (observed && (observed.title !== event.name || observedLocation !== event.destination || observed.startsAt !== event.startsAt || observed.endsAt !== event.endsAt || observed.cancelled !== (event.cancelled ?? false))) await invalidatePermissionCoverage(ctx, event, event.calendarActorId!);
     if (args.calendarEventId) {
       const claim = await ctx.db.query("eventCalendarClaims").withIndex("by_calendarEventId", q => q.eq("calendarEventId", args.calendarEventId!)).unique();
       if (claim && claim.eventId !== event._id) throw new ConvexError("This Calendar entry is already connected to another event. Choose a different entry.");
       if (!claim) await ctx.db.insert("eventCalendarClaims", { calendarEventId: args.calendarEventId, eventId: event._id });
     }
-    await ctx.db.patch(event._id, { calendarEventId: args.calendarEventId ?? event.calendarEventId, calendarEtag: args.etag, calendarProviderUpdatedAt: args.providerUpdatedAt ?? event.calendarProviderUpdatedAt, calendarSyncState: "synced", calendarSyncError: undefined, calendarLinkReplaceable: undefined, calendarReconcileOnRetry: undefined, calendarRevision: args.revision + (observed ? 1 : 0), ...(observed ? { name: observed.title, destination: observed.location, startsAt: observed.startsAt, endsAt: observed.endsAt, ...safeDeadlines(event, observed.startsAt), cancelled: observed.cancelled, mediaSupportRequested: observed.media, calendarAllDayStartDate: observed.startDate, calendarAllDayEndDate: observed.endDate, calendarRecurring: observed.recurring } : {}) });
+    await ctx.db.patch(event._id, { calendarEventId: args.calendarEventId ?? event.calendarEventId, calendarEtag: args.etag, calendarProviderUpdatedAt: args.providerUpdatedAt ?? event.calendarProviderUpdatedAt, calendarSyncState: "synced", calendarSyncError: undefined, calendarLinkReplaceable: undefined, calendarReconcileOnRetry: undefined, calendarRevision: args.revision + (observed ? 1 : 0), ...(observed ? { name: observed.title, destination: observedLocation, startsAt: observed.startsAt, endsAt: observed.endsAt, ...safeDeadlines(event, observed.startsAt), cancelled: observed.cancelled, mediaSupportRequested: observed.media, calendarAllDayStartDate: observed.startDate, calendarAllDayEndDate: observed.endDate, calendarRecurring: observed.recurring } : {}) });
     if (observed && observed.endsAt !== event.endsAt) await scheduleEventArchive(ctx, event._id);
     if (observed?.cancelled && !event.cancelled) await ctx.runMutation(internal.eventEnrollment.stopCancelledEnrollment, { eventId: event._id });
   }
@@ -371,7 +375,8 @@ export const applyObserved = internalMutation({ args: observedArgs, returns: v.n
     return null;
   }
   const title = args.cancelled ? event.name : args.title;
-  const location = args.cancelled ? event.destination : args.location;
+  // On-site events keep their school location even if the Calendar entry lists another place.
+  const location = args.cancelled || event.onsite ? event.destination : args.location;
   const material = title !== event.name || location !== event.destination || (!args.cancelled && (args.start !== event.startsAt || args.end !== event.endsAt)) || args.cancelled !== (event.cancelled ?? false);
   if (material) await invalidatePermissionCoverage(ctx, event, event.calendarActorId!);
   await ctx.db.patch(event._id, { name: title, destination: location, startsAt: args.start ?? event.startsAt, endsAt: args.end ?? event.endsAt, ...safeDeadlines(event, args.start ?? event.startsAt), cancelled: args.cancelled, mediaSupportRequested: args.cancelled ? event.mediaSupportRequested : args.description.split(/\r?\n/).some(line => line.trim() === mediaMarker), calendarAllDayStartDate: args.cancelled ? event.calendarAllDayStartDate : args.allDayStartDate, calendarAllDayEndDate: args.cancelled ? event.calendarAllDayEndDate : args.allDayEndDate, calendarRecurring: args.cancelled ? event.calendarRecurring : args.recurring, calendarEtag: args.etag, calendarProviderUpdatedAt: args.providerUpdatedAt ?? event.calendarProviderUpdatedAt, calendarRevision: (event.calendarRevision ?? 0) + 1, calendarSyncError: undefined });

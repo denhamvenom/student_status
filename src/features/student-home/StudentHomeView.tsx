@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { DashboardTile } from '@/components/dashboard/DashboardTile'
 import { HeroStack, type HeroSlide } from '@/components/dashboard/HeroStack'
 import { TileError, TileErrorBoundary } from '@/components/dashboard/TileErrorBoundary'
@@ -10,7 +10,7 @@ import { ActionCard, actionContent } from './tiles/ActionCard'
 import { AnnouncementCard } from './tiles/AnnouncementCard'
 import { BalanceTile } from './tiles/BalanceTile'
 import { CountdownCard } from './tiles/CountdownCard'
-import { OpenSignupsTile } from './tiles/OpenSignupsTile'
+import { OpenSignupsTile, type SignedUp } from './tiles/OpenSignupsTile'
 import { ParticipationTile } from './tiles/ParticipationTile'
 import { RoomChoiceCard } from './tiles/RoomChoiceCard'
 import { WhatsLeftTile } from './tiles/WhatsLeftTile'
@@ -92,9 +92,12 @@ function Balance({ finance, summary, handlers }: Pick<StudentHomeViewProps, 'fin
  * The shell supplies the page gutters (14px phone, 28px desktop in the artboards).
  */
 export function StudentHomeView({ summary, attendance, announcements, finance, now, handlers }: StudentHomeViewProps) {
+  // Held here, not in the tile: the tile remounts when the summary reloads or its error boundary recovers,
+  // and the signed-up event has already left the list by then.
+  const [signedUp, setSignedUp] = useState<SignedUp | null>(null)
   const signups = summary === undefined ? <TileSkeleton label={copy.states.loading(copy.signups.title)} />
     : summary instanceof Error ? failed(copy.signups.title, 'summary', handlers)
-    : <Guard title={copy.signups.title} source="summary" handlers={handlers}><OpenSignupsTile signups={summary.openSignups} now={now} handlers={handlers} /></Guard>
+    : <Guard title={copy.signups.title} source="summary" handlers={handlers}><OpenSignupsTile signups={summary.openSignups} now={now} handlers={handlers} signedUp={signedUp} onSignedUpChange={setSignedUp} /></Guard>
   const whatsLeft = summary === undefined ? <TileSkeleton label={copy.states.loading(copy.whatsLeft.title)} />
     : summary instanceof Error ? failed(copy.whatsLeft.title, 'summary', handlers)
     : <Guard title={copy.whatsLeft.title} source="summary" handlers={handlers}><WhatsLeftTile items={summary.whatsLeft} now={now} /></Guard>

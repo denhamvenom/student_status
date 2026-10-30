@@ -14,7 +14,7 @@ import { feeMaintenanceProjection } from "./lib/seasonFinance";
 import { age18, firstStatus } from "./firstRegistration";
 import { studentSetupCompleteFor } from "./setupWizard";
 
-const eventType = v.union(v.literal("Competition"), v.literal("Outreach"), v.literal("Team"));
+const eventType = v.union(v.literal("Competition"), v.literal("Outreach"), v.literal("Team"), v.literal("Fundraiser"));
 const whatsLeftItem = v.object({
   key: v.string(),
   kind: v.union(v.literal("inviteParent"), v.literal("studentSetup"), v.literal("healthProfile"), v.literal("firstRegistration"), v.literal("firstVerification"), v.literal("requiredPayment"), v.literal("permissionForm"), v.literal("permissionReview"), v.literal("roomChoice"), v.literal("requirement"), v.literal("signupApproval"), v.literal("staffReview")),

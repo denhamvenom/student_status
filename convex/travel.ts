@@ -121,6 +121,7 @@ export const setEventTransport = mutation({
     const user = await viewer(ctx); operator(user);
     const event = await currentEvent(ctx, args.eventId);
     whole(args.busSeats, "Bus passenger seats"); whole(args.additionalAdults, "Additional adult passengers");
+    if (event.onsite) throw new ConvexError("This event is on site at the DSHS STEM Center, so it has no transportation to manage.");
     if (!args.travel && args.transportEnabled && !teamTransportEnabled({ travel: event.travel })) throw new ConvexError("Choose team transport for this event before managing rides.");
     const patch = { ...(args.travel ? { travel: args.travel } : {}), transportEnabled: args.travel ? teamTransportEnabled({ travel: args.travel }) : args.transportEnabled, busSeats: args.busSeats, additionalAdults: args.additionalAdults, trailerRequired: args.trailerRequired };
     await ctx.db.patch(event._id, patch);

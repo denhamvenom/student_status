@@ -425,7 +425,7 @@ describe("signup availability", () => {
         if (item.withdrawal) await f.t.run(ctx => ctx.db.insert("withdrawalRequests", { eventId, studentId: f.ids.riley, participantId, status: "approved", requestedBy: f.ids.coach, requestedAt: 1, idempotencyKey: `withdraw-${eventId}` }));
       }
       const availability = await f.riley.query(api.participation.signupAvailability, { eventId });
-      expect(availability, item.name).toEqual({ eventId, name: item.name, startsAt: START, endsAt: START + 4 * HOUR, feeCents: item.event.feeCents ?? 0, signupMode: item.event.signupMode ?? "open", signupClosesAt: null, capacity: item.event.capacity ?? null, spotsLeft: item.spotsLeft, outcome: item.outcome });
+      expect(availability, item.name).toEqual({ eventId, name: item.name, startsAt: START, endsAt: START + 4 * HOUR, feeCents: item.event.feeCents ?? 0, signupMode: item.event.signupMode ?? "open", signupClosesAt: null, capacity: item.event.capacity ?? null, spotsLeft: item.spotsLeft, outcome: item.outcome, hasQuestions: false, shiftsEnabled: false });
       if (item.signUp) expect(await f.riley.mutation(api.participation.signUp, { eventId }), item.name).toBe(item.signUp);
       if (item.refused) await expect(f.riley.mutation(api.participation.signUp, { eventId }), item.name).rejects.toThrow(item.refused);
     }

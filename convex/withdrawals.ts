@@ -8,6 +8,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { activeSeason, audit, ownStudent, studentAccess, viewer } from "./lib/access";
 import { effectiveChargeCents } from "./lib/money";
+import { clearShifts } from "./lib/eventSignupExtras";
 
 import { ensureFinancialAccount, saveFinancialAccount } from "./lib/financialSources";
 import { makeFunctionReference } from "convex/server";
@@ -152,6 +153,7 @@ export const leaveWholeTeam = mutation({
       else await ctx.db.insert("withdrawalRequests", { eventId: data.event._id, studentId: student._id, participantId: data.participant._id, wholeTeamLeave: true, status: "pending", requestedBy: user._id, requestedAt: now, idempotencyKey: `wholeTeamLeave:${noticeId}` });
     }
     await removeRoomState(ctx, data.event._id, student._id, user);
+    await clearShifts(ctx, data.event._id, student._id);
     await ctx.db.patch(data.participant._id, { status: "withdrawn", updatedAt: now });
     await audit(ctx, user, "participants", data.participant._id, "leaveWholeTeam", { status: "confirmed" }, { status: "withdrawn", noticeId, moneyReviewPending: needsMoneyReview });
     return { moneyReviewPending: needsMoneyReview };
@@ -233,6 +235,7 @@ export async function finalizeWithdrawal(ctx: MutationCtx, job: Doc<"financialOp
   if (!participant || participant.studentId !== job.studentId || participant.eventId !== job.eventId || (request.wholeTeamLeave ? participant.status !== "withdrawn" : participant.status === "withdrawn")) throw new ConvexError("The signup changed. Review the request again.");
   if (participant.status !== "withdrawn") {
     await removeRoomState(ctx, job.eventId, job.studentId, user);
+    await clearShifts(ctx, job.eventId, job.studentId);
     await ctx.db.patch(participant._id, { status: "withdrawn", updatedAt: Date.now() });
   }
   await ctx.db.patch(request._id, { status: "approved", decidedBy: user._id, decidedAt: Date.now() });

@@ -45,7 +45,7 @@ const signup = (key: string, name: string, type: OpenSignup['type'], startsAt: s
 })
 
 const availabilityFor = (row: OpenSignup, capacity: number | null, spotsLeft: number | null, outcome: SignupAvailability['outcome']): SignupAvailability => ({
-  eventId: row.eventId, name: row.name, startsAt: row.startsAt, endsAt: row.endsAt, feeCents: row.feeCents, signupMode: row.signupMode, signupClosesAt: row.signupClosesAt, capacity, spotsLeft, outcome,
+  eventId: row.eventId, name: row.name, startsAt: row.startsAt, endsAt: row.endsAt, feeCents: row.feeCents, signupMode: row.signupMode, signupClosesAt: row.signupClosesAt, capacity, spotsLeft, outcome, hasQuestions: false, shiftsEnabled: false,
 })
 
 const item = (key: string, kind: WhatsLeftItem['kind'], owner: WhatsLeftItem['owner'], extra: Partial<WhatsLeftItem> = {}): WhatsLeftItem => ({

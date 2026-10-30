@@ -8,6 +8,8 @@ import type { SignupAvailability } from '../contract'
 import { studentHomeFixtures, type StudentHomeFixture } from '../fixtures'
 import { StudentHomeView } from '../StudentHomeView'
 import type { Loadable, SignUpResult, StudentHomeHandlers, StudentHomeViewProps } from '../types'
+import type { SignupWizardSource } from '../../event-signup/types'
+import { onsitePlace } from '@/lib/event-place'
 
 /*
  * Development-only preview of Student Home with synthetic fixtures (main.tsx loads this only when
@@ -27,11 +29,19 @@ const isState = (value: string | null): value is PreviewState => stateNames.some
 
 const signUpResult: Record<SignupAvailability['outcome'], SignUpResult> = { signedUp: 'confirmed', waitlisted: 'waitlist', waitingForApproval: 'pending', closed: 'pending' }
 
-function previewHandlers(fixture: StudentHomeFixture): StudentHomeHandlers {
+function previewHandlers(fixture: StudentHomeFixture, onJoined: (eventId: Id<'events'>) => void): StudentHomeHandlers {
+  return { signup: previewSignup(fixture, onJoined), retry: source => console.info(`Student Home preview: Try again re-subscribes ${source}`) }
+}
+
+// Nothing is saved; edits from the event page are not part of the Home preview.
+const saved = () => Promise.resolve(null)
+
+/** Like the live summary, a landed signup drops the event from Open signups (while the wizard is still open). */
+function previewSignup(fixture: StudentHomeFixture, onJoined: (eventId: Id<'events'>) => void): SignupWizardSource {
   return {
     signUp: eventId => new Promise((resolve, reject) => window.setTimeout(() => {
       if (fixture.failingSignups?.includes(eventId)) reject(new Error('This event is full right now. Ask a Coach or Travel Lead if you still need to go.'))
-      else resolve(signUpResult[fixture.availability[eventId]?.outcome ?? 'signedUp'])
+      else { onJoined(eventId); resolve(signUpResult[fixture.availability[eventId]?.outcome ?? 'signedUp']) }
     }, 700)),
     useAvailability: function usePreviewAvailability(eventId: Id<'events'>): Loadable<SignupAvailability> {
       const [loaded, setLoaded] = useState<string | null>(null)
@@ -39,8 +49,12 @@ function previewHandlers(fixture: StudentHomeFixture): StudentHomeHandlers {
       if (loaded !== eventId) return undefined
       return fixture.availability[eventId] ?? new Error('No preview availability for this event.')
     },
-    // Nothing to re-subscribe here; the console shows which sources "Try again" would reload.
-    retry: source => console.info(`Student Home preview: Try again re-subscribes ${source}`),
+    // The fixtures have no questions or shifts; the real form is checked against the backend.
+    useSignupExtras: () => ({ questions: null, shifts: null }),
+    useEventFacts: () => ({ place: onsitePlace, ride: null }),
+    useWhatsLeft: () => fixture.summary.whatsLeft,
+    saveShifts: saved,
+    saveAnswers: saved,
   }
 }
 
@@ -64,13 +78,16 @@ export default function StudentHomePreview() {
   useEffect(() => { setTheme(theme) }, [setTheme, theme])
 
   const fixture = state === 'loading' || state === 'errors' ? studentHomeFixtures.busyWeek : studentHomeFixtures[state]
-  const handlers = useMemo(() => previewHandlers(fixture), [fixture])
+  const [joined, setJoined] = useState<{ fixture: StudentHomeFixture; ids: Id<'events'>[] }>({ fixture, ids: [] })
+  if (joined.fixture !== fixture) setJoined({ fixture, ids: [] })
+  const handlers = useMemo(() => previewHandlers(fixture, eventId => setJoined(previous => ({ ...previous, ids: [...previous.ids, eventId] }))), [fixture])
+  const summary = useMemo(() => ({ ...fixture.summary, openSignups: fixture.summary.openSignups.filter(signup => !joined.ids.includes(signup.eventId)) }), [fixture, joined.ids])
   const failure = new Error('Preview failure')
   const props: StudentHomeViewProps = state === 'loading'
     ? { summary: undefined, attendance: undefined, announcements: undefined, finance: undefined, now: fixture.now, handlers }
     : state === 'errors'
       ? { summary: failure, attendance: failure, announcements: failure, finance: { state: 'failed' }, now: fixture.now, handlers }
-      : { summary: fixture.summary, attendance: fixture.attendance, announcements: fixture.announcements, finance: fixture.finance, now: fixture.now, handlers }
+      : { summary, attendance: fixture.attendance, announcements: fixture.announcements, finance: fixture.finance, now: fixture.now, handlers }
   const link = (next: PreviewState, nextTheme = theme) => `${previewPath}?state=${next}&theme=${nextTheme}`
 
   // Same frame as main.tsx: the shell, then the public footer.
