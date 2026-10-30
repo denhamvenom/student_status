@@ -42,7 +42,7 @@ export type WhatsLeftItem = {
 export type OpenSignup = {
   eventId: Id<'events'>
   name: string
-  type: 'Competition' | 'Outreach' | 'Team'
+  type: 'Competition' | 'Outreach' | 'Team' | 'Fundraiser'
   startsAt: number
   endsAt: number
   signupClosesAt: number | null
@@ -102,6 +102,10 @@ export type SignupAvailability = {
   spotsLeft: number | null
   /** What pressing Sign up would do right now, using the same rules as participation.signUp. */
   outcome: 'signedUp' | 'waitlisted' | 'waitingForApproval' | 'closed'
+  /** The event has signup questions (eventQuestions.forSignup); the sheet collects answers before Sign up. */
+  hasQuestions: boolean
+  /** The event uses shifts (eventShifts.forEvent); Sign up needs shiftIds unless it lands on the waitlist. */
+  shiftsEnabled: boolean
 }
 
 /** dashboardReports.homeAttendance: the Participation rings. */

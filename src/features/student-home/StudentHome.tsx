@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useMutation, useQueries } from 'convex/react'
+import { useQueries } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
-import type { HomeAttendance, PinnedAnnouncement, SignupAvailability, StudentHomeSummary } from './contract'
+import { useLiveSignupSource } from '../event-signup/wizardSource'
+import type { HomeAttendance, PinnedAnnouncement, StudentHomeSummary } from './contract'
 import { chicagoDateKey } from './format'
 import { StudentHomeView } from './StudentHomeView'
 import type { HomeFinance, HomeTileSource, Loadable, StudentHomeHandlers } from './types'
@@ -12,7 +13,6 @@ import { useNow } from './useNow'
 const summaryQuery = api.studentHome.summary
 const homeAttendanceQuery = api.dashboardReports.homeAttendance
 const pinnedQuery = api.announcements.pinnedForHome
-const availabilityQuery = api.participation.signupAvailability
 
 type FamilyFinance = FunctionReturnType<typeof api.dashboardReports.familyFinance>
 
@@ -69,22 +69,12 @@ function useStudentHomeData(studentId: Id<'students'>, asOfDay: string) {
   }
 }
 
-/** Passed to the view as a hook; runs inside the open signup sheet. */
-function useSignupAvailability(eventId: Id<'events'>): Loadable<SignupAvailability> {
-  const queries = useMemo(() => ({ availability: { query: availabilityQuery, args: { eventId } } }), [eventId])
-  return useQueries(queries).availability as Loadable<SignupAvailability>
-}
-
 /** Student Home for the signed-in Student. `studentId` is the Student's own record (viewer.students[0]). */
 export function StudentHome({ studentId }: { studentId: Id<'students'> }) {
   const now = useNow()
   const asOfDay = chicagoDateKey(now)
   const { summary, attendance, announcements, finance, retry } = useStudentHomeData(studentId, asOfDay)
-  const signUp = useMutation(api.participation.signUp)
-  const handlers = useMemo<StudentHomeHandlers>(() => ({
-    signUp: eventId => signUp({ eventId }),
-    useAvailability: useSignupAvailability,
-    retry,
-  }), [signUp, retry])
+  const signup = useLiveSignupSource()
+  const handlers = useMemo<StudentHomeHandlers>(() => ({ signup, retry }), [signup, retry])
   return <StudentHomeView summary={summary} attendance={attendance} announcements={announcements} finance={finance} now={now} handlers={handlers} />
 }

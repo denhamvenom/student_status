@@ -28,6 +28,7 @@
 .checkboxes{display:flex;flex-direction:column;gap:4px}
 .checkboxes label{display:flex;flex-direction:row;align-items:center;gap:10px;min-height:44px;font-size:15px;font-weight:400}
 .checkboxes label>button{flex:none}
+.checkNote{color:var(--text-muted);font-size:13px}
 .review{display:grid;grid-template-columns:minmax(110px,auto) minmax(0,1fr);gap:8px 14px;margin:0;font-size:15px}
 .review dt{color:var(--text-muted)}
 .review dd{margin:0;overflow-wrap:anywhere}

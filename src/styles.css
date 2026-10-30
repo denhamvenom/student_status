@@ -37,6 +37,9 @@ select,[data-slot="native-select-wrapper"]{max-width:100%}
 .app-frame>:first-child{flex:1}
 .app-frame>.signin,.app-frame>.app-shell{min-height:0}
 @media(max-width:1023px){.app-frame footer{padding-bottom:84px}}
+/* Phones pin a 64px bottom bar (Student: plus the home-indicator inset). Focus and scroll-into-view stop above it;
+   the page's last buttons already clear it (the footer after the page, or the shell's own bottom padding). */
+@media(max-width:1023px){html{--bottom-nav-height:64px;scroll-padding-bottom:calc(var(--bottom-nav-height) + env(safe-area-inset-bottom) + 12px)}}
 [id^="event-"]{scroll-margin-top:232px}
 @media(max-width:1023px){.event-workspace-nav{top:72px}[id^="event-"]{scroll-margin-top:156px}}
 

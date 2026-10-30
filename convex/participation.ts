@@ -7,6 +7,7 @@ import type { SignupAvailability } from "../src/features/student-home/contract";
 import { activeSeason, audit, ownStudent, viewer } from "./lib/access";
 import { addCharge } from "./lib/money";
 import { enrollmentPending, requireEnrollmentComplete } from "./lib/eventEnrollmentState";
+import { activeQuestions, answerInput, checkAnswers, checkListSizes, checkShifts, clearShifts, replaceShifts, saveAnswers } from "./lib/eventSignupExtras";
 
 async function reserved(ctx: MutationCtx, eventId: Id<"events">) {
   const rows = await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", eventId)).take(501);
@@ -14,9 +15,15 @@ async function reserved(ctx: MutationCtx, eventId: Id<"events">) {
   return rows.filter(x => x.status === "confirmed" || x.status === "pending").length;
 }
 
+/**
+ * answers: the event's signup questions (every active required one must be answered). shiftIds: required when the event uses shifts,
+ * within its min/max, open places and non-overlapping times. Everything is checked before any write. A signup that lands
+ * on the waitlist keeps its answers but holds no shift places; the student chooses shifts with eventShifts.setMyShifts after promotion.
+ */
 export const signUp = mutation({
-  args: { eventId: v.id("events") }, returns: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("waitlist")),
+  args: { eventId: v.id("events"), answers: v.optional(v.array(answerInput)), shiftIds: v.optional(v.array(v.id("eventShifts"))) }, returns: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("waitlist")),
   handler: async (ctx, args) => {
+    checkListSizes({ answers: args.answers, shiftIds: args.shiftIds });
     await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const user = await viewer(ctx); const student = await ownStudent(ctx, user);
     const event = await ctx.db.get(args.eventId); const season = await activeSeason(ctx);
@@ -30,10 +37,15 @@ export const signUp = mutation({
     if (waiting.length > 500) throw new ConvexError("This event has too many signups to update here. Contact a Coach.");
     const full = waiting.some(p => p.status === "waitlist") || event.capacity !== undefined && waiting.filter(p => p.status === "confirmed" || p.status === "pending").length >= event.capacity;
     const status = full ? "waitlist" : event.signupMode === "approval" ? "pending" : "confirmed";
+    const answers = await checkAnswers(ctx, event._id, args.answers ?? []);
+    const shifts = status === "waitlist" ? [] : await checkShifts(ctx, event, student._id, args.shiftIds ?? []);
     const now = Date.now();
     if (prior) await ctx.db.patch(prior._id, { status, createdAt: now, updatedAt: now });
     else await ctx.db.insert("participants", { eventId: event._id, studentId: student._id, status, createdAt: now, updatedAt: now });
     if (status === "confirmed" && event.feeCents > 0) await addCharge(ctx, user, student._id, event.name, event.feeCents, event.startsAt, `eventFee:${event._id}:${student._id}`, event._id);
+    await saveAnswers(ctx, event._id, student._id, answers, user._id);
+    if (shifts.length) await replaceShifts(ctx, event._id, student._id, shifts);
+    else if (status === "waitlist" && prior) await clearShifts(ctx, event._id, student._id);
     await audit(ctx, user, "participants", `${event._id}:${student._id}`, "signup", prior?.status ?? null, status);
     return status;
   },
@@ -46,6 +58,8 @@ const availabilityResult = v.object({
   capacity: v.union(v.number(), v.null()),
   spotsLeft: v.union(v.number(), v.null()),
   outcome: v.union(v.literal("signedUp"), v.literal("waitlisted"), v.literal("waitingForApproval"), v.literal("closed")),
+  hasQuestions: v.boolean(),
+  shiftsEnabled: v.boolean(),
 });
 // Compile-time guard: the return validator and the shared screen contract must stay identical.
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
@@ -69,7 +83,7 @@ export const signupAvailability = query({
     const reserved = rows.filter(p => p.status === "confirmed" || p.status === "pending").length;
     const full = rows.some(p => p.status === "waitlist") || event.capacity !== undefined && reserved >= event.capacity;
     const outcome = event.archived || event.cancelled || event.signupMode === "assigned" || enrollmentPending(event) || signedUp || withdrew || !counted ? "closed" as const : full ? "waitlisted" as const : event.signupMode === "approval" ? "waitingForApproval" as const : "signedUp" as const;
-    return { eventId: event._id, name: event.name, startsAt: event.startsAt, endsAt: event.endsAt, feeCents: event.feeCents, signupMode: event.signupMode, signupClosesAt: event.signupClosesAt ?? null, capacity: event.capacity ?? null, spotsLeft: event.capacity === undefined || !counted ? null : Math.max(0, event.capacity - reserved), outcome };
+    return { eventId: event._id, name: event.name, startsAt: event.startsAt, endsAt: event.endsAt, feeCents: event.feeCents, signupMode: event.signupMode, signupClosesAt: event.signupClosesAt ?? null, capacity: event.capacity ?? null, spotsLeft: event.capacity === undefined || !counted ? null : Math.max(0, event.capacity - reserved), outcome, hasQuestions: (await activeQuestions(ctx, event._id)).length > 0, shiftsEnabled: event.shiftsEnabled ?? false };
   },
 });
 
@@ -120,6 +134,8 @@ export const setParticipation = mutation({
       await ctx.db.insert("participants", { eventId: event._id, studentId: student._id, status: args.status, createdAt: now, updatedAt: now });
     }
     if (args.status === "confirmed" && event.feeCents > 0) await addCharge(ctx, user, student._id, event.name, event.feeCents, event.startsAt, `eventFee:${event._id}:${student._id}`, event._id);
+    // A waitlisted student holds no shift places; they choose again with eventShifts.setMyShifts once promoted.
+    if (args.status === "waitlist") await clearShifts(ctx, event._id, student._id);
     await audit(ctx, user, "participants", `${event._id}:${student._id}`, "setStatus", prior?.status ?? null, args.status, args.reason);
     return null;
   },

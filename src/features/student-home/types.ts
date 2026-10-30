@@ -1,5 +1,5 @@
-import type { Id } from '../../../convex/_generated/dataModel'
-import type { HomeAttendance, PinnedAnnouncement, SignupAvailability, StudentHomeSummary } from './contract'
+import type { SignupWizardSource } from '../event-signup/types'
+import type { HomeAttendance, PinnedAnnouncement, StudentHomeSummary } from './contract'
 
 /** A query result as useQueries reports it: undefined while loading, an Error when it failed. */
 export type Loadable<T> = T | undefined | Error
@@ -17,9 +17,8 @@ export type HomeTileSource = 'summary' | 'attendance' | 'announcements' | 'finan
 export type SignUpResult = 'pending' | 'confirmed' | 'waitlist'
 
 export type StudentHomeHandlers = {
-  signUp: (eventId: Id<'events'>) => Promise<SignUpResult>
-  /** A hook: called inside the signup sheet while it is open. */
-  useAvailability: (eventId: Id<'events'>) => Loadable<SignupAvailability>
+  /** The signup wizard's data and mutations (hooks are called only while it is open). */
+  signup: SignupWizardSource
   /** Re-subscribe to one data source after "Try again". */
   retry: (source: HomeTileSource) => void
 }

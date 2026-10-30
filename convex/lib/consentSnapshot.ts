@@ -1,4 +1,4 @@
-import { teamTransportEnabled } from "./transportation";
+import { eventLocation, teamTransportEnabled } from "./transportation";
 import { ConvexError } from 'convex/values';
 import { v, type Infer, type GenericValidator } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
@@ -15,7 +15,7 @@ export const expectedCoverageValidator = v.object({ eventId: v.id("events"), rev
 export const medicationDefinitionValidator = v.object({ key: v.union(v.literal("pain"), v.literal("allergy"), v.literal("cold")), label: v.string(), productsText: v.string(), exceptionsText: v.string() });
 export const versionValidator = v.object({ versionId: v.id("permissionVersions"), version: v.string(), title: v.string(), wording: v.string(), schoolName: v.string(), teamName: v.string(), medications: v.array(medicationDefinitionValidator), administrationText: v.string(), acknowledgmentText: v.string(), approved: v.boolean() });
 const reportValidator = v.object({ state: v.union(v.literal("none"), v.literal("reported")), text: v.union(v.string(), v.null()) });
-export const consentEventValidator = v.object({ eventId: v.id("events"), name: v.string(), type: v.union(v.literal("Competition"), v.literal("Outreach"), v.literal("Team")), startsAt: v.number(), endsAt: v.number(), destination: v.string(), travel: v.string(), overnight: v.boolean(), feeCents: v.number(), independentTravel: v.boolean(), transportEnabled: v.boolean(), busSeats: v.union(v.number(), v.null()), additionalAdults: v.union(v.number(), v.null()), trailerRequired: v.boolean() });
+export const consentEventValidator = v.object({ eventId: v.id("events"), name: v.string(), type: v.union(v.literal("Competition"), v.literal("Outreach"), v.literal("Team"), v.literal("Fundraiser")), startsAt: v.number(), endsAt: v.number(), destination: v.string(), travel: v.string(), overnight: v.boolean(), feeCents: v.number(), independentTravel: v.boolean(), transportEnabled: v.boolean(), busSeats: v.union(v.number(), v.null()), additionalAdults: v.union(v.number(), v.null()), trailerRequired: v.boolean() });
 export const consentSnapshotValidator = v.object({
   format: v.literal(1), synthetic: v.literal(true), version: versionValidator,
   student: v.object({ studentId: v.id("students"), seasonId: v.id("seasons"), legalName: v.string(), preferredName: v.string(), email: v.string(), subteam: v.string(), profileRevision: v.number() }),
@@ -93,7 +93,7 @@ export async function selectedEvents(ctx: Ctx, student: Doc<"students">, eventId
     requireEnrollmentComplete(event);
     const participant = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", eventId).eq("studentId", student._id)).unique();
     if (participant?.status !== "confirmed") throw new ConvexError("Permission forms cover confirmed event participation only.");
-    result.push({ eventId, name: event.name, type: event.type, startsAt: event.startsAt, endsAt: event.endsAt, destination: event.destination, travel: event.travel, overnight: event.overnight, feeCents: event.feeCents, independentTravel: participant.independentTravel ?? false, transportEnabled: teamTransportEnabled(event), busSeats: event.busSeats ?? null, additionalAdults: event.additionalAdults ?? null, trailerRequired: event.trailerRequired ?? false });
+    result.push({ eventId, name: event.name, type: event.type, startsAt: event.startsAt, endsAt: event.endsAt, destination: eventLocation(event), travel: event.travel, overnight: event.overnight, feeCents: event.feeCents, independentTravel: participant.independentTravel ?? false, transportEnabled: teamTransportEnabled(event), busSeats: event.busSeats ?? null, additionalAdults: event.additionalAdults ?? null, trailerRequired: event.trailerRequired ?? false });
   }
   return result;
 }

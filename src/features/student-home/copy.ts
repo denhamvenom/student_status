@@ -119,6 +119,14 @@ export const homeCopy = {
     showMore: 'Show more signups',
     allTitle: 'Open signups',
     empty: 'No open signups right now. New events show up here.',
+    /** After the wizard closes: the event leaves this list, so say where it went. */
+    done: {
+      confirmed: (name: string) => `You're signed up for ${name}.`,
+      waitlist: (name: string) => `You're on the waitlist for ${name}.`,
+      pending: (name: string) => `Your signup for ${name} is waiting for approval.`,
+    },
+    viewEvent: 'View event',
+    dismiss: 'Dismiss',
   },
 
   signupSheet: {
