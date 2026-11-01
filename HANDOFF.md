@@ -1,6 +1,17 @@
 # Handoff
 
-October 29, 2026 | main `316039e`
+November 1, 2026 | main `e8e18d8`
+
+## Event signups, shifts and Fundraisers (released)
+
+PR #57 merged as main `e8e18d8` (source `e51ed7e`): signup questions, shifts (min/max per student, capacity, generator, roster, CSV), Fundraiser type, student signup wizard and parent time-slot view. Production Convex has the additive schema (verified November 1, 2026; deploy order not recorded). Not verified: signed-in production walkthrough; Worker version IDs. [Release receipt](docs/releases/RELEASE_2026-10-30_EVENT_SIGNUPS.md)
+
+Follow-ups:
+- New Event wizard setup steps (shifts, questions, requirements) are in progress and unreleased.
+- Profile setup prompts reappear (staff skip per page load; Student/Parent setup redirects while the FIRST invite is unavailable). Fix proposed, not implemented.
+- Events list title is not clickable and has no filters.
+- Slow `signUp` (about 10 s on development) to investigate.
+- DSHS STEM Center address and drop-off note not added.
 
 ## Permission signing switch (released)
 
