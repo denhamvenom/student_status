@@ -51,7 +51,7 @@ export const eventCopy = {
   },
   review: {
     event: 'Event', type: 'Type', dates: 'Dates', destination: 'Destination',
-    audience: 'Who’s going', fee: 'Fee', travel: 'Travel', rooming: 'Rooming',
+    audience: 'Who’s going', fee: 'Fee', capacity: 'Participant limit', travel: 'Travel', rooming: 'Rooming',
     notEntered: 'Not entered', enabled: 'Enabled', notEnabled: 'Not enabled', currency: 'USD',
   },
   workspace: { roomingSummary: 'Room groups, assignments and adult review' },
