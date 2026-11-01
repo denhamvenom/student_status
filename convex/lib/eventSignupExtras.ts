@@ -10,6 +10,9 @@ export const answerInput = v.object({ questionId: v.id("eventQuestions"), value:
 export type AnswerValue = Infer<typeof answerValue>;
 export type QuestionKind = Infer<typeof questionKind>;
 
+export const shiftInput = v.object({ label: v.optional(v.string()), startsAt: v.number(), endsAt: v.number(), capacity: v.optional(v.union(v.number(), v.null())) });
+export const questionInput = v.object({ kind: questionKind, prompt: v.string(), options: v.optional(v.array(v.string())), required: v.boolean() });
+
 export const MAX_QUESTIONS = 25, MAX_QUESTION_ROWS = 100, MAX_PROMPT = 300, MAX_OPTION = 100, MAX_OPTIONS = 20, MAX_TEXT_ANSWER = 2000;
 export const MAX_SHIFTS = 100, MAX_SHIFT_SIGNUPS_PER_EVENT = 2000;
 export const choiceKind = (kind: QuestionKind) => kind === "singleChoice" || kind === "multiChoice";
@@ -68,6 +71,14 @@ export function cleanOptions(kind: QuestionKind, options: string[] | undefined) 
   if (cleaned.length < 2 || cleaned.length > MAX_OPTIONS || cleaned.some(o => !o || o.length > MAX_OPTION)) throw new ConvexError(`Give a choice question 2 to ${MAX_OPTIONS} options, each up to ${MAX_OPTION} characters.`);
   if (new Set(cleaned.map(o => o.toLowerCase())).size !== cleaned.length) throw new ConvexError("Each option must be different. Remove the repeated option.");
   return cleaned;
+}
+
+/** Checks and cleans a question's prompt and options: the rules saveQuestion and createEvent share. */
+export function cleanQuestion(input: { kind: QuestionKind; prompt: string; options?: string[]; required: boolean }) {
+  checkListSizes({ options: input.options });
+  const prompt = input.prompt.trim();
+  if (!prompt || prompt.length > MAX_PROMPT) throw new ConvexError("Enter a question of up to 300 characters.");
+  return { kind: input.kind, prompt, options: cleanOptions(input.kind, input.options), required: input.required };
 }
 
 /** A valid answer, or null when the student left it blank. Throws a plain-language error for an invalid answer. */
@@ -159,6 +170,24 @@ export function checkShiftSettings(settings: { maxShiftsPerStudent?: number | nu
   if (max != null && (!Number.isSafeInteger(max) || max < 1 || max > MAX_SHIFTS)) throw new ConvexError("Set the most shifts per student from 1 to 100, or leave it blank for no limit.");
   if (min != null && (!Number.isSafeInteger(min) || min < 0 || min > MAX_SHIFTS)) throw new ConvexError("Set the fewest shifts per student from 0 to 100.");
   if (max != null && min != null && min > max) throw new ConvexError("The fewest shifts per student can't be more than the most shifts per student.");
+}
+
+/** Checks and cleans one shift against the event's window: the rules saveShift and createEvent share. */
+export function cleanShift(input: { label?: string; startsAt: number; endsAt: number; capacity?: number | null }, event: { startsAt: number; endsAt: number }) {
+  const label = input.label?.trim() || undefined;
+  if (label && label.length > 80) throw new ConvexError("Keep the shift name to 80 characters or fewer.");
+  if (!Number.isFinite(input.startsAt) || !Number.isFinite(input.endsAt) || input.endsAt <= input.startsAt) throw new ConvexError("A shift must end after it starts.");
+  if (input.startsAt < event.startsAt || input.endsAt > event.endsAt) throw new ConvexError("Shifts must fall within the event's start and end times.");
+  if (input.capacity != null && (!Number.isSafeInteger(input.capacity) || input.capacity < 1 || input.capacity > 500)) throw new ConvexError("Enter shift places from 1 to 500, or leave it blank for no limit.");
+  return { label, startsAt: input.startsAt, endsAt: input.endsAt, capacity: input.capacity ?? undefined };
+}
+
+/** Rejects a custom requirement that saveRequirement would refuse (the short-name and reserved-key rules stay in createEvent). */
+export function checkRequirementFields(requirement: { label: string; instructions?: string; url?: string; dueAt?: number }) {
+  const label = requirement.label.trim();
+  if (!label || label.length > 100 || (requirement.instructions?.length ?? 0) > 1000 || (requirement.url?.length ?? 0) > 500) throw new ConvexError("Check the requirement. Display name: up to 100 characters. Instructions: up to 1,000. Link: up to 500.");
+  if (requirement.dueAt !== undefined && !Number.isFinite(requirement.dueAt)) throw new ConvexError("Enter a valid due date.");
+  if (requirement.url && !/^https:\/\//i.test(requirement.url)) throw new ConvexError("Requirement links must start with https://.");
 }
 
 export const shiftName = (shift: Doc<"eventShifts">) => shift.label ? `The "${clip(shift.label)}" shift` : "A shift you chose";

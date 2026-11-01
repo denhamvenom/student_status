@@ -13,7 +13,9 @@ import { markRoomCategoryReview } from "./lib/profileCorrections";
 import { syncWholeTeamMembership } from "./lib/wholeTeam";
 import { subteamOptions } from "../src/lib/subteams";
 import { allocateInvitationCode } from "./lib/invitationCodes";
-import { checkShiftSettings } from "./lib/eventSignupExtras";
+import { MAX_QUESTIONS, MAX_SHIFTS, checkListSizes, checkRequirementFields, checkShiftSettings, cleanQuestion, cleanShift, questionInput, shiftInput } from "./lib/eventSignupExtras";
+
+const MAX_REQUIREMENTS = 100;
 
 export const listJoinRequests = query({
   args: {}, returns: v.any(),
@@ -101,8 +103,13 @@ export const approveJoin = mutation({
 });
 
 export const createEvent = mutation({
-  args: { isOutreach: v.optional(v.boolean()), onsite: v.optional(v.boolean()), name: v.string(), type: v.union(v.literal("Competition"), v.literal("Outreach"), v.literal("Team"), v.literal("Fundraiser")), startsAt: v.number(), endsAt: v.number(), destination: v.string(), travel: v.string(), overnight: v.boolean(), roomingEnabled: v.boolean(), roomDeadline: v.optional(v.number()), feeCents: v.number(), signupMode: v.union(v.literal("assigned"), v.literal("open"), v.literal("approval")), assignmentScope: v.optional(v.union(v.literal("selected"), v.literal("travelTeam"), v.literal("wholeTeam"))), assignedStudentIds: v.optional(v.array(v.id("students"))), capacity: v.optional(v.number()), signupClosesAt: v.optional(v.number()), allowWithdrawal: v.boolean(), permissionRequired: v.boolean(), firstRequired: v.boolean(), mediaSupportRequested: v.optional(v.boolean()), shiftsEnabled: v.optional(v.boolean()), maxShiftsPerStudent: v.optional(v.number()), minShiftsPerStudent: v.optional(v.number()), calendarChoice: v.optional(v.union(v.object({ kind: v.literal("create") }), v.object({ kind: v.literal("link"), eventId: v.string() }))), requirements: v.array(v.object({ key: v.string(), label: v.string(), instructions: v.optional(v.string()), url: v.optional(v.string()), dueAt: v.optional(v.number()) })) }, returns: v.id("events"),
+  args: { isOutreach: v.optional(v.boolean()), onsite: v.optional(v.boolean()), name: v.string(), type: v.union(v.literal("Competition"), v.literal("Outreach"), v.literal("Team"), v.literal("Fundraiser")), startsAt: v.number(), endsAt: v.number(), destination: v.string(), travel: v.string(), overnight: v.boolean(), roomingEnabled: v.boolean(), roomDeadline: v.optional(v.number()), feeCents: v.number(), signupMode: v.union(v.literal("assigned"), v.literal("open"), v.literal("approval")), assignmentScope: v.optional(v.union(v.literal("selected"), v.literal("travelTeam"), v.literal("wholeTeam"))), assignedStudentIds: v.optional(v.array(v.id("students"))), capacity: v.optional(v.number()), signupClosesAt: v.optional(v.number()), allowWithdrawal: v.boolean(), permissionRequired: v.boolean(), firstRequired: v.boolean(), mediaSupportRequested: v.optional(v.boolean()), shiftsEnabled: v.optional(v.boolean()), maxShiftsPerStudent: v.optional(v.number()), minShiftsPerStudent: v.optional(v.number()), calendarChoice: v.optional(v.union(v.object({ kind: v.literal("create") }), v.object({ kind: v.literal("link"), eventId: v.string() }))), requirements: v.array(v.object({ key: v.string(), label: v.string(), instructions: v.optional(v.string()), url: v.optional(v.string()), dueAt: v.optional(v.number()) })), shifts: v.optional(v.array(shiftInput)), questions: v.optional(v.array(questionInput)) }, returns: v.id("events"),
   handler: async (ctx, args) => {
+    // Oversized lists are rejected before any database read.
+    if ((args.shifts?.length ?? 0) > MAX_SHIFTS) throw new ConvexError("An event can have up to 100 shifts. Remove some shifts.");
+    if ((args.questions?.length ?? 0) > MAX_QUESTIONS) throw new ConvexError("An event can have up to 25 questions. Remove some questions.");
+    if (args.requirements.length > MAX_REQUIREMENTS) throw new ConvexError("An event can have up to 100 requirements. Remove some requirements.");
+    for (const question of args.questions ?? []) checkListSizes({ options: question.options });
     await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const user = await viewer(ctx);
     if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Only a Coach or Travel Lead can create events.");
@@ -115,7 +122,15 @@ export const createEvent = mutation({
     if (args.onsite && (args.overnight || args.roomingEnabled || teamTransportEnabled({ travel: args.travel }))) throw new ConvexError("On-site events happen at the DSHS STEM Center, so they can't be overnight or use team transport. Turn off overnight and choose no transportation.");
     if (args.onsite && args.roomDeadline !== undefined) throw new ConvexError("On-site events have no rooms, so they can't have a room deadline. Clear the room deadline.");
     if (args.calendarChoice?.kind === "link" && (!args.calendarChoice.eventId || args.calendarChoice.eventId.length > 512)) throw new ConvexError("Choose a Calendar entry from the list, then try again.");
-    const { requirements, assignedStudentIds, calendarChoice, onsite, ...fields } = args;
+    // Shifts and questions are checked with saveShift's and saveQuestion's rules before anything is written, so a bad one rejects the whole create.
+    const shiftRows = args.shifts ?? [], questionRows = args.questions ?? [];
+    if (shiftRows.length && !args.shiftsEnabled) throw new ConvexError("Shifts can be added only when students pick shifts. Turn on shifts or remove the shifts.");
+    if (shiftRows.length > MAX_SHIFTS) throw new ConvexError("An event can have up to 100 shifts. Remove some shifts.");
+    if (questionRows.length > MAX_QUESTIONS) throw new ConvexError("An event can have up to 25 questions. Remove some questions.");
+    const cleanShifts = shiftRows.map(shift => cleanShift(shift, args));
+    const cleanQuestions = questionRows.map(question => cleanQuestion(question));
+    args.requirements.forEach(checkRequirementFields);
+    const { requirements, assignedStudentIds, calendarChoice, onsite, shifts: _shifts, questions: _questions, ...fields } = args;
     // A Fundraiser counts as Outreach only when the flag is set, so the title-based Outreach fallback never applies.
     const eventFields = { ...fields, ...(onsite ? { onsite: true, destination: onsiteLocation, travel: onsiteLocation } : {}), ...(args.type === "Fundraiser" ? { isOutreach: args.isOutreach ?? false } : {}) };
     let assigned = [...new Set(assignedStudentIds ?? [])];
@@ -138,6 +153,14 @@ export const createEvent = mutation({
       if (!requirement.key.trim() || keys.has(requirement.key) || ["pay", "perm", "first", "room"].includes(requirement.key)) throw new ConvexError("Each requirement needs its own short name, and pay, perm, first and room are reserved. Change the short name.");
       keys.add(requirement.key);
       await ctx.db.insert("requirements", { ...requirement, eventId: id });
+    }
+    for (const shift of cleanShifts) {
+      const shiftId = await ctx.db.insert("eventShifts", { eventId: id, ...shift });
+      await audit(ctx, user, "eventShifts", shiftId, "create", null, shift);
+    }
+    for (const [order, question] of cleanQuestions.entries()) {
+      const questionId = await ctx.db.insert("eventQuestions", { eventId: id, order, ...question });
+      await audit(ctx, user, "eventQuestions", questionId, "create", null, question);
     }
     for (const studentId of args.assignmentScope === "wholeTeam" ? [] : assigned) {
       const now = Date.now();

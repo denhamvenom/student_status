@@ -3,7 +3,7 @@ import { mutation, query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { audit, ownStudent, viewer } from "./lib/access";
 import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
-import { MAX_PROMPT, MAX_QUESTIONS, MAX_QUESTION_ROWS, activeQuestions, answerInput, answerValue, checkAnswers, checkListSizes, cleanOptions, liveEvent, questionKind, questionRows, requireEventStaff, saveAnswers } from "./lib/eventSignupExtras";
+import { MAX_QUESTIONS, MAX_QUESTION_ROWS, activeQuestions, answerInput, answerValue, checkAnswers, checkListSizes, cleanQuestion, liveEvent, questionKind, questionRows, requireEventStaff, saveAnswers } from "./lib/eventSignupExtras";
 
 const questionResult = v.object({ questionId: v.id("eventQuestions"), order: v.number(), kind: questionKind, prompt: v.string(), options: v.union(v.array(v.string()), v.null()), required: v.boolean(), archived: v.boolean() });
 const answerResult = v.object({ questionId: v.id("eventQuestions"), value: answerValue });
@@ -17,10 +17,7 @@ export const saveQuestion = mutation({
     const user = await viewer(ctx); requireEventStaff(user);
     const event = await liveEvent(ctx, args.eventId);
     requireEnrollmentComplete(event);
-    const prompt = args.prompt.trim();
-    if (!prompt || prompt.length > MAX_PROMPT) throw new ConvexError("Enter a question of up to 300 characters.");
-    const options = cleanOptions(args.kind, args.options);
-    const values = { kind: args.kind, prompt, options, required: args.required };
+    const values = cleanQuestion(args), options = values.options;
     if (args.questionId) {
       const prior = await ctx.db.get(args.questionId);
       if (!prior || prior.eventId !== event._id || prior.archived) throw new ConvexError("This question was removed. Reload to see the event's current questions.");

@@ -4,7 +4,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { audit, ownStudent, studentAccess, viewer } from "./lib/access";
 import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
-import { MAX_SHIFTS, activeShifts, activeStudentIds, checkListSizes, checkShiftSettings, checkShifts, eventShiftSignups, liveEvent, replaceShifts, requireEventStaff } from "./lib/eventSignupExtras";
+import { MAX_SHIFTS, activeShifts, cleanShift, activeStudentIds, checkListSizes, checkShiftSettings, checkShifts, eventShiftSignups, liveEvent, replaceShifts, requireEventStaff } from "./lib/eventSignupExtras";
 
 const studentName = (student: Doc<"students">) => student.legalName || student.preferredName || "Student";
 const MAX_REASON = 500;
@@ -79,12 +79,7 @@ export const saveShift = mutation({
     const event = await liveEvent(ctx, args.eventId);
     if (event.cancelled) throw new ConvexError("This event is canceled, so its shifts can't be changed.");
     requireEnrollmentComplete(event);
-    const label = args.label?.trim() || undefined;
-    if (label && label.length > 80) throw new ConvexError("Keep the shift name to 80 characters or fewer.");
-    if (!Number.isFinite(args.startsAt) || !Number.isFinite(args.endsAt) || args.endsAt <= args.startsAt) throw new ConvexError("A shift must end after it starts.");
-    if (args.startsAt < event.startsAt || args.endsAt > event.endsAt) throw new ConvexError("Shifts must fall within the event's start and end times.");
-    if (args.capacity != null && (!Number.isSafeInteger(args.capacity) || args.capacity < 1 || args.capacity > 500)) throw new ConvexError("Enter shift places from 1 to 500, or leave it blank for no limit.");
-    const values = { label, startsAt: args.startsAt, endsAt: args.endsAt, capacity: args.capacity ?? undefined };
+    const values = cleanShift(args, event);
     if (args.shiftId) {
       const prior = await ctx.db.get(args.shiftId);
       if (!prior || prior.eventId !== event._id || prior.archived) throw new ConvexError("This shift was removed. Reload to see current shifts.");
