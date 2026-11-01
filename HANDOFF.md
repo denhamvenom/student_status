@@ -1,13 +1,16 @@
 # Handoff
 
-November 1, 2026 | main `e8e18d8`
+November 1, 2026 | main `d8f1464`
+
+## New Event setup steps (released)
+
+PR #59 merged as main `d8f1464` (source `6bae22a`): the New Event wizard adds optional Time slots, Signup questions and Things students must do steps, each with Skip for now; `admin:createEvent` saves them with the event in one mutation. Production Convex deployed first (no schema change). Not verified: signed-in production walkthrough; Worker version IDs. [Release receipt](docs/releases/RELEASE_2026-11-01_NEW_EVENT_SETUP.md)
 
 ## Event signups, shifts and Fundraisers (released)
 
 PR #57 merged as main `e8e18d8` (source `e51ed7e`): signup questions, shifts (min/max per student, capacity, generator, roster, CSV), Fundraiser type, student signup wizard and parent time-slot view. Production Convex has the additive schema (verified November 1, 2026; deploy order not recorded). Not verified: signed-in production walkthrough; Worker version IDs. [Release receipt](docs/releases/RELEASE_2026-10-30_EVENT_SIGNUPS.md)
 
 Follow-ups:
-- New Event wizard setup steps (shifts, questions, requirements) are in progress and unreleased.
 - Profile setup prompts reappear (staff skip per page load; Student/Parent setup redirects while the FIRST invite is unavailable). Fix proposed, not implemented.
 - Events list title is not clickable and has no filters.
 - Slow `signUp` (about 10 s on development) to investigate.
