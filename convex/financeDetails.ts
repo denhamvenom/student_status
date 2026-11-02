@@ -74,3 +74,36 @@ export const history = query({
     return {...result, page};
   },
 });
+
+/** Most unpaid charges one family student can have before the summary refuses to guess. */
+const OWED_SUMMARY_LIMIT = 200;
+
+/**
+ * The family Money lead line across every unpaid charge, not just the first charges page:
+ * what is owed in total, the soonest effective due date (own, else the fee's) and how much is due then.
+ */
+export const owedSummary = query({
+  args: { studentId: v.id("students") },
+  returns: v.object({ owedCents: v.number(), soonestDueAt: v.union(v.number(), v.null()), soonestDueCents: v.number() }),
+  handler: async (ctx, args) => {
+    await authorize(ctx, args.studentId, 1);
+    const unpaid = await ctx.db.query("charges").withIndex("by_studentId_and_outstanding_and_priority", q => q.eq("studentId", args.studentId).eq("outstanding", true)).take(OWED_SUMMARY_LIMIT + 1);
+    if (unpaid.length > OWED_SUMMARY_LIMIT) throw new ConvexError("This summary couldn't load. Reload the page to try again.");
+    const feeDueAt = new Map<Id<"feeDefinitions">, number | undefined>();
+    let owedCents = 0, soonestDueAt: number | null = null, soonestDueCents = 0;
+    for (const charge of unpaid) {
+      const dueCents = charge.amountCents + (charge.adjustedCents ?? 0) - (charge.cancelledCents ?? 0) - charge.appliedCents;
+      if (dueCents <= 0) continue;
+      owedCents += dueCents;
+      let dueAt = charge.dueAt;
+      if (dueAt === undefined && charge.feeDefinitionId) {
+        if (!feeDueAt.has(charge.feeDefinitionId)) feeDueAt.set(charge.feeDefinitionId, await effectiveChargeDueAt(ctx, charge));
+        dueAt = feeDueAt.get(charge.feeDefinitionId);
+      }
+      if (dueAt === undefined) continue;
+      if (soonestDueAt === null || dueAt < soonestDueAt) { soonestDueAt = dueAt; soonestDueCents = dueCents; }
+      else if (dueAt === soonestDueAt) soonestDueCents += dueCents;
+    }
+    return { owedCents, soonestDueAt, soonestDueCents: Math.min(soonestDueCents, owedCents) };
+  },
+});

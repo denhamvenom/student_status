@@ -3,7 +3,7 @@ import { internal } from "./_generated/api";
 import { env, internalMutation, mutation, query, type MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { viewer as requireViewer } from "./lib/access";
-import { audienceForRole, categoriesForAudience } from "./lib/notificationCategories";
+import { categoriesForUser } from "./lib/notificationCategories";
 import { viewerOrNull } from "./lib/notify";
 import { isAllowedPushEndpoint } from "./lib/pushEndpoint";
 
@@ -31,7 +31,7 @@ export const deliver = internalMutation({
     // The account or its preferences may have changed since this was queued (quiet hours defer up to a day).
     const user = await ctx.db.get(notification.userId);
     const prefs = user ? await ctx.db.query("notificationPreferences").withIndex("by_userId", q => q.eq("userId", user._id)).unique() : null;
-    if (!user || !user.active || !categoriesForAudience(audienceForRole(user)).includes(notification.category) || prefs?.disabledCategories.includes(notification.category)) {
+    if (!user || !user.active || !categoriesForUser(user).includes(notification.category) || prefs?.disabledCategories.includes(notification.category)) {
       await ctx.db.patch(notification._id, { pushStatus: "skipped" });
       return null;
     }
@@ -62,7 +62,7 @@ export async function scheduleSummaryPush(ctx: MutationCtx, args: { notification
   if (!vapidConfigured()) return await skip();
   const user = await ctx.db.get(notification.userId);
   const prefs = user ? await ctx.db.query("notificationPreferences").withIndex("by_userId", q => q.eq("userId", user._id)).unique() : null;
-  if (!user || !user.active || !categoriesForAudience(audienceForRole(user)).includes(notification.category) || prefs?.disabledCategories.includes(notification.category)) return await skip();
+  if (!user || !user.active || !categoriesForUser(user).includes(notification.category) || prefs?.disabledCategories.includes(notification.category)) return await skip();
   const subscriptions = await ctx.db.query("pushSubscriptions").withIndex("by_userId", q => q.eq("userId", user._id)).take(MAX_SUBSCRIPTIONS_PER_USER);
   if (!subscriptions.length) return await skip();
   const unread = await ctx.db.query("notifications").withIndex("by_userId_and_readAt", q => q.eq("userId", user._id).eq("readAt", undefined)).take(MAX_BADGE + 1);

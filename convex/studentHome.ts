@@ -11,6 +11,8 @@ import { permissionSigningPaused } from "./lib/permissionSigningMode";
 import { roomSelectionState, studentReadiness, type RoomSelectionState } from "./lib/readModels";
 import { kickoffBoundaryForCompetitionYear } from "./lib/seasonCalendar";
 import { feeMaintenanceProjection } from "./lib/seasonFinance";
+import { effectiveChargeCents } from "./lib/chargeObligation";
+import { effectiveChargeDueAt } from "./lib/feeDefinitions";
 import { age18, firstStatus } from "./firstRegistration";
 import { studentSetupCompleteFor } from "./setupWizard";
 
@@ -23,6 +25,8 @@ const whatsLeftItem = v.object({
   eventName: v.union(v.string(), v.null()),
   label: v.union(v.string(), v.null()),
   dueAt: v.union(v.number(), v.null()),
+  /** Present only when dueAt is the event start rather than a real due date (a fee with no due date set). */
+  dateKind: v.optional(v.literal("eventStart")),
   href: v.union(v.string(), v.null()),
 });
 const openSignup = v.object({ eventId: v.id("events"), name: v.string(), type: eventType, startsAt: v.number(), endsAt: v.number(), signupClosesAt: v.union(v.number(), v.null()), feeCents: v.number(), signupMode: v.union(v.literal("open"), v.literal("approval")) });
@@ -133,6 +137,23 @@ function eventItem(key: string, kind: WhatsLeftItem["kind"], owner: WhatsLeftIte
   return { key: `${key}:${event._id}${fields.keySuffix ? `:${fields.keySuffix}` : ""}`, kind, owner, eventId: event._id, eventName: event.name, label: fields.label ?? null, dueAt: fields.dueAt ?? event.startsAt, href: fields.href ?? null };
 }
 
+/**
+ * The Balance due item uses the same effective due date as Money (financeDetails.charges): the earliest
+ * due date among this event's unpaid charges, each charge's own date first, else its fee's. With no due
+ * date anywhere it falls back to the event start and says so, so Home never calls an event date a due date.
+ */
+async function paymentItem(ctx: QueryCtx, student: Doc<"students">, event: Doc<"events">): Promise<WhatsLeftItem> {
+  const charges = await ctx.db.query("charges").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(101);
+  let dueAt: number | undefined;
+  for (const charge of charges) {
+    if (charge.appliedCents >= effectiveChargeCents(charge)) continue;
+    const at = await effectiveChargeDueAt(ctx, charge);
+    if (at !== undefined && (dueAt === undefined || at < dueAt)) dueAt = at;
+  }
+  const item = eventItem("payment", "requiredPayment", "parent", event, { dueAt });
+  return dueAt === undefined ? { ...item, dateKind: "eventStart" } : item;
+}
+
 /** Shared projection; entry points authorize the student before reaching it. */
 async function buildSummary(ctx: QueryCtx, student: Doc<"students">, asOfDay: string): Promise<StudentHomeSummary> {
     const asOf = asOfFromDay(asOfDay);
@@ -179,7 +200,7 @@ async function buildSummary(ctx: QueryCtx, student: Doc<"students">, asOfDay: st
       let staffReview = false;
       for (const item of builtIn) {
         if (STAFF_ITEMS.has(item)) staffReview = true;
-        else if (item === "Required payment") whatsLeft.push(eventItem("payment", "requiredPayment", "parent", event));
+        else if (item === "Required payment") whatsLeft.push(await paymentItem(ctx, student, event));
         else if (item === "Room selection") whatsLeft.push(eventItem("room", "roomChoice", "student", event, { dueAt: event.roomDeadline ?? event.startsAt, href: `/events/${event._id}/rooming` }));
         else if (item === "Permission accepted") {
           if (signingPaused) continue;

@@ -141,7 +141,10 @@ function AnnouncementItem({ row, list, pinned, pinLimit, coach, editing, setEdit
 
   return <li className="grid gap-2 border-b border-border py-4 last:border-b-0">
     {row.title && <h3 className="mb-0">{row.title}</h3>}
-    <span className="badge badge-pending w-fit">{copy.audiences[row.audience]}</span>
+    <div className="flex flex-wrap gap-2">
+      <span className="badge badge-pending w-fit">{copy.audiences[row.audience]}</span>
+      {row.urgent && <span className="badge badge-open w-fit">{copy.urgentBadge}</span>}
+    </div>
     <p className="mb-0 whitespace-pre-line">{row.body}</p>
     <p className="mb-0 text-sm text-muted-foreground">
       {copy.by(row.authorName, copy.roles[row.authorRole])} · {row.pinnedAt !== null ? copy.pinnedOn(formatDate(row.pinnedAt)) : copy.posted(formatDate(row.createdAt))}

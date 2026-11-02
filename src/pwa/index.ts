@@ -1,4 +1,4 @@
-export { isIOS, isStandalone } from './install'
+export { detectOS, isIOS, isStandalone, type DeviceOS } from './install'
 export { captureInstallPrompt, useInstallPrompt } from './useInstallPrompt'
 export { useOnlineStatus } from './useOnlineStatus'
 export { applyServiceWorkerUpdate, onServiceWorkerMessage, registerServiceWorker, serviceWorkerRegistration } from './register'

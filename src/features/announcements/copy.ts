@@ -11,6 +11,10 @@ export const announcementsCopy = {
   urgentLabel: 'Send as urgent (arrives even during school hours)',
   urgentHint: 'Use only when people need to know right away, like a canceled meeting.',
   staffHomeHeading: 'Team announcements',
+  urgentBadge: 'Urgent',
+  /** Staff Home shows only pinned messages; the Inbox lists every message sent to this account. */
+  staffHomePinned: 'Pinned',
+  seeAllMessages: 'See all messages',
   characters: (used: number, limit: number) => `${used} of ${limit} characters`,
   showUntilLabel: 'Show until (optional)',
   showUntilHint: 'The selected audience stops seeing it after this day ends. Leave it blank to show it until you unpin it.',

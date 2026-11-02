@@ -8,17 +8,21 @@ import { Button } from '@/components/ui/button'
 import { notificationsCopy } from '@/copy/notifications-copy'
 import { userFacingError } from '@/lib/error-message'
 import { InstallCard } from '@/pwa'
+import { thisDeviceState, type ThisDeviceState } from './deviceStatus'
 import { EnableNotifications, needsHomeScreen } from './EnableNotifications'
 import { NotificationPreferences } from './NotificationPreferences'
 import { unsubscribe } from './pushClient'
 import { refreshPushDevice, usePushDevice } from './usePushDevice'
 
 const copy = notificationsCopy.devices
+/** Empty list wording: what to do on this device, or plainly why it can't be added. */
+const noDevicesText = (state: ThisDeviceState) => state === 'on' || state === 'off' || state === 'checking' ? copy.none.off : copy.none[state]
 const addedOn = (at: number) => new Date(at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
 /** Every device this account gets notifications on, with remove. Removing this device also turns it off here. */
 function NotificationDevices() {
   const device = usePushDevice()
+  const publicKey = useQuery(api.push.getVapidPublicKey)
   const devices = useQuery(api.push.listMySubscriptions, device.checked ? { currentEndpoint: device.endpoint ?? undefined } : 'skip')
   const remove = useMutation(api.push.deleteSubscriptionById)
   const [removing, setRemoving] = useState<Id<'pushSubscriptions'> | null>(null)
@@ -47,7 +51,7 @@ function NotificationDevices() {
         </span>
         <Button type="button" variant="outline" aria-label={copy.removeLabel(row.deviceLabel)} disabled={removing !== null} onClick={() => void removeDevice(row._id, row.isThisDevice)}>{copy.remove}</Button>
       </li>
-    })}</ul> : <p className="muted m-0">{copy.none}</p>}
+    })}</ul> : <p className="muted m-0">{noDevicesText(thisDeviceState({ publicKey, device, needsHomeScreen: needsHomeScreen() }))}</p>}
     {error && <p role="alert" className="open-text m-0">{error}</p>}
   </div>
 }

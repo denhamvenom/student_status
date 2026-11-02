@@ -33,11 +33,11 @@ const destinationOf = (row: Announcement): Audience => row.audience ?? "students
 const PIN_WINDOW = DESTINATIONS.length * PIN_LIMIT + 1;
 const pinnedAnnouncement = v.object({
   id: v.id("teamAnnouncements"), title: v.union(v.string(), v.null()), body: v.string(), authorName: v.string(), authorRole,
-  pinnedAt: v.number(), showUntil: v.union(v.number(), v.null()),
+  pinnedAt: v.number(), showUntil: v.union(v.number(), v.null()), urgent: v.boolean(),
 });
 const staffAnnouncement = v.object({
   id: v.id("teamAnnouncements"), audience, title: v.union(v.string(), v.null()), body: v.string(), authorName: v.string(), authorRole,
-  pinned: v.boolean(), pinnedAt: v.union(v.number(), v.null()), showUntil: v.union(v.number(), v.null()), createdAt: v.number(), updatedAt: v.number(),
+  pinned: v.boolean(), pinnedAt: v.union(v.number(), v.null()), showUntil: v.union(v.number(), v.null()), urgent: v.boolean(), createdAt: v.number(), updatedAt: v.number(),
 });
 
 /** A Coach, or a Mentor with Travel Lead access (including a Parent who selected Travel Lead for this session). */
@@ -46,6 +46,9 @@ function managerRole(user: AppUser): AuthorRole | null {
   if (user.role === "mentor" && user.travelLead) return "travelLead";
   return null;
 }
+
+/** Urgent is Coach-only to send, so only a Coach may change, pin, unpin or remove an urgent announcement. */
+const URGENT_COACH_ONLY = "Only a Coach can change an urgent announcement.";
 
 async function requireManager(ctx: Ctx) {
   const actor = await viewer(ctx);
@@ -87,8 +90,8 @@ async function requirePinRoom(ctx: MutationCtx, seasonId: Id<"seasons">, targetA
 }
 
 /** What the audit trail keeps: the visible content and pin state, never account details. */
-function auditView(row: Pick<Announcement, "audience" | "title" | "body" | "pinned" | "showUntil">) {
-  return { audience: row.audience ?? "students", title: row.title ?? null, body: row.body, pinned: row.pinned, showUntil: row.showUntil ?? null };
+function auditView(row: Pick<Announcement, "audience" | "title" | "body" | "pinned" | "showUntil" | "urgent">) {
+  return { audience: row.audience ?? "students", title: row.title ?? null, body: row.body, pinned: row.pinned, showUntil: row.showUntil ?? null, urgent: row.urgent ?? false };
 }
 
 /** Author names come from the account name. An account whose name is an email shows its role instead. */
@@ -125,7 +128,7 @@ export const pinnedForHome = query({
     const nameOf = authorNames(ctx);
     return await Promise.all(rows.filter(row => row.archivedAt === undefined && reaches(destinationOf(row), "students")).slice(0, PIN_LIMIT).map(async row => ({
       id: row._id, title: row.title ?? null, body: row.body, authorName: await nameOf(row), authorRole: row.authorRole,
-      pinnedAt: row.pinnedAt ?? row.updatedAt, showUntil: row.showUntil ?? null,
+      pinnedAt: row.pinnedAt ?? row.updatedAt, showUntil: row.showUntil ?? null, urgent: row.urgent ?? false,
     })));
   },
 });
@@ -147,7 +150,7 @@ export const pinnedForParentHome = query({
     const nameOf = authorNames(ctx);
     return Promise.all(rows.filter(row => row.archivedAt === undefined && reaches(destinationOf(row), "parents")).slice(0, PIN_LIMIT).map(async row => ({
       id: row._id, title: row.title ?? null, body: row.body, authorName: await nameOf(row), authorRole: row.authorRole,
-      pinnedAt: row.pinnedAt ?? row.updatedAt, showUntil: row.showUntil ?? null,
+      pinnedAt: row.pinnedAt ?? row.updatedAt, showUntil: row.showUntil ?? null, urgent: row.urgent ?? false,
     })));
   },
 });
@@ -165,7 +168,7 @@ export const listForStaff = query({
     const nameOf = authorNames(ctx);
     const project = async (row: Announcement) => ({
       id: row._id, audience: row.audience ?? "students", title: row.title ?? null, body: row.body, authorName: await nameOf(row), authorRole: row.authorRole,
-      pinned: row.pinned, pinnedAt: row.pinnedAt ?? null, showUntil: row.showUntil ?? null, createdAt: row.createdAt, updatedAt: row.updatedAt,
+      pinned: row.pinned, pinnedAt: row.pinnedAt ?? null, showUntil: row.showUntil ?? null, urgent: row.urgent ?? false, createdAt: row.createdAt, updatedAt: row.updatedAt,
     });
     return {
       pinned: await Promise.all(pinned.filter(row => row.archivedAt === undefined).map(project)),
@@ -187,10 +190,12 @@ export const create = mutation({
     const content = cleanContent(args);
     const showUntil = futureShowUntil(args.showUntil, now);
     if (args.pin) await requirePinRoom(ctx, season._id, args.audience ?? "students");
-    const row = { seasonId: season._id, audience: args.audience, ...content, showUntil, authorId: actor._id, authorRole: role, pinned: args.pin, pinnedAt: args.pin ? now : undefined, createdAt: now, updatedAt: now };
+    // Urgent is Coach-only (refused above), so a stored flag always means a Coach sent it urgently.
+    const urgent = args.urgent === true ? true : undefined;
+    const row = { seasonId: season._id, audience: args.audience, ...content, showUntil, urgent, authorId: actor._id, authorRole: role, pinned: args.pin, pinnedAt: args.pin ? now : undefined, createdAt: now, updatedAt: now };
     const id = await ctx.db.insert("teamAnnouncements", row);
     await audit(ctx, actor, "teamAnnouncements", id, "createAnnouncement", null, auditView(row));
-    await ctx.scheduler.runAfter(0, notifyAudienceRef, { announcementId: id, urgent: args.urgent ?? false });
+    await ctx.scheduler.runAfter(0, notifyAudienceRef, { announcementId: id, urgent: urgent ?? false });
     return id;
   },
 });
@@ -202,6 +207,7 @@ export const update = mutation({
   handler: async (ctx, args) => {
     const { actor, season } = await requireManager(ctx);
     const row = await currentAnnouncement(ctx, args.id, season._id);
+    if (row.urgent && actor.role !== "coach") throw new ConvexError(URGENT_COACH_ONLY);
     const targetAudience = args.audience ?? destinationOf(row);
     if ((coachOnly(destinationOf(row)) || coachOnly(targetAudience)) && actor.role !== "coach") throw new ConvexError("Only a Coach can manage parent announcements.");
     const now = Date.now();
@@ -222,6 +228,7 @@ export const pin = mutation({
   handler: async (ctx, args) => {
     const { actor, season } = await requireManager(ctx);
     const row = await currentAnnouncement(ctx, args.id, season._id);
+    if (row.urgent && actor.role !== "coach") throw new ConvexError(URGENT_COACH_ONLY);
     if (coachOnly(destinationOf(row)) && actor.role !== "coach") throw new ConvexError("Only a Coach can manage parent announcements.");
     if (row.pinned) return null;
     await requirePinRoom(ctx, season._id, destinationOf(row));
@@ -238,6 +245,7 @@ export const unpin = mutation({
   handler: async (ctx, args) => {
     const { actor, season } = await requireManager(ctx);
     const row = await currentAnnouncement(ctx, args.id, season._id);
+    if (row.urgent && actor.role !== "coach") throw new ConvexError(URGENT_COACH_ONLY);
     if (coachOnly(destinationOf(row)) && actor.role !== "coach") throw new ConvexError("Only a Coach can manage parent announcements.");
     if (!row.pinned) return null;
     await ctx.db.patch("teamAnnouncements", row._id, { pinned: false, pinnedAt: undefined, updatedAt: Date.now() });
@@ -253,6 +261,7 @@ export const archive = mutation({
   handler: async (ctx, args) => {
     const { actor, season } = await requireManager(ctx);
     const row = await currentAnnouncement(ctx, args.id, season._id);
+    if (row.urgent && actor.role !== "coach") throw new ConvexError(URGENT_COACH_ONLY);
     if (coachOnly(destinationOf(row)) && actor.role !== "coach") throw new ConvexError("Only a Coach can manage parent announcements.");
     const now = Date.now();
     await ctx.db.patch("teamAnnouncements", row._id, { archivedAt: now, pinned: false, pinnedAt: undefined, updatedAt: now });
@@ -273,7 +282,7 @@ export const pinnedForStaffHome = query({
     const nameOf = authorNames(ctx);
     return Promise.all(rows.filter(row => row.archivedAt === undefined && reaches(destinationOf(row), "staff")).slice(0, PIN_LIMIT).map(async row => ({
       id: row._id, title: row.title ?? null, body: row.body, authorName: await nameOf(row), authorRole: row.authorRole,
-      pinnedAt: row.pinnedAt ?? row.updatedAt, showUntil: row.showUntil ?? null,
+      pinnedAt: row.pinnedAt ?? row.updatedAt, showUntil: row.showUntil ?? null, urgent: row.urgent ?? false,
     })));
   },
 });

@@ -194,7 +194,7 @@ describe("event notifications", () => {
     await f.coach.mutation(api.admin.approveJoin, { requestId, approve: true });
     const rows = await f.inbox();
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ category: "announcements", url: "/", title: "Welcome to the team" });
+    expect(rows[0]).toMatchObject({ category: "announcements", url: "/setup", title: "Welcome to the team" });
     expect((await f.t.run(ctx => ctx.db.get(rows[0].userId)))?.email).toBe("newstudent@synthetic.test");
   });
 });

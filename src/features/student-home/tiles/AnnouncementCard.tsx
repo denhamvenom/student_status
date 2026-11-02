@@ -8,6 +8,7 @@ import { dashboardButtonVariants } from '@/components/dashboard/styles'
 import type { PinnedAnnouncement } from '../contract'
 import { homeCopy } from '../copy'
 import { initialsOf } from '../format'
+import { announcementsCopy } from '../../announcements/copy'
 
 const copy = homeCopy.announcement
 
@@ -15,9 +16,10 @@ const titleClass = 'm-0! font-heading! text-[20px]! leading-[1.15]! font-normal!
 
 /**
  * A pinned Coach or Travel Lead message. The body is plain text; line breaks are kept. Long messages
- * are clamped (6 lines on phones, 8 on desktop) and open in full in a sheet.
+ * are clamped (6 lines on phones, 8 on desktop) and open in full in a sheet. A Coach's urgent message
+ * carries a small Urgent badge (the same badge staff Home uses).
  */
-export function AnnouncementCard({ announcement }: { announcement: PinnedAnnouncement }) {
+export function AnnouncementCard({ announcement }: { announcement: PinnedAnnouncement & { urgent?: boolean } }) {
   const labelId = useId()
   const titleId = useId()
   const bodyRef = useRef<HTMLParagraphElement>(null)
@@ -42,6 +44,7 @@ export function AnnouncementCard({ announcement }: { announcement: PinnedAnnounc
         <p id={labelId} className="text-[11px] leading-tight font-bold tracking-[0.04em] text-vs-accent-text uppercase">{label}</p>
         <p className="truncate text-[12px] text-vs-muted">{announcement.authorName}</p>
       </div>
+      {announcement.urgent && <span className="badge badge-open shrink-0">{announcementsCopy.urgentBadge}</span>}
       <Pin size={15} aria-hidden="true" className="shrink-0 text-vs-accent" />
     </div>
     {/* On desktop the hero fills the column, so the message sits in the middle of the card. */}

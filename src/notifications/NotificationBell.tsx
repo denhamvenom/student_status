@@ -13,7 +13,7 @@ const defaultCount = 'absolute -top-1.5 -right-1.5 min-w-5 rounded-full bg-[#fdd
 function BellLink({ unread = 0, className, countClassName, showLabel = false }: { unread?: number; className?: string; countClassName?: string; showLabel?: boolean }) {
   const { pathname } = useLocation()
   const count = unread > 0 ? unreadBadge(unread) : null
-  return <Link to="/inbox" aria-label={count ? copy.labelWithCount(count) : copy.label} aria-current={pathname === '/inbox' ? 'page' : undefined} className={cn('relative inline-flex items-center justify-center', className)} style={{ textDecoration: 'none' }}>
+  return <Link to="/inbox" aria-label={count ? copy.labelWithCount(count) : copy.label} aria-current={pathname === '/inbox' ? 'page' : undefined} className={cn('relative inline-flex min-h-11 min-w-11 items-center justify-center', className)} style={{ textDecoration: 'none' }}>
     <Bell size={showLabel ? undefined : 20} aria-hidden="true"/>
     {showLabel && <span>{copy.label}</span>}
     {count && <span aria-hidden="true" className={countClassName ?? defaultCount}>{count}</span>}
@@ -27,7 +27,7 @@ function BellWithCount(props: BellProps) {
   return <BellLink unread={unread} {...props}/>
 }
 
-/** Bell link to /inbox with the unread count (99+). `showLabel` adds the word Inbox, for side menus. If the count fails, the bell still links to the Inbox. */
+/** Bell icon link to /inbox (at least 44px) with a visible unread count (99+) and the label "Inbox, N unread". `showLabel` adds the word Inbox, for side menus. If the count fails, the bell still links to the Inbox. */
 export function NotificationBell(props: BellProps) {
   return <NotificationsBoundary fallback={<BellLink {...props}/>}><BellWithCount {...props}/></NotificationsBoundary>
 }

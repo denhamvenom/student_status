@@ -203,6 +203,73 @@ describe("inbox", () => {
   });
 });
 
+describe("staff travel category", () => {
+  async function staffFixture(role: "coach" | "mentor", travelLead: boolean) {
+    const f = await fixture();
+    const auth = await f.t.run(ctx => ctx.db.insert("users", { email: "staff@example.invalid" }));
+    const id = await f.t.run(ctx => ctx.db.insert("appUsers", { authUserId: auth, email: "staff@example.invalid", name: "Staff", role, travelLead, financialEdit: false, active: true }));
+    return { f, id, who: f.t.withIdentity({ subject: `${auth}|session` }) };
+  }
+
+  // Regression: plain Mentors were offered (and pushed) Travel although they have no travel pages.
+  it.each([
+    { title: "Mentor", role: "mentor" as const, travelLead: false, travel: false },
+    { title: "Travel Lead", role: "mentor" as const, travelLead: true, travel: true },
+    { title: "Coach", role: "coach" as const, travelLead: false, travel: true },
+  ])("$title: Travel offered = $travel, and push delivery follows the same rule", async ({ role, travelLead, travel }) => {
+    vi.setSystemTime(OPEN_NOW);
+    const { f, id, who } = await staffFixture(role, travelLead);
+    const categories = (await who.query(api.notifications.getMyPreferences, {})).map(p => p.category);
+    expect(categories).toEqual(expect.arrayContaining(["schedule", "announcements", "events", "staff"]));
+    expect(categories.includes("travel")).toBe(travel);
+    const toggle = who.mutation(api.notifications.setCategoryEnabled, { category: "travel", enabled: false });
+    if (travel) await toggle; else await expect(toggle).rejects.toThrow("does not apply");
+
+    vi.stubEnv("VAPID_PUBLIC_KEY", "k"); vi.stubEnv("VAPID_PRIVATE_KEY", "k"); vi.stubEnv("VAPID_SUBJECT", "mailto:a@example.invalid");
+    if (travel) await who.mutation(api.notifications.setCategoryEnabled, { category: "travel", enabled: true });
+    await who.mutation(api.push.saveSubscription, sub("https://fcm.googleapis.com/fcm/send/staff"));
+    const [notificationId] = await f.t.run(ctx => notifyUsers(ctx, { ...base, category: "travel", userIds: [id] }));
+    await f.t.mutation(internal.push.deliver, { notificationId });
+    expect((await f.t.run(ctx => ctx.db.get(notificationId)))?.pushStatus).toBe(travel ? "pending" : "skipped");
+    vi.unstubAllEnvs();
+  });
+});
+
+describe("parent with staff access", () => {
+  // Regression: Settings followed the session's selected role while push followed the stored row, so a Parent
+  // in a Travel Lead session lost Forms and Money in Settings and staff pushes were skipped.
+  it("offers Parent and staff categories in every session, delivers staff pushes and respects toggles", async () => {
+    vi.setSystemTime(OPEN_NOW);
+    const f = await fixture();
+    const ids = await f.t.run(async ctx => {
+      const auth = await ctx.db.insert("users", { email: "ps@example.invalid" });
+      const id = await ctx.db.insert("appUsers", { authUserId: auth, email: "ps@example.invalid", name: "Parent Lead", role: "parent", parentStaffAccess: "travelLead", travelLead: false, financialEdit: false, active: true });
+      const leadSession = await ctx.db.insert("authSessions", { userId: auth, expirationTime: OPEN_NOW + 86_400_000 });
+      const parentSession = await ctx.db.insert("authSessions", { userId: auth, expirationTime: OPEN_NOW + 86_400_000 });
+      await ctx.db.insert("operatingRoles", { sessionId: leadSession, userId: id, role: "travelLead", accessRevision: 0 });
+      return { auth, id, leadSession, parentSession };
+    });
+    const asLead = f.t.withIdentity({ subject: `${ids.auth}|${ids.leadSession}` });
+    const asParent = f.t.withIdentity({ subject: `${ids.auth}|${ids.parentSession}` });
+    for (const who of [asLead, asParent]) {
+      const categories = (await who.query(api.notifications.getMyPreferences, {})).map(p => p.category);
+      expect(categories).toEqual(["schedule", "announcements", "forms", "events", "money", "travel", "staff"]);
+    }
+    await asLead.mutation(api.notifications.setCategoryEnabled, { category: "forms", enabled: false });
+    expect((await asParent.query(api.notifications.getMyPreferences, {})).find(p => p.category === "forms")?.enabled).toBe(false);
+
+    vi.stubEnv("VAPID_PUBLIC_KEY", "k"); vi.stubEnv("VAPID_PRIVATE_KEY", "k"); vi.stubEnv("VAPID_SUBJECT", "mailto:a@example.invalid");
+    await asParent.mutation(api.push.saveSubscription, sub("https://fcm.googleapis.com/fcm/send/parent-lead"));
+    const status = async (category: "staff" | "forms" | "money") => {
+      const [notificationId] = await f.t.run(ctx => notifyUsers(ctx, { ...base, category, userIds: [ids.id] }));
+      await f.t.mutation(internal.push.deliver, { notificationId });
+      return (await f.t.run(ctx => ctx.db.get(notificationId)))?.pushStatus;
+    };
+    expect([await status("staff"), await status("money"), await status("forms")]).toEqual(["pending", "pending", "skipped"]);
+    vi.unstubAllEnvs();
+  });
+});
+
 describe("signed-in accounts that cannot use notifications yet", () => {
   // Regression: a signed-in account whose viewer() check fails (no profile, inactive, parent with staff access) crashed the shell via unreadCount.
   it("returns empty values instead of throwing", async () => {

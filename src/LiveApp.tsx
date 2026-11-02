@@ -69,7 +69,7 @@ import { AppShell, menu } from './AppShell'
 import { ReadinessReview } from './features/design-review/ReadinessReview'
 import { Announcements } from './features/announcements/Announcements'
 import { StaffHomeAnnouncements } from './features/announcements/StaffHomeAnnouncements'
-import { dueDateCopy } from './copy/due-date-copy'
+import { dueDateCopy, owedCopy, owedSummary } from './copy/due-date-copy'
 import { announcementsCopy } from './features/announcements/copy'
 import { Inbox, NotificationSettings, useSignOut } from './notifications'
 import { notificationsCopy } from './copy/notifications-copy'
@@ -181,12 +181,17 @@ function FinancePage({studentId,showHeading=true,allowChargeEditing=false}:{stud
   const data=useQuery(qFinances,studentId?{studentId:sid(studentId)}:'skip')
   const chargesPage=usePaginatedQuery(api.financeDetails.charges,studentId?{studentId:sid(studentId)}:'skip',{initialNumItems:25})
   const historyPage=usePaginatedQuery(api.financeDetails.history,studentId?{studentId:sid(studentId)}:'skip',{initialNumItems:25})
+  const owedTotals=useQuery(api.financeDetails.owedSummary,studentId&&showHeading?{studentId:sid(studentId)}:'skip')
   if(!studentId)return <State>{familyCopy.finance.selectStudent}</State>
   if(!data)return <State>{familyCopy.finance.loading}</State>
   if(chargesPage.status==='LoadingFirstPage'||historyPage.status==='LoadingFirstPage')return <State>{familyCopy.finance.loading}</State>
   const chargeGroups=Array.from(new Set(chargesPage.results.map(c=>c.eventId??'standalone')))
+  // Computed server-side across every unpaid charge (not just the loaded page), using each charge's effective due date.
+  const owed=data.state==='ready'&&owedTotals?owedSummary(owedTotals.owedCents,[{dueCents:owedTotals.soonestDueCents,dueAt:owedTotals.soonestDueAt}]):null
+  const openCharge=chargeDetail?chargesPage.results.find(c=>c._id===chargeDetail.chargeId):undefined
   return <>
     {showHeading&&<Heading title={familyCopy.finance.title} description={uiCopy.finance.description}/>}
+    {showHeading&&owed&&<section className="card" aria-label={owedCopy.label}><p className="metric-value">{owed.owes?<>{owedCopy.owe(chargeCurrency(owed.totalDueCents))} · {owed.next===null?owedCopy.noDate:owed.next.dueCents<owed.totalDueCents?owedCopy.partDue(chargeCurrency(owed.next.dueCents),owed.next.dueAt):owedCopy.due(owed.next.dueAt)}</>:owedCopy.nothing}</p></section>}
     {showHeading&&<FundraiserAnchor><FamilyFundraiserLink key={studentId} studentId={sid(studentId)}/></FundraiserAnchor>}
     {data.state==='ready'?<><div className={familyStyles.financeMetrics}>
       <Box><span className="metric-label">{familyCopy.finance.due}</span><strong className="metric-value">{chargeCurrency(data.summary.dueCents)}</strong><p className="muted">{moneyMeanings.due}</p></Box>
@@ -217,7 +222,7 @@ function FinancePage({studentId,showHeading=true,allowChargeEditing=false}:{stud
       </div>):<Box title={familyCopy.finance.charges}><p className="muted">{familyCopy.finance.noCharges}</p></Box>}
     </section>
     {chargesPage.status!=='Exhausted'&&<Button disabled={chargesPage.status!=='CanLoadMore'} onClick={()=>chargesPage.loadMore(25)}>{reportCopy.moreCharges}</Button>}
-    {chargeDetail?.studentId===studentId&&<ChargeAdministration key={chargeDetail.chargeId} chargeId={chargeDetail.chargeId} allowEditing={allowChargeEditing} onClose={()=>setChargeDetail(null)}/>}
+    {chargeDetail?.studentId===studentId&&<ChargeAdministration key={chargeDetail.chargeId} chargeId={chargeDetail.chargeId} effectiveDueAt={openCharge?.dueAt} allowEditing={allowChargeEditing} onClose={()=>setChargeDetail(null)}/>}
     <Box title={familyCopy.finance.history}>{historyPage.results.length?<div className="simple-list">{historyPage.results.map(x=><div className="split-line" key={x._id}><span>{date(x.recordedAt)} · {x.safeDescription}{x.method?' / '+status(x.method):''}{!showHeading&&'reason' in x&&x.reason&&<span className="muted"> · {x.reason}</span>}</span><strong>{chargeCurrency(x.amountCents)}</strong></div>)}</div>:<p className="muted">{familyCopy.finance.noTransactions}</p>}</Box>{historyPage.status!=='Exhausted'&&<Button disabled={historyPage.status!=='CanLoadMore'} onClick={()=>historyPage.loadMore(25)}>{reportCopy.moreHistory}</Button>}
   </>
 }
@@ -263,7 +268,7 @@ function AdminFinance({viewer}:{viewer:Viewer}) {
       {canEdit&&<><ChargeEditor key={`charge:${details.id}`} studentId={sid(details.id)}/><FinanceOperations key={`finance:${details.id}`} studentId={sid(details.id)}/></>}
     </section>}
     <TeamFinanceOverview/>
-    <p><Link to="/money-tools">Money tools</Link> · Fee order, charge matching, bulk payments, exports and recent changes.</p>
+    <p><Link to="/money-tools">Money tools</Link> · Fee order and fee due dates, charge matching, bulk payments, exports and recent changes.</p>
     <Dialog open={!!selection} onOpenChange={value=>{if(!value)closePayment()}}>
       <DialogPortal><DialogOverlay className={newEventStyles.overlay}/><DialogPrimitive.Popup className={newEventStyles.panel}>
         <DialogTitle>{selection?.name} · {selection?.mode==='record'?liveCopy.financeAdmin.recordPayment:financeWorkspaceCopy.accountDetails}</DialogTitle>
@@ -273,7 +278,7 @@ function AdminFinance({viewer}:{viewer:Viewer}) {
     </Dialog>
   </>
 }
-function MoneyTools({viewer}:{viewer:Viewer}) {const canEdit=viewer.user?.role==='coach'||!!viewer.user?.financialEdit;return <><Heading title="Money tools" description="Manage fees, match earlier charges, import payments and review exports and changes."/><Link to="/finances">← Money</Link>{viewer.user?.role==='coach'&&<><FundraiserLinkSettings/><ZeffySync/></>}<FeeAdministration isCoach={viewer.user?.role==='coach'}/>{canEdit&&<PaymentAdministration mode="bulk"/>}<FinanceExport/><CoachFinanceChanges/></>}
+function MoneyTools({viewer}:{viewer:Viewer}) {const canEdit=viewer.user?.role==='coach'||!!viewer.user?.financialEdit;return <><Heading title="Money tools" description="Manage fees and their due dates, match earlier charges, import payments and review exports and changes."/><Link to="/finances">← Money</Link>{viewer.user?.role==='coach'&&<><FundraiserLinkSettings/><ZeffySync/></>}<FeeAdministration isCoach={viewer.user?.role==='coach'} canSetDueDates={viewer.user?.role==='coach'||(!!viewer.user?.travelLead&&!!viewer.user?.financialEdit)}/>{canEdit&&<PaymentAdministration mode="bulk"/>}<FinanceExport/><CoachFinanceChanges/></>}
 function WaitingSignups({eventId}:{eventId:Id<'events'>}) {const data=useQuery(api.workflowSummaries.waitingSignups,{eventId});return data&&data.count>0?<p>{data.count}{data.more?'+':''} waiting</p>:null}
 function CorrectionNotice(){const data=useQuery(api.workflowSummaries.profileCorrections,{});return data&&data.count>0?<p><Link to="/adults">{data.count}{data.more?'+':''} profile corrections waiting</Link></p>:null}
 function ProfileEditor({studentId,student}:{studentId:string;student:Student}){

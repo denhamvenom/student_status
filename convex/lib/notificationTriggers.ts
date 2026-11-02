@@ -247,9 +247,10 @@ export async function notifyRoomUpdate(ctx: MutationCtx, args: { eventId: Id<"ev
 /**
  * The new student: their join request was approved. Category "announcements": it is a team welcome, not about an event,
  * and it is one of the categories a student can see (events would misfile it under event activity).
+ * It links to setup so the Inbox navigates there; only Home-linked team announcements open in place.
  */
 export async function notifyJoinApproved(ctx: MutationCtx, args: { userId: Id<"appUsers">; requestId: Id<"joinRequests"> }): Promise<void> {
-  await notifyUsers(ctx, { userIds: [args.userId], category: "announcements", url: "/", dedupeKey: `join:${args.requestId}`, title: "Welcome to the team", body: "A Coach approved your request to join. Open Venom Status to finish setting up." });
+  await notifyUsers(ctx, { userIds: [args.userId], category: "announcements", url: "/setup", dedupeKey: `join:${args.requestId}`, title: "Welcome to the team", body: "A Coach approved your request to join. Open Venom Status to finish setting up." });
 }
 
 // ---------- D3: staff to-do digest (inbox now, one push with the daily digest) ----------

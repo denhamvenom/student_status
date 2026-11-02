@@ -4,7 +4,7 @@ import { ConvexError, v } from "convex/values";
 import { components, internal } from "./_generated/api";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { viewer as requireViewer } from "./lib/access";
-import { audienceForRole, categoriesForAudience, NOTIFICATION_CATEGORY_INFO, notificationCategoryValidator } from "./lib/notificationCategories";
+import { categoriesForUser, NOTIFICATION_CATEGORY_INFO, notificationCategoryValidator } from "./lib/notificationCategories";
 import { notifyUsers, viewerOrNull } from "./lib/notify";
 
 const MARK_ALL_BATCH = 200;
@@ -71,9 +71,12 @@ export const getMyPreferences = query({
   handler: async ctx => {
     const user = await viewerOrNull(ctx);
     if (!user) return [];
+    // The stored row, not the session's operating role: push delivery reads the same row (see categoriesForUser).
+    const stored = await ctx.db.get(user._id);
+    if (!stored) return [];
     const prefs = await ctx.db.query("notificationPreferences").withIndex("by_userId", q => q.eq("userId", user._id)).unique();
     const disabled = new Set(prefs?.disabledCategories ?? []);
-    return categoriesForAudience(audienceForRole(user)).map(category => ({ category, label: NOTIFICATION_CATEGORY_INFO[category].label, description: NOTIFICATION_CATEGORY_INFO[category].description, urgentByDefault: NOTIFICATION_CATEGORY_INFO[category].urgentByDefault, enabled: !disabled.has(category) }));
+    return categoriesForUser(stored).map(category => ({ category, label: NOTIFICATION_CATEGORY_INFO[category].label, description: NOTIFICATION_CATEGORY_INFO[category].description, urgentByDefault: NOTIFICATION_CATEGORY_INFO[category].urgentByDefault, enabled: !disabled.has(category) }));
   },
 });
 
@@ -81,7 +84,8 @@ export const setCategoryEnabled = mutation({
   args: { category: notificationCategoryValidator, enabled: v.boolean() }, returns: v.null(),
   handler: async (ctx, args) => {
     const user = await requireViewer(ctx);
-    if (!categoriesForAudience(audienceForRole(user)).includes(args.category)) throw new ConvexError("This notification type does not apply to your account.");
+    const stored = await ctx.db.get(user._id);
+    if (!stored || !categoriesForUser(stored).includes(args.category)) throw new ConvexError("This notification type does not apply to your account.");
     const prefs = await ctx.db.query("notificationPreferences").withIndex("by_userId", q => q.eq("userId", user._id)).unique();
     const rest = (prefs?.disabledCategories ?? []).filter(category => category !== args.category);
     const disabledCategories = args.enabled ? rest : [...rest, args.category];

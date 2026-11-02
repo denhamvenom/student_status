@@ -5,7 +5,7 @@ import { Checkbox } from './components/ui/checkbox'
 import { NativeSelect, NativeSelectOption } from './components/ui/native-select'
 import type { Doc, Id } from '../convex/_generated/dataModel'
 import { Input } from './components/ui/input'
-import { Component, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Component, Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useConvex, useMutation, usePaginatedQuery, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
 import type { FunctionArgs, FunctionReturnType } from 'convex/server'
@@ -14,9 +14,10 @@ import { feeAdministrationCopy as copy } from './lib/fee-administration-copy'
 import styles from './FeeAdministration.module.css'
 import { dueAtFromInput, dueDateCopy, dueDateInput } from './copy/due-date-copy'
 
-export default function FeeAdministration({ isCoach }: { isCoach: boolean }) {
+/** canSetDueDates: a Coach, or a Travel Lead with Money editing (the same rule as feeDefinitions.setDueAt). */
+export default function FeeAdministration({ isCoach, canSetDueDates = isCoach }: { isCoach: boolean; canSetDueDates?: boolean }) {
   const [attempt, setAttempt] = useState(0)
-  return <FeeQueryBoundary key={attempt} onRetry={() => setAttempt(value => value + 1)}><FeeWorkspace isCoach={isCoach} /></FeeQueryBoundary>
+  return <FeeQueryBoundary key={attempt} onRetry={() => setAttempt(value => value + 1)}><FeeWorkspace isCoach={isCoach} canSetDueDates={canSetDueDates} /></FeeQueryBoundary>
 }
 
 class FeeQueryBoundary extends Component<{ children: ReactNode; onRetry: () => void }, { error: unknown }> {
@@ -28,7 +29,7 @@ class FeeQueryBoundary extends Component<{ children: ReactNode; onRetry: () => v
   }
 }
 
-function FeeWorkspace({ isCoach }: { isCoach: boolean }) {
+function FeeWorkspace({ isCoach, canSetDueDates }: { isCoach: boolean; canSetDueDates: boolean }) {
   const maintenance = useQuery(api.feePriorities.maintenance, {})
   const fees = usePaginatedQuery(api.feePriorities.list, {}, { initialNumItems: 20 })
   const move = useMutation(api.feePriorities.move)
@@ -42,6 +43,7 @@ function FeeWorkspace({ isCoach }: { isCoach: boolean }) {
   const [dismissedBulkJobId, setDismissedBulkJobId] = useState<Id<'feeBulkJobs'> | null>(null)
   function openBulkJob(id: Id<'feeBulkJobs'>) { setDismissedBulkJobId(null); setBulkJobId(id) }
   const [bulkDraft, setBulkDraft] = useState<{kind:'create'|'edit'|'cancel';definition?:Doc<'feeDefinitions'>}|null>(null)
+  const [dueDateFeeId, setDueDateFeeId] = useState<Id<'feeDefinitions'> | null>(null)
   const submittedIntent = useRef<{ fingerprint: string; key: string } | null>(null)
   const visibleJobId = jobId ?? maintenance?.control?.priorityJobId
   const visibleMappingJobId = mappingJobId ?? maintenance?.control?.mappingJobId
@@ -70,7 +72,11 @@ function FeeWorkspace({ isCoach }: { isCoach: boolean }) {
       {!maintenance || fees.status === 'LoadingFirstPage' ? <p role="status">{copy.loading}</p> : <>
         {maintenance.mappingState !== 'ready' && <p className={styles.notice}>{maintenance.mappingState === 'uninitialized' ? copy.mappingUnknown : copy.partialOrder}</p>}
         {fees.results.length === 0 && fees.status === 'Exhausted' && <p>{copy.noFees}</p>}
-        <FeePriorityRows disabled={pending || maintenance.control?.state !== 'ready'} rows={fees.results.map(row => ({ key: row.definition._id, label: row.definition.label, summary: row.eventName ? `${copy.connectedTo}: ${row.eventName}` : undefined, priority: row.definition.priority, amountCents: row.definition.defaultAmountCents, dueAt: row.definition.dueAt, cancelled: row.definition.state === 'cancelled', actions: {
+        <FeePriorityRows disabled={pending || maintenance.control?.state !== 'ready'} rows={fees.results.map(row => ({ key: row.definition._id, label: row.definition.label, summary: row.eventName ? `${copy.connectedTo}: ${row.eventName}` : undefined, priority: row.definition.priority, amountCents: row.definition.defaultAmountCents, dueAt: row.definition.dueAt, cancelled: row.definition.state === 'cancelled',
+          below: dueDateFeeId === row.definition._id && row.definition.state === 'active' ? <FeeDueDate key={row.definition._id} definition={row.definition} onClose={() => setDueDateFeeId(null)} /> : undefined,
+          actions: {
+          dueDate: canSetDueDates && row.definition.state === 'active' ? () => setDueDateFeeId(id => id === row.definition._id ? null : row.definition._id) : undefined,
+          dueDateOpen: dueDateFeeId === row.definition._id,
           view: row.definition.latestJobId ? ()=>{if(row.definition.latestJobId)openBulkJob(row.definition.latestJobId)} : undefined,
           up: row.canMoveUp ? () => open(row.definition, row.eventName, 'up') : undefined,
           down: row.canMoveDown ? () => open(row.definition, row.eventName, 'down') : undefined,
@@ -487,7 +493,12 @@ type FeeRowPresentation = {
   summary?: string
   dueAt?: number
   cancelled: boolean
+  /** Shown directly under the row, e.g. the fee's due date control. */
+  below?: ReactNode
   actions?: {
+    /** Opens the fee's due date control; only for a Coach or a Travel Lead with Money editing. */
+    dueDate?: () => void
+    dueDateOpen?: boolean
     view?: () => void
     up?: () => void
     down?: () => void
@@ -529,17 +540,54 @@ export function FeeDefinitionDraftForm({ scopeFields, scopeValid, disabled, onPr
 
 /** Presentation receives recorded ranks and permitted actions from its caller. */
 export function FeePriorityRows({ rows, disabled }: { rows: ReadonlyArray<FeeRowPresentation>; disabled: boolean }) {
-  return <div className={styles.order}>{rows.map((row, index) => <div className={styles.fee} key={row.key}>
+  return <div className={styles.order}>{rows.map((row, index) => <Fragment key={row.key}><div className={styles.fee}>
     <span className={styles.rank} aria-label={`Displayed fee order position ${index + 1}`}>{index + 1}</span>
     <div className={styles.feeName}><strong>{row.label}</strong><span className={styles.muted}>{copy.defaultAmount}: {chargeCurrency(row.amountCents)}{row.dueAt !== undefined ? ` · ${dueDateCopy.short(row.dueAt)}` : ''}{row.summary ? ` · ${row.summary}` : ''}</span>{row.cancelled && <span className={styles.status}>{copy.cancelled}</span>}</div>
     {row.actions && <div className={styles.feeActions}>
+      {row.actions.dueDate && <Button type="button" variant="outline" aria-expanded={row.actions.dueDateOpen ?? false} aria-label={`${row.dueAt !== undefined ? dueDateCopy.changeAction : dueDateCopy.setAction} for ${row.label}`} onClick={row.actions.dueDate}>{row.dueAt !== undefined ? dueDateCopy.changeAction : dueDateCopy.setAction}</Button>}
       {row.actions.view && <Button type="button" variant="outline" aria-label={`${copy.details} ${row.label}`} onClick={row.actions.view}>{copy.details}</Button>}
       {row.actions.edit && <Button type="button" variant="outline" disabled={disabled} aria-label={`${copy.edit} ${row.label}`} onClick={row.actions.edit}>{copy.edit}</Button>}
       {row.actions.cancel && <Button type="button" variant="outline" disabled={disabled} aria-label={`${copy.cancel} ${row.label}`} onClick={row.actions.cancel}>{copy.cancel}</Button>}
       {row.actions.up && <Button type="button" variant="outline" disabled={disabled} aria-label={`Move ${row.label} up`} onClick={row.actions.up}>{copy.up}</Button>}
       {row.actions.down && <Button type="button" variant="outline" disabled={disabled} aria-label={`Move ${row.label} down`} onClick={row.actions.down}>{copy.down}</Button>}
     </div>}
-  </div>)}</div>
+  </div>{row.below}</Fragment>)}</div>
+}
+
+/**
+ * Set or clear one fee's due date (feeDefinitions.setDueAt). It moves no money and needs no review job;
+ * charges without their own due date use it right away, on Money and on Home.
+ */
+function FeeDueDate({ definition, onClose }: { definition: Doc<'feeDefinitions'>; onClose: () => void }) {
+  const save = useMutation(api.feeDefinitions.setDueAt)
+  const saved = dueDateInput(definition.dueAt)
+  const [date, setDate] = useState(saved)
+  const [busy, setBusy] = useState(false)
+  const [status, setStatus] = useState('')
+  const [error, setError] = useState('')
+  const input = useRef<HTMLInputElement>(null)
+  useEffect(() => { input.current?.focus() }, [])
+  const next = dueAtFromInput(date)
+  const invalid = next !== null && Number.isNaN(next)
+  async function submit(value: number | null) {
+    if (busy) return
+    setBusy(true); setError(''); setStatus('')
+    try { await save({ feeDefinitionId: definition._id, dueAt: value }); setStatus(value === null ? dueDateCopy.cleared : dueDateCopy.saved); if (value === null) setDate('') }
+    catch (cause) { setError(userFacingError(cause, dueDateCopy.failed)) }
+    finally { setBusy(false) }
+  }
+  return <form className={`${styles.form} ${styles.dueDate}`} aria-label={dueDateCopy.feeHeading(definition.label)} onSubmit={event => { event.preventDefault(); if (invalid) { setError(dueDateCopy.invalid); return } if (date !== saved) void submit(next) }}>
+    <strong>{dueDateCopy.feeHeading(definition.label)}</strong>
+    <p className={styles.muted}>{definition.dueAt !== undefined ? dueDateCopy.full(definition.dueAt) : dueDateCopy.none} · {dueDateCopy.feeHint}</p>
+    <label className={styles.field}>{dueDateCopy.label}<Input ref={input} type="date" value={date} disabled={busy} aria-invalid={invalid} onChange={event => { setDate(event.target.value); setStatus(''); setError('') }} /></label>
+    <div className={styles.actions}>
+      <Button type="submit" disabled={busy || invalid || date === saved}>{busy ? dueDateCopy.saving : dueDateCopy.save}</Button>
+      {definition.dueAt !== undefined && <Button type="button" variant="outline" disabled={busy} onClick={() => void submit(null)}>{dueDateCopy.clear}</Button>}
+      <Button type="button" variant="outline" disabled={busy} onClick={onClose}>{dueDateCopy.close}</Button>
+    </div>
+    {status && <p role="status" className={styles.muted}>{status}</p>}
+    {error && <p role="alert" className={styles.error}>{error}</p>}
+  </form>
 }
 
 export function FeeMaintenanceNotice({ state, message, processed }: { state: 'ready' | 'draining' | 'applying' | 'failed'; message?: string; processed?: number }) {

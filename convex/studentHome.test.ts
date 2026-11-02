@@ -63,6 +63,36 @@ describe("Parent Home access", () => {
     await expect(f.parent.query(api.studentHome.parentSummary, { studentId: f.ids.riley, asOfDay: DAY, asOf: START - 1 })).rejects.toThrow("permission");
   });
 
+  // Regression: Home said "Due <event start>" while Money → Details said "No due date" for the same charge.
+  it("dates the Balance due item with the same effective due date Money shows", async () => {
+    const feeDue = START - 72 * HOUR, chargeDue = START - 48 * HOUR, paidDue = START - 96 * HOUR;
+    const cases: { name: string; fee?: number; charge?: number; money: number | undefined; home: number; dateKind?: "eventStart" }[] = [
+      { name: "no due date anywhere: Home shows the event start, labelled as the event", money: undefined, home: START, dateKind: "eventStart" },
+      { name: "fee due date only: the charge inherits it", fee: feeDue, money: feeDue, home: feeDue },
+      { name: "the charge's own due date wins over the fee's", fee: feeDue, charge: chargeDue, money: chargeDue, home: chargeDue },
+    ];
+    for (const item of cases) {
+      const f = await fixture();
+      await settle(f, f.ids.riley);
+      const eventId = await f.event({ name: "Synthetic trip" });
+      await f.join(eventId, f.ids.riley, "confirmed");
+      await f.t.run(async ctx => {
+        const feeDefinitionId = await ctx.db.insert("feeDefinitions", { seasonId: f.ids.season, kind: "eventMain", eventId, label: "Synthetic trip", defaultAmountCents: 500, priority: 1, revision: 0, state: "active", createdBy: f.ids.coach, createdAt: 1, updatedAt: 1, dueAt: item.fee });
+        await ctx.db.insert("charges", { eventId, studentId: f.ids.riley, feeDefinitionId, label: "Synthetic trip", amountCents: 500, appliedCents: 0, priority: 1, createdBy: f.ids.coach, createdAt: 1, dueAt: item.charge });
+        // A paid charge's earlier date is not what the family still owes.
+        await ctx.db.insert("charges", { eventId, studentId: f.ids.riley, label: "Paid extra", category: "extra", amountCents: 100, appliedCents: 100, priority: 2, createdBy: f.ids.coach, createdAt: 1, dueAt: paidDue });
+      });
+      const money = await f.parent.query(api.financeDetails.charges, { studentId: f.ids.riley, paginationOpts: { cursor: null, numItems: 25 } });
+      const home = await f.parent.query(api.studentHome.parentSummary, { studentId: f.ids.riley, asOfDay: DAY, asOf: START - 100 * HOUR });
+      const unpaid = money.page.find(row => row.label === "Synthetic trip");
+      const payment = home.whatsLeft.find(row => row.kind === "requiredPayment");
+      expect(unpaid?.dueAt, item.name).toBe(item.money);
+      expect(payment?.dueAt, item.name).toBe(item.home);
+      expect(payment?.dateKind, item.name).toBe(item.dateKind);
+      if (item.money !== undefined) expect(payment?.dueAt, item.name).toBe(unpaid?.dueAt);
+    }
+  });
+
   it("finds the next event after more than 200 old participations", async () => {
     const f = await fixture();
     for (let i = 0; i < 201; i++) {

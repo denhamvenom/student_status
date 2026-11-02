@@ -22,7 +22,7 @@ export function itemLabel(item: WhatsLeftItem) {
 function DueText({ item, now }: { item: WhatsLeftItem; now: number }) {
   if (item.dueAt === null) return null
   const state = dueState(item, now)
-  return <span className={cn('shrink-0 text-[12px] lg:text-[11px]', state === 'overdue' ? 'font-semibold text-vs-urgent' : state === 'soon' ? cn('font-semibold', warningText) : 'text-vs-muted')}>{copy.due(formatShortDate(item.dueAt))}</span>
+  return <span className={cn('shrink-0 text-[12px] lg:text-[11px]', state === 'overdue' ? 'font-semibold text-vs-urgent' : state === 'soon' ? cn('font-semibold', warningText) : 'text-vs-muted')}>{item.dateKind === 'eventStart' ? copy.eventOn(formatShortDate(item.dueAt)) : copy.due(formatShortDate(item.dueAt))}</span>
 }
 
 /** "Invite a parent" always opens Parents, whatever the backend sends. */
