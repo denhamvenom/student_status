@@ -13,6 +13,7 @@ import { markRoomCategoryReview } from "./lib/profileCorrections";
 import { syncWholeTeamMembership } from "./lib/wholeTeam";
 import { subteamOptions } from "../src/lib/subteams";
 import { allocateInvitationCode } from "./lib/invitationCodes";
+import { notifyEventCreated, notifyJoinApproved } from "./lib/notificationTriggers";
 import { MAX_QUESTIONS, MAX_SHIFTS, checkListSizes, checkRequirementFields, checkShiftSettings, cleanQuestion, cleanShift, questionInput, shiftInput } from "./lib/eventSignupExtras";
 
 const MAX_REQUIREMENTS = 100;
@@ -98,6 +99,7 @@ export const approveJoin = mutation({
     }
     await ctx.db.patch(request._id, { status: "approved", decidedAt: Date.now(), decidedBy: actor._id });
     await audit(ctx, actor, "joinRequests", request._id, "approve", "pending", "approved");
+    await notifyJoinApproved(ctx, { userId, requestId: request._id });
     return null;
   },
 });
@@ -177,6 +179,7 @@ export const createEvent = mutation({
     if (calendarChoice) await ctx.scheduler.runAfter(0, internal.eventCalendar.push, { eventId: id, revision: 1 });
     await scheduleEventArchive(ctx, id);
     await audit(ctx, user, "events", id, "create", null, eventFields);
+    await notifyEventCreated(ctx, { eventId: id, assignedStudentIds: assigned });
     return id;
   },
 });

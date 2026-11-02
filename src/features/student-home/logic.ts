@@ -140,8 +140,8 @@ const waitsForParentLink = (item: WhatsLeftItem) =>
   item.kind === 'requiredPayment' || item.kind === 'permissionForm' || (item.kind === 'firstRegistration' && item.owner === 'parent')
 
 /**
- * Which card an item becomes, or null. Fees count only once overdue (dueAt is the event start until fee
- * due dates exist). FIRST verification, permission review, setup, health, signup approval and staff
+ * Which card an item becomes, or null. Fees count only once overdue (dueAt is the fee's effective due date,
+ * or the event start with dateKind 'eventStart' when no due date is set). FIRST verification, permission review, setup, health, signup approval and staff
  * review are someone else's step or live elsewhere, so they never become cards.
  */
 function highlightKind(item: WhatsLeftItem, now: number): Exclude<HighlightKind, 'inviteParent'> | null {

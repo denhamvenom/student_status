@@ -202,9 +202,23 @@ describe("exact synthetic account cleanup", () => {
     f.manifest.ids.audit.push(...related.audits.map(a => a._id), ...related.codeAudits.map(a => a._id), ...related.codeRevokeAudit.map(a => a._id), ...related.inviteAudits.map(a => a._id));
     const leavesBefore = await f.t.run(ctx => reportAggregate.count(ctx, { namespace: financeNamespace(f.ids.season, financeMetrics[0]) }));
     expect(leavesBefore).toBe(1);
+    // The join approval notifies the rehearsal student; its inbox, digest, preference and push rows are found by userId, not listed.
+    const owned = await f.t.run(async ctx => {
+      const userId = joined.studentApp._id;
+      const notification = await ctx.db.insert("notifications", { userId, title: "Synthetic digest", body: "Synthetic", url: "/", category: "money", urgent: false, createdAt: 1, pushStatus: "digest" });
+      return {
+        notification, digest: await ctx.db.insert("notificationDigestItems", { userId, category: "money", kind: "charge", url: "/", notificationId: notification, createdAt: 1 }),
+        preference: await ctx.db.insert("notificationPreferences", { userId, disabledCategories: [], updatedAt: 1 }),
+        push: await ctx.db.insert("pushSubscriptions", { userId, endpoint: "https://push.example.invalid/synthetic", p256dh: "synthetic", auth: "synthetic", deviceLabel: "Synthetic", createdAt: 1 }),
+      };
+    });
+    const coachInbox = await f.t.run(ctx => ctx.db.query("notifications").withIndex("by_userId_and_createdAt", q => q.eq("userId", f.ids.coach)).take(10));
+    expect(coachInbox.length).toBeGreaterThan(0);
     const reviewed = await f.t.query(internal.syntheticRehearsalCleanup.preview, { targetUrl, manifest: f.manifest });
-    expect(reviewed.counts).toMatchObject({ students: 1, familyLinks: 1, parentInvitations: 1, joinRequests: 1, joinCodes: 1, studentFinanceSummaries: 1, financialAccounts: 1 });
+    expect(reviewed.counts).toMatchObject({ students: 1, familyLinks: 1, parentInvitations: 1, joinRequests: 1, joinCodes: 1, studentFinanceSummaries: 1, financialAccounts: 1, notifications: 2, notificationDigestItems: 1, notificationPreferences: 1, pushSubscriptions: 1 });
     await f.t.mutation(internal.syntheticRehearsalCleanup.commit, { targetUrl, manifest: f.manifest, reviewedFingerprint: reviewed.fingerprint, reviewedCounts: reviewed.counts });
+    expect(await f.t.run(async ctx => Promise.all(Object.values(owned).map(id => ctx.db.get(id))))).toEqual([null, null, null, null]);
+    expect(await f.t.run(async ctx => Promise.all(coachInbox.map(row => ctx.db.get(row._id))))).toEqual(coachInbox);
     for (const metric of financeMetrics) {
       expect(await f.t.run(ctx => reportAggregate.count(ctx, { namespace: financeNamespace(f.ids.season, metric) }))).toBe(0);
     }

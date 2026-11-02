@@ -56,6 +56,8 @@ export const homeCopy = {
     dueToday: 'Due today',
     /** Next to the Overdue pill: "Due Fri, Oct 23". */
     wasDue: (date: string) => `Due ${date}`,
+    /** A fee with no due date is dated by its event, and says so: "Event started Fri, Oct 23". */
+    eventStarted: (date: string) => `Event started ${date}`,
     daysLeft,
     dateLine,
     inviteParent: {
@@ -166,6 +168,8 @@ export const homeCopy = {
     dueSoon: (count: number) => `${count} due soon`,
     allSet: "You're all set",
     due: (date: string) => `Due ${date}`,
+    /** A fee with no due date shows its event's date instead, labelled as the event. */
+    eventOn: (date: string) => `Event ${date}`,
     leftForYou: (count: number) => `${count} left for you`,
     nothingForYou: 'Nothing for you right now',
     showAll: 'Show all',

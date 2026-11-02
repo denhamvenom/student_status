@@ -1,12 +1,12 @@
 import { userFacingError } from '@/lib/error-message'
 import { useEffect, useState, type FormEvent } from 'react'
-import { useAuthActions } from '@convex-dev/auth/react'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
 import { PendingJoinView } from './PendingJoinView'
 import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { liveCopy } from './lib/live-copy'
+import { useSignOut } from './notifications/useSignOut'
 
 const joinCopy = {
   code: 'Invitation code',
@@ -32,7 +32,7 @@ export function PendingJoin() {
   const request = useMutation(api.app.requestJoin)
   const redeem = useMutation(api.bulkInvites.redeem)
   const checkCode = useMutation(api.bulkInvites.checkInvitationCode)
-  const { signOut } = useAuthActions()
+  const signOut = useSignOut()
   const [code, setCode] = useState(''), [first, setFirst] = useState(''), [last, setLast] = useState('')
   // Set only after the server confirms a team code; the name is asked for only then.
   const [teamCode, setTeamCode] = useState<string | null>(null)

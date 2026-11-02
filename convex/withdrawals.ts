@@ -9,6 +9,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { activeSeason, audit, ownStudent, studentAccess, viewer } from "./lib/access";
 import { effectiveChargeCents } from "./lib/money";
 import { clearShifts } from "./lib/eventSignupExtras";
+import { notifyWithdrawalDecision, queueWithdrawalRequestDigest } from "./lib/notificationTriggers";
 
 import { ensureFinancialAccount, saveFinancialAccount } from "./lib/financialSources";
 import { makeFunctionReference } from "convex/server";
@@ -126,6 +127,7 @@ export const requestWithdrawal = mutation({
     if (data.requests.some(r => r.status === "approved")) throw new ConvexError("Your withdrawal from this event was already approved.");
     const id = await ctx.db.insert("withdrawalRequests", { eventId: args.eventId, studentId: student._id, participantId: data.participant._id, status: "pending", requestedBy: user._id, requestedAt: Date.now(), idempotencyKey: args.idempotencyKey });
     await audit(ctx, user, "withdrawalRequests", id, "request", null, { eventId: args.eventId, studentId: student._id, participation: data.participant.status });
+    await queueWithdrawalRequestDigest(ctx);
     return id;
   },
 });
@@ -150,7 +152,10 @@ export const leaveWholeTeam = mutation({
     const noticeId = await ctx.db.insert("wholeTeamLeaveNotices", { seasonId: data.event.seasonId, eventId: data.event._id, studentId: student._id, participantId: data.participant._id, leftAt: now });
     if (needsMoneyReview) {
       if (pending) await ctx.db.patch(pending._id, { wholeTeamLeave: true });
-      else await ctx.db.insert("withdrawalRequests", { eventId: data.event._id, studentId: student._id, participantId: data.participant._id, wholeTeamLeave: true, status: "pending", requestedBy: user._id, requestedAt: now, idempotencyKey: `wholeTeamLeave:${noticeId}` });
+      else {
+        await ctx.db.insert("withdrawalRequests", { eventId: data.event._id, studentId: student._id, participantId: data.participant._id, wholeTeamLeave: true, status: "pending", requestedBy: user._id, requestedAt: now, idempotencyKey: `wholeTeamLeave:${noticeId}` });
+        await queueWithdrawalRequestDigest(ctx);
+      }
     }
     await removeRoomState(ctx, data.event._id, student._id, user);
     await clearShifts(ctx, data.event._id, student._id);
@@ -203,6 +208,7 @@ export const reviewWithdrawal = mutation({
       if (args.returnCents !== undefined || args.cancelUnpaidMain) throw new ConvexError("Denying a request can't move money. Choose another decision to return money.");
       await ctx.db.patch(request._id, { status: "denied", decision: "deny", decidedBy: user._id, decidedAt: Date.now(), reason: args.reason.trim(), cancelUnpaidMain: false, returnCents: 0, retainedCents: 0 });
       await audit(ctx, user, "withdrawalRequests", request._id, "deny", { status: "pending" }, { status: "denied", participation: data.participant.status }, args.reason.trim());
+      await notifyWithdrawalDecision(ctx, { requestId: request._id, approved: false });
       return null;
     }
     const totalPaid = data.charges.reduce((n, c) => n + c.appliedCents, 0);
@@ -239,5 +245,6 @@ export async function finalizeWithdrawal(ctx: MutationCtx, job: Doc<"financialOp
     await ctx.db.patch(participant._id, { status: "withdrawn", updatedAt: Date.now() });
   }
   await ctx.db.patch(request._id, { status: "approved", decidedBy: user._id, decidedAt: Date.now() });
+  await notifyWithdrawalDecision(ctx, { requestId: request._id, approved: true });
   await audit(ctx, user, "withdrawalRequests", request._id, "approve", { status: "processing", participation: participant.status }, { status: "approved", participation: "withdrawn", returnedCents: job.committedCents, retainedCents: request.retainedCents }, job.reason);
 }

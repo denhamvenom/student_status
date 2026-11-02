@@ -25,7 +25,11 @@ const manifestValidator = v.object({
 });
 type Manifest = typeof manifestValidator.type;
 type Row = Record<string, unknown> & { _id: string; _creationTime: number };
-type AllowedTable = keyof Manifest["ids"] | "appUsers" | "students" | "users";
+// Notification rows a rehearsal account owns. They are found through each account's userId index (not listed in the
+// manifest), and still appear in the preview counts and fingerprint, so the reviewed preview pins their exact IDs.
+const ownedTables = ["notificationDigestItems", "notifications", "notificationPreferences", "pushSubscriptions"] as const;
+type OwnedTable = typeof ownedTables[number];
+type AllowedTable = keyof Manifest["ids"] | OwnedTable | "appUsers" | "students" | "users";
 const MAX_TARGETS = 4;
 const MAX_ROWS_PER_TABLE = 100;
 const MAX_DELETE_ROWS = 100;
@@ -67,6 +71,22 @@ function expectedIds(manifest: Manifest): Map<string, AllowedTable> {
 async function fingerprint(value: unknown): Promise<string> {
   const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(value)));
   return [...new Uint8Array(bytes)].map(byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+/** Bounded, indexed lookup of every notification row owned by a rehearsal account. */
+async function ownedNotificationRows(ctx: QueryCtx | MutationCtx, manifest: Manifest) {
+  const rows: Array<[OwnedTable, string]> = [];
+  const bounded = <T extends { _id: string }>(table: OwnedTable, found: T[]) => {
+    if (found.length > MAX_ROWS_PER_TABLE) throw new Error(`Rehearsal ${table} inventory limit exceeded.`);
+    for (const row of found) rows.push([table, row._id]);
+  };
+  for (const { id: userId } of manifest.accounts) {
+    bounded("notificationDigestItems", await ctx.db.query("notificationDigestItems").withIndex("by_userId_and_flushedAt", q => q.eq("userId", userId)).take(MAX_ROWS_PER_TABLE + 1));
+    bounded("notifications", await ctx.db.query("notifications").withIndex("by_userId_and_createdAt", q => q.eq("userId", userId)).take(MAX_ROWS_PER_TABLE + 1));
+    bounded("notificationPreferences", await ctx.db.query("notificationPreferences").withIndex("by_userId", q => q.eq("userId", userId)).take(MAX_ROWS_PER_TABLE + 1));
+    bounded("pushSubscriptions", await ctx.db.query("pushSubscriptions").withIndex("by_userId", q => q.eq("userId", userId)).take(MAX_ROWS_PER_TABLE + 1));
+  }
+  return rows;
 }
 
 async function inspect(ctx: QueryCtx | MutationCtx, manifest: Manifest) {
@@ -117,6 +137,11 @@ async function inspect(ctx: QueryCtx | MutationCtx, manifest: Manifest) {
     }
     targetEmails.add(account.email);
     if (row.role === "student" && !manifest.students.some(s => s.userId === row._id)) throw new Error("Student profile is missing from manifest.");
+  }
+  for (const [table, id] of await ownedNotificationRows(ctx, manifest)) {
+    if (expected.has(id)) throw new Error("A manifest ID appears more than once.");
+    expected.set(id, table);
+    protectedIds.add(id);
   }
   for (const student of manifest.students) {
     const row = await ctx.db.get(student.id);
@@ -183,6 +208,8 @@ async function inspect(ctx: QueryCtx | MutationCtx, manifest: Manifest) {
   for (const { table, row } of documents) {
     switch (table) {
       case "appUsers": case "students": case "users": break;
+      case "notifications": case "notificationPreferences": case "pushSubscriptions": check(accountIds.has(row.userId as string)); break;
+      case "notificationDigestItems": check(accountIds.has(row.userId as string) && (row.notificationId === undefined || expected.get(row.notificationId as string) === "notifications")); break;
       case "familyLinks": check(accountIds.has(row.parentUserId as string) && studentIds.has(row.studentId as string)); break;
       case "adultInvitations": check(row.createdBy === manifest.coachId && manifest.accounts.some(a => a.role === "mentor" && a.email === row.email && (!row.acceptedBy || row.acceptedBy === a.id))); break;
       case "parentInvitations": check(studentIds.has(row.studentId as string) && manifest.students.some(s => s.userId === row.createdBy) && manifest.accounts.some(a => a.role === "parent" && a.email === row.parentEmail && (!row.acceptedBy || row.acceptedBy === a.id))); break;
@@ -244,7 +271,7 @@ export const commit = internalMutation({
       });
     }
     // Remove children before parents. The entire mutation rolls back on any failure.
-    const order = ["authRefreshTokens", "authVerificationCodes", "authVerifiers", "authSessions", "authAccounts", "familyLinks", "adultInvitations", "parentInvitations", "joinRequests", "joinAttempts", "joinCodes", "setupDrafts", "studentFinanceSummaries", "financialAccounts", "audit", "students", "appUsers", "users"];
+    const order = [...ownedTables, "authRefreshTokens", "authVerificationCodes", "authVerifiers", "authSessions", "authAccounts", "familyLinks", "adultInvitations", "parentInvitations", "joinRequests", "joinAttempts", "joinCodes", "setupDrafts", "studentFinanceSummaries", "financialAccounts", "audit", "students", "appUsers", "users"];
     for (const table of order) for (const { row } of result.documents.filter(entry => entry.table === table)) await ctx.db.delete(row._id as Id<"users">);
     const receiptId = await ctx.db.insert("audit", {
       actorId: args.manifest.coachId, entity: "syntheticRehearsalCleanup", entityId: args.manifest.seasonId,

@@ -8,6 +8,7 @@ import { mutation, query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { audit, requireRole, viewer } from "./lib/access";
 import { availableRoles } from "./lib/access";
+import { deleteUserPushSubscriptions } from "./lib/notify";
 import { getAuthSessionId } from "@convex-dev/auth/server";
 import { newToken, tokenHash, verifiedAdult } from "./lib/invitationIdentity";
 
@@ -38,6 +39,7 @@ export const updateParentStaffAccess = mutation({
     if (!args.reason.trim() || args.reason.trim().length > 1000) throw new ConvexError("Enter a reason (up to 1,000 characters).");
     if (!user.active && args.staffAccess !== null) throw new ConvexError("This Parent account is inactive. Reactivate it before giving staff access.");
     await ctx.db.patch(user._id, { parentStaffAccess: args.staffAccess ?? undefined, accessRevision: (user.accessRevision ?? 0) + 1 });
+    if (args.staffAccess !== (user.parentStaffAccess ?? null)) await deleteUserPushSubscriptions(ctx, user._id);
     await audit(ctx, actor, "appUsers", user._id, "updateParentStaffAccess", { staffAccess: user.parentStaffAccess ?? null }, { staffAccess: args.staffAccess }, args.reason.trim());
     return null;
   },
@@ -210,6 +212,7 @@ export const updateAdult = mutation({
     }
     const patch = { role: args.role, travelLead: args.travelLead, financialEdit: args.financialEdit, healthExport: args.healthExport, active: args.active, accessRevision: (user.accessRevision ?? 0) + 1, ...(user.active && !args.active ? { archivedAt: Date.now() } : {}) };
     await ctx.db.patch(user._id, patch);
+    if (!args.active || args.role !== user.role || args.travelLead !== user.travelLead) await deleteUserPushSubscriptions(ctx, user._id);
     await audit(ctx, actor, "appUsers", user._id, "updateAdultAccess", { ...summary(user), archivedAt: user.archivedAt ?? null }, { ...patch, archivedAt: patch.archivedAt ?? user.archivedAt ?? null }, args.reason.trim());
     return null;
   },

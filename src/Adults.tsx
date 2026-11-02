@@ -16,6 +16,7 @@ import { NativeSelect, NativeSelectOption } from './components/ui/native-select'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './components/ui/dialog'
 import { accountCopy } from './lib/account-copy'
 import styles from './Adults.module.css'
+import { useSignOut } from './notifications/useSignOut'
 import { adultInvitationLandingUrl, readAdultInvitationToken, prepareAdultInvitationOAuth, clearAdultInvitationOAuth } from './lib/adult-invitation-token'
 
 const copy = accountCopy.adults
@@ -115,7 +116,8 @@ export function AdultInvitationLanding({viewer}: {viewer: {status: 'signedOut' |
   const [emailBusy, setEmailBusy] = useState(false)
   const previewInvite = useMutation(api.accounts.preview)
   const accept = useMutation(api.accounts.accept)
-  const {signIn, signOut} = useAuthActions()
+  const {signIn} = useAuthActions()
+  const signOut = useSignOut()
   const navigate = useNavigate()
   const [preview, setPreview] = useState<Awaited<ReturnType<typeof previewInvite>> | null>(null)
   const [accepted, setAccepted] = useState(false)

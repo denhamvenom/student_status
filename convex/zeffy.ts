@@ -5,6 +5,7 @@ import type { Id } from "./_generated/dataModel";
 import { activeSeason, audit, requireRole, viewer } from "./lib/access";
 import { ensureFinancialAccount, recordProjectedEntry } from "./lib/financialSources";
 import { allocateUnapplied } from "./lib/money";
+import { queueMoneyDigest } from "./lib/digest";
 import { canonicalZeffyUrl, paymentSafety, type ZeffyCampaign, type ZeffyPayment } from "./lib/zeffy";
 
 const summary = v.object({ credited: v.number(), unchanged: v.number(), review: v.number() });
@@ -178,5 +179,6 @@ export const applyPayment = internalMutation({ args: { runId: v.id("zeffyRuns"),
   await audit(ctx, actor, "zeffyPayments", payment.id, "creditDonation", null, { studentId: student._id, amountCents: payment.amount, campaignId: campaign.id });
   await allocateUnapplied(ctx, actor, student._id, `zeffy:${payment.id}:allocate`);
   await clearExceptionKey(ctx, `payment:${payment.id}`);
+  await queueMoneyDigest(ctx, student._id, "payment");
   return "credited";
 } });

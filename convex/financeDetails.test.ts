@@ -66,4 +66,28 @@ describe("paginated financial evidence", () => {
     await t.run(ctx => ctx.db.patch(ids.parent, { role: "mentor" }));
     await expect(client.query(api.financeDetails.charges, { studentId: ids.studentId, paginationOpts: { cursor: null, numItems: 25 } })).rejects.toThrow("Mentors can't see student money");
   });
+  it("names the soonest due date across every unpaid charge, not just the first page", async () => {
+    const t = createTest(schema, modules);
+    const ids = await t.run(async ctx => {
+      const auth = await ctx.db.insert("users", { email: "owed-reader@example.invalid" });
+      const parent = await ctx.db.insert("appUsers", { authUserId: auth, name: "Synthetic Parent", email: "owed-reader@example.invalid", role: "parent", active: true, travelLead: false, financialEdit: false });
+      const seasonId = await ctx.db.insert("seasons", { name: "Synthetic", year: 2026, status: "active", startsAt: 0, permissionVersion: "DRAFT", createdBy: parent });
+      const profile = { seasonId, legalName: "Synthetic", preferredName: "Synthetic", email: "synthetic@example.invalid", subteam: "Build", active: true, travelTeam: false, roomCategoryLocked: false, allergies: { state: "unknown" as const }, medications: { state: "unknown" as const } };
+      const studentId = await ctx.db.insert("students", profile);
+      const unrelatedId = await ctx.db.insert("students", profile);
+      await ctx.db.insert("familyLinks", { parentUserId: parent, studentId, active: true, createdBy: parent });
+      const charge = (priority: number, fields: { amountCents: number; appliedCents: number; dueAt?: number }) => ctx.db.insert("charges", { studentId, label: `Synthetic ${priority}`, priority, createdBy: parent, createdAt: priority, outstanding: fields.appliedCents < fields.amountCents, ...fields });
+      for (let priority = 0; priority < 30; priority++) await charge(priority, { amountCents: 100, appliedCents: 0, dueAt: 9_000 + priority });
+      await charge(40, { amountCents: 500, appliedCents: 200, dueAt: 1_000 });
+      await charge(41, { amountCents: 250, appliedCents: 0, dueAt: 1_000 });
+      await charge(42, { amountCents: 100, appliedCents: 100, dueAt: 10 });
+      await charge(43, { amountCents: 70, appliedCents: 0 });
+      return { auth, studentId, unrelatedId };
+    });
+    const client = t.withIdentity({ subject: `${ids.auth}|session` });
+    const firstPage = await client.query(api.financeDetails.charges, { studentId: ids.studentId, paginationOpts: { cursor: null, numItems: 25 } });
+    expect(firstPage.page.some(row => row.dueAt === 1_000)).toBe(false);
+    expect(await client.query(api.financeDetails.owedSummary, { studentId: ids.studentId })).toEqual({ owedCents: 30 * 100 + 300 + 250 + 70, soonestDueAt: 1_000, soonestDueCents: 550 });
+    await expect(client.query(api.financeDetails.owedSummary, { studentId: ids.unrelatedId })).rejects.toThrow();
+  });
 });

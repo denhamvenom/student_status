@@ -34,6 +34,8 @@ export type WhatsLeftItem = {
   eventName: string | null
   label: string | null
   dueAt: number | null
+  /** 'eventStart': dueAt is the event start, not a due date (a fee with no due date set). Label it as the event date. */
+  dateKind?: 'eventStart'
   /** In-app path for items the Student can act on; null when someone else acts. */
   href: string | null
 }

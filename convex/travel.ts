@@ -6,6 +6,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { mutation, query } from "./_generated/server";
 import { activeSeason, audit, studentAccess, viewer } from "./lib/access";
+import { queueTravelDigest } from "./lib/digest";
 
 type Ctx = QueryCtx | MutationCtx;
 const MAX_DRIVERS = 200;
@@ -126,6 +127,7 @@ export const setEventTransport = mutation({
     const patch = { ...(args.travel ? { travel: args.travel } : {}), transportEnabled: args.travel ? teamTransportEnabled({ travel: args.travel }) : args.transportEnabled, busSeats: args.busSeats, additionalAdults: args.additionalAdults, trailerRequired: args.trailerRequired };
     await ctx.db.patch(event._id, patch);
     await audit(ctx, user, "events", event._id, "setTransport", { travel: event.travel, transportEnabled: event.transportEnabled, busSeats: event.busSeats, additionalAdults: event.additionalAdults, trailerRequired: event.trailerRequired }, patch);
+    await queueTravelDigest(ctx, event._id);
     return null;
   },
 });
@@ -151,6 +153,7 @@ export const assignVehicle = mutation({
       const id = await ctx.db.insert("eventVehicles", { eventId: event._id, driverId: driver._id, ...patch });
       await audit(ctx, user, "eventVehicles", id, "assign", null, patch);
     }
+    await queueTravelDigest(ctx, event._id);
     return null;
   },
 });

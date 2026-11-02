@@ -26,6 +26,9 @@ const app = defineApp({ env: {
   ZEFFY_API_KEY: v.optional(v.string()),
   DEVELOPER_SIGN_IN_ENABLED: v.optional(v.string()),
   DEVELOPER_SIGN_IN_KEY: v.optional(v.string()),
+  VAPID_PUBLIC_KEY: v.optional(v.string()),
+  VAPID_PRIVATE_KEY: v.optional(v.string()),
+  VAPID_SUBJECT: v.optional(v.string()),
 } });
 app.use(rateLimiter);
 app.use(aggregate, { name: "reportAggregates" });

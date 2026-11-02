@@ -10,6 +10,7 @@ import { Input } from './components/ui/input'
 import { NativeSelect, NativeSelectOption } from './components/ui/native-select'
 import { chargeAdministrationCopy as copy } from './lib/charge-administration-copy'
 import styles from './ChargeAdministration.module.css'
+import { dueAtFromInput, dueDateCopy, dueDateInput } from './copy/due-date-copy'
 import { chargeCurrency, parseChargeTarget } from './lib/charge-money'
 export { chargeCurrency, parseChargeTarget } from './lib/charge-money'
 
@@ -23,9 +24,10 @@ const errorText = (error: unknown) => userFacingError(error, copy.unavailable)
 const processLabel = (state: string) => state === 'complete' ? 'Complete' : state === 'failed' ? 'Needs Coach review' : 'In progress'
 const revisionLabel = (kind: string) => kind === 'cancellation' ? 'Charge cancellation' : kind === 'adjustment' ? 'Charge adjustment' : 'Charge correction'
 
-export function ChargeAdministration({ chargeId, allowEditing = false, onClose }: { chargeId: Id<'charges'>; allowEditing?: boolean; onClose?: () => void }) {
+/** effectiveDueAt: the charge's effective due date from financeDetails.charges (its own, else its fee's). */
+export function ChargeAdministration({ chargeId, effectiveDueAt, allowEditing = false, onClose }: { chargeId: Id<'charges'>; effectiveDueAt?: number | null; allowEditing?: boolean; onClose?: () => void }) {
   const [attempt, setAttempt] = useState(0)
-  return <ChargeBoundary key={`${chargeId}:${attempt}`} retry={() => setAttempt(value => value + 1)}><ChargeAdministrationContent chargeId={chargeId} allowEditing={allowEditing} onClose={onClose} /></ChargeBoundary>
+  return <ChargeBoundary key={`${chargeId}:${attempt}`} retry={() => setAttempt(value => value + 1)}><ChargeAdministrationContent chargeId={chargeId} effectiveDueAt={effectiveDueAt} allowEditing={allowEditing} onClose={onClose} /></ChargeBoundary>
 }
 
 class ChargeBoundary extends Component<{ children: ReactNode; retry: () => void }, { error: unknown }> {
@@ -34,7 +36,43 @@ class ChargeBoundary extends Component<{ children: ReactNode; retry: () => void 
   render() { return this.state.error !== null ? <section className={styles.root}><p className={styles.error} role="alert">{userFacingError(this.state.error, copy.unavailable, false)}</p><Button type="button" variant="outline" onClick={this.props.retry}>Try again</Button></section> : this.props.children }
 }
 
-function ChargeAdministrationContent({ chargeId, allowEditing, onClose }: { chargeId: Id<'charges'>; allowEditing: boolean; onClose?: () => void }) {
+/**
+ * The charge's due date: its own, else the fee's (effectiveDueAt, from financeDetails.charges), so Details
+ * names the same date as the charge card and Home. Coaches and Travel Leads with Money editing can set or clear the charge's own date here.
+ */
+export function ChargeDueDate({ chargeId, dueAt, effectiveDueAt, inheritsFromFee, allowEditing }: { chargeId: Id<'charges'>; dueAt: number | undefined; effectiveDueAt?: number | null; inheritsFromFee: boolean; allowEditing: boolean }) {
+  const save = useMutation(api.finance.setChargeDueAt)
+  const saved = dueDateInput(dueAt)
+  const [date, setDate] = useState(saved)
+  const [busy, setBusy] = useState(false)
+  const [status, setStatus] = useState('')
+  const [error, setError] = useState('')
+  const next = dueAtFromInput(date)
+  const invalid = next !== null && Number.isNaN(next)
+  const fromFee = dueAt === undefined && effectiveDueAt !== undefined && effectiveDueAt !== null
+  const shown = dueAt ?? (fromFee ? effectiveDueAt : undefined)
+  async function submit(value: number | null) {
+    if (busy) return
+    setBusy(true); setError(''); setStatus('')
+    try { await save({ chargeId, dueAt: value }); setStatus(value === null ? dueDateCopy.cleared : dueDateCopy.saved); if (value === null) setDate('') }
+    catch (cause) { setError(userFacingError(cause, dueDateCopy.failed)) }
+    finally { setBusy(false) }
+  }
+  return <div className={styles.form}>
+    <dl className={styles.details}><dt>{dueDateCopy.heading}</dt><dd>{shown !== undefined ? dueDateCopy.full(shown) : dueDateCopy.none}</dd></dl>
+    {dueAt === undefined && fromFee && <p className={styles.muted}>{dueDateCopy.fromFee}</p>}
+    {dueAt === undefined && !fromFee && inheritsFromFee && <p className={styles.muted}>{dueDateCopy.inherits}</p>}
+    {allowEditing && <form className={styles.dueForm} onSubmit={event => { event.preventDefault(); if (invalid) { setError(dueDateCopy.invalid); return } if (date !== saved) void submit(next) }}>
+      <label className={styles.field}>{dueDateCopy.label}<Input type="date" value={date} disabled={busy} aria-invalid={invalid} onChange={event => { setDate(event.target.value); setStatus(''); setError('') }} /></label>
+      <Button type="submit" variant="outline" disabled={busy || invalid || date === saved}>{busy ? dueDateCopy.saving : dueDateCopy.save}</Button>
+      {dueAt !== undefined && <Button type="button" variant="outline" disabled={busy} onClick={() => void submit(null)}>{dueDateCopy.clear}</Button>}
+    </form>}
+    {status && <p role="status" className={styles.muted}>{status}</p>}
+    {error && <p role="alert" className={styles.error}>{error}</p>}
+  </div>
+}
+
+function ChargeAdministrationContent({ chargeId, effectiveDueAt, allowEditing, onClose }: { chargeId: Id<'charges'>; effectiveDueAt?: number | null; allowEditing: boolean; onClose?: () => void }) {
   const detail = useQuery(api.chargeAdmin.detail, { chargeId })
   const [jobId, setJobId] = useState<Id<'financialOperationJobs'> | null>(null)
   const status = useQuery(api.chargeAdmin.status, { chargeId, ...(jobId ? { jobId } : {}) })
@@ -78,7 +116,7 @@ function ChargeAdministrationContent({ chargeId, allowEditing, onClose }: { char
   if (!detail) return <section className={styles.root}><p role="status">{copy.loading}</p></section>
   const values = [{ label: copy.original, cents: detail.amounts.amountCents }, { label: copy.adjusted, cents: detail.amounts.adjustedCents }, { label: copy.cancelled, cents: detail.amounts.cancelledCents }, { label: copy.effective, cents: detail.amounts.effectiveCents }, { label: copy.applied, cents: detail.amounts.appliedCents }, { label: copy.outstanding, cents: detail.amounts.effectiveCents - detail.amounts.appliedCents }]
   return <section className={styles.root} aria-label={copy.title}>
-    <Card className={styles.card}><div className={styles.header}><div><CardTitle>{detail.charge.label} · {copy.title}</CardTitle><p className={styles.muted}>Current recorded amounts</p></div>{onClose && <Button type="button" variant="outline" onClick={onClose}>{copy.close}</Button>}</div><ChargeAmountFacts values={values} />{detail.financialState !== 'ready' && <p className={styles.notice} role="status">{detail.financialState === 'failed' ? copy.failed : copy.updating}</p>}</Card>
+    <Card className={styles.card}><div className={styles.header}><div><CardTitle>{detail.charge.label} · {copy.title}</CardTitle><p className={styles.muted}>Current recorded amounts</p></div>{onClose && <Button type="button" variant="outline" onClick={onClose}>{copy.close}</Button>}</div><ChargeAmountFacts values={values} /><ChargeDueDate chargeId={chargeId} dueAt={detail.charge.dueAt} effectiveDueAt={effectiveDueAt} inheritsFromFee={detail.charge.feeDefinitionId !== undefined} allowEditing={allowEditing} />{detail.financialState !== 'ready' && <p className={styles.notice} role="status">{detail.financialState === 'failed' ? copy.failed : copy.updating}</p>}</Card>
     {status?.job && <Card className={styles.card}><CardTitle>{copy.correction} · {processLabel(status.job.state)}</CardTitle><p className={styles.muted}>Requested by {status.originalActorName ?? 'Unavailable Coach'} · Processing by {status.processingActorName ?? 'Unavailable Coach'}</p><ChargeAmountFacts values={[{ label: copy.committedRelease, cents: status.job.committedCents }, { label: copy.release, cents: status.job.releaseRequiredCents ?? status.job.amountCents }, ...(status.job.originalEffectiveCents !== undefined ? [{ label: 'Charge amount before this correction', cents: status.job.originalEffectiveCents }] : []), ...(status.job.targetEffectiveCents !== undefined ? [{ label: 'New charge amount requested', cents: status.job.targetEffectiveCents }] : [])]} /><p role="status" className={status.job.state === 'complete' ? styles.muted : styles.notice}>{status.job.state === 'complete' ? 'The new charge amount is saved. Money may still be applied to other charges.' : copy.planned}</p><p>{status.job.reason}</p>{status.job.lastError && <p role="alert" className={styles.error}>{userFacingError(new Error(status.job.lastError), copy.unavailable)}</p>}{allowEditing && status.canRetry && <form className={styles.form} onSubmit={async event => { event.preventDefault(); if (!status.job || busyGuard.current || retryReason.trim().length < 8) return; busyGuard.current = true; setBusy(true); setError(''); try { await retry({ jobId: status.job._id, reason: retryReason.trim() }); setRetryReason('') } catch (cause) { setError(errorText(cause)) } finally { busyGuard.current = false; setBusy(false) } }}><label className={styles.field}>{copy.retryReason}<Input value={retryReason} onChange={event => setRetryReason(event.target.value)} minLength={8} maxLength={1000} required disabled={busy} /></label><Button type="submit" disabled={busy || retryReason.trim().length < 8}>{copy.retry}</Button></form>}</Card>}
     {allowEditing && detail.canCorrect && <Card className={styles.card}><CardTitle>{copy.correction}</CardTitle><form className={styles.form} onSubmit={review}><div className={styles.fields}><label className={styles.field}>Type<NativeSelect value={kind} disabled={busy} onChange={event => { const selected = event.target.value; if (selected !== 'adjustment' && selected !== 'cancellation') return; setKind(selected); setTarget(selected === 'cancellation' ? '0.00' : ''); changed() }}><NativeSelectOption value="adjustment">{copy.correction}</NativeSelectOption><NativeSelectOption value="cancellation">{copy.cancellation}</NativeSelectOption></NativeSelect></label><label className={styles.field}>{copy.target}<Input inputMode="decimal" value={target} onChange={event => { setTarget(event.target.value); changed() }} maxLength={24} disabled={busy} required aria-invalid={target !== '' && targetCents === null} /></label></div><p className={styles.muted}>{copy.targetNote}</p><Button type="submit" disabled={busy || targetCents === null}>{busy ? 'Reviewing…' : copy.preview}</Button></form>{preview && <form className={styles.form} onSubmit={confirm}><ChargeAmountFacts values={[{ label: 'Current charge amount reviewed', cents: preview.amounts.effectiveCents }, { label: 'New charge amount', cents: preview.targetEffectiveCents }, { label: copy.release, cents: preview.releaseRequiredCents }, { label: 'Amount still due after correction', cents: preview.targetOutstandingCents }]} /><p className={styles.muted}>{copy.releaseNote} {copy.futureAllocation}</p>{preview.message && <p role="status" className={styles.notice}>{preview.message}</p>}{!ready && <p className={styles.notice}>The charge or account changed, or this review is no longer ready. Review the amounts again before saving.</p>}<label className={styles.field}>{copy.reason}<Input value={reason} onChange={event => { setReason(event.target.value); intent.current = null }} minLength={8} maxLength={1000} required disabled={busy} /></label><p className={styles.muted}>{copy.noPayment}</p><Button type="submit" disabled={busy || !ready || reason.trim().length < 8}>{copy.confirm}</Button></form>}</Card>}
     {error && <p role="alert" className={styles.error}>{error}</p>}

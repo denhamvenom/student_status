@@ -1,8 +1,12 @@
-import { cronJobs } from "convex/server";
+import { cronJobs, makeFunctionReference } from "convex/server";
 import { internal } from "./_generated/api";
 
 const crons = cronJobs();
 crons.interval("archive past events", { minutes: 1 }, internal.eventArchive.sweep, {});
 crons.cron("refresh team calendar", "0 11,12,20,21 * * *", internal.calendar.scheduledRefresh, {});
 crons.cron("sync Zeffy donations", "0 0,1,12,13 * * *", internal.zeffyActions.scheduledRun, {});
+crons.cron("delete old notifications", "30 9 * * *", internal.notifications.purgeOld, {});
+// Hourly; each handler acts only at its America/Chicago local hour (DST-safe): digest flush 17:00, R1 18:00, R2 17:00, R6 Mon 17:00, R7 Sat 10:00; R3–R5 every hour.
+crons.cron("notification digest", "0 * * * *", makeFunctionReference<"mutation", Record<string, never>, null>("notificationDigest:hourly"), {});
+crons.cron("notification reminders", "0 * * * *", makeFunctionReference<"mutation", Record<string, never>, null>("notificationReminders:hourly"), {});
 export default crons;

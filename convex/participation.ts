@@ -1,6 +1,6 @@
 import { requireSeasonFinanceReady } from "./lib/seasonFinance";
 import { ConvexError, v, type Infer } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import type { SignupAvailability } from "../src/features/student-home/contract";
@@ -8,6 +8,7 @@ import { activeSeason, audit, ownStudent, viewer } from "./lib/access";
 import { addCharge } from "./lib/money";
 import { enrollmentPending, requireEnrollmentComplete } from "./lib/eventEnrollmentState";
 import { activeQuestions, answerInput, checkAnswers, checkListSizes, checkShifts, clearShifts, replaceShifts, saveAnswers } from "./lib/eventSignupExtras";
+import { notifyEventAssigned, queueSignupPendingDigest } from "./lib/notificationTriggers";
 
 async function reserved(ctx: MutationCtx, eventId: Id<"events">) {
   const rows = await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", eventId)).take(501);
@@ -47,6 +48,7 @@ export const signUp = mutation({
     if (shifts.length) await replaceShifts(ctx, event._id, student._id, shifts);
     else if (status === "waitlist" && prior) await clearShifts(ctx, event._id, student._id);
     await audit(ctx, user, "participants", `${event._id}:${student._id}`, "signup", prior?.status ?? null, status);
+    if (status === "pending") await queueSignupPendingDigest(ctx, { eventId: event._id });
     return status;
   },
 });
@@ -137,6 +139,18 @@ export const setParticipation = mutation({
     // A waitlisted student holds no shift places; they choose again with eventShifts.setMyShifts once promoted.
     if (args.status === "waitlist") await clearShifts(ctx, event._id, student._id);
     await audit(ctx, user, "participants", `${event._id}:${student._id}`, "setStatus", prior?.status ?? null, args.status, args.reason);
+    // Newly on the event (the no-op return above skips repeats); pending and waitlist changes are not an assignment.
+    if (args.status === "confirmed") await notifyEventAssigned(ctx, { eventId: event._id, studentIds: [student._id] });
+    return null;
+  },
+});
+
+/** Whole Team membership sync (lib/wholeTeam.ts): one assignment notice per newly joined event; the per-event dedupe key keeps one per person. */
+export const notifyWholeTeamAssigned = internalMutation({
+  args: { studentId: v.id("students"), eventIds: v.array(v.id("events")) }, returns: v.null(),
+  handler: async (ctx, args) => {
+    if (args.eventIds.length > 100) throw new Error("Whole Team notice batch exceeds the event limit.");
+    for (const eventId of new Set(args.eventIds)) await notifyEventAssigned(ctx, { eventId, studentIds: [args.studentId] });
     return null;
   },
 });

@@ -1,8 +1,10 @@
 import { ConvexError, v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { makeFunctionReference } from "convex/server";
 import { activeSeason, audit, viewer, type AppUser } from "./lib/access";
+import { notifyUsers, parentUserIdsForStudents, studentUserIds } from "./lib/notify";
 
 /** Student Home shows at most this many pinned messages; pinning one more is refused. */
 const PIN_LIMIT = 5;
@@ -16,22 +18,26 @@ type Announcement = Doc<"teamAnnouncements">;
 type AuthorRole = Announcement["authorRole"];
 
 const authorRole = v.union(v.literal("coach"), v.literal("travelLead"));
-const audience = v.union(v.literal("students"), v.literal("parents"), v.literal("both"));
-type Audience = "students" | "parents" | "both";
-type Destination = "students" | "parents";
-const reaches = (audience: Audience, destination: Destination) => audience === "both" || audience === destination;
+const audience = v.union(v.literal("students"), v.literal("parents"), v.literal("both"), v.literal("staff"), v.literal("everyone"));
+type Audience = "students" | "parents" | "both" | "staff" | "everyone";
+type Destination = "students" | "parents" | "staff";
+const DESTINATIONS = ["students", "parents", "staff"] as const;
+/** Both = Students + Parents; Everyone = Students + Parents + staff (Coaches, Mentors, Travel Leads, Parents with staff access). */
+const reaches = (audience: Audience, destination: Destination) => audience === "everyone" || audience === destination || audience === "both" && destination !== "staff";
+/** Anything reaching Parents is Coach-only; Travel Leads may post to Students or staff. */
+const coachOnly = (audience: Audience) => reaches(audience, "parents");
 const destinationOf = (row: Announcement): Audience => row.audience ?? "students";
 
-// Each destination has at most five current pins. Disjoint lists therefore hold at most ten rows;
-// a Both row occupies one slot in each. Read one extra for bounded legacy over-limit fixtures.
-const PIN_WINDOW = 2 * PIN_LIMIT + 1;
+// Each destination has at most five current pins. Disjoint lists therefore hold at most fifteen rows;
+// a Both or Everyone row occupies one slot in each destination it reaches. Read one extra for bounded legacy over-limit fixtures.
+const PIN_WINDOW = DESTINATIONS.length * PIN_LIMIT + 1;
 const pinnedAnnouncement = v.object({
   id: v.id("teamAnnouncements"), title: v.union(v.string(), v.null()), body: v.string(), authorName: v.string(), authorRole,
-  pinnedAt: v.number(), showUntil: v.union(v.number(), v.null()),
+  pinnedAt: v.number(), showUntil: v.union(v.number(), v.null()), urgent: v.boolean(),
 });
 const staffAnnouncement = v.object({
   id: v.id("teamAnnouncements"), audience, title: v.union(v.string(), v.null()), body: v.string(), authorName: v.string(), authorRole,
-  pinned: v.boolean(), pinnedAt: v.union(v.number(), v.null()), showUntil: v.union(v.number(), v.null()), createdAt: v.number(), updatedAt: v.number(),
+  pinned: v.boolean(), pinnedAt: v.union(v.number(), v.null()), showUntil: v.union(v.number(), v.null()), urgent: v.boolean(), createdAt: v.number(), updatedAt: v.number(),
 });
 
 /** A Coach, or a Mentor with Travel Lead access (including a Parent who selected Travel Lead for this session). */
@@ -40,6 +46,9 @@ function managerRole(user: AppUser): AuthorRole | null {
   if (user.role === "mentor" && user.travelLead) return "travelLead";
   return null;
 }
+
+/** Urgent is Coach-only to send, so only a Coach may change, pin, unpin or remove an urgent announcement. */
+const URGENT_COACH_ONLY = "Only a Coach can change an urgent announcement.";
 
 async function requireManager(ctx: Ctx) {
   const actor = await viewer(ctx);
@@ -72,7 +81,7 @@ async function currentAnnouncement(ctx: MutationCtx, id: Id<"teamAnnouncements">
 
 async function requirePinRoom(ctx: MutationCtx, seasonId: Id<"seasons">, targetAudience: Audience, excludeId?: Id<"teamAnnouncements">) {
   const pinned = await ctx.db.query("teamAnnouncements").withIndex("by_seasonId_and_pinned_and_pinnedAt", q => q.eq("seasonId", seasonId).eq("pinned", true)).take(PIN_WINDOW);
-  for (const destination of ["students", "parents"] as const) {
+  for (const destination of DESTINATIONS) {
     if (!reaches(targetAudience, destination)) continue;
     if (pinned.filter(row => row._id !== excludeId && row.archivedAt === undefined && reaches(destinationOf(row), destination)).length >= PIN_LIMIT) {
       throw new ConvexError("Five announcements are already pinned. Unpin one first.");
@@ -81,8 +90,8 @@ async function requirePinRoom(ctx: MutationCtx, seasonId: Id<"seasons">, targetA
 }
 
 /** What the audit trail keeps: the visible content and pin state, never account details. */
-function auditView(row: Pick<Announcement, "audience" | "title" | "body" | "pinned" | "showUntil">) {
-  return { audience: row.audience ?? "students", title: row.title ?? null, body: row.body, pinned: row.pinned, showUntil: row.showUntil ?? null };
+function auditView(row: Pick<Announcement, "audience" | "title" | "body" | "pinned" | "showUntil" | "urgent">) {
+  return { audience: row.audience ?? "students", title: row.title ?? null, body: row.body, pinned: row.pinned, showUntil: row.showUntil ?? null, urgent: row.urgent ?? false };
 }
 
 /** Author names come from the account name. An account whose name is an email shows its role instead. */
@@ -119,7 +128,7 @@ export const pinnedForHome = query({
     const nameOf = authorNames(ctx);
     return await Promise.all(rows.filter(row => row.archivedAt === undefined && reaches(destinationOf(row), "students")).slice(0, PIN_LIMIT).map(async row => ({
       id: row._id, title: row.title ?? null, body: row.body, authorName: await nameOf(row), authorRole: row.authorRole,
-      pinnedAt: row.pinnedAt ?? row.updatedAt, showUntil: row.showUntil ?? null,
+      pinnedAt: row.pinnedAt ?? row.updatedAt, showUntil: row.showUntil ?? null, urgent: row.urgent ?? false,
     })));
   },
 });
@@ -141,7 +150,7 @@ export const pinnedForParentHome = query({
     const nameOf = authorNames(ctx);
     return Promise.all(rows.filter(row => row.archivedAt === undefined && reaches(destinationOf(row), "parents")).slice(0, PIN_LIMIT).map(async row => ({
       id: row._id, title: row.title ?? null, body: row.body, authorName: await nameOf(row), authorRole: row.authorRole,
-      pinnedAt: row.pinnedAt ?? row.updatedAt, showUntil: row.showUntil ?? null,
+      pinnedAt: row.pinnedAt ?? row.updatedAt, showUntil: row.showUntil ?? null, urgent: row.urgent ?? false,
     })));
   },
 });
@@ -159,7 +168,7 @@ export const listForStaff = query({
     const nameOf = authorNames(ctx);
     const project = async (row: Announcement) => ({
       id: row._id, audience: row.audience ?? "students", title: row.title ?? null, body: row.body, authorName: await nameOf(row), authorRole: row.authorRole,
-      pinned: row.pinned, pinnedAt: row.pinnedAt ?? null, showUntil: row.showUntil ?? null, createdAt: row.createdAt, updatedAt: row.updatedAt,
+      pinned: row.pinned, pinnedAt: row.pinnedAt ?? null, showUntil: row.showUntil ?? null, urgent: row.urgent ?? false, createdAt: row.createdAt, updatedAt: row.updatedAt,
     });
     return {
       pinned: await Promise.all(pinned.filter(row => row.archivedAt === undefined).map(project)),
@@ -171,18 +180,22 @@ export const listForStaff = query({
 });
 
 export const create = mutation({
-  args: { title: v.optional(v.string()), body: v.string(), showUntil: v.optional(v.number()), pin: v.boolean(), audience: v.optional(audience) },
+  args: { title: v.optional(v.string()), body: v.string(), showUntil: v.optional(v.number()), pin: v.boolean(), audience: v.optional(audience), urgent: v.optional(v.boolean()) },
   returns: v.id("teamAnnouncements"),
   handler: async (ctx, args) => {
     const { actor, role, season } = await requireManager(ctx);
-    if ((args.audience === "parents" || args.audience === "both") && role !== "coach") throw new ConvexError("Only a Coach can manage parent announcements.");
+    if (coachOnly(args.audience ?? "students") && role !== "coach") throw new ConvexError("Only a Coach can manage parent announcements.");
+    if (args.urgent && role !== "coach") throw new ConvexError("Only a Coach can send an urgent announcement.");
     const now = Date.now();
     const content = cleanContent(args);
     const showUntil = futureShowUntil(args.showUntil, now);
     if (args.pin) await requirePinRoom(ctx, season._id, args.audience ?? "students");
-    const row = { seasonId: season._id, audience: args.audience, ...content, showUntil, authorId: actor._id, authorRole: role, pinned: args.pin, pinnedAt: args.pin ? now : undefined, createdAt: now, updatedAt: now };
+    // Urgent is Coach-only (refused above), so a stored flag always means a Coach sent it urgently.
+    const urgent = args.urgent === true ? true : undefined;
+    const row = { seasonId: season._id, audience: args.audience, ...content, showUntil, urgent, authorId: actor._id, authorRole: role, pinned: args.pin, pinnedAt: args.pin ? now : undefined, createdAt: now, updatedAt: now };
     const id = await ctx.db.insert("teamAnnouncements", row);
     await audit(ctx, actor, "teamAnnouncements", id, "createAnnouncement", null, auditView(row));
+    await ctx.scheduler.runAfter(0, notifyAudienceRef, { announcementId: id, urgent: urgent ?? false });
     return id;
   },
 });
@@ -194,8 +207,9 @@ export const update = mutation({
   handler: async (ctx, args) => {
     const { actor, season } = await requireManager(ctx);
     const row = await currentAnnouncement(ctx, args.id, season._id);
+    if (row.urgent && actor.role !== "coach") throw new ConvexError(URGENT_COACH_ONLY);
     const targetAudience = args.audience ?? destinationOf(row);
-    if ((destinationOf(row) !== "students" || targetAudience !== "students") && actor.role !== "coach") throw new ConvexError("Only a Coach can manage parent announcements.");
+    if ((coachOnly(destinationOf(row)) || coachOnly(targetAudience)) && actor.role !== "coach") throw new ConvexError("Only a Coach can manage parent announcements.");
     const now = Date.now();
     const content = cleanContent(args);
     // An unchanged date may already have passed; only a newly chosen date must be in the future.
@@ -214,7 +228,8 @@ export const pin = mutation({
   handler: async (ctx, args) => {
     const { actor, season } = await requireManager(ctx);
     const row = await currentAnnouncement(ctx, args.id, season._id);
-    if (destinationOf(row) !== "students" && actor.role !== "coach") throw new ConvexError("Only a Coach can manage parent announcements.");
+    if (row.urgent && actor.role !== "coach") throw new ConvexError(URGENT_COACH_ONLY);
+    if (coachOnly(destinationOf(row)) && actor.role !== "coach") throw new ConvexError("Only a Coach can manage parent announcements.");
     if (row.pinned) return null;
     await requirePinRoom(ctx, season._id, destinationOf(row));
     const now = Date.now();
@@ -230,7 +245,8 @@ export const unpin = mutation({
   handler: async (ctx, args) => {
     const { actor, season } = await requireManager(ctx);
     const row = await currentAnnouncement(ctx, args.id, season._id);
-    if (destinationOf(row) !== "students" && actor.role !== "coach") throw new ConvexError("Only a Coach can manage parent announcements.");
+    if (row.urgent && actor.role !== "coach") throw new ConvexError(URGENT_COACH_ONLY);
+    if (coachOnly(destinationOf(row)) && actor.role !== "coach") throw new ConvexError("Only a Coach can manage parent announcements.");
     if (!row.pinned) return null;
     await ctx.db.patch("teamAnnouncements", row._id, { pinned: false, pinnedAt: undefined, updatedAt: Date.now() });
     await audit(ctx, actor, "teamAnnouncements", row._id, "unpinAnnouncement", auditView(row), auditView({ ...row, pinned: false }));
@@ -245,10 +261,64 @@ export const archive = mutation({
   handler: async (ctx, args) => {
     const { actor, season } = await requireManager(ctx);
     const row = await currentAnnouncement(ctx, args.id, season._id);
-    if (destinationOf(row) !== "students" && actor.role !== "coach") throw new ConvexError("Only a Coach can manage parent announcements.");
+    if (row.urgent && actor.role !== "coach") throw new ConvexError(URGENT_COACH_ONLY);
+    if (coachOnly(destinationOf(row)) && actor.role !== "coach") throw new ConvexError("Only a Coach can manage parent announcements.");
     const now = Date.now();
     await ctx.db.patch("teamAnnouncements", row._id, { archivedAt: now, pinned: false, pinnedAt: undefined, updatedAt: now });
     await audit(ctx, actor, "teamAnnouncements", row._id, "archiveAnnouncement", auditView(row), { ...auditView({ ...row, pinned: false }), archived: true });
+    return null;
+  },
+});
+
+/** Pinned messages for staff Home (Coaches, Mentors, Travel Leads, and Parents in a staff session): Staff and Everyone rows. */
+export const pinnedForStaffHome = query({
+  args: {}, returns: v.array(pinnedAnnouncement),
+  handler: async ctx => {
+    const user = await viewer(ctx);
+    if (user.role !== "coach" && user.role !== "mentor") throw new ConvexError("Staff announcements are unavailable to this account.");
+    const season = await ctx.db.query("seasons").withIndex("by_status", q => q.eq("status", "active")).unique();
+    if (!season) return [];
+    const rows = await ctx.db.query("teamAnnouncements").withIndex("by_seasonId_and_pinned_and_pinnedAt", q => q.eq("seasonId", season._id).eq("pinned", true)).order("desc").take(PIN_WINDOW);
+    const nameOf = authorNames(ctx);
+    return Promise.all(rows.filter(row => row.archivedAt === undefined && reaches(destinationOf(row), "staff")).slice(0, PIN_LIMIT).map(async row => ({
+      id: row._id, title: row.title ?? null, body: row.body, authorName: await nameOf(row), authorRole: row.authorRole,
+      pinnedAt: row.pinnedAt ?? row.updatedAt, showUntil: row.showUntil ?? null, urgent: row.urgent ?? false,
+    })));
+  },
+});
+
+const MAX_ROSTER = 1000;
+const notifyAudienceRef = makeFunctionReference<"mutation", { announcementId: Id<"teamAnnouncements">; urgent: boolean }, null>("announcements:notifyAudience");
+
+/** Active Coaches, Mentors, and Parents with staff access (Mentor or Travel Lead). */
+async function staffUserIds(ctx: MutationCtx) {
+  const ids: Id<"appUsers">[] = [];
+  for await (const user of ctx.db.query("appUsers").withIndex("by_role", q => q.eq("role", "coach"))) if (user.active) ids.push(user._id);
+  for await (const user of ctx.db.query("appUsers").withIndex("by_role", q => q.eq("role", "mentor"))) if (user.active) ids.push(user._id);
+  for (const access of ["mentor", "travelLead"] as const) {
+    for await (const user of ctx.db.query("appUsers").withIndex("by_parentStaffAccess", q => q.eq("parentStaffAccess", access))) if (user.active && user.role === "parent") ids.push(user._id);
+  }
+  return ids;
+}
+
+/** Push + inbox for a new announcement's audience. Runs after create so the author's request stays small. */
+export const notifyAudience = internalMutation({
+  args: { announcementId: v.id("teamAnnouncements"), urgent: v.boolean() }, returns: v.null(),
+  handler: async (ctx, args) => {
+    const row = await ctx.db.get("teamAnnouncements", args.announcementId);
+    if (!row || row.archivedAt !== undefined) return null;
+    const target = destinationOf(row);
+    const userIds = new Set<Id<"appUsers">>();
+    if (reaches(target, "students") || reaches(target, "parents")) {
+      const students = await ctx.db.query("students").withIndex("by_seasonId_and_active", q => q.eq("seasonId", row.seasonId).eq("active", true)).take(MAX_ROSTER);
+      const studentIds = students.map(student => student._id);
+      if (reaches(target, "students")) for (const id of await studentUserIds(ctx, studentIds)) userIds.add(id);
+      if (reaches(target, "parents")) for (const id of await parentUserIdsForStudents(ctx, studentIds)) userIds.add(id);
+    }
+    if (reaches(target, "staff")) for (const id of await staffUserIds(ctx)) userIds.add(id);
+    userIds.delete(row.authorId);
+    if (!userIds.size) return null;
+    await notifyUsers(ctx, { userIds: [...userIds], category: "announcements", url: "/", urgent: args.urgent, dedupeKey: `announcement:${row._id}`, title: row.title ?? "New team announcement", body: row.body });
     return null;
   },
 });

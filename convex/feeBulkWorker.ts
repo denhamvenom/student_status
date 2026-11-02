@@ -10,6 +10,7 @@ import { effectiveChargeCents } from "./lib/chargeObligation";
 import { tokenHash } from "./lib/invitationIdentity";
 import { addCharges } from "./lib/money";
 import { bulkTargetHold, startBulkChargeCorrection } from "./lib/feeBulkMoney";
+import { queueMoneyDigest } from "./lib/digest";
 
 const runRef = makeFunctionReference<"mutation">("feeBulkWorker:run");
 const pageRef = makeFunctionReference<"mutation">("feeBulkWorker:processPage");
@@ -129,6 +130,8 @@ export const processPage = internalMutation({
             const [chargeId] = await addCharges(ctx, actor, row.studentId, [{ feeDefinitionId: fee._id, label: fee.label, eventId: fee.eventId, category: fee.eventId ? "extra" : "main", amountCents: row.targetAmountCents, priority: fee.priority, idempotencyKey: `fee-bulk:${job._id}:${row._id}` }], `fee-bulk:${job._id}:${row._id}:allocate`, job._id);
             const after = await financialAccount(ctx, row.studentId);
             await ctx.db.patch(row._id, { chargeId, state: "waiting", allocationJobId: after?.allocationJobId });
+            // One row per student per job, and this branch runs once per row (the row now holds its chargeId), so Parents get one digest item per job.
+            await queueMoneyDigest(ctx, row.studentId, "charge");
             await ctx.db.patch(job._id, { step: job.step + 1, updatedAt: Date.now() });
           }
         }

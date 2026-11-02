@@ -52,11 +52,11 @@ export function actionContent(action: HighlightAction, fundraiserLinked: boolean
 }
 
 /** The pill and the line beside it, as on the room choice card. */
-function DueRow({ due, urgent }: { due: HighlightDue; urgent: boolean }) {
+function DueRow({ due, urgent, eventDate }: { due: HighlightDue; urgent: boolean; eventDate: boolean }) {
   const pill = due.state === 'overdue' ? copy.overdue
     : dueShowsDate(due) ? copy.dueOn(formatMonthDay(due.at))
     : due.daysLeft <= 0 ? copy.dueToday : copy.dueOn(formatWeekday(due.at))
-  const line = due.state === 'overdue' ? copy.wasDue(formatShortDate(due.at)) : dueShowsDate(due) ? copy.daysLeft(due.daysLeft) : copy.dateLine(formatMonthDay(due.at), copy.daysLeft(due.daysLeft))
+  const line = due.state === 'overdue' ? (eventDate ? copy.eventStarted : copy.wasDue)(formatShortDate(due.at)) : dueShowsDate(due) ? copy.daysLeft(due.daysLeft) : copy.dateLine(formatMonthDay(due.at), copy.daysLeft(due.daysLeft))
   return <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
     <StatusBadge tone={urgent ? 'urgentStrong' : 'calm'} className={cn(urgent && 'tracking-[0.03em] uppercase')}>{pill}</StatusBadge>
     <span className="text-[12px] text-vs-muted lg:text-[11px] lg:tracking-[0.02em]">{line}</span>
@@ -77,7 +77,7 @@ export function ActionCard({ action, fundraiserLinked, balanceDueCents }: { acti
   return <DashboardTile surface="hero" tone={urgent ? 'hero' : 'quiet'} aria-labelledby={titleId} className={cn(urgent && 'border-2 border-vs-gold lg:border lg:border-[color-mix(in_srgb,var(--vs-gold)_32%,transparent)]')}>
     <div className="flex items-start justify-between gap-4">
       <div className="min-w-0">
-        {due && <DueRow due={due} urgent={urgent} />}
+        {due && <DueRow due={due} urgent={urgent} eventDate={action.item.dateKind === 'eventStart'} />}
         <h2 id={titleId} className={cn('mb-0! font-heading! text-[28px]! leading-[1.05]! font-normal! tracking-normal! break-words text-vs-heading lg:text-[30px]! lg:tracking-[0.01em]!', due ? 'mt-2.5! lg:mt-2!' : 'mt-0!')}>{content.title}</h2>
       </div>
       <span aria-hidden="true" className="hidden size-[54px] shrink-0 items-center justify-center rounded-[14px] border border-vs-border bg-vs-inset-raised text-vs-purple lg:inline-flex dark:border-[color-mix(in_srgb,var(--vs-gold)_25%,transparent)] dark:bg-[color-mix(in_srgb,var(--vs-gold)_10%,transparent)] dark:text-vs-gold"><Icon size={28} strokeWidth={2} /></span>

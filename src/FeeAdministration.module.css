@@ -30,3 +30,4 @@
 .details dd{margin:0;text-align:right;overflow-wrap:anywhere}
 .historyRow{display:grid;gap:8px;padding:14px 0;border-top:1px solid var(--border-default);font-size:14px;min-width:0;overflow-wrap:anywhere}
 @media(max-width:767px){.card{padding:16px}.fee{flex-wrap:wrap}.feeActions{flex-basis:100%;justify-content:flex-start;padding-left:40px}.actions>:global(button){flex:1 1 140px}.students{grid-template-columns:1fr}.details{gap:8px 12px}}
+.dueDate{padding:12px 0 16px 40px}

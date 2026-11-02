@@ -5,17 +5,19 @@ import { Checkbox } from './components/ui/checkbox'
 import { NativeSelect, NativeSelectOption } from './components/ui/native-select'
 import type { Doc, Id } from '../convex/_generated/dataModel'
 import { Input } from './components/ui/input'
-import { Component, useEffect, useRef, useState, type ReactNode } from 'react'
-import { useMutation, usePaginatedQuery, useQuery } from 'convex/react'
+import { Component, Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useConvex, useMutation, usePaginatedQuery, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
 import type { FunctionArgs, FunctionReturnType } from 'convex/server'
 import { chargeCurrency, parseChargeTarget } from './lib/charge-money'
 import { feeAdministrationCopy as copy } from './lib/fee-administration-copy'
 import styles from './FeeAdministration.module.css'
+import { dueAtFromInput, dueDateCopy, dueDateInput } from './copy/due-date-copy'
 
-export default function FeeAdministration({ isCoach }: { isCoach: boolean }) {
+/** canSetDueDates: a Coach, or a Travel Lead with Money editing (the same rule as feeDefinitions.setDueAt). */
+export default function FeeAdministration({ isCoach, canSetDueDates = isCoach }: { isCoach: boolean; canSetDueDates?: boolean }) {
   const [attempt, setAttempt] = useState(0)
-  return <FeeQueryBoundary key={attempt} onRetry={() => setAttempt(value => value + 1)}><FeeWorkspace isCoach={isCoach} /></FeeQueryBoundary>
+  return <FeeQueryBoundary key={attempt} onRetry={() => setAttempt(value => value + 1)}><FeeWorkspace isCoach={isCoach} canSetDueDates={canSetDueDates} /></FeeQueryBoundary>
 }
 
 class FeeQueryBoundary extends Component<{ children: ReactNode; onRetry: () => void }, { error: unknown }> {
@@ -27,7 +29,7 @@ class FeeQueryBoundary extends Component<{ children: ReactNode; onRetry: () => v
   }
 }
 
-function FeeWorkspace({ isCoach }: { isCoach: boolean }) {
+function FeeWorkspace({ isCoach, canSetDueDates }: { isCoach: boolean; canSetDueDates: boolean }) {
   const maintenance = useQuery(api.feePriorities.maintenance, {})
   const fees = usePaginatedQuery(api.feePriorities.list, {}, { initialNumItems: 20 })
   const move = useMutation(api.feePriorities.move)
@@ -41,6 +43,7 @@ function FeeWorkspace({ isCoach }: { isCoach: boolean }) {
   const [dismissedBulkJobId, setDismissedBulkJobId] = useState<Id<'feeBulkJobs'> | null>(null)
   function openBulkJob(id: Id<'feeBulkJobs'>) { setDismissedBulkJobId(null); setBulkJobId(id) }
   const [bulkDraft, setBulkDraft] = useState<{kind:'create'|'edit'|'cancel';definition?:Doc<'feeDefinitions'>}|null>(null)
+  const [dueDateFeeId, setDueDateFeeId] = useState<Id<'feeDefinitions'> | null>(null)
   const submittedIntent = useRef<{ fingerprint: string; key: string } | null>(null)
   const visibleJobId = jobId ?? maintenance?.control?.priorityJobId
   const visibleMappingJobId = mappingJobId ?? maintenance?.control?.mappingJobId
@@ -69,7 +72,11 @@ function FeeWorkspace({ isCoach }: { isCoach: boolean }) {
       {!maintenance || fees.status === 'LoadingFirstPage' ? <p role="status">{copy.loading}</p> : <>
         {maintenance.mappingState !== 'ready' && <p className={styles.notice}>{maintenance.mappingState === 'uninitialized' ? copy.mappingUnknown : copy.partialOrder}</p>}
         {fees.results.length === 0 && fees.status === 'Exhausted' && <p>{copy.noFees}</p>}
-        <FeePriorityRows disabled={pending || maintenance.control?.state !== 'ready'} rows={fees.results.map(row => ({ key: row.definition._id, label: row.definition.label, summary: row.eventName ? `${copy.connectedTo}: ${row.eventName}` : undefined, priority: row.definition.priority, amountCents: row.definition.defaultAmountCents, cancelled: row.definition.state === 'cancelled', actions: {
+        <FeePriorityRows disabled={pending || maintenance.control?.state !== 'ready'} rows={fees.results.map(row => ({ key: row.definition._id, label: row.definition.label, summary: row.eventName ? `${copy.connectedTo}: ${row.eventName}` : undefined, priority: row.definition.priority, amountCents: row.definition.defaultAmountCents, dueAt: row.definition.dueAt, cancelled: row.definition.state === 'cancelled',
+          below: dueDateFeeId === row.definition._id && row.definition.state === 'active' ? <FeeDueDate key={row.definition._id} definition={row.definition} onClose={() => setDueDateFeeId(null)} /> : undefined,
+          actions: {
+          dueDate: canSetDueDates && row.definition.state === 'active' ? () => setDueDateFeeId(id => id === row.definition._id ? null : row.definition._id) : undefined,
+          dueDateOpen: dueDateFeeId === row.definition._id,
           view: row.definition.latestJobId ? ()=>{if(row.definition.latestJobId)openBulkJob(row.definition.latestJobId)} : undefined,
           up: row.canMoveUp ? () => open(row.definition, row.eventName, 'up') : undefined,
           down: row.canMoveDown ? () => open(row.definition, row.eventName, 'down') : undefined,
@@ -109,12 +116,19 @@ function BulkPreparationForm({ kind, definition, disabled, onDismiss, onJob }: {
   onJob:(id:Id<'feeBulkJobs'>)=>void
 }) {
   const prepare=useMutation(api.feeDefinitions.prepareBulk)
+  const setDueAt=useMutation(api.feeDefinitions.setDueAt)
+  const client=useConvex()
   const latest=useQuery(api.feeDefinitions.bulkStatus,definition?.latestJobId?{jobId:definition.latestJobId}:'skip')
   const events=usePaginatedQuery(api.feeDefinitions.events,{}, {initialNumItems:20})
   const students=usePaginatedQuery(api.feeDefinitions.students,{}, {initialNumItems:20})
   const [label,setLabel]=useState(definition?.label??'')
   const [amount,setAmount]=useState(definition?`${BigInt(definition.defaultAmountCents)/100n}.${String(BigInt(definition.defaultAmountCents)%100n).padStart(2,'0')}`:'')
   const [reason,setReason]=useState('')
+  const savedDueDate=dueDateInput(definition?.dueAt)
+  const [dueDate,setDueDate]=useState(savedDueDate)
+  const [dueStatus,setDueStatus]=useState('')
+  // Set once the fee change is prepared, so a failed due-date save retries only the due date.
+  const prepared=useRef<{jobId:Id<'feeBulkJobs'>;feeDefinitionId:Id<'feeDefinitions'>}|null>(null)
   const [scope,setScope]=useState<'allActive'|'selected'>('allActive')
   const [existingScope,setExistingScope]=useState(kind!=='create')
   const [eventId,setEventId]=useState<Id<'events'>|null>(definition?.eventId??null)
@@ -128,14 +142,39 @@ function BulkPreparationForm({ kind, definition, disabled, onDismiss, onJob }: {
   const scopeValid=effectiveScope!=='selected'||studentIds.length>0
   const priorReady=(!definition?.latestJobId||!!latest)&&(kind!=='cancel'||latest?.job.state!=='held'||reviewedPrior?.jobId===latest.job._id&&reviewedPrior.held===latest.job.held)
   useEffect(()=>{if(shouldLoadStudentChoices(kind,scope,existingScope,eventId,students.status))students.loadMore(20)},[kind,scope,existingScope,eventId,students.status,students.loadMore])
+  const dueAt=kind==='cancel'?null:dueAtFromInput(dueDate)
+  const dueInvalid=dueAt!==null&&Number.isNaN(dueAt)
+  async function saveDueDateOnly(){
+    if(!definition||pending||dueInvalid||dueDate===savedDueDate)return
+    setPending(true);setError(null);setDueStatus('')
+    try{await setDueAt({feeDefinitionId:definition._id,dueAt});setDueStatus(dueAt===null?dueDateCopy.cleared:dueDateCopy.saved)}
+    catch(failure){setError(userFacingError(failure,dueDateCopy.failed))}
+    finally{setPending(false)}
+  }
   async function submit(){
     if(disabled||pending||!label.trim()||cents===null||!scopeValid||!priorReady||reason.trim().length<8)return
+    if(dueInvalid){setError(dueDateCopy.invalid);return}
     setPending(true);setError(null)
+    if(prepared.current){
+      const done=prepared.current
+      try{await setDueAt({feeDefinitionId:done.feeDefinitionId,dueAt});onJob(done.jobId)}
+      catch(failure){setError(userFacingError(failure,dueDateCopy.savedWithoutDueDate))}
+      finally{setPending(false)}
+      return
+    }
     const input={kind,feeDefinitionId:definition?._id,label:kind==='create'?label.trim():undefined,targetAmountCents:cents,scope:effectiveScope,studentIds:effectiveScope==='selected'?[...studentIds]:undefined,eventId:eventId??undefined,supersedeHeldJobId:latest?.job.state==='held'?reviewedPrior?.jobId:undefined,expectedHeldRows:latest?.job.state==='held'?reviewedPrior?.held:undefined,reason:reason.trim()} as const
     const fingerprint=JSON.stringify(input)
     if(intent.current?.fingerprint!==fingerprint)intent.current={fingerprint,key:crypto.randomUUID()}
-    try{onJob(await prepare({...input,idempotencyKey:intent.current.key}))}
-    catch(failure){setError(userFacingError(failure, copy.unavailable))}
+    let jobId:Id<'feeBulkJobs'>
+    try{jobId=await prepare({...input,idempotencyKey:intent.current.key})}
+    catch(failure){setError(userFacingError(failure, copy.unavailable));setPending(false);return}
+    if(kind==='cancel'||dueDate===savedDueDate){setPending(false);onJob(jobId);return}
+    try{
+      const feeDefinitionId=definition?._id??(await client.query(api.feeDefinitions.bulkStatus,{jobId})).job.feeDefinitionId
+      prepared.current={jobId,feeDefinitionId}
+      await setDueAt({feeDefinitionId,dueAt})
+      onJob(jobId)
+    }catch(failure){setError(userFacingError(failure,dueDateCopy.savedWithoutDueDate))}
     finally{setPending(false)}
   }
   return <Card className={`${styles.card} ${styles.formCard}`}><CardTitle>{kind==='create'?copy.add:kind==='cancel'?copy.cancel:copy.edit}</CardTitle><p>{copy.prepareBulkNote} {copy.scopeNote}</p>
@@ -143,13 +182,14 @@ function BulkPreparationForm({ kind, definition, disabled, onDismiss, onJob }: {
     <form className={styles.form} onSubmit={event=>{event.preventDefault();void submit()}}>
       <label className={styles.field}>{copy.name}<Input value={label} required maxLength={150} disabled={disabled||pending||kind!=='create'} onChange={event=>setLabel(event.target.value)}/></label>
       {kind!=='cancel'&&<label className={styles.field}>{copy.amount}<Input value={amount} required inputMode="decimal" disabled={disabled||pending} onChange={event=>setAmount(event.target.value)}/></label>}
+      {kind!=='cancel'&&<div className={styles.field}><label className={styles.field}>{dueDateCopy.label}<Input type="date" value={dueDate} disabled={disabled||pending} aria-invalid={dueInvalid} aria-describedby="fee-due-date-hint" onChange={event=>{setDueDate(event.target.value);setDueStatus('')}}/></label><span id="fee-due-date-hint" className={styles.muted}>{dueDateCopy.hint}</span>{definition&&<div className={styles.actions}><Button type="button" variant="outline" disabled={disabled||pending||dueInvalid||dueDate===savedDueDate} onClick={()=>void saveDueDateOnly()}>{dueDateCopy.save}</Button>{dueStatus&&<span role="status" className={styles.muted}>{dueStatus}</span>}</div>}</div>}
       {kind==='cancel'?<p>{copy.cancelNote} {copy.cancelTarget}</p>:<>
         {definition&&<div className={styles.scope}><Button type="button" variant={existingScope?'default':'outline'} disabled={disabled||pending} onClick={()=>setExistingScope(true)}>{copy.existingCharges}</Button><Button type="button" variant={!existingScope?'default':'outline'} disabled={disabled||pending} onClick={()=>setExistingScope(false)}>{copy.changeScope}</Button></div>}
         {existingScope?<p>{copy.existingScopeNote}</p>:<FeeScopeFields eventSelectionDisabled={!!definition} eventId={eventId} events={events.results.filter(event=>!event.archived).map(event=>({id:event.eventId,name:event.name}))} onEventChange={setEventId} scope={scope} onScopeChange={setScope} students={students.results.map(student=>({id:student.studentId,name:student.name,checked:studentIds.includes(student.studentId),disabled:studentIds.length>=500&&!studentIds.includes(student.studentId)}))} onStudentChange={(id,checked)=>setStudentIds(previous=>checked?previous.includes(id)?previous:previous.length<500?[...previous,id]:previous:previous.filter(value=>value!==id))} disabled={disabled||pending} loadingStudents={students.status==='LoadingFirstPage'||students.status==='LoadingMore'} moreStudents={students.status!=='Exhausted'} autoLoadStudents={scope==='selected'&&!existingScope&&!eventId} loadStudents={()=>students.loadMore(20)} loadingEvents={events.status==='LoadingFirstPage'||events.status==='LoadingMore'} moreEvents={events.status!=='Exhausted'} loadEvents={()=>events.loadMore(20)}/>}
       </>}
       {effectiveScope==='selected'&&<p>{copy.studentsSelected}: {studentIds.length} / 500</p>}<label className={styles.field}>{copy.reasonInput}<Input value={reason} required maxLength={1000} disabled={disabled||pending} onChange={event=>setReason(event.target.value)}/></label>
       <Button type="submit" disabled={disabled||pending||!label.trim()||cents===null||!scopeValid||!priorReady||reason.trim().length<8}>{pending?copy.submitting:copy.prepareBulk}</Button>
-      <Button type="button" variant="outline" disabled={pending} onClick={onDismiss}>{copy.dismiss}</Button>
+      <Button type="button" variant="outline" disabled={pending} onClick={()=>{if(prepared.current)onJob(prepared.current.jobId);else onDismiss()}}>{copy.dismiss}</Button>
       {error&&<p role="alert">{error}</p>}
     </form>
   </Card>
@@ -451,8 +491,14 @@ type FeeRowPresentation = {
   priority: number
   amountCents: number
   summary?: string
+  dueAt?: number
   cancelled: boolean
+  /** Shown directly under the row, e.g. the fee's due date control. */
+  below?: ReactNode
   actions?: {
+    /** Opens the fee's due date control; only for a Coach or a Travel Lead with Money editing. */
+    dueDate?: () => void
+    dueDateOpen?: boolean
     view?: () => void
     up?: () => void
     down?: () => void
@@ -494,17 +540,54 @@ export function FeeDefinitionDraftForm({ scopeFields, scopeValid, disabled, onPr
 
 /** Presentation receives recorded ranks and permitted actions from its caller. */
 export function FeePriorityRows({ rows, disabled }: { rows: ReadonlyArray<FeeRowPresentation>; disabled: boolean }) {
-  return <div className={styles.order}>{rows.map((row, index) => <div className={styles.fee} key={row.key}>
+  return <div className={styles.order}>{rows.map((row, index) => <Fragment key={row.key}><div className={styles.fee}>
     <span className={styles.rank} aria-label={`Displayed fee order position ${index + 1}`}>{index + 1}</span>
-    <div className={styles.feeName}><strong>{row.label}</strong><span className={styles.muted}>{copy.defaultAmount}: {chargeCurrency(row.amountCents)}{row.summary ? ` · ${row.summary}` : ''}</span>{row.cancelled && <span className={styles.status}>{copy.cancelled}</span>}</div>
+    <div className={styles.feeName}><strong>{row.label}</strong><span className={styles.muted}>{copy.defaultAmount}: {chargeCurrency(row.amountCents)}{row.dueAt !== undefined ? ` · ${dueDateCopy.short(row.dueAt)}` : ''}{row.summary ? ` · ${row.summary}` : ''}</span>{row.cancelled && <span className={styles.status}>{copy.cancelled}</span>}</div>
     {row.actions && <div className={styles.feeActions}>
+      {row.actions.dueDate && <Button type="button" variant="outline" aria-expanded={row.actions.dueDateOpen ?? false} aria-label={`${row.dueAt !== undefined ? dueDateCopy.changeAction : dueDateCopy.setAction} for ${row.label}`} onClick={row.actions.dueDate}>{row.dueAt !== undefined ? dueDateCopy.changeAction : dueDateCopy.setAction}</Button>}
       {row.actions.view && <Button type="button" variant="outline" aria-label={`${copy.details} ${row.label}`} onClick={row.actions.view}>{copy.details}</Button>}
       {row.actions.edit && <Button type="button" variant="outline" disabled={disabled} aria-label={`${copy.edit} ${row.label}`} onClick={row.actions.edit}>{copy.edit}</Button>}
       {row.actions.cancel && <Button type="button" variant="outline" disabled={disabled} aria-label={`${copy.cancel} ${row.label}`} onClick={row.actions.cancel}>{copy.cancel}</Button>}
       {row.actions.up && <Button type="button" variant="outline" disabled={disabled} aria-label={`Move ${row.label} up`} onClick={row.actions.up}>{copy.up}</Button>}
       {row.actions.down && <Button type="button" variant="outline" disabled={disabled} aria-label={`Move ${row.label} down`} onClick={row.actions.down}>{copy.down}</Button>}
     </div>}
-  </div>)}</div>
+  </div>{row.below}</Fragment>)}</div>
+}
+
+/**
+ * Set or clear one fee's due date (feeDefinitions.setDueAt). It moves no money and needs no review job;
+ * charges without their own due date use it right away, on Money and on Home.
+ */
+function FeeDueDate({ definition, onClose }: { definition: Doc<'feeDefinitions'>; onClose: () => void }) {
+  const save = useMutation(api.feeDefinitions.setDueAt)
+  const saved = dueDateInput(definition.dueAt)
+  const [date, setDate] = useState(saved)
+  const [busy, setBusy] = useState(false)
+  const [status, setStatus] = useState('')
+  const [error, setError] = useState('')
+  const input = useRef<HTMLInputElement>(null)
+  useEffect(() => { input.current?.focus() }, [])
+  const next = dueAtFromInput(date)
+  const invalid = next !== null && Number.isNaN(next)
+  async function submit(value: number | null) {
+    if (busy) return
+    setBusy(true); setError(''); setStatus('')
+    try { await save({ feeDefinitionId: definition._id, dueAt: value }); setStatus(value === null ? dueDateCopy.cleared : dueDateCopy.saved); if (value === null) setDate('') }
+    catch (cause) { setError(userFacingError(cause, dueDateCopy.failed)) }
+    finally { setBusy(false) }
+  }
+  return <form className={`${styles.form} ${styles.dueDate}`} aria-label={dueDateCopy.feeHeading(definition.label)} onSubmit={event => { event.preventDefault(); if (invalid) { setError(dueDateCopy.invalid); return } if (date !== saved) void submit(next) }}>
+    <strong>{dueDateCopy.feeHeading(definition.label)}</strong>
+    <p className={styles.muted}>{definition.dueAt !== undefined ? dueDateCopy.full(definition.dueAt) : dueDateCopy.none} · {dueDateCopy.feeHint}</p>
+    <label className={styles.field}>{dueDateCopy.label}<Input ref={input} type="date" value={date} disabled={busy} aria-invalid={invalid} onChange={event => { setDate(event.target.value); setStatus(''); setError('') }} /></label>
+    <div className={styles.actions}>
+      <Button type="submit" disabled={busy || invalid || date === saved}>{busy ? dueDateCopy.saving : dueDateCopy.save}</Button>
+      {definition.dueAt !== undefined && <Button type="button" variant="outline" disabled={busy} onClick={() => void submit(null)}>{dueDateCopy.clear}</Button>}
+      <Button type="button" variant="outline" disabled={busy} onClick={onClose}>{dueDateCopy.close}</Button>
+    </div>
+    {status && <p role="status" className={styles.muted}>{status}</p>}
+    {error && <p role="alert" className={styles.error}>{error}</p>}
+  </form>
 }
 
 export function FeeMaintenanceNotice({ state, message, processed }: { state: 'ready' | 'draining' | 'applying' | 'failed'; message?: string; processed?: number }) {
