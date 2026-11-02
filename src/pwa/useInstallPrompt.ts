@@ -1,7 +1,7 @@
 import { useCallback, useSyncExternalStore } from 'react'
-import { isStandalone } from './install'
+import { isStandalone, type InstallOutcome } from './install'
+import { isInstallPromptEvent, runInstallPrompt, type BeforeInstallPromptEvent } from './installBanner'
 
-type BeforeInstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> }
 type InstallState = { prompt: BeforeInstallPromptEvent | null; installed: boolean }
 
 // Chrome/Edge/Android fire beforeinstallprompt once, often before any install UI mounts, so it is captured app-wide.
@@ -14,7 +14,12 @@ let capturing = false
 export function captureInstallPrompt() {
   if (capturing || typeof window === 'undefined') return
   capturing = true
-  window.addEventListener('beforeinstallprompt', event => { event.preventDefault(); update({ prompt: event as BeforeInstallPromptEvent }) })
+  window.addEventListener('beforeinstallprompt', event => {
+    // Only a real prompt counts; a synthetic event without prompt()/userChoice must not turn on the Install button.
+    if (!isInstallPromptEvent(event)) return
+    event.preventDefault()
+    update({ prompt: event })
+  })
   window.addEventListener('appinstalled', () => update({ prompt: null, installed: true }))
 }
 
@@ -24,13 +29,11 @@ const serverState: InstallState = { prompt: null, installed: false }
 /** The deferred install prompt (desktop and Android Chromium) and whether the app is already installed. */
 export function useInstallPrompt() {
   const current = useSyncExternalStore(subscribe, () => state, () => serverState)
-  const install = useCallback(async () => {
+  const install = useCallback(async (): Promise<InstallOutcome> => {
     const prompt = state.prompt
-    if (!prompt) return 'unavailable' as const
+    if (!prompt) return 'unavailable'
     update({ prompt: null }) // A prompt can be shown only once.
-    await prompt.prompt()
-    const { outcome } = await prompt.userChoice
-    return outcome
+    return runInstallPrompt(prompt) // 'unavailable' on error or after the timeout, so callers never stay busy.
   }, [])
   return { canInstall: current.prompt !== null, installed: current.installed || isStandalone(), install }
 }
