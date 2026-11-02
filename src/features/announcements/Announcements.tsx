@@ -12,12 +12,12 @@ import { Input } from '../../components/ui/input'
 import { Textarea } from '../../components/ui/textarea'
 import { chicagoInputTime, parseChicagoInput } from '../../lib/chicago-time'
 import { announcementsCopy as copy } from './copy'
-import { hasPinRoom, type Audience } from './audience'
+import { anyHomeFull, COACH_AUDIENCES, coachOnly, hasPinRoom, TRAVEL_LEAD_AUDIENCES, type Audience } from './audience'
 
 type StaffAnnouncement = FunctionReturnType<typeof api.announcements.listForStaff>['pinned'][number]
 type AnnouncementId = Id<'teamAnnouncements'>
 type ListName = 'pinned' | 'notPinned'
-type Values = { title?: string; body: string; showUntil?: number; pin: boolean; audience: Audience }
+type Values = { title?: string; body: string; showUntil?: number; pin: boolean; audience: Audience; urgent?: boolean }
 
 const TITLE_MAX = 80
 const BODY_MAX = 500
@@ -49,6 +49,7 @@ function AnnouncementForm({ initial, pinned, pinLimit, coach, submitLabel, onSub
   const [date, setDate] = useState(initialDate)
   const [pin, setPin] = useState(true)
   const [audience, setAudience] = useState<Audience>(initial.audience ?? 'students')
+  const [urgent, setUrgent] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState('')
@@ -67,8 +68,8 @@ function AnnouncementForm({ initial, pinned, pinLimit, coach, submitLabel, onSub
     if (showUntil !== undefined && Number.isNaN(showUntil)) { setError(copy.invalidDate); return }
     setBusy(true); setError(''); setDone('')
     try {
-      const message = await onSubmit({ title: title.trim() || undefined, body, showUntil, pin: willPin, audience })
-      if (creating) { setTitle(''); setBody(''); setDate(''); setPin(true); setAudience('students') }
+      const message = await onSubmit({ title: title.trim() || undefined, body, showUntil, pin: willPin, audience, ...(creating && coach && urgent ? { urgent: true } : {}) })
+      if (creating) { setTitle(''); setBody(''); setDate(''); setPin(true); setAudience('students'); setUrgent(false) }
       setDone(message)
     } catch (cause) { setError(userFacingError(cause, copy.failed)) } finally { setBusy(false) }
   }
@@ -77,12 +78,16 @@ function AnnouncementForm({ initial, pinned, pinLimit, coach, submitLabel, onSub
     <label className="grid gap-2 font-semibold">{copy.titleLabel}<Input ref={titleInput} value={title} maxLength={TITLE_MAX} disabled={busy} onChange={event => { setTitle(event.target.value); setDone('') }}/></label>
     <label className="grid gap-2 font-semibold">{copy.messageLabel}<Textarea value={body} required maxLength={BODY_MAX} rows={4} disabled={busy} aria-describedby={`${id}-count`} onChange={event => { setBody(event.target.value); setDone('') }}/></label>
     <p id={`${id}-count`} className="-mt-2 text-sm text-muted-foreground">{copy.characters(body.length, BODY_MAX)}</p>
-    {coach && <label className="grid gap-2 font-semibold">{copy.audienceLabel}<select className="min-h-11 rounded-md border border-input bg-background px-3 text-foreground" value={audience} disabled={busy} onChange={event => { setAudience(event.target.value as Audience); setDone('') }}><option value="students">{copy.audiences.students}</option><option value="parents">{copy.audiences.parents}</option><option value="both">{copy.audiences.both}</option></select></label>}
+    <label className="grid gap-2 font-semibold">{copy.audienceLabel}<select className="min-h-11 rounded-md border border-input bg-background px-3 text-foreground" value={audience} disabled={busy} onChange={event => { setAudience(event.target.value as Audience); setDone('') }}>{(coach ? COACH_AUDIENCES : TRAVEL_LEAD_AUDIENCES).map(value => <option key={value} value={value}>{copy.audiences[value]}</option>)}</select></label>
     <label className="grid gap-2 font-semibold">{copy.showUntilLabel}<Input type="date" value={date} min={date !== initialDate ? chicagoDate(Date.now()) : undefined} disabled={busy} aria-describedby={`${id}-until`} onChange={event => { setDate(event.target.value); setDone('') }}/></label>
     <p id={`${id}-until`} className="-mt-2 text-sm text-muted-foreground">{copy.showUntilHint}</p>
     {creating && <>
       <label className="flex min-h-11 items-center gap-3"><Checkbox className="size-6" checked={willPin} disabled={busy || !pinAvailable} aria-describedby={pinAvailable ? undefined : `${id}-limit`} onCheckedChange={setPin}/><span>{copy.pinLabel}</span></label>
       {!pinAvailable && <p id={`${id}-limit`} className="-mt-2 text-sm text-muted-foreground">{copy.limitReached}</p>}
+      {coach && <>
+        <label className="flex min-h-11 items-center gap-3"><Checkbox className="size-6" checked={urgent} disabled={busy} aria-describedby={`${id}-urgent`} onCheckedChange={setUrgent}/><span>{copy.urgentLabel}</span></label>
+        <p id={`${id}-urgent`} className="-mt-2 text-sm text-muted-foreground">{copy.urgentHint}</p>
+      </>}
     </>}
     {error && <p role="alert" className="open-text">{error}</p>}
     {done && <p role="status" className="ready-text">{done}</p>}
@@ -125,7 +130,7 @@ function AnnouncementItem({ row, list, pinned, pinLimit, coach, editing, setEdit
 
   // Repeated buttons carry the message in their accessible name ("Edit: Kickoff").
   const context = <span className="sr-only">: {shortLabel(row)}</span>
-  if (editing && (coach || row.audience === 'students')) return <li className="grid gap-3 border-b border-border py-4 last:border-b-0">
+  if (editing && (coach || !coachOnly(row.audience))) return <li className="grid gap-3 border-b border-border py-4 last:border-b-0">
     <h3 className="mb-0">{copy.editHeading}</h3>
     <AnnouncementForm initial={row} coach={coach} pinLimit={pinLimit} submitLabel={copy.saveChanges} onCancel={() => setEditing(false)} onSubmit={async values => {
       await update({ id: row.id, title: values.title, body: values.body, showUntil: values.showUntil, audience: values.audience })
@@ -144,7 +149,7 @@ function AnnouncementItem({ row, list, pinned, pinLimit, coach, editing, setEdit
     </p>
     {expired && row.showUntil !== null && <p className="mb-0 text-sm open-text">{copy.hiddenSince(formatDate(row.showUntil))}</p>}
     {error && <p role="alert" className="mb-0 open-text">{error}</p>}
-    {(coach || row.audience === 'students') && <div className="flex flex-wrap gap-2">
+    {(coach || !coachOnly(row.audience)) && <div className="flex flex-wrap gap-2">
       {row.pinned
         ? <Button type="button" variant="outline" disabled={busy} onClick={() => void move(() => unpin({ id: row.id }), copy.unpinnedDone)}>{copy.unpin}{context}</Button>
         : <Button type="button" variant="outline" disabled={busy || !hasPinRoom(pinned, row.audience, pinLimit)} onClick={() => void move(() => pin({ id: row.id }), copy.pinnedDone)}>{copy.pin}{context}</Button>}
@@ -208,7 +213,7 @@ export function Announcements({ coach }: { coach: boolean }) {
     </CardContent></Card>
     {status && <p role="status" className="ready-text">{status}</p>}
     <AnnouncementList {...shared} title={copy.pinnedHeading(list.pinned.length, list.pinLimit)} rows={list.pinned} list="pinned" empty={copy.noPinned} headingRef={pinnedHeading}>
-      {(!hasPinRoom(list.pinned, 'students', list.pinLimit) || !hasPinRoom(list.pinned, 'parents', list.pinLimit)) && <CardDescription>{copy.limitReached}</CardDescription>}
+      {anyHomeFull(list.pinned, list.pinLimit) && <CardDescription>{copy.limitReached}</CardDescription>}
     </AnnouncementList>
     <AnnouncementList {...shared} title={copy.notPinnedHeading(list.notPinned.length)} rows={list.notPinned} list="notPinned" empty={copy.noNotPinned} headingRef={notPinnedHeading}>
       {list.moreNotPinned && <CardDescription>{copy.moreNotPinned(list.notPinned.length)}</CardDescription>}

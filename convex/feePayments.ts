@@ -7,6 +7,7 @@ import { effectiveChargeCents } from "./lib/chargeObligation";
 import { cents, financialAccount, readyFinancialAccount, recordChargeChange, recordProjectedEntry } from "./lib/financialSources";
 import { refreshStudentFinance } from "./lib/financeSummaries";
 import { requireSeasonFinanceReady } from "./lib/seasonFinance";
+import { queueMoneyDigest } from "./lib/digest";
 
 const method = v.union(v.literal("cash"), v.literal("check"), v.literal("other"));
 const filter = v.union(v.literal("all"), v.literal("paid"), v.literal("unpaid"));
@@ -157,6 +158,7 @@ export const recordRow = mutation({
     await refreshStudentFinance(ctx, item.studentId);
     await ctx.db.insert("feePaymentRows", { batchId: batch._id, rowKey: item.rowKey, receiptId, allocationId, recordedBy: actor._id, recordedAt: now });
     await audit(ctx, actor, "charges", charge._id, "recordFeeSpecificPayment", { appliedCents: previousApplied }, { appliedCents: charge.appliedCents, receiptId, exportId: batch.exportId, rowKey: item.rowKey }, reason);
+    await queueMoneyDigest(ctx, item.studentId, "payment");
     return { receiptId, replayed: false };
   },
 });

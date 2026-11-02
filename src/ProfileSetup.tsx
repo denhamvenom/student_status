@@ -1,6 +1,5 @@
 import { userFacingError } from '@/lib/error-message'
 import { useState, type FormEvent } from 'react'
-import { useAuthActions } from '@convex-dev/auth/react'
 import { useMutation, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { api } from '../convex/_generated/api'
@@ -9,6 +8,7 @@ import { Input } from './components/ui/input'
 import { Button } from './components/ui/button'
 import { accountCopy } from './lib/account-copy'
 import { liveCopy } from './lib/live-copy'
+import { useSignOut } from './notifications/useSignOut'
 import { normalizeChangedEmail, normalizeChangedPhone } from '../shared/contact-format'
 
 const copy = accountCopy.setup
@@ -19,7 +19,7 @@ export function ProfileSetup() {
   return <SetupForm key={`${profile.studentId}:${profile.revision}`} profile={profile}/>
 }
 function SetupForm({ profile }: { profile: Profile }) {
-  const { signOut } = useAuthActions()
+  const signOut = useSignOut()
   const [step, setStep] = useState(0)
   const complete = useMutation(api.profileSetup.complete)
   const [preferred, setPreferred] = useState(profile.preferredName)

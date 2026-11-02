@@ -12,6 +12,7 @@ import { Checkbox } from './components/ui/checkbox'
 import { NativeSelect, NativeSelectOption } from './components/ui/native-select'
 import styles from './features/operations/Operations.module.css'
 import { chargeCurrency } from './lib/charge-money'
+import { dueAtFromInput, dueDateCopy } from './copy/due-date-copy'
 
 const usd = chargeCurrency
 const message = (error:unknown) => userFacingError(error)
@@ -110,6 +111,7 @@ export function ChargeEditor({studentId}:{studentId:Id<'students'>}) {
   const [label,setLabel] = useState('')
   const [amount,setAmount] = useState('')
   const [priority,setPriority] = useState('')
+  const [dueDate,setDueDate] = useState('')
   const [busy,setBusy] = useState(false)
   const [error,setError] = useState('')
   const [saved,setSaved] = useState(false)
@@ -117,14 +119,18 @@ export function ChargeEditor({studentId}:{studentId:Id<'students'>}) {
   const changed = () => {pending.current.key=null;setError('');setSaved(false)}
   const cents = exactCents(amount)
   const priorityNumber = Number(priority)
-  const valid = label.trim().length>0 && Number.isSafeInteger(cents) && cents>0 && Number.isSafeInteger(priorityNumber) && priority.trim()!==''
-  const submit = async (event:FormEvent) => {event.preventDefault();if(!valid||pending.current.busy)return;const idempotencyKey=pending.current.key??key();pending.current.key=idempotencyKey;pending.current.busy=true;setBusy(true);setError('');setSaved(false);try{await create({studentId,...(eventId?{eventId:eventId as Id<'events'>,category}:{}),label:label.trim(),amountCents:cents,priority:priorityNumber,idempotencyKey});pending.current.key=null;setLabel('');setAmount('');setSaved(true)}catch(e){setError(message(e))}finally{pending.current.busy=false;setBusy(false)}}
+  const dueAt = dueAtFromInput(dueDate)
+  const dueInvalid = Number.isNaN(dueAt)
+  const valid = label.trim().length>0 && Number.isSafeInteger(cents) && cents>0 && Number.isSafeInteger(priorityNumber) && priority.trim()!=='' && !dueInvalid
+  const submit = async (event:FormEvent) => {event.preventDefault();if(!valid||pending.current.busy)return;const idempotencyKey=pending.current.key??key();pending.current.key=idempotencyKey;pending.current.busy=true;setBusy(true);setError('');setSaved(false);try{await create({studentId,...(eventId?{eventId:eventId as Id<'events'>,category}:{}),label:label.trim(),amountCents:cents,priority:priorityNumber,...(dueAt!==null?{dueAt}:{}),idempotencyKey});pending.current.key=null;setLabel('');setAmount('');setDueDate('');setSaved(true)}catch(e){setError(message(e))}finally{pending.current.busy=false;setBusy(false)}}
   return <section className={`${styles.root} card`} aria-labelledby="charge-editor-title"><h2 id="charge-editor-title">{operationsCopy.withdrawals.addACharge}</h2><p>{operationsCopy.withdrawals.classifyEventChargesAsTheMainEventTravelFeeOrAnExtraSuchAsLunchOutstandingCredit}</p><form className="form-grid" onSubmit={e=>void submit(e)}>
     <label>{operationsCopy.withdrawals.eventLabel} <NativeSelect value={eventId} disabled={busy} onChange={e=>{changed();setEventId(e.target.value)}}><NativeSelectOption value="">{operationsCopy.withdrawals.standaloneCharge}</NativeSelectOption>{events?.map(row=><NativeSelectOption key={row.event._id} value={row.event._id}>{row.event.name}</NativeSelectOption>)}</NativeSelect></label>
     {eventId && <label>{operationsCopy.withdrawals.feeCategory} <NativeSelect value={category} disabled={busy} onChange={e=>{changed();setCategory(e.target.value as typeof category)}}><NativeSelectOption value="main">{operationsCopy.withdrawals.mainEventTravel}</NativeSelectOption><NativeSelectOption value="extra">{operationsCopy.withdrawals.extra}</NativeSelectOption></NativeSelect></label>}
     <label>{operationsCopy.withdrawals.chargeLabel} <Input value={label} disabled={busy} maxLength={150} onChange={e=>{changed();setLabel(e.target.value)}} required placeholder={operationsCopy.withdrawals.lunch}/></label>
     <label>{operationsCopy.withdrawals.amountUsd} <Input type="text" inputMode="decimal" value={amount} disabled={busy} onChange={e=>{changed();setAmount(e.target.value)}} required placeholder="0.00"/></label>
     <label>{operationsCopy.withdrawals.priority} <Input type="number" step="1" value={priority} disabled={busy} onChange={e=>{changed();setPriority(e.target.value)}} required/></label>
+    <label>{dueDateCopy.label} <Input type="date" value={dueDate} disabled={busy} aria-invalid={dueInvalid} onChange={e=>{changed();setDueDate(e.target.value)}}/></label>
+    {dueInvalid && <p role="alert">{dueDateCopy.invalid}</p>}
     <Button className="button button-primary" type="submit" disabled={busy||!valid}>{busy?operationsCopy.withdrawals.saving:operationsCopy.withdrawals.addCharge}</Button>
     {saved && <p role="status">{operationsCopy.withdrawals.chargeRecorded}</p>}{error && <p role="alert" className="open-text">{error}</p>}
   </form></section>

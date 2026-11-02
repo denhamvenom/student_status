@@ -4,7 +4,6 @@ import { observeStickyHeader } from './lib/sticky-header'
 import { phoneLabel, uiCopy } from './lib/ui-copy'
 import { menu, navigationCopy, staysOnCurrentGroup } from './lib/navigation-copy'
 import { useState, useRef, useLayoutEffect, type ReactNode } from 'react'
-import { useAuthActions } from '@convex-dev/auth/react'
 import { useMutation } from 'convex/react'
 import { Link, useLocation } from 'react-router'
 import { useTheme } from 'next-themes'
@@ -15,6 +14,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './co
 import { readinessCopy as copy } from './features/design-review/readinessCopy'
 import styles from './features/design-review/ReadinessReview.module.css'
 import { StudentShell } from './components/student-shell/StudentShell'
+import { OfflineBanner } from './pwa/OfflineBanner'
+import { NotificationBell, NotificationSync, useSignOut } from './notifications'
 type ShellViewer = { user: { name: string; email: string } | null; season: { name: string } | null }
 export { menu }
 export const primaryPaths:Record<string,string[]>={student:['/','/events','/finances','/profile'],parent:['/','/events','/forms','/finances'],coach:['/','/events','/readiness','/finances'],travelLead:['/readiness','/events','/','/drivers'],mentor:['/','/report','/settings']}
@@ -26,7 +27,7 @@ export function AppShell({ children, viewer, familyContext, role = "coach" }: { 
   useLayoutEffect(()=>{if(role!=='student'&&role!=='parent')return;const root=document.documentElement;root.dataset.design='student';return()=>{delete root.dataset.design}},[role])
   const { theme, resolvedTheme, setTheme } = useTheme()
   const saveTheme = useMutation(api.app.setTheme)
-  const { signOut } = useAuthActions()
+  const signOut = useSignOut()
   const [more, setMore] = useState(false)
   const { pathname } = useLocation()
   const activePath = pathname.startsWith('/events/archive') ? '/events/archive' : pathname.startsWith('/events/') ? '/events' : role === 'coach' && (pathname === '/team' || pathname.startsWith('/team/')) || role === 'mentor' && pathname === '/myprofile' ? '/' : pathname
@@ -40,7 +41,7 @@ export function AppShell({ children, viewer, familyContext, role = "coach" }: { 
     setTheme(next); setThemeError('')
     try { await saveTheme({ theme: next }) } catch (cause) { setTheme(theme ?? 'system'); setThemeError(userFacingError(cause, copy.themeFailed)) }
   }
-  if (role === 'student') return <StudentShell userName={viewer.user?.name} familyContext={familyContext} dark={resolvedTheme === 'dark'} onToggleTheme={() => void changeTheme()} onSignOut={() => void exit()} themeError={themeError} signOutError={signOutError}>{children}</StudentShell>
+  if (role === 'student') return <><OfflineBanner/><NotificationSync viewingInbox={pathname === '/inbox'}/><StudentShell userName={viewer.user?.name} familyContext={familyContext} dark={resolvedTheme === 'dark'} onToggleTheme={() => void changeTheme()} onSignOut={() => void exit()} themeError={themeError} signOutError={signOutError}>{children}</StudentShell></>
   const nav = navigationCopy.groups
   const groups: Record<string, [string, string][]> = {
     [nav.team]: [[nav.team, '/'], [nav.joinRequests, '/enroll'], [nav.attendance, '/attendance'], [nav.reports, '/reports']],
@@ -63,8 +64,10 @@ export function AppShell({ children, viewer, familyContext, role = "coach" }: { 
   const roleLabel = role === 'travelLead' ? navigationCopy.travelLeadRole : role[0].toUpperCase() + role.slice(1)
   const icon = (path: string) => path === '/events' ? <Calendar size={21}/> : path === '/finances' ? <DollarSign size={21}/> : path === '/readiness' ? <SquareCheck size={21}/> : path === '/' ? (role === 'mentor' ? <UserRound size={21}/> : staff ? <Users size={21}/> : <Home size={21}/>) : path === '/profile' || path === '/myprofile' ? <UserRound size={21}/> : path === '/settings' ? <Settings size={21}/> : path === '/drivers' ? <Car size={21}/> : <FileText size={21}/>
   return <div ref={shellRef} className={styles.review}>
+    <OfflineBanner/>
+    <NotificationSync viewingInbox={pathname === '/inbox'}/>
     <header ref={headerRef} className={styles.header}>
-      <div className={styles.headerInner}><Link to="/" aria-label={copy.brand} className={styles.brand}><img src="/assets/logos/logo-mark-white-text.png" alt="" /><span className={styles.brandCopy}><span className={styles.wordmark}>{copy.brand}</span><span className={styles.product}>{copy.product} · {viewer.season?.name ?? copy.seasonFallback}</span></span></Link><div className={styles.headerActions}><RoleSwitchButton compact className={styles.headerButton}/><span className={styles.viewerName}><strong>{viewer.user?.name}</strong><small>{roleLabel} · {viewer.user?.email}</small></span><Button type="button" variant="outline" role="switch" aria-checked={resolvedTheme === 'dark'} className={styles.headerButton} onClick={() => void changeTheme()} aria-label={copy.themeLabel(resolvedTheme === 'dark')}><Moon size={18} aria-hidden="true"/><span className={styles.themeTrack}><span className={styles.themeKnob}/></span></Button><Button type="button" variant="outline" className={`${styles.headerButton} ${styles.signOut}`} onClick={() => void exit()}>{nav.signOut}</Button></div></div>
+      <div className={styles.headerInner}><Link to="/" aria-label={copy.brand} className={styles.brand}><img src="/assets/logos/logo-mark-white-text.png" alt="" /><span className={styles.brandCopy}><span className={styles.wordmark}>{copy.brand}</span><span className={styles.product}>{copy.product} · {viewer.season?.name ?? copy.seasonFallback}</span></span></Link><div className={styles.headerActions}><NotificationBell className={styles.headerButton}/><RoleSwitchButton compact className={styles.headerButton}/><span className={styles.viewerName}><strong>{viewer.user?.name}</strong><small>{roleLabel} · {viewer.user?.email}</small></span><Button type="button" variant="outline" role="switch" aria-checked={resolvedTheme === 'dark'} className={styles.headerButton} onClick={() => void changeTheme()} aria-label={copy.themeLabel(resolvedTheme === 'dark')}><Moon size={18} aria-hidden="true"/><span className={styles.themeTrack}><span className={styles.themeKnob}/></span></Button><Button type="button" variant="outline" className={`${styles.headerButton} ${styles.signOut}`} onClick={() => void exit()}>{nav.signOut}</Button></div></div>
       {themeError && <p role="alert" className={styles.themeError}>{themeError}</p>}
       {signOutError && <p role="alert" className={styles.themeError}>{signOutError}</p>}
       {staff ? <><nav className={styles.groupNav} aria-label={navigationCopy.main}><div className={styles.navInner}>{Object.entries(filteredGroups).map(([label, links]) => <Link key={label} to={links[0][1]} aria-current={group === label ? 'page' : undefined} onClick={event => { if (staysOnCurrentGroup(pathname, links.map(([, path]) => path))) event.preventDefault() }}>{label}</Link>)}</div></nav>

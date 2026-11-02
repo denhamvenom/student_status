@@ -7,6 +7,7 @@ import { activeSeason, requireRole, viewer } from "./lib/access";
 import { effectiveChargeCents } from "./lib/chargeObligation";
 import { tokenHash } from "./lib/invitationIdentity";
 import { requireSeasonFinanceReady, requireNoUnfinishedFeeScopes } from "./lib/seasonFinance";
+import { validDueAt } from "./lib/feeDefinitions";
 export { prepareBulk, previewBulk, commitBulk, cancelPrepared, bulkStatus, bulkRows, bulkJobs, priorHeldRows, retryBulk } from "./feeBulk";
 
 export const prepareMapping = mutation({
@@ -94,10 +95,11 @@ export const retryMapping = mutation({
 });
 
 export const createMappingDefinition = mutation({
-  args: { label: v.string(), kind: v.union(v.literal("eventExtra"), v.literal("custom")), eventId: v.optional(v.id("events")), defaultAmountCents: v.number(), expectedOrderRevision: v.number(), reason: v.string(), idempotencyKey: v.string() }, returns: v.id("feeDefinitions"),
+  args: { label: v.string(), kind: v.union(v.literal("eventExtra"), v.literal("custom")), eventId: v.optional(v.id("events")), defaultAmountCents: v.number(), expectedOrderRevision: v.number(), reason: v.string(), idempotencyKey: v.string(), dueAt: v.optional(v.number()) }, returns: v.id("feeDefinitions"),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach"); const season = await activeSeason(ctx);
     if (!args.label.trim() || args.label.length > 150 || !Number.isSafeInteger(args.defaultAmountCents) || args.defaultAmountCents < 0 || args.reason.trim().length < 8 || args.reason.length > 1000 || args.idempotencyKey.length < 8 || args.idempotencyKey.length > 150 || (args.kind === "eventExtra") !== !!args.eventId) throw new ConvexError("Enter the fee name, amount, and a reason of at least eight characters.");
+    validDueAt(args.dueAt);
     const originKey = `review:${actor._id}:${args.idempotencyKey}`;
     const existing = await ctx.db.query("feeDefinitions").withIndex("by_seasonId_and_originKey", q => q.eq("seasonId", season._id).eq("originKey", originKey)).unique();
     if (existing) {
@@ -111,10 +113,29 @@ export const createMappingDefinition = mutation({
     const last = await ctx.db.query("feeDefinitions").withIndex("by_seasonId_and_priority", q => q.eq("seasonId", season._id)).order("desc").first();
     const now = Date.now(); const priority = (last?.priority ?? 0) + 1;
     if (!Number.isSafeInteger(priority)) throw new ConvexError("The fee order isn't ready yet. Reload, then try again.");
-    const id = await ctx.db.insert("feeDefinitions", { seasonId: season._id, kind: args.kind, eventId: args.eventId, label: args.label.trim(), defaultAmountCents: args.defaultAmountCents, priority, revision: 0, state: "active", createdBy: actor._id, createdAt: now, updatedAt: now, originKey, originProof: "manual" });
+    const id = await ctx.db.insert("feeDefinitions", { seasonId: season._id, kind: args.kind, eventId: args.eventId, label: args.label.trim(), defaultAmountCents: args.defaultAmountCents, priority, revision: 0, state: "active", createdBy: actor._id, createdAt: now, updatedAt: now, originKey, originProof: "manual", dueAt: args.dueAt });
     await ctx.db.patch(control._id, { revision: control.revision + 1, updatedAt: now });
     await ctx.db.insert("audit", { actorId: actor._id, entity: "feeDefinitions", entityId: id, action: "createMappingDestination", reason: args.reason.trim(), at: now, afterJson: JSON.stringify({ kind: args.kind, label: args.label.trim(), eventId: args.eventId }) });
     return id;
+  },
+});
+
+/** R6: sets or clears a fee definition due date. Charges without their own due date inherit it. Does not change amounts or order. */
+export const setDueAt = mutation({
+  args: { feeDefinitionId: v.id("feeDefinitions"), dueAt: v.union(v.number(), v.null()) }, returns: v.null(),
+  handler: async (ctx, args) => {
+    const actor = await viewer(ctx);
+    if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead && actor.financialEdit)) throw new ConvexError("Only a Coach or a Travel Lead with Money editing access can do this.");
+    validDueAt(args.dueAt);
+    const season = await activeSeason(ctx);
+    const definition = await ctx.db.get(args.feeDefinitionId);
+    if (!definition || definition.seasonId !== season._id || definition.state !== "active") throw new ConvexError("This fee no longer exists. Reload to see the latest.");
+    const dueAt = args.dueAt ?? undefined;
+    if (definition.dueAt === dueAt) return null;
+    const now = Date.now();
+    await ctx.db.patch(definition._id, { dueAt, updatedAt: now });
+    await ctx.db.insert("audit", { actorId: actor._id, entity: "feeDefinitions", entityId: definition._id, action: "setDueAt", at: now, beforeJson: JSON.stringify({ dueAt: definition.dueAt ?? null }), afterJson: JSON.stringify({ dueAt: dueAt ?? null }) });
+    return null;
   },
 });
 

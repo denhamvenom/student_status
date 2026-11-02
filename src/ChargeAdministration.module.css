@@ -13,6 +13,8 @@
 .field{display:grid;gap:5px;min-width:0;font-size:14px;font-weight:600}
 .field :global(input),.field :global(select){min-height:44px;max-width:100%;font-size:16px;border-radius:4px}
 .actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.dueForm{display:flex;align-items:flex-end;flex-wrap:wrap;gap:10px;margin:0}
+.dueForm>label{flex:0 1 220px}
 .root :global([data-slot=button]){min-height:44px;min-width:44px;border-radius:4px;font-weight:700;white-space:normal}
 .root :global([data-slot=button][class*='bg-primary']){background:var(--gold-500);color:var(--primary-foreground)}
 .root :global([data-slot=button][class*='bg-primary']:hover){background:var(--gold-600)}

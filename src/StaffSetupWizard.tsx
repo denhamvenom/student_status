@@ -1,6 +1,5 @@
 import { RoleSwitchButton } from "./RoleChoice"
 import { Component, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import { useAuthActions } from '@convex-dev/auth/react'
 import { useMutation, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { api } from '../convex/_generated/api'
@@ -12,17 +11,19 @@ import { adultProfileCopy } from './lib/adult-profile-copy'
 import { userFacingError } from './lib/error-message'
 import styles from './StaffSetupWizard.module.css'
 import { normalizeChangedPhone } from '../shared/contact-format'
+import { useSignOut } from './notifications/useSignOut'
 
 type Basics = FunctionReturnType<typeof api.adultProfile.ownBasics>
 const steps = ['Contact information', 'Shirt and emergency contact', 'Driving', 'Review your information']
 
+/** Uses the shared bounded sign-out (push cleanup + server sign-out, with a local fallback) so it can never hang. */
 function SignOutButton() {
-  const { signOut } = useAuthActions()
+  const signOut = useSignOut()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   return <><Button type="button" variant="ghost" disabled={busy} onClick={() => {
     setBusy(true); setError('')
-    void signOut().catch(cause => { setError(userFacingError(cause, 'Could not sign out. Please try again.')); setBusy(false) })
+    void signOut().catch(cause => setError(userFacingError(cause, 'Could not sign out. Please try again.'))).finally(() => setBusy(false))
   }}>{busy ? 'Signing out…' : 'Sign out'}</Button>{error && <p role="alert">{error}</p>}</>
 }
 

@@ -7,6 +7,7 @@ import { internalMutation, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { activeSeason, audit, viewer } from "./lib/access";
 import { assignWholeTeamMember } from "./lib/wholeTeam";
+import { notifyEventAssigned } from "./lib/notificationTriggers";
 
 export const status = query({
   args: { eventId: v.id("events") },
@@ -51,6 +52,7 @@ export const processPage = internalMutation({
       const student = await ctx.db.get(member.studentId);
       if (student) await assignWholeTeamMember(ctx, actor, event, student, job._id);
     }
+    await notifyEventAssigned(ctx, { eventId: event._id, studentIds: page.page.map(member => member.studentId) });
     const state = page.isDone ? "complete" as const : "running" as const;
     await ctx.db.patch(job._id, { cursor: page.continueCursor, processed: job.processed + page.page.length, state, updatedAt: Date.now(), lastError: undefined });
     if (page.isDone) {

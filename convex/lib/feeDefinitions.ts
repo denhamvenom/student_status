@@ -1,5 +1,6 @@
 import type { Doc, Id } from "../_generated/dataModel";
-import type { MutationCtx } from "../_generated/server";
+import { ConvexError } from "convex/values";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { seasonFinanceControl } from "./seasonFinance";
 
 export async function provenMainFee(ctx: MutationCtx, charge: Doc<"charges">) {
@@ -34,4 +35,16 @@ export async function chargeFeeDefinition(ctx: MutationCtx, actorId: Id<"appUser
   const result = await ctx.db.get(id);
   if (!result) throw new Error("Fee definition could not be created.");
   return result;
+}
+
+/** R6 due dates: a positive epoch-millisecond instant, or blank. */
+export function validDueAt(dueAt: number | undefined | null) {
+  if (dueAt !== undefined && dueAt !== null && (!Number.isSafeInteger(dueAt) || dueAt <= 0)) throw new ConvexError("Choose a valid due date, or leave it blank.");
+}
+
+/** A charge's own due date wins; otherwise it inherits its fee definition's due date (read-time, so definition edits apply). */
+export async function effectiveChargeDueAt(ctx: QueryCtx | MutationCtx, charge: Doc<"charges">): Promise<number | undefined> {
+  if (charge.dueAt !== undefined) return charge.dueAt;
+  if (!charge.feeDefinitionId) return undefined;
+  return (await ctx.db.get(charge.feeDefinitionId))?.dueAt;
 }

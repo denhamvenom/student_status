@@ -5,8 +5,9 @@ import type { QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { activeSeason, studentAccess, viewer } from "./lib/access";
 import schema from "./schema";
+import { effectiveChargeDueAt } from "./lib/feeDefinitions";
 
-const familyCharge = v.object({_id: v.id("charges"), eventId: v.optional(v.id("events")), label: v.string(), category: v.optional(v.union(v.literal("main"), v.literal("extra"))), cancelledCents: v.optional(v.number()), outstanding: v.optional(v.boolean()), adjustedCents: v.optional(v.number()), amountCents: v.number(), appliedCents: v.number(), priority: v.number(), createdAt: v.number()});
+const familyCharge = v.object({_id: v.id("charges"), eventId: v.optional(v.id("events")), label: v.string(), category: v.optional(v.union(v.literal("main"), v.literal("extra"))), cancelledCents: v.optional(v.number()), outstanding: v.optional(v.boolean()), adjustedCents: v.optional(v.number()), amountCents: v.number(), appliedCents: v.number(), priority: v.number(), createdAt: v.number(), dueAt: v.optional(v.number())});
 const familyHistoryEntry = v.object({_id: v.id("ledgerEntries"), kind: schema.doc("ledgerEntries").fields.kind, amountCents: v.number(), recordedAt: v.number(), method: v.optional(schema.doc("ledgerEntries").fields.method), sourceKind: v.optional(schema.doc("ledgerEntries").fields.sourceKind), destination: v.optional(v.literal("team")), safeDescription: v.string()});
 const staffHistoryEntry = schema.doc("ledgerEntries").extend({safeDescription: v.string()});
 function familyDescription(kind: string, chargeLabel: string | null, destination: "team" | undefined, sourceKind: "payment" | "fundraiser" | undefined) {
@@ -49,8 +50,10 @@ export const charges = query({
     boundRead(args.paginationOpts);
     const result = await ctx.db.query("charges").withIndex("by_studentId_and_priority", q => q.eq("studentId", args.studentId)).paginate(args.paginationOpts);
     if (result.page.length > 25) throw new ConvexError("This list couldn't load. Reload the page to try again.");
-    if (actor.role === "coach" || actor.role === "mentor" && actor.travelLead) return result;
-    return {...result, page: result.page.map(charge => ({_id: charge._id, eventId: charge.eventId, label: charge.label, category: charge.category, cancelledCents: charge.cancelledCents, outstanding: charge.outstanding, adjustedCents: charge.adjustedCents, amountCents: charge.amountCents, appliedCents: charge.appliedCents, priority: charge.priority, createdAt: charge.createdAt}))};
+    // dueAt is the effective due date: the charge's own, else its fee definition's.
+    const page = await Promise.all(result.page.map(async charge => ({charge, dueAt: await effectiveChargeDueAt(ctx, charge)})));
+    if (actor.role === "coach" || actor.role === "mentor" && actor.travelLead) return {...result, page: page.map(({charge, dueAt}) => ({...charge, dueAt}))};
+    return {...result, page: page.map(({charge, dueAt}) => ({_id: charge._id, eventId: charge.eventId, label: charge.label, category: charge.category, cancelledCents: charge.cancelledCents, outstanding: charge.outstanding, adjustedCents: charge.adjustedCents, amountCents: charge.amountCents, appliedCents: charge.appliedCents, priority: charge.priority, createdAt: charge.createdAt, dueAt}))};
   },
 });
 

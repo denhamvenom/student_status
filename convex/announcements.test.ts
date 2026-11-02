@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createTest } from "../testUtils";
 import { api } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -294,5 +294,40 @@ describe("listForStaff", () => {
     expect(list.notPinned.map(row => row.id)).toEqual(unpinned.slice(2).reverse());
     expect(list).toMatchObject({ moreNotPinned: true, pinLimit: 5 });
     expect(list.notPinned[0]).toEqual({ id: unpinned[21], audience: "students", title: null, body: "Note 22", authorName: "Casey Coach", authorRole: "coach", pinned: false, pinnedAt: null, showUntil: null, createdAt: 22, updatedAt: 1 });
+  });
+});
+
+describe("staff and everyone audiences", () => {
+  it("routes Staff and Everyone pins to the right homes and writes", async () => {
+    const f = await fixture();
+    const staff = await f.lead.mutation(api.announcements.create, { body: "Synthetic staff notice", audience: "staff", pin: true });
+    const everyone = await f.coach.mutation(api.announcements.create, { body: "Synthetic team notice", audience: "everyone", pin: true });
+    await expect(f.lead.mutation(api.announcements.create, { body: "Blocked", audience: "everyone", pin: false })).rejects.toThrow("Only a Coach");
+    await expect(f.lead.mutation(api.announcements.create, { body: "Blocked", audience: "staff", pin: false, urgent: true })).rejects.toThrow("Only a Coach");
+    const ids = (rows: { id: Id<"teamAnnouncements"> }[]) => rows.map(row => row.id).sort();
+    for (const client of [f.coach, f.lead, f.mentor, f.parentAsLead]) expect(ids(await client.query(api.announcements.pinnedForStaffHome, {}))).toEqual([staff, everyone].sort());
+    expect(ids(await f.student.query(api.announcements.pinnedForHome, {}))).toEqual([everyone]);
+    expect(ids(await f.coach.query(api.announcements.pinnedForParentHome, {}))).toEqual([everyone]);
+    for (const client of [f.student, f.parent, f.parentAsParent]) await expect(client.query(api.announcements.pinnedForStaffHome, {})).rejects.toThrow("unavailable");
+    expect((await f.coach.query(api.announcements.listForStaff, {})).pinned.map(row => row.audience)).toEqual(["everyone", "staff"]);
+  });
+
+  it("notifies the targeted audience once, never the author", async () => {
+    vi.useFakeTimers();
+    try {
+      const f = await fixture();
+      const recipients = async (id: Id<"teamAnnouncements">) => {
+        vi.runOnlyPendingTimers(); await f.t.finishInProgressScheduledFunctions();
+        return f.t.run(async ctx => (await ctx.db.query("notifications").take(100)).filter(row => row.dedupeKey?.endsWith(`announcement:${id}`)).map(row => row.userId).sort());
+      };
+      const staff = await f.coach.mutation(api.announcements.create, { title: "Staff meeting", body: "Synthetic staff notice", audience: "staff", pin: false, urgent: true });
+      expect(await recipients(staff)).toEqual([f.ids.lead.app, f.ids.mentor.app, f.ids.parentLead.app].sort());
+      const rows = await f.t.run(async ctx => (await ctx.db.query("notifications").take(100)).filter(row => row.userId === f.ids.mentor.app));
+      expect(rows.map(row => [row.title, row.category, row.urgent, row.url])).toEqual([["Staff meeting", "announcements", true, "/"]]);
+      const students = await f.lead.mutation(api.announcements.create, { body: "Synthetic student notice", pin: false });
+      expect(await recipients(students)).toEqual([f.ids.student.app]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -4,6 +4,7 @@ import { paginationOptsValidator, paginationResultValidator } from "convex/serve
 import { mutation, query } from "./_generated/server";
 import { activeSeason, audit, ownStudent, studentAccess, viewer } from "./lib/access";
 import { markRoomCategoryReview } from "./lib/profileCorrections";
+import { queueProfileCorrectionDigest } from "./lib/notificationTriggers";
 
 const category = v.union(v.literal("Boys"), v.literal("Girls"));
 const sizes = ["XS", "S", "M", "L", "XL", "2XL", "3XL"];
@@ -53,6 +54,7 @@ export const requestCorrection = mutation({
     }
     const id = await ctx.db.insert("profileCorrectionRequests", { studentId: student._id, seasonId: student.seasonId, field: args.field, requestedBy: actor._id, requestedAt: Date.now(), note: args.note.trim(), status: "pending" });
     await audit(ctx, actor, "profileCorrectionRequests", id, "request", null, { field: args.field });
+    await queueProfileCorrectionDigest(ctx);
     return id;
   },
 });

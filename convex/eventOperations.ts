@@ -8,6 +8,7 @@ import { activeSeason, audit, viewer } from "./lib/access";
 import { addCharge } from "./lib/money";
 import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
 import { activeQuestions, activeShifts, clearShifts } from "./lib/eventSignupExtras";
+import { notifySignupDecision } from "./lib/notificationTriggers";
 
 function requireOperations(user: Doc<"appUsers">) {
   if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Only a Coach or Travel Lead can manage events.");
@@ -65,6 +66,7 @@ export const reviewSignup = mutation({
       await ctx.db.patch(participant._id, { status: "withdrawn", updatedAt: Date.now() });
       await clearShifts(ctx, event._id, participant.studentId);
       await audit(ctx, user, "participants", participant._id, "declineSignup", participant.status, "withdrawn", args.reason.trim());
+      await notifySignupDecision(ctx, { eventId: event._id, studentId: student._id, decision: "decline" });
       return null;
     }
     if (args.decision === "approve" && participant.status !== "pending") throw new ConvexError("Only signups Waiting for approval can be approved. Reload to see the latest.");
@@ -78,6 +80,7 @@ export const reviewSignup = mutation({
     await ctx.db.patch(participant._id, { status: "confirmed", updatedAt: Date.now() });
     if (event.feeCents > 0) await addCharge(ctx, user, student._id, event.name, event.feeCents, event.startsAt, `eventFee:${event._id}:${student._id}`, event._id);
     await audit(ctx, user, "participants", participant._id, args.decision === "promote" ? "promoteWaitlist" : "approveSignup", participant.status, "confirmed", args.reason?.trim());
+    await notifySignupDecision(ctx, { eventId: event._id, studentId: student._id, decision: args.decision });
     return null;
   },
 });

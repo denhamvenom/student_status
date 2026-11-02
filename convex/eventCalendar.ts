@@ -9,6 +9,7 @@ import { hashId, serviceToken } from "./lib/calendarAuth";
 import { chicagoDate, chicagoMidnight } from "./lib/calendarDates";
 import { timeclockTransitionLocked } from "./lib/timeclockTransition";
 import { eventLocation } from "./lib/transportation";
+import { notifyEventScheduleChange } from "./lib/notificationTriggers";
 
 const calendarBase = "https://www.googleapis.com/calendar/v3/calendars/";
 const mediaMarker = "Media Support Requested";
@@ -173,6 +174,7 @@ export const update = mutation({
     await ctx.db.patch(event._id, { name, destination, startsAt, endsAt, ...safeDeadlines(event, startsAt), mediaSupportRequested: args.mediaSupportRequested ?? event.mediaSupportRequested ?? false, cancelled: args.cancelled ?? event.cancelled ?? false, ...(event.calendarChoice ? { calendarSyncState: "pending" as const, calendarSyncError: undefined, calendarRevision: revision, calendarActorId: actor._id } : {}) });
     if (endsAt !== event.endsAt) await scheduleEventArchive(ctx, event._id);
     if (args.cancelled && !event.cancelled) await ctx.runMutation(internal.eventEnrollment.stopCancelledEnrollment, { eventId: event._id });
+    await notifyEventScheduleChange(ctx, event);
     if (event.calendarChoice) await ctx.scheduler.runAfter(0, internal.eventCalendar.push, { eventId: event._id, revision });
     await audit(ctx, actor, "events", event._id, "updateCalendarDetails", { name: event.name, destination: event.destination, startsAt: event.startsAt, endsAt: event.endsAt, mediaSupportRequested: event.mediaSupportRequested, cancelled: event.cancelled }, { name, destination, startsAt, endsAt, mediaSupportRequested: args.mediaSupportRequested ?? event.mediaSupportRequested, cancelled: args.cancelled ?? event.cancelled });
     return null;
@@ -213,6 +215,7 @@ export const finishPush = internalMutation({ args: { eventId: v.id("events"), re
     await ctx.db.patch(event._id, { calendarEventId: args.calendarEventId ?? event.calendarEventId, calendarEtag: args.etag, calendarProviderUpdatedAt: args.providerUpdatedAt ?? event.calendarProviderUpdatedAt, calendarSyncState: "synced", calendarSyncError: undefined, calendarLinkReplaceable: undefined, calendarReconcileOnRetry: undefined, calendarRevision: args.revision + (observed ? 1 : 0), ...(observed ? { name: observed.title, destination: observedLocation, startsAt: observed.startsAt, endsAt: observed.endsAt, ...safeDeadlines(event, observed.startsAt), cancelled: observed.cancelled, mediaSupportRequested: observed.media, calendarAllDayStartDate: observed.startDate, calendarAllDayEndDate: observed.endDate, calendarRecurring: observed.recurring } : {}) });
     if (observed && observed.endsAt !== event.endsAt) await scheduleEventArchive(ctx, event._id);
     if (observed?.cancelled && !event.cancelled) await ctx.runMutation(internal.eventEnrollment.stopCancelledEnrollment, { eventId: event._id });
+    if (observed) await notifyEventScheduleChange(ctx, event);
   }
   return null;
 } });
@@ -382,5 +385,6 @@ export const applyObserved = internalMutation({ args: observedArgs, returns: v.n
   await ctx.db.patch(event._id, { name: title, destination: location, startsAt: args.start ?? event.startsAt, endsAt: args.end ?? event.endsAt, ...safeDeadlines(event, args.start ?? event.startsAt), cancelled: args.cancelled, mediaSupportRequested: args.cancelled ? event.mediaSupportRequested : args.description.split(/\r?\n/).some(line => line.trim() === mediaMarker), calendarAllDayStartDate: args.cancelled ? event.calendarAllDayStartDate : args.allDayStartDate, calendarAllDayEndDate: args.cancelled ? event.calendarAllDayEndDate : args.allDayEndDate, calendarRecurring: args.cancelled ? event.calendarRecurring : args.recurring, calendarEtag: args.etag, calendarProviderUpdatedAt: args.providerUpdatedAt ?? event.calendarProviderUpdatedAt, calendarRevision: (event.calendarRevision ?? 0) + 1, calendarSyncError: undefined });
     if (args.end !== undefined && args.end !== event.endsAt) await scheduleEventArchive(ctx, event._id);
   if (args.cancelled && !event.cancelled) await ctx.runMutation(internal.eventEnrollment.stopCancelledEnrollment, { eventId: event._id });
+  await notifyEventScheduleChange(ctx, event);
   return null;
 } });

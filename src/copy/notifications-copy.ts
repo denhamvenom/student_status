@@ -1,0 +1,76 @@
+// Notifications, Inbox and install copy. Plain language for families: no "push", "subscription" or browser jargon.
+
+const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`
+
+export const notificationsCopy = {
+  section: {
+    title: 'Notifications & app',
+    description: 'Get a message on this phone or computer when something changes, like a canceled meeting or a form to sign.',
+  },
+  enable: {
+    turnOn: 'Turn on notifications',
+    turningOn: 'Turning on…',
+    turnOnHelp: 'Your phone or browser will ask you to allow notifications. Choose Allow.',
+    turnOnFailed: 'Notifications could not be turned on. Please try again.',
+    turnedOn: 'Notifications are on for this device',
+    onFor: (label: string) => `Notifications are on for this device (${label}).`,
+    sendTest: 'Send a test',
+    testSent: 'Test sent. It should appear in a few seconds.',
+    testFailed: 'The test could not be sent. Please try again.',
+    turnOff: 'Turn off on this device',
+    turnedOff: 'Notifications are off for this device',
+    turnOffFailed: 'Notifications could not be turned off. Please try again.',
+    checking: 'Checking this device…',
+    notReady: 'Notifications aren’t set up for the team yet. New messages will still show in your Inbox.',
+    unsupported: 'This browser can’t receive notifications. New messages will still show in your Inbox.',
+    iosHomeScreen: 'To get notifications on an iPhone or iPad, first add Venom Status to your Home Screen, then open it from there and come back to Settings.',
+    blockedTitle: 'Notifications are blocked',
+    blocked: 'Notifications are blocked — turn them on in your browser/phone settings, then come back to this page.',
+    blockedSteps: {
+      ios: ['Open the Settings app.', 'Tap Notifications, then Venom Status.', 'Turn on Allow Notifications.'],
+      android: ['Press and hold the Venom Status icon, then tap App info (or tap the icon next to the web address in your browser).', 'Tap Notifications.', 'Turn notifications on.'],
+      desktop: ['Click the icon just left of the web address at the top of the browser.', 'Find Notifications and choose Allow.', 'Reload this page.'],
+    },
+  },
+  preferences: {
+    title: 'What to send me',
+    description: 'Choose which messages you get. Everything still shows in your Inbox.',
+    urgent: 'Urgent',
+    saveFailed: 'That change could not be saved. Please try again.',
+    loading: 'Loading your choices…',
+  },
+  devices: {
+    title: 'Your devices',
+    description: 'Phones and computers where you get notifications.',
+    none: 'No devices yet. Turn on notifications above to add this one.',
+    thisDevice: 'This device',
+    added: (date: string) => `Added ${date}`,
+    remove: 'Remove',
+    removeLabel: (label: string) => `Remove ${label}`,
+    removed: 'Device removed',
+    removeFailed: 'The device could not be removed. Please try again.',
+  },
+  inbox: {
+    title: 'Inbox',
+    description: 'Messages from the team, newest first.',
+    loading: 'Loading messages…',
+    empty: 'You’re all caught up. New messages from the team will show up here.',
+    markAll: 'Mark all as read',
+    marking: 'Marking…',
+    markFailed: 'Messages could not be marked as read. Please try again.',
+    loadMore: 'Load more',
+    loadingMore: 'Loading…',
+    unread: 'Unread',
+  },
+  bell: {
+    label: 'Inbox',
+    labelWithCount: (count: string) => `Inbox, ${count} unread`,
+  },
+  time: {
+    justNow: 'Just now',
+    minutes: (count: number) => `${count} min ago`,
+    hours: (count: number) => `${count} hr ago`,
+    yesterday: 'Yesterday',
+    days: (count: number) => `${plural(count, 'day')} ago`,
+  },
+} as const

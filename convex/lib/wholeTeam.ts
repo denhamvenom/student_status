@@ -2,6 +2,9 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { audit } from "./access";
 import { addCharge, addCharges, type ChargeDraft } from "./money";
+import { makeFunctionReference } from "convex/server";
+
+const notifyAssignedRef = makeFunctionReference<"mutation", { studentId: Id<"students">; eventIds: Id<"events">[] }, null>("participation:notifyWholeTeamAssigned");
 
 /** Enrollment is additive: existing participation and reviewed withdrawals retain their history. */
 async function enrollWholeTeamMember(ctx: MutationCtx, actor: Doc<"appUsers">, event: Doc<"events">, student: Doc<"students">) {
@@ -31,8 +34,13 @@ export async function syncWholeTeamMembership(ctx: MutationCtx, actor: Doc<"appU
   const events = await ctx.db.query("events").withIndex("by_seasonId_and_assignmentScope_and_archived_and_startsAt", q => q.eq("seasonId", student.seasonId).eq("assignmentScope", "wholeTeam").eq("archived", false).gt("startsAt", now)).take(101);
   if (events.length > 100) throw new Error("Whole Team event limit reached; membership update stopped safely.");
   const drafts: ChargeDraft[] = [];
+  const added: Id<"events">[] = [];
   for (const event of events) {
-    if (await enrollWholeTeamMember(ctx, actor, event, student) && event.feeCents > 0) drafts.push({ label: event.name, amountCents: event.feeCents, priority: event.startsAt, idempotencyKey: `eventFee:${event._id}:${student._id}`, eventId: event._id });
+    if (!await enrollWholeTeamMember(ctx, actor, event, student)) continue;
+    added.push(event._id);
+    if (event.feeCents > 0) drafts.push({ label: event.name, amountCents: event.feeCents, priority: event.startsAt, idempotencyKey: `eventFee:${event._id}:${student._id}`, eventId: event._id });
   }
   if (drafts.length) await addCharges(ctx, actor, student._id, drafts, `auto:${drafts[0].idempotencyKey}`);
+  // Only events this call newly enrolled the student in, sent in the background so a roster change stays a bounded write.
+  if (added.length) await ctx.scheduler.runAfter(0, notifyAssignedRef, { studentId: student._id, eventIds: added });
 }

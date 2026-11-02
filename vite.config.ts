@@ -3,17 +3,14 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath, URL } from "node:url";
 
-// Development-only developer sign-in must never reach a production bundle, however the build is started.
+// Development-only developer sign-in must never reach any `vite build` output, whatever the mode or NODE_ENV.
 // See docs/DECISIONS.md "Developer sign-in".
 const forbiddenInProduction = ["developer-sign-in-panel", "developerSignIn", "Developer sign-in"];
 function excludeDeveloperSignIn(): Plugin {
-  let production = false;
   return {
     name: "exclude-developer-sign-in",
     apply: "build",
-    configResolved(config) { production = config.isProduction; },
     generateBundle(_options, bundle) {
-      if (!production) return;
       const found = Object.values(bundle).flatMap(file => {
         const text = file.type === "chunk" ? file.code : typeof file.source === "string" ? file.source : "";
         return forbiddenInProduction.filter(marker => text.includes(marker)).map(marker => `${file.fileName}: ${marker}`);

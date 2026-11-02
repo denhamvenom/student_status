@@ -13,6 +13,7 @@ import { transportSummary } from "./travel";
 import { age18, firstStatus } from "./firstRegistration";
 import { studentSetupCompleteFor } from "./setupWizard";
 import { operatingRole } from "./lib/access";
+import { queueJoinRequestDigest } from "./lib/notificationTriggers";
 import { clearJoinAttempts, codeLimiter, googleRequiredForStudents, joinAttemptsLocked, recordFailedJoinAttempt, usableTeamCode } from "./lib/invitationCodes";
 
 export const viewer = query({
@@ -289,8 +290,11 @@ export const requestJoin = mutation({
     if (!firstName || !lastName || firstName.length > 80 || lastName.length > 80) throw new ConvexError("Enter your first and last name, each under 80 characters.");
     if (existing) {
       await ctx.db.patch(existing._id, { email: who.email.toLowerCase(), firstName, lastName, status: "pending", createdAt: now, decidedAt: undefined, decidedBy: undefined });
+      await queueJoinRequestDigest(ctx);
       return existing._id;
     }
-    return await ctx.db.insert("joinRequests", { authUserId: who.authUserId, email: who.email.toLowerCase(), firstName, lastName, seasonId: season._id, status: "pending", createdAt: now });
+    const requestId = await ctx.db.insert("joinRequests", { authUserId: who.authUserId, email: who.email.toLowerCase(), firstName, lastName, seasonId: season._id, status: "pending", createdAt: now });
+    await queueJoinRequestDigest(ctx);
+    return requestId;
   },
 });

@@ -4,6 +4,7 @@ import { ArrowLeftRight, Calendar, CalendarCheck, DollarSign, Ellipsis, House, L
 import { RoleSwitchButton, RoleSwitchContext } from '@/RoleChoice'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { observeStickyHeader } from '@/lib/sticky-header'
+import { NotificationBell } from '@/notifications'
 import { initials, studentBarPaths, studentNavItems, studentNavPath, studentShellCopy as copy } from './student-nav'
 import styles from './StudentShell.module.css'
 import './student-pages.css'
@@ -47,6 +48,7 @@ export function StudentShell({ children, userName, familyContext, dark, onToggle
         <div className={styles.sidebarBrand}><Link to="/" className={styles.brand}><img src={logo} alt="" className={styles.sidebarLogo}/><span className={styles.sidebarWords}>{copy.product}</span></Link></div>
         <nav className={styles.sidebarNav} aria-label={copy.main}>
           {studentNavItems.map(item => <Link key={item.path} to={item.path} className={styles.sideLink} aria-current={item.path === active ? 'page' : undefined}>{icon(item.path)}<span>{item.label}</span></Link>)}
+          <NotificationBell className={styles.sideLink} countClassName={styles.sideCount} showLabel/>
         </nav>
         <section className={styles.account} aria-label={copy.account}>
           <div className={styles.accountRow}>{avatar}<div className={styles.accountText}><p className={styles.accountName}>{userName}</p><p className={styles.accountTeam}>{copy.team}</p></div></div>
@@ -60,6 +62,7 @@ export function StudentShell({ children, userName, familyContext, dark, onToggle
 
     <header ref={headerRef} className={styles.header}>
       <Link to="/" className={`${styles.brand} ${styles.headerBrand}`}><img src={logo} alt="" className={styles.headerLogo}/><span className={styles.headerWords}>{copy.product}</span></Link>
+      <NotificationBell className={styles.headerBell} countClassName={styles.bellCount}/>
       <Link to="/profile" className={styles.headerAvatar} aria-label={copy.profile} aria-current={active === '/profile' ? 'page' : undefined}>{avatar}</Link>
     </header>
 

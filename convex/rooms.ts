@@ -4,6 +4,10 @@ import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { activeSeason, audit, ownStudent, viewer } from "./lib/access";
+import { notifyRoomUpdate } from "./lib/notificationTriggers";
+
+const INVITE_PUSHES_PER_HOUR = 10;
+const INVITE_PUSH_WINDOW_MS = 60 * 60 * 1000;
 
 async function eligible(ctx: MutationCtx, eventId: Id<"events">, studentId: Id<"students">) {
   const event = await ctx.db.get(eventId); const student = await ctx.db.get(studentId);
@@ -166,8 +170,14 @@ export const invite = mutation({
     if (targetMember) throw new ConvexError("This teammate is already in a room group.");
     const prior = await ctx.db.query("roomInvites").withIndex("by_groupId_and_studentId", q => q.eq("groupId", group._id).eq("studentId", target.student._id)).unique();
     if (prior?.status === "pending") return prior._id;
-    if (prior) { await ctx.db.patch(prior._id, { status: "pending", createdAt: Date.now(), invitedBy: own._id }); return prior._id; }
-    return await ctx.db.insert("roomInvites", { eventId: group.eventId, groupId: group._id, studentId: target.student._id, invitedBy: own._id, status: "pending", createdAt: Date.now() });
+    const now = Date.now();
+    // Soft push limit: past this many invites sent in the last hour, the invite is still saved but sends no push.
+    const recent = await ctx.db.query("roomInvites").withIndex("by_invitedBy_and_createdAt", q => q.eq("invitedBy", own._id).gt("createdAt", now - INVITE_PUSH_WINDOW_MS)).take(INVITE_PUSHES_PER_HOUR);
+    if (prior) await ctx.db.patch(prior._id, { status: "pending", createdAt: now, invitedBy: own._id });
+    const inviteId = prior?._id ?? await ctx.db.insert("roomInvites", { eventId: group.eventId, groupId: group._id, studentId: target.student._id, invitedBy: own._id, status: "pending", createdAt: now });
+    // One push per (room group, invited student): canceling and re-inviting never sends another.
+    if (recent.length < INVITE_PUSHES_PER_HOUR) await notifyRoomUpdate(ctx, { eventId: group.eventId, studentIds: [target.student._id], kind: "invited", dedupeKey: `invite:${group._id}:${target.student._id}` });
+    return inviteId;
   },
 });
 
@@ -197,6 +207,7 @@ export const respond = mutation({
       for (const other of groupInvites.filter(x => x.status === "pending")) await ctx.db.patch(other._id, { status: "declined" });
     }
     await audit(ctx, user, "roomGroups", group._id, "join", null, { studentId: own._id });
+    await notifyRoomUpdate(ctx, { eventId: group.eventId, studentIds: members.map(member => member.studentId), kind: "joined" });
     return null;
   },
 });
@@ -222,6 +233,7 @@ export const finalize = mutation({
     }
     await ctx.db.patch(group._id, { finalized: true, adultFifthException: members.length === 5, needsReview: false });
     await audit(ctx, user, "roomGroups", group._id, "finalize", { finalized: group.finalized }, { finalized: true, members: members.length }, args.reason);
+    if (!group.finalized) await notifyRoomUpdate(ctx, { eventId: event._id, studentIds: members.map(member => member.studentId), kind: "finalized" });
     return null;
   },
 });

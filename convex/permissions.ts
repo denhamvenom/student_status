@@ -12,6 +12,7 @@ import { consentEventValidator, consentSnapshotValidator, correctionFieldValidat
 import { compareCoverage, controlledCoverage, coverageFor, expectedCoverage, sealedSnapshot, setPendingCoverage } from "./lib/permissionCoverage";
 import { consentSnapshotV2Validator } from "./lib/consentSnapshotV2";
 import { sealedSnapshotV2 } from "./permissionsV2";
+import { notifyPermissionNeedsAttention } from "./lib/notificationTriggers";
 import { PERMISSION_SIGNING_CLOSED, PERMISSION_SIGNING_PAUSED, permissionSigningMode, permissionSigningPaused, requireParentSigningOn, v2SigningAllowed } from "./lib/permissionSigningMode";
 
 type Ctx = QueryCtx | MutationCtx;
@@ -235,6 +236,7 @@ export const review = mutation({
     await compareCoverage(ctx, submission.studentId, args.expectedCoverage, rows.map(row => row.eventId));
     const reviewId = await ctx.db.insert("permissionReviews", {submissionId: submission._id, status: args.status, note: args.note?.trim() || undefined, field: args.field, controlledCoverage: rows.map(row => ({eventId: row.eventId, priorRevision: row.revision})), snapshotHash: submission.snapshotHash, reviewedBy: actor._id, reviewedAt: Date.now(), idempotencyKey: args.idempotencyKey, operationHash});
     for (const row of rows) await ctx.db.patch(row._id, {state: args.status, latestReviewId: reviewId, revision: row.revision + 1, updatedAt: Date.now(), updatedBy: actor._id, reason: args.status === "correction" ? args.note?.trim() : undefined, correctionField: args.status === "correction" ? args.field ?? "general" : undefined});
+    if (args.status === "correction") await notifyPermissionNeedsAttention(ctx, {studentId: submission.studentId, reason: "correction", dedupeKey: reviewId});
     await audit(ctx, actor, "permissionSubmissions", submission._id, submission.synthetic ? "reviewSyntheticPermission" : "reviewPermission", null, {status: args.status, synthetic: submission.synthetic ?? false, eventIds: rows.map(row => row.eventId)});
     return null;
   },
@@ -252,6 +254,7 @@ export const requestNewSignature = mutation({
       const fields = {seasonId: student.seasonId, studentId: student._id, eventId: item.eventId, state: "required" as const, revision: item.revision + 1, updatedAt: now, updatedBy: actor._id, signatureRequestedAt: now, reason: args.reason.trim(), correctionField: undefined, sealedSnapshotFormat: undefined, sealedSnapshotHash: undefined, synthetic: undefined, source: undefined};
       if (row) await ctx.db.patch(row._id, fields); else await ctx.db.insert("permissionCoverage", fields);
     }
+    await notifyPermissionNeedsAttention(ctx, {studentId: student._id, reason: "newSignature", dedupeKey: requestId});
     await audit(ctx, actor, "permissionSignatureRequests", requestId, "requestNewSignature", null, {eventIds: args.eventIds});
     return null;
   },

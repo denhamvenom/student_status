@@ -10,6 +10,9 @@ import { PublicFooter } from './PublicFooter'
 import { uiCopy } from './lib/ui-copy'
 import { userFacingError } from './lib/error-message'
 import { Toaster } from './components/ui/sonner'
+import { toast } from 'sonner'
+import { applyServiceWorkerUpdate, registerServiceWorker } from './pwa/register'
+import { captureInstallPrompt } from './pwa/useInstallPrompt'
 import './shadcn.css'
 import '@fontsource/anton/latin-400.css'
 import './styles.css'
@@ -33,6 +36,8 @@ const router = createBrowserRouter([
   ...(ParentHomePreview?[{path:'/__parent-home-preview',element:<AppErrorBoundary><Suspense fallback={null}><ParentHomePreview /></Suspense></AppErrorBoundary>}]:[]),
   {path:'*',element:<AppErrorBoundary>{app}</AppErrorBoundary>},
 ])
+captureInstallPrompt()
+registerServiceWorker(to => void router.navigate(to), () => toast('A new version is ready', { id: 'sw-update', duration: Infinity, action: { label: 'Refresh', onClick: () => void applyServiceWorkerUpdate() } }))
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange><RouterProvider router={router}/><Toaster richColors position="top-right" /></ThemeProvider></React.StrictMode>,
 )

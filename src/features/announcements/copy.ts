@@ -1,13 +1,16 @@
-/** Wording for the staff Announcements page (Coach and Travel Lead). Student Home renders the pinned messages itself. */
+/** Wording for the staff Announcements page (Coach and Travel Lead). Each Home renders its pinned messages itself. */
 export const announcementsCopy = {
   title: 'Announcements',
-  description: 'Pin up to five messages to Student Home. Students see the newest pin first.',
+  description: 'Pin up to five messages to each Home. People see the newest pin first.',
   newHeading: 'New announcement',
   editHeading: 'Edit announcement',
   titleLabel: 'Title (optional)',
   messageLabel: 'Message',
   audienceLabel: 'Show to',
-  audiences: { students: 'Students', parents: 'Parents', both: 'Both' },
+  audiences: { students: 'Students', parents: 'Parents', both: 'Students and parents', staff: 'Mentors & staff', everyone: 'Everyone' },
+  urgentLabel: 'Send as urgent (arrives even during school hours)',
+  urgentHint: 'Use only when people need to know right away, like a canceled meeting.',
+  staffHomeHeading: 'Team announcements',
   characters: (used: number, limit: number) => `${used} of ${limit} characters`,
   showUntilLabel: 'Show until (optional)',
   showUntilHint: 'The selected audience stops seeing it after this day ends. Leave it blank to show it until you unpin it.',
