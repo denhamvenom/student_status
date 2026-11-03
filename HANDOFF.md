@@ -1,6 +1,12 @@
 # Handoff
 
-November 1, 2026 | main `d8f1464`
+November 2, 2026 | main `ddc3234`
+
+## PWA install and push notifications (released)
+
+PR #61 merged as main `ccd9145` (commits `6dcc68f`, `604a486`); PR #62 (Home install banner, frontend only) merged as main `ddc3234`. Installable app, service worker, Web Push (VAPID), inbox, per-category preferences, quiet hours, instant triggers, R1–R7 reminders and 5 PM digests. Production Convex deployed first from `604a486` (additive schema, new crons); production VAPID env vars set by the owner. Not verified: real iPhone/Android install and push on production; signed-in production walkthrough; Worker version IDs. [Release receipt](docs/releases/RELEASE_2026-11-02_PWA_PUSH_NOTIFICATIONS.md)
+
+Follow-ups: Inbox items lack an Urgent badge; rotate the development `DEVELOPER_SIGN_IN_KEY`; owner decisions on sign-in session length and virtual-event permission forms.
 
 ## New Event setup steps (released)
 
@@ -44,7 +50,9 @@ Clocking, PIN controls, automatic closing, fixed event roster and historical imp
 
 ## Next
 
-A Coach or Parent does a signed-in production check of Parent Home.
+- Sprint 2 (event audiences, subteams including CAD/Leadership, mentor invites, Virtual (Discord) location, recurring meetings) on a new branch off main. Its untracked drafts are in this checkout (`convex/lib/eventAudienceRules*`, `convex/lib/rrule*`, `convex/lib/seriesRecurrence*`, `src/features/event-setup/audience/`) and must use the helpers in `convex/lib/notificationTriggers.ts` and `convex/lib/eventAudience.ts`.
+- Install the app and check push on a real iPhone (Home Screen) and an Android phone against production.
+- A Coach or Parent does a signed-in production check of Parent Home.
 
 ## Top open risks
 
