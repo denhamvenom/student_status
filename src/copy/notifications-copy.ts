@@ -14,6 +14,7 @@ export const notificationsCopy = {
     turnOnFailed: 'Notifications could not be turned on. Please try again.',
     turnedOn: 'Notifications are on for this device',
     onFor: (label: string) => `Notifications are on for this device (${label}).`,
+    // Coach-only developer tool (see EnableNotifications showTest).
     sendTest: 'Send a test',
     testSent: 'Test sent. It should appear in a few seconds.',
     testFailed: 'The test could not be sent. Please try again.',
@@ -34,7 +35,7 @@ export const notificationsCopy = {
   },
   troubleshoot: {
     title: 'Not seeing notifications?',
-    intro: 'Your device may be hiding them. Check these steps, then tap Send a test.',
+    intro: 'Your device may be hiding them. Check these steps.',
     otherDevices: 'Using a different device?',
     windows: { label: 'Windows computer', steps: ['Open Settings → System → Notifications.', 'Turn on Google Chrome or Microsoft Edge (the browser you use).'] },
     mac: { label: 'Mac', steps: ['Open System Settings → Notifications.', 'Click your browser (Chrome, Edge or Safari) and turn on Allow notifications.'] },
