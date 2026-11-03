@@ -56,8 +56,15 @@ function NotificationDevices() {
   </div>
 }
 
+/** Minimal shape of api.app.viewer (it returns v.any()) needed to know the role. */
+type RoleViewer = { user: { role: 'student' | 'parent' | 'coach' | 'mentor'; travelLead: boolean } | null } | null | undefined
+/** Coach only, matching the app's role rule: a Travel Lead flag takes precedence over the stored role. */
+const isCoach = (viewer: RoleViewer) => viewer?.user?.role === 'coach' && !viewer.user.travelLead
+
 /** Settings → Notifications & app: install help, turn on notifications, what to send, and this account's devices. */
 export function NotificationSettings() {
+  // Same subscription Settings already holds, so this adds no extra server work.
+  const viewer = useQuery(api.app.viewer, {}) as RoleViewer
   return <section className="card flex flex-col gap-5" aria-labelledby="notifications-settings-title">
     <div>
       <h2 id="notifications-settings-title" className="m-0">{notificationsCopy.section.title}</h2>
@@ -65,7 +72,7 @@ export function NotificationSettings() {
     </div>
     {/* On iPhone and iPad outside the Home Screen app, EnableNotifications shows the install steps itself. */}
     {!needsHomeScreen() && <InstallCard/>}
-    <EnableNotifications/>
+    <EnableNotifications showTest={isCoach(viewer)}/>
     <NotificationPreferences/>
     <NotificationDevices/>
   </section>

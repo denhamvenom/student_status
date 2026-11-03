@@ -26,8 +26,11 @@ function BlockedSteps() {
   </div>
 }
 
-/** Turns notifications on or off for this device. Permission is requested only from the button, never on load. */
-export function EnableNotifications() {
+/**
+ * Turns notifications on or off for this device. Permission is requested only from the button, never on load.
+ * `showTest` adds the Coach-only "Send a test" developer tool; everyone else sees only turn on/off.
+ */
+export function EnableNotifications({ showTest = false }: { showTest?: boolean }) {
   const publicKey = useQuery(api.push.getVapidPublicKey)
   const save = useMutation(api.push.saveSubscription)
   const remove = useMutation(api.push.deleteSubscription)
@@ -83,7 +86,7 @@ export function EnableNotifications() {
     {on ? <>
       <p className="m-0 flex items-center gap-2 font-bold"><Bell size={20} aria-hidden="true"/>{copy.onFor(deviceLabel())}</p>
       <div className="action-row flex flex-wrap gap-2">
-        <Button type="button" size="lg" disabled={busy !== null} onClick={() => void test()}><Send aria-hidden="true"/>{copy.sendTest}</Button>
+        {showTest && <Button type="button" size="lg" disabled={busy !== null} onClick={() => void test()}><Send aria-hidden="true"/>{copy.sendTest}</Button>}
         <Button type="button" size="lg" variant="outline" disabled={busy !== null} onClick={() => void turnOff()}><BellOff aria-hidden="true"/>{copy.turnOff}</Button>
       </div>
       <TroubleshootNotifications/>
