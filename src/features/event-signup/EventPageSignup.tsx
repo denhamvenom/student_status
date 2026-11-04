@@ -16,9 +16,12 @@ export function EventPageSignup({ eventId, eventName, label, canSign }: { eventI
   const availability = (useQueries(queries) as { availability?: SignupAvailability | undefined | Error }).availability
   const source = useLiveSignupSource()
   const [open, setOpen] = useState(false)
-  const blocked = availability === undefined ? signupCopy.form.checking : availability instanceof Error ? signupCopy.form.availabilityFailed : availability.outcome === 'closed' ? signupCopy.form.closed : null
+  const blocked = availability === undefined ? signupCopy.form.checking : availability instanceof Error ? null : availability.outcome === 'closed' ? signupCopy.form.closed : null
+  // signupAvailability refuses students outside the event's audience, so an error shows no Sign up button.
+  const refused = availability instanceof Error
   return <>
-    {canSign && <>
+    {canSign && refused && <p className="muted">{signupCopy.form.notForYou}</p>}
+    {canSign && !refused && <>
       <button className="button button-primary" disabled={!!blocked} aria-describedby={blocked ? `event-signup-${eventId}-why` : undefined} onClick={() => setOpen(true)}>{label}</button>
       {blocked && <p id={`event-signup-${eventId}-why`} className="muted">{blocked}</p>}
     </>}

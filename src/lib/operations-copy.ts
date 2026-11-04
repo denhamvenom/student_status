@@ -202,18 +202,20 @@ export const operationsCopy = {
     "requirementSaved": "Requirement saved.",
     "reasonForDeclining": "Reason for declining a signup",
     "capacityNoLimit": "Capacity (blank for no limit)",
-    "signupClosesLocal": "Signup closes (your local time)",
-    "roomDeadlineLocal": "Room selection deadline (your local time)",
+    "signupClosesLocal": "Signup closes (Central Time)",
+    "roomDeadlineLocal": "Room selection deadline (Central Time)",
     "requirementKey": "Short name",
     "requirementLabel": "Display name",
     "requirementInstructions": "Instructions",
     "requirementLink": "Web link (https://)",
-    "requirementDue": "Due",
-    "placesReserved": " places taken",
-    "pendingReserveNotice": ". A pending signup holds a place. The fee is charged only when the student is confirmed.",
-    "waitlistNotice": ". Waitlisted students move up only when someone presses Promote. They move up one at a time, in signup order.",
+    "requirementDue": "Due (Central Time)",
     "signupCloses": "Signup closes:",
-    "confirmed": "Confirmed:"
+    "confirmed": "Confirmed:",
+    "signupRulesLabel": "How signups and the waitlist work",
+    "signupRules": "A pending signup holds a place. The fee is charged only when the student is confirmed. Waitlisted students move up only when someone presses Promote, one at a time, in signup order.",
+    "addQuestions": "Add signup questions",
+    "addShifts": "Add shifts",
+    "readinessLink": "Event readiness"
   },
   "rooms": {
     reviewAndFinalize: "Review and finalize",
@@ -334,8 +336,11 @@ export const operationsText = {
     pendingReview: (count: number) => `Pending review · ${count}`,
   },
   event: {
-    reserved: (count: number, capacity: number | undefined, available: number | null) => `${count}${capacity !== undefined ? ` of ${capacity}` : ''} place${count === 1 && capacity === undefined ? '' : 's'} taken${available !== null ? ` · ${available} left` : ''}. A pending signup holds a place. The fee is charged only when the student is confirmed.`,
-    signupCloses: (date: string) => `Signup closes: ${date}. Waitlisted students move up only when someone presses Promote. They move up one at a time, in signup order.`,
+    // Short status lines (design audit, November 2026); the rules prose sits behind a "?" (event.signupRules).
+    signedUp: (count: number, capacity: number | undefined, available: number | null) => `${count}${capacity !== undefined ? ` of ${capacity}` : ''} signed up${available !== null ? ` · ${available} left` : ''}`,
+    /** Required events sign students up automatically, so the count is who was assigned, not who chose to sign up. */
+    assigned: (count: number) => `${count} assigned`,
+    signupCloses: (date: string | null) => `Signup closes: ${date ?? 'not set'}`,
     approved: (name: string) => `${name} approved.`,
     declined: (name: string) => `${name} declined.`,
     promoted: (name: string) => `${name} promoted and confirmed.`,

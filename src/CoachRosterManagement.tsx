@@ -15,9 +15,10 @@ import { rosterManagementCopy as copy } from './lib/roster-management-copy'
 import { balanceStatusLabel } from './lib/report-state-copy'
 import styles from './CoachRoster.module.css'
 import { CoachRosterBoundary } from './CoachRosterBoundary'
-import { canonicalSubteam, subteamDisplay, subteamOptions } from './lib/subteams'
+import { subteamDisplay, subteamOptions } from './lib/subteams'
 import { gradeLabel, sortRoster, type Direction, type RosterSort } from './lib/rosterSort'
 import { rosterAsOfAtTransition } from './lib/roster-refresh'
+import { inRosterGroup, rosterGroupOptions } from './lib/roster-filter'
 
 type Row = typeof api.coachRoster.list._returnType['page'][number]
 type DirectoryRow = typeof api.coachRoster.directory._returnType['page'][number]
@@ -79,7 +80,7 @@ function RosterPage({active,asOf}:{active:boolean;asOf:number}){
   useEffect(()=>setPageIndex(0),[active,connection,search,subteam,travelOnly,quick,sort,direction])
   const quickIds=useMemo(()=>quick==='all'?null:new Set(enriched.results.filter(row=>quickMatches(row,quick)).map(row=>row.studentId)),[quick,enriched.results])
   const complete=directory.status==='Exhausted'&&(quick==='all'||enriched.status==='Exhausted')
-  const filtered=useMemo(()=>directory.results.filter(row=>(connection==='all'||row.connected===(connection==='connected'))&&(!search.trim()||row.name.toLowerCase().includes(search.trim().toLowerCase()))&&(!subteam||canonicalSubteam(row.subteam)===subteam)&&(!travelOnly||row.travelTeam)&&(!quickIds||quickIds.has(row.studentId))),[directory.results,connection,search,subteam,travelOnly,quickIds])
+  const filtered=useMemo(()=>directory.results.filter(row=>(connection==='all'||row.connected===(connection==='connected'))&&(!search.trim()||row.name.toLowerCase().includes(search.trim().toLowerCase()))&&inRosterGroup(row,subteam)&&(!travelOnly||row.travelTeam)&&(!quickIds||quickIds.has(row.studentId))),[directory.results,connection,search,subteam,travelOnly,quickIds])
   const ordered=useMemo(()=>sortRoster(filtered,sort,direction),[filtered,sort,direction])
   const effectivePageIndex=Math.min(pageIndex,Math.max(0,Math.ceil(ordered.length/20)-1))
   const visible=complete?ordered.slice(effectivePageIndex*20,(effectivePageIndex+1)*20):[]
@@ -93,7 +94,7 @@ function RosterPage({active,asOf}:{active:boolean;asOf:number}){
     <div className="roster-filters">
       <NativeSelect aria-label="Filter roster by account connection" value={connection} onChange={e=>setConnection(e.target.value as typeof connection)}><NativeSelectOption value="all">All connections</NativeSelectOption><NativeSelectOption value="unconnected">Not connected</NativeSelectOption><NativeSelectOption value="connected">Connected</NativeSelectOption></NativeSelect>
       <Input aria-label="Search students" placeholder="Search students" value={search} onChange={e=>setSearch(e.target.value)}/>
-      <NativeSelect aria-label="Filter students by subteam" value={subteam} onChange={e=>setSubteam(e.target.value)}><NativeSelectOption value="">{liveCopy.roster.allSubteams}</NativeSelectOption>{subteamOptions.filter(value=>directory.results.some(row=>canonicalSubteam(row.subteam)===value)).map(value=><NativeSelectOption key={value} value={value}>{value}</NativeSelectOption>)}</NativeSelect>
+      <NativeSelect aria-label="Filter students by subteam" value={subteam} onChange={e=>setSubteam(e.target.value)}><NativeSelectOption value="">{liveCopy.roster.allSubteams}</NativeSelectOption>{rosterGroupOptions.map(value=><NativeSelectOption key={value} value={value}>{value}</NativeSelectOption>)}</NativeSelect>
       <Button variant="outline" aria-pressed={travelOnly} onClick={()=>setTravelOnly(!travelOnly)} aria-describedby="travel-team-help">{liveCopy.roster.travelTeam}</Button>
       <NativeSelect aria-label="Sort roster by" value={sort} onChange={e=>setSort(e.target.value as RosterSort)}><NativeSelectOption value="lastName">Last name</NativeSelectOption><NativeSelectOption value="grade">Grade</NativeSelectOption><NativeSelectOption value="subteam">Subteam</NativeSelectOption></NativeSelect>
       <NativeSelect aria-label="Sort direction" value={direction} onChange={e=>setDirection(e.target.value as Direction)}><NativeSelectOption value="asc">Ascending</NativeSelectOption><NativeSelectOption value="desc">Descending</NativeSelectOption></NativeSelect>

@@ -28,11 +28,25 @@ export const uiCopy = {
     withdrawn: 'Withdrawn',
   },
   finance: { editDescription: 'Review a student account and record payments.', readDescription: 'Review a student account.', description: 'Charges, credits and transaction history.' },
-  event: { staffRequirements: 'Review student requirements in Event readiness.', readiness: 'Event readiness', noRequirements: 'No requirements for this event.', participants: 'Signups', requirements: 'Requirements', transport: 'Transport', rooming: 'Rooming', overview: 'Overview' },
+  event: {
+    staffRequirements: 'Review student requirements in Event readiness.', readiness: 'Event readiness', noRequirements: 'No requirements for this event.', participants: 'Signups', requirements: 'Requirements', transport: 'Transport', rooming: 'Rooming', overview: 'Overview',
+    // Student and Parent event page Details box (design audit, November 2026): When, Where, Signup, Cost, Status.
+    when: 'When', where: 'Where', signup: 'Signup', cost: 'Cost', status: 'Status', free: 'Free',
+    noDriving: 'No driving needed.',
+    signupMeaning: {
+      parent: { required: 'Required — signed up automatically', optional: 'Optional — your student signs up' },
+      student: { required: 'Required — you’re signed up', optional: 'Optional — you choose' },
+    },
+    // Staff only: Media Support sits behind a disclosure in the Details box.
+    moreDetails: 'More details', media: 'Media Support Requested', yes: 'Yes', no: 'No',
+    canceled: 'This event is canceled.',
+  },
   readiness: { noEvents: 'No events yet.', noStudents: 'No students are signed up for this event.', allComplete: 'All applicable requirements are complete.', students: 'Students', transportation: 'Transportation', rooming: 'Rooming' },
   theme: { dark: 'Dark mode', light: 'Light mode', failed: 'Appearance could not be saved. Please try again.' },
   wizard: { steps: reference.options.newEventSteps, cancel: 'Cancel', back: 'Back', continue: 'Continue', create: 'Create event' },
-  // Three categories supersede the reference's older four-choice workflow.
+  // Three categories supersede the reference's older four-choice workflow. Event pages and cards no longer show the
+  // legacy "Open Registration" / "Whole Team" names: features/operations/event-page.ts maps them to Everyone or
+  // Travel Team plus Required / Optional.
   audiences: { travelTeam: 'Travel Team', wholeTeam: 'Whole Team', open: 'Open Registration' },
   errors: { pageTitle: 'Something went wrong', pageBody: 'The page could not load. Please try again.', reload: 'Reload page', signIn: 'Sign-in could not be completed. Please try again.', rooming: 'Room selection is unavailable for this view. Return to the event or try again.', retry: 'Try again', returnEvent: 'Return to event' },
 } as const

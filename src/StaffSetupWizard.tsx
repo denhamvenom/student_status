@@ -12,6 +12,7 @@ import { userFacingError } from './lib/error-message'
 import styles from './StaffSetupWizard.module.css'
 import { normalizeChangedPhone } from '../shared/contact-format'
 import { useSignOut } from './notifications/useSignOut'
+import { browserStorage, rememberStaffSetupSkip, staffSetupSkipped } from './lib/staff-setup-skip'
 
 type Basics = FunctionReturnType<typeof api.adultProfile.ownBasics>
 const steps = ['Contact information', 'Shirt and emergency contact', 'Driving', 'Review your information']
@@ -163,7 +164,7 @@ function StaffWizard({ profile, reload, skip }: { profile: Basics; reload: () =>
           <Button type="submit" disabled={busy || stale}>{busy ? 'Saving…' : step === 3 ? 'Finish setup' : 'Continue'}</Button>
         </div>
         <div className={styles.skip}>
-          <p className={styles.muted}>You can skip setup and add your information later in Profile. “Don’t ask me again” turns off future setup reminders.</p>
+          <p className={styles.muted}>You can skip setup and add your information later in Profile. “Skip for now” hides this on this device for a week. “Don’t ask me again” turns off future setup reminders.</p>
           <div className={styles.skipActions}><Button type="button" variant="ghost" disabled={busy} onClick={skip}>Skip for now</Button>
             <Button type="button" variant="ghost" disabled={busy || stale} onClick={() => void dismissPermanently()}>Don’t ask me again</Button></div>
         </div>
@@ -174,15 +175,22 @@ function StaffWizard({ profile, reload, skip }: { profile: Basics; reload: () =>
 }
 
 function SetupContent({ children, reload, skip, skipped }: { children: ReactNode; reload: () => void; skip: () => void; skipped: boolean }) {
-  const profile = useQuery(api.adultProfile.ownBasics, {})
+  const latest = useQuery(api.adultProfile.ownBasics, {})
+  // The loading screen is for the first load only: if the profile query ever reloads (for example while sign-in
+  // refreshes), keep the last answer so the staff pages below (and anything typed in them) stay mounted.
+  const [loaded, setLoaded] = useState(latest)
+  if (latest !== undefined && latest !== loaded) setLoaded(latest)
+  const profile = latest ?? loaded
   if (profile === undefined) return <div className={styles.page}><main className={styles.card}><p role="status">Loading your staff profile…</p><RoleSwitchButton/><SignOutButton /></main></div>
   return profile.needsSetup && !skipped ? <StaffWizard profile={profile} reload={reload} skip={skip} /> : children
 }
 
 /** Render only for accepted staff accounts, before mounting any staff routes. */
-export function StaffSetupGate({ children }: { children: ReactNode }) {
+export function StaffSetupGate({ children, userId }: { children: ReactNode; userId?: string }) {
   const [attempt, setAttempt] = useState(0)
-  const [skipped, setSkipped] = useState(false)
+  // Skip for now lasts a week on this device (see lib/staff-setup-skip.ts), not only until the next page load.
+  const [skipped, setSkipped] = useState(() => staffSetupSkipped(browserStorage(), userId, Date.now()))
   const retry = () => setAttempt(value => value + 1)
-  return <SetupBoundary key={attempt} retry={retry}><SetupContent reload={retry} skipped={skipped} skip={() => setSkipped(true)}>{children}</SetupContent></SetupBoundary>
+  const skip = () => { rememberStaffSetupSkip(browserStorage(), userId, Date.now()); setSkipped(true) }
+  return <SetupBoundary key={attempt} retry={retry}><SetupContent reload={retry} skipped={skipped} skip={skip}>{children}</SetupContent></SetupBoundary>
 }

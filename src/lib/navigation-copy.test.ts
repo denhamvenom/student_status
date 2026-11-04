@@ -21,7 +21,7 @@ describe('staff navigation', () => {
   })
 
   it('opens the Mentor profile first and keeps its report separate from operational staff', () => {
-    expect(menu.mentor).toEqual([['Profile', '/'], ['Report', '/report'], ['Settings', '/settings']])
+    expect(menu.mentor).toEqual([['Profile', '/'], ['Invitations', '/invited'], ['Report', '/report'], ['Settings', '/settings']])
     expect(menu.coach[0]).toEqual(['Team', '/'])
     expect(menu.travelLead[0]).toEqual(['Team', '/'])
     expect(menu.coach.some(([, path]) => path === '/report')).toBe(false)

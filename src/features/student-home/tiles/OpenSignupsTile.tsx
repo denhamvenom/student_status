@@ -6,23 +6,29 @@ import { DashboardTile, TileTitle } from '@/components/dashboard/DashboardTile'
 import { DetailsSheet } from '@/components/dashboard/DetailsSheet'
 import { StatusBadge } from '@/components/dashboard/StatusBadge'
 import { dashboardButtonVariants, focusRing, inset, warningText } from '@/components/dashboard/styles'
+import type { Id } from '../../../../convex/_generated/dataModel'
 import type { OpenSignup } from '../contract'
 import { homeCopy } from '../copy'
-import { isWithinSoon, openSignupsSummary, signupDateLine } from '../logic'
+import { isWithinSoon, openSignupDetails, openSignupsSummary, signupDateLine } from '../logic'
 import type { SignUpResult, StudentHomeHandlers } from '../types'
 import { SignupSheet } from './SignupSheet'
 
 const copy = homeCopy.signups
 const INLINE_ROWS = 2
 
-function SignupRow({ signup, now, onSignUp }: { signup: OpenSignup; now: number; onSignUp: () => void }) {
+/** Family-facing place per event, from app.listEvents ("Virtual (Discord)" for virtual events). */
+export type SignupPlaces = ReadonlyMap<Id<'events'>, string>
+
+function SignupRow({ signup, now, place, onSignUp }: { signup: OpenSignup; now: number; place: string | undefined; onSignUp: () => void }) {
   const soon = isWithinSoon(signup.signupClosesAt, now)
   return <li className={cn(inset, 'flex min-h-[60px] items-center gap-3 py-2 pr-2.5 pl-3')}>
     <div className="min-w-0 flex-1">
       <p className="truncate text-[14px] font-medium text-vs-text-2 lg:text-[13px]">{signup.name}</p>
-      <p className={cn('mt-0.5 text-[12px] lg:text-[11px]', soon ? cn('font-semibold', warningText) : 'text-vs-muted')}>
+      <p className="mt-0.5 text-[12px] text-vs-muted lg:text-[11px]">{openSignupDetails(signup, place)}</p>
+      {/* With no close time the detail line already carries the start date. */}
+      {signup.signupClosesAt !== null && <p className={cn('mt-0.5 text-[12px] lg:text-[11px]', soon ? cn('font-semibold', warningText) : 'text-vs-muted')}>
         {signupDateLine(signup, now)}
-      </p>
+      </p>}
     </div>
     {/* Desktop draws calm rows with a softer button; phones keep the primary button. The phone's fixed bottom bar
         (64px) covers the last rows: the scroll margin keeps focus and scroll-into-view from parking the button under it. */}
@@ -53,9 +59,11 @@ function SignedUpNotice({ signup, result, announce, onDismiss, ref }: { signup: 
 }
 
 /** Events the Student can still sign up for. Urgent when any signup closes within seven days. */
-export function OpenSignupsTile({ signups, now, handlers, signedUp, onSignedUpChange }: {
+export function OpenSignupsTile({ signups, now, places, handlers, signedUp, onSignedUpChange }: {
   signups: OpenSignup[]
   now: number
+  /** Missing while app.listEvents loads or after it fails; rows then leave the place out. */
+  places?: SignupPlaces
   handlers: StudentHomeHandlers
   signedUp: SignedUp | null
   onSignedUpChange: (next: SignedUp | null) => void
@@ -78,12 +86,12 @@ export function OpenSignupsTile({ signups, now, handlers, signedUp, onSignedUpCh
     {signedUp && <SignedUpNotice ref={noticeRef} signup={signedUp.signup} result={signedUp.result} announce={!sheetOpen} onDismiss={() => onSignedUpChange(null)} />}
     {rows.length === 0
       ? <p className="mt-1.5 text-[13px] text-vs-muted lg:text-[12px]">{copy.empty}</p>
-      : <ul className="mt-2.5 flex flex-col gap-[7px] lg:mt-3 lg:gap-2">{rows.slice(0, INLINE_ROWS).map(signup => <SignupRow key={signup.eventId} signup={signup} now={now} onSignUp={() => choose(signup)} />)}</ul>}
+      : <ul className="mt-2.5 flex flex-col gap-[7px] lg:mt-3 lg:gap-2">{rows.slice(0, INLINE_ROWS).map(signup => <SignupRow key={signup.eventId} signup={signup} now={now} place={places?.get(signup.eventId)} onSignUp={() => choose(signup)} />)}</ul>}
     {/* Desktop keeps the right column short (Participation above the fold at 1280×800): a compact link whose 44px target overlaps the padding. */}
     {rows.length > INLINE_ROWS && <button type="button" onClick={() => setListOpen(true)} className={cn(dashboardButtonVariants({ tone: 'ghost', size: 'sm' }), "mt-1.5 -mb-1.5 self-center lg:relative lg:mt-3 lg:mb-0 lg:min-h-0 lg:rounded-sm lg:px-1 lg:hover:bg-transparent lg:hover:underline lg:after:absolute lg:after:inset-x-[-8px] lg:after:top-1/2 lg:after:h-11 lg:after:-translate-y-1/2 lg:after:content-['']")}>{copy.showMore}</button>}
 
     <DetailsSheet open={listOpen} onOpenChange={setListOpen} title={copy.allTitle}>
-      <ul className="flex flex-col gap-2">{rows.map(signup => <SignupRow key={signup.eventId} signup={signup} now={now} onSignUp={() => choose(signup)} />)}</ul>
+      <ul className="flex flex-col gap-2">{rows.map(signup => <SignupRow key={signup.eventId} signup={signup} now={now} place={places?.get(signup.eventId)} onSignUp={() => choose(signup)} />)}</ul>
     </DetailsSheet>
     <SignupSheet signup={selected} open={sheetOpen} onOpenChange={setSheetOpen} onSignedUp={(signup, result) => onSignedUpChange({ signup, result })}
       returnFocus={() => noticeRef.current} handlers={handlers} />

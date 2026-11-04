@@ -15,7 +15,7 @@ export const questionKindLabels: Record<QuestionKind, string> = {
 export const eventSetupCopy = {
   newEvent: {
     shifts: 'Students pick shifts',
-    shiftsDetail: 'For events like an all-day fundraiser. You’ll add time slots in the next step (or later on the event page).',
+    shiftsDetail: 'For all-day events like fundraisers.',
     maxShifts: 'Most shifts one student can pick',
     maxShiftsHint: 'Leave blank for no limit.',
     minShifts: 'Fewest shifts one student must pick',
@@ -26,10 +26,10 @@ export const eventSetupCopy = {
   },
   newEventSteps: {
     labels: ['Time slots', 'Signup questions', 'Things students must do'] as const,
-    skip: 'Skip for now — add later on the event page',
-    slotsPurpose: 'Give students shift times to pick from. Optional: you can add or change these on the event page.',
-    questionsPurpose: 'Ask students something when they sign up, like a T-shirt size or lunch choice. Optional.',
-    requirementsPurpose: 'Things students must do besides the permission form, like turn in a waiver or bring a lunch. Optional.',
+    skip: 'Skip',
+    slotsPurpose: 'Like 9–11 AM setup or 11 AM–1 PM booth.',
+    questionsPurpose: 'Like a T-shirt size or lunch choice.',
+    requirementsPurpose: 'Like turn in a waiver or bring a lunch.',
     slotsAddTitle: 'Add a time slot',
     slotsNone: 'No time slots yet.',
     slotsCount: (count: number) => `${plural(count, 'time slot')} added`,
@@ -70,7 +70,7 @@ export const eventSetupCopy = {
     skipConfirm: (count: number) => `Skip and remove ${count === 1 ? '1 unfinished item' : `${count} unfinished items`}? Finished items are kept.`,
     skipConfirmButton: 'Skip and remove',
     removeOptionDisabled: 'Choice questions need at least 2 options',
-    minShiftsHint: 'Fewest: students must pick at least this many (set 0 to make time slots optional).',
+    minShiftsHint: '0 = optional',
     reviewSlotsTitle: 'Time slots',
     reviewQuestionsTitle: 'Signup questions',
     reviewRequirementsTitle: 'Things students must do',

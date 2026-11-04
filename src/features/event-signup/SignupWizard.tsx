@@ -108,11 +108,12 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
   </div>
 }
 
+/** What Sign up does beyond the fee line, or null when signing up just confirms (the Cost line already says it). */
 function outcomeText(availability: SignupAvailability) {
   if (availability.outcome === 'closed') return availability.signupMode === 'assigned' ? sheetCopy.outcome.assigned : sheetCopy.outcome.closed
   if (availability.outcome === 'waitlisted') return sheetCopy.outcome.waitlisted
   if (availability.outcome === 'waitingForApproval') return sheetCopy.outcome.waitingForApproval
-  return availability.feeCents > 0 ? sheetCopy.outcome.signedUp : sheetCopy.outcome.signedUpNoFee
+  return null
 }
 
 function spotsText(availability: SignupAvailability) {
@@ -124,15 +125,16 @@ function spotsText(availability: SignupAvailability) {
 function EventDetails({ availability, facts, shiftsLater, outcome }: { availability: SignupAvailability; facts: Loadable<EventFacts>; shiftsLater: boolean; outcome: boolean }) {
   const spots = spotsText(availability)
   const closed = availability.outcome === 'closed'
+  const note = outcome || closed ? outcomeText(availability) : null
   return <>
     <dl className="m-0">
       <Fact label={copy.facts.when}>{eventSchedule(availability)}</Fact>
       {!(facts instanceof Error) && <Fact label={copy.facts.where}>{facts === undefined ? copy.loading : facts.place}</Fact>}
-      <Fact label={copy.facts.cost}>{availability.feeCents > 0 ? formatMoney(availability.feeCents) : copy.facts.free}</Fact>
+      <Fact label={copy.facts.cost}>{sheetCopy.feeOutcome(availability.feeCents > 0 ? formatMoney(availability.feeCents) : null)}</Fact>
       {facts && !(facts instanceof Error) && facts.ride && <Fact label={copy.facts.ride}>{facts.ride}</Fact>}
       {spots && !closed && <Fact label={copy.facts.spots}>{spots}</Fact>}
-      {(outcome || closed) && <Fact label={closed ? sheetCopy.whatHappens : copy.facts.whatHappens}>{outcomeText(availability)}</Fact>}
     </dl>
+    {note && <p className="m-0 py-3 text-[16px] text-vs-text">{note}</p>}
     {shiftsLater && <p className="m-0 text-[15px] text-vs-text-2">{signupCopy.shifts.waitlist}</p>}
   </>
 }

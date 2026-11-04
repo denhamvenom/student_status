@@ -6,6 +6,7 @@ describe('on-site event wording', () => {
     [{ destination: 'On site', onsite: true }, 'DSHS STEM Center (on site)'],
     [{ destination: 'Calendar room 12', onsite: true }, 'DSHS STEM Center (on site)'],
     [{ destination: 'Example arena' }, 'Example arena'],
+    [{ destination: 'Example arena', locationType: 'virtual' }, 'Virtual (Discord)'],
   ])('shows %o as %s', (event, shown) => expect(eventLocation(event)).toBe(shown))
 
   it.each([

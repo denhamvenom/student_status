@@ -68,3 +68,15 @@
 .disclosureBody :global([data-slot=card]),.disclosureBody :global(.card){box-shadow:none}
 .root .disclosure{margin-bottom:0}
 @media(max-width:767px){.disclosure>summary{align-items:flex-start;flex-wrap:wrap;gap:2px 12px;padding:12px 14px}.disclosure>summary strong{flex-basis:calc(100% - 36px)}.disclosure>summary span{flex-basis:calc(100% - 36px);order:2}.disclosure>summary::after{position:relative;margin-top:-2px}.disclosureBody{padding:0 14px 14px}}
+/* Event page: section anchors as 44px chips, the "?" help toggle and the Team Calendar chip. */
+nav.navChips{gap:8px;padding:8px 0}
+nav.navChips a{min-height:44px;padding:8px 16px;border:1px solid var(--border-default);border-radius:22px;background:var(--surface-card);font-weight:600;text-decoration:none}
+nav.navChips a:hover{border-color:var(--purple-700)}
+.helpToggle{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;margin-left:4px;vertical-align:middle;border:1px solid var(--border-default);border-radius:50%;background:var(--surface-card);color:var(--accent-text);font-weight:700;cursor:pointer}
+.helpToggle:focus-visible{outline:2px solid var(--accent-text);outline-offset:2px}
+.helpText{display:block;margin-top:6px;color:var(--text-muted);font-size:14px}
+.statusLine{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin:0}
+.detailsMore{margin-top:8px}.detailsMore>summary{display:flex;align-items:center;min-height:44px;cursor:pointer;font-weight:600}
+.chip,.disclosure>summary span.chip{flex:0 0 auto;display:inline-flex;align-items:center;min-height:26px;padding:3px 10px;border-radius:18px;font-size:13px;font-weight:700;background:var(--surface-metal);color:var(--text-body)}
+.chip.chipReady,.disclosure>summary span.chipReady{background:var(--go-bg);color:var(--go-dot)}
+.chip.chipAttention,.disclosure>summary span.chipAttention{background:var(--stop-bg);color:var(--stop-dot)}

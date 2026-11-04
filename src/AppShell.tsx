@@ -18,7 +18,7 @@ import { OfflineBanner } from './pwa/OfflineBanner'
 import { NotificationBell, NotificationSync, useSignOut } from './notifications'
 type ShellViewer = { user: { name: string; email: string } | null; season: { name: string } | null }
 export { menu }
-export const primaryPaths:Record<string,string[]>={student:['/','/events','/finances','/profile'],parent:['/','/events','/forms','/finances'],coach:['/','/events','/readiness','/finances'],travelLead:['/readiness','/events','/','/drivers'],mentor:['/','/report','/settings']}
+export const primaryPaths:Record<string,string[]>={student:['/','/events','/finances','/profile'],parent:['/','/events','/forms','/finances'],coach:['/','/events','/readiness','/finances'],travelLead:['/readiness','/events','/','/drivers'],mentor:['/','/invited','/report','/settings']}
 
 export function AppShell({ children, viewer, familyContext, role = "coach" }: { children: ReactNode; viewer: ShellViewer; familyContext?: ReactNode; role?: string }) {
   const shellRef=useRef<HTMLDivElement>(null), headerRef=useRef<HTMLElement>(null)
@@ -62,7 +62,7 @@ export function AppShell({ children, viewer, familyContext, role = "coach" }: { 
   const additionalLinks = allowed.filter(([, path]) => !primary.includes(path))
   const moreGroups = staff ? Object.entries(filteredGroups).map(([label, links]) => [label, links.filter(([, path]) => !primary.includes(path))] as const).filter(([, links]) => links.length > 0) : []
   const roleLabel = role === 'travelLead' ? navigationCopy.travelLeadRole : role[0].toUpperCase() + role.slice(1)
-  const icon = (path: string) => path === '/events' ? <Calendar size={21}/> : path === '/finances' ? <DollarSign size={21}/> : path === '/readiness' ? <SquareCheck size={21}/> : path === '/' ? (role === 'mentor' ? <UserRound size={21}/> : staff ? <Users size={21}/> : <Home size={21}/>) : path === '/profile' || path === '/myprofile' ? <UserRound size={21}/> : path === '/settings' ? <Settings size={21}/> : path === '/drivers' ? <Car size={21}/> : <FileText size={21}/>
+  const icon = (path: string) => path === '/events' || path === '/invited' ? <Calendar size={21}/> : path === '/finances' ? <DollarSign size={21}/> : path === '/readiness' ? <SquareCheck size={21}/> : path === '/' ? (role === 'mentor' ? <UserRound size={21}/> : staff ? <Users size={21}/> : <Home size={21}/>) : path === '/profile' || path === '/myprofile' ? <UserRound size={21}/> : path === '/settings' ? <Settings size={21}/> : path === '/drivers' ? <Car size={21}/> : <FileText size={21}/>
   return <div ref={shellRef} className={styles.review}>
     <OfflineBanner/>
     <NotificationSync viewingInbox={pathname === '/inbox'}/>

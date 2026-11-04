@@ -1,16 +1,17 @@
-import { useState, type ReactNode } from 'react'
-import { DashboardTile } from '@/components/dashboard/DashboardTile'
+import { useMemo, useState, type ReactNode } from 'react'
 import { HeroStack, type HeroSlide } from '@/components/dashboard/HeroStack'
 import { TileError, TileErrorBoundary } from '@/components/dashboard/TileErrorBoundary'
 import { RingsSkeleton, TileSkeleton } from '@/components/dashboard/TileSkeleton'
 import { homeCopy } from './copy'
 import { formatLongDate } from './format'
+import { nextUp, thisWeek } from './agenda'
 import { hasOwnWork, heroCards, visibleAnnouncements, type HeroCard } from './logic'
 import { ActionCard, actionContent } from './tiles/ActionCard'
 import { AnnouncementCard } from './tiles/AnnouncementCard'
 import { BalanceTile } from './tiles/BalanceTile'
 import { CountdownCard } from './tiles/CountdownCard'
-import { OpenSignupsTile, type SignedUp } from './tiles/OpenSignupsTile'
+import { NextUpCard } from './tiles/NextUpCard'
+import { OpenSignupsTile, type SignedUp, type SignupPlaces } from './tiles/OpenSignupsTile'
 import { ParticipationTile } from './tiles/ParticipationTile'
 import { RoomChoiceCard } from './tiles/RoomChoiceCard'
 import { WhatsLeftTile } from './tiles/WhatsLeftTile'
@@ -61,7 +62,8 @@ function Hero({ summary, announcements, finance, now, handlers }: Pick<StudentHo
   const cards: HeroCard[] = summary instanceof Error
     ? visibleAnnouncements(pinned, now).map(announcement => ({ kind: 'announcement', key: `pin:${announcement.id}`, announcement }))
     : heroCards(summary, pinned, now)
-  if (cards.length === 0) return <DashboardTile surface="hero" tone="quiet" aria-label={copy.hero.region} className="justify-center"><p className="m-0 text-[14px] text-vs-muted">{copy.hero.empty}</p></DashboardTile>
+  // Nothing to show: Highlights collapse so Next up leads the page instead of an empty card.
+  if (cards.length === 0) return null
   const fundraiserLinked = !(summary instanceof Error) && summary.fundraiserLinked
   // The amount appears only while Money has it; the card still says what to do without it.
   const balanceDueCents = finance !== undefined && !(finance instanceof Error) && finance.state === 'ready' ? finance.dueCents : null
@@ -76,6 +78,14 @@ function Hero({ summary, announcements, finance, now, handlers }: Pick<StudentHo
   return <HeroStack slides={slides} labels={copy.hero} />
 }
 
+/** Next up and This week lead Home; they read app.listEvents only. */
+function NextUp({ events, now, handlers }: Pick<StudentHomeViewProps, 'events' | 'now' | 'handlers'>) {
+  if (events === undefined) return <TileSkeleton rows={2} label={copy.states.loading(copy.agenda.nextUp)} />
+  if (events instanceof Error) return failed(copy.agenda.nextUp, 'events', handlers, 'tile', copy.states.tileFailed(copy.agenda.nextUp))
+  const next = nextUp(events, now)
+  return <Guard title={copy.agenda.nextUp} source="events" handlers={handlers}><NextUpCard next={next} week={thisWeek(events, now, next?.eventId ?? null)} /></Guard>
+}
+
 function Balance({ finance, summary, handlers }: Pick<StudentHomeViewProps, 'finance' | 'summary' | 'handlers'>) {
   if (finance === undefined) return <TileSkeleton surface="compact" rows={0} label={copy.states.loading(copy.balance.label)} />
   if (finance instanceof Error || finance.state === 'failed') return failed(copy.balance.label, 'finance', handlers, 'compact', copy.balance.failed)
@@ -85,19 +95,21 @@ function Balance({ finance, summary, handlers }: Pick<StudentHomeViewProps, 'fin
 }
 
 /**
- * Student Home, phone first. Phone: greeting line, Highlights, Open signups, What's left,
+ * Student Home, phone first. Phone: greeting line, Next up (with This week), Highlights (hidden when empty), Open signups, What's left,
  * Participation, Balance due. Tablet (768–1023px): the phone layout, at most 720px wide and centered.
  * Desktop (≥1024px): greeting row, then a 2fr/1fr grid with Highlights on the left, Open signups /
  * What's left / Balance due on the right and Participation full width.
  * The shell supplies the page gutters (14px phone, 28px desktop in the artboards).
  */
-export function StudentHomeView({ summary, attendance, announcements, finance, now, handlers }: StudentHomeViewProps) {
+export function StudentHomeView({ summary, attendance, announcements, finance, events, now, handlers }: StudentHomeViewProps) {
   // Held here, not in the tile: the tile remounts when the summary reloads or its error boundary recovers,
   // and the signed-up event has already left the list by then.
   const [signedUp, setSignedUp] = useState<SignedUp | null>(null)
+  // Open signup rows show where each event is; app.listEvents has the place, the summary does not.
+  const places = useMemo<SignupPlaces | undefined>(() => Array.isArray(events) ? new Map(events.map(event => [event.eventId, event.place])) : undefined, [events])
   const signups = summary === undefined ? <TileSkeleton label={copy.states.loading(copy.signups.title)} />
     : summary instanceof Error ? failed(copy.signups.title, 'summary', handlers)
-    : <Guard title={copy.signups.title} source="summary" handlers={handlers}><OpenSignupsTile signups={summary.openSignups} now={now} handlers={handlers} signedUp={signedUp} onSignedUpChange={setSignedUp} /></Guard>
+    : <Guard title={copy.signups.title} source="summary" handlers={handlers}><OpenSignupsTile signups={summary.openSignups} now={now} places={places} handlers={handlers} signedUp={signedUp} onSignedUpChange={setSignedUp} /></Guard>
   const whatsLeft = summary === undefined ? <TileSkeleton label={copy.states.loading(copy.whatsLeft.title)} />
     : summary instanceof Error ? failed(copy.whatsLeft.title, 'summary', handlers)
     : <Guard title={copy.whatsLeft.title} source="summary" handlers={handlers}><WhatsLeftTile items={summary.whatsLeft} now={now} /></Guard>
@@ -109,8 +121,12 @@ export function StudentHomeView({ summary, attendance, announcements, finance, n
     <Greeting summary={summary} now={now} />
     {/* 2fr / 1fr as drawn at 1280px; the right column keeps at least 300px so its rows stay readable at 1024px. */}
     <div className="flex min-w-0 flex-col gap-2.5 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)] lg:gap-4">
-      <div className="flex min-w-0 flex-col [&>*]:flex-1">
-        <Guard title={copy.hero.region} source={heroSources} handlers={handlers} surface="hero"><Hero summary={summary} announcements={announcements} finance={finance} now={now} handlers={handlers} /></Guard>
+      <div className="flex min-w-0 flex-col gap-2.5 lg:gap-4">
+        <NextUp events={events} now={now} handlers={handlers} />
+        {/* Collapses (empty:hidden) when Highlights have nothing to show. */}
+        <div className="flex min-w-0 flex-1 flex-col empty:hidden [&>*]:flex-1">
+          <Guard title={copy.hero.region} source={heroSources} handlers={handlers} surface="hero"><Hero summary={summary} announcements={announcements} finance={finance} now={now} handlers={handlers} /></Guard>
+        </div>
       </div>
       <div className="flex min-w-0 flex-col gap-2.5 lg:gap-[14px]">
         {signups}

@@ -21,5 +21,6 @@ describe('event wizard validation', () => {
   it('accepts a linked Calendar entry with no location while requiring one for a separate entry', () => {
     expect(eventDraftIssue({...draft,destination:'',calendarChoice:'existing-1'},0)).toBeNull()
     expect(eventDraftIssue({...draft,destination:'',calendarChoice:'create'},0)?.field).toBe('event-destination')
+    expect(eventDraftIssue({...draft,destination:'',calendarChoice:'none'},0)?.field).toBe('event-destination')
   })
 })

@@ -4,6 +4,7 @@ import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { chicagoDateKey } from '../student-home/format'
 import { useNow } from '../student-home/useNow'
+import { toAgendaEvents, type ListedEventRow } from '../student-home/agenda'
 import type { ParentHomeFinance, ParentHomeSummary, ParentPinnedAnnouncement } from './contract'
 import { ParentHomeView, type ParentHomeSource } from './ParentHomeView'
 
@@ -24,10 +25,13 @@ export function ParentHome({ studentId, studentName }: { studentId: Id<'students
     summary: { query: api.studentHome.parentSummary, args: { studentId, asOfDay, asOf: now } },
     announcements: { query: api.announcements.pinnedForParentHome, args: {} },
     finance: { query: api.dashboardReports.familyFinance, args: { studentId } },
+    events: { query: api.app.listEvents, args: {} },
     }
     return Object.fromEntries(Object.entries(all).filter(([source]) => !paused.has(source as ParentHomeSource)))
   }, [studentId, asOfDay, now, paused])
   const results = useQueries(queries)
+  const rows = results.events as Loadable<ListedEventRow[]>
+  const events = useMemo(() => rows === undefined || rows instanceof Error ? rows : toAgendaEvents(rows), [rows])
   const retry = useCallback((source: ParentHomeSource) => setPaused(previous => new Set([...previous, source])), [])
-  return <ParentHomeView studentName={studentName} now={now} summary={results.summary as Loadable<ParentHomeSummary>} announcements={results.announcements as Loadable<ParentPinnedAnnouncement[]>} finance={results.finance as Loadable<ParentHomeFinance>} retry={retry} />
+  return <ParentHomeView studentName={studentName} now={now} summary={results.summary as Loadable<ParentHomeSummary>} announcements={results.announcements as Loadable<ParentPinnedAnnouncement[]>} finance={results.finance as Loadable<ParentHomeFinance>} events={events} retry={retry} />
 }

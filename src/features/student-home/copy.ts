@@ -27,6 +27,17 @@ export const homeCopy = {
     empty: 'Nothing new from the team right now.',
   },
 
+  /** Next up and This week (app.listEvents). */
+  agenda: {
+    nextUp: 'Next up',
+    thisWeek: 'This week',
+    nothingNext: 'Nothing on your calendar yet. New events show up here.',
+    nothingThisWeek: 'Nothing else this week.',
+    openEvent: (name: string) => `Open ${name}`,
+    allEvents: 'All events',
+    failed: 'Your events could not load.',
+  },
+
   room: {
     title: 'Room choice',
     closesOn: (day: string) => `Closes ${day}`,
@@ -138,10 +149,13 @@ export const homeCopy = {
     spots: 'Spots',
     spotsLeft: (count: number) => `${count} ${plural(count, 'spot', 'spots')} left`,
     full: 'Full',
-    whatHappens: 'What happens',
+    /** Label for the closed-signup note (the "What happens" heading was dropped, owner request 2026-11-03). */
+    whatHappens: 'Signup',
+    /** What Sign up costs: "Fee: $85 (added to Money)" or "Free". */
+    feeOutcome: (amount: string | null) => amount ? `Fee: ${amount} (added to Money)` : 'Free',
     outcome: {
-      signedUp: "You're signed up when you press Sign up. The fee is added to Money.",
-      signedUpNoFee: "You're signed up when you press Sign up.",
+      signedUp: 'Fee added to Money',
+      signedUpNoFee: 'Free',
       waitingForApproval: "A Coach or Travel Lead reviews your signup. Any fee is charged when you're confirmed.",
       waitlisted: "You'll join the waitlist.",
       closed: 'Signup for this event has closed. Ask a Coach or Travel Lead if you still need to go.',

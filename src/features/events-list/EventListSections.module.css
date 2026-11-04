@@ -1,0 +1,31 @@
+/* Events list: date sections, staff type chips, series cards and a canceled badge that reads at a glance. */
+.chips{display:flex;gap:8px;margin:18px 0 0;padding:0 0 4px;overflow-x:auto;scrollbar-width:thin}
+.chips button{flex:0 0 auto;min-height:44px}
+.chips button[aria-pressed="true"]{background:var(--purple-700);color:white;border-color:transparent}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:12px}
+.toolbar button{min-height:44px}
+
+.sectionHead{display:flex;align-items:baseline;gap:8px;margin:26px 0 12px}
+.sectionHead h2{margin:0}
+.sectionHead span{font-size:14px}
+
+/* Solid, high-contrast pill (not tinted text) so a canceled event can't be mistaken for an open one. */
+.canceledBadge{display:inline-flex;align-items:center;min-height:26px;padding:3px 10px;border-radius:18px;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;line-height:1.25;white-space:nowrap;background:var(--stop-dot);color:var(--surface-card)}
+
+/* Single canceled cards come from the page's renderCard; the wrapper adds no box of its own. */
+.canceledCard{display:contents}
+.canceledCard > :global(.card){border-style:dashed;opacity:.85}
+.canceledCard :global(.badge-open){background:var(--stop-dot);color:var(--surface-card);font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+
+.series h3{margin:0 0 6px}
+.series p{margin:0 0 8px}
+.meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 8px}
+.series details summary{display:flex;align-items:center;min-height:44px;cursor:pointer}
+.series li{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.series li a{display:inline-flex;align-items:center;min-height:44px}
+.canceledSeries{border-style:dashed}
+
+@media (max-width:480px){
+  .series p{font-size:14px}
+  .sectionHead{margin:20px 0 10px}
+}

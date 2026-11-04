@@ -4,6 +4,7 @@ import type { FunctionReturnType } from 'convex/server'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { useLiveSignupSource } from '../event-signup/wizardSource'
+import { toAgendaEvents, type AgendaEvent, type ListedEventRow } from './agenda'
 import type { HomeAttendance, PinnedAnnouncement, StudentHomeSummary } from './contract'
 import { chicagoDateKey } from './format'
 import { StudentHomeView } from './StudentHomeView'
@@ -35,6 +36,11 @@ function useSteadySummary(current: Loadable<StudentHomeSummary>): Loadable<Stude
   return current === undefined ? last : current
 }
 
+/** app.listEvents rows as Next up / This week events; recomputed only when the rows change. */
+function useAgendaEvents(rows: Loadable<ListedEventRow[]>): Loadable<AgendaEvent[]> {
+  return useMemo(() => rows === undefined || rows instanceof Error ? rows : toAgendaEvents(rows), [rows])
+}
+
 /**
  * Loads every Home source without throwing (useQueries reports errors as values), so one failed
  * query only breaks its own tile. "Try again" drops the tile's subscriptions for a tick and
@@ -53,6 +59,7 @@ function useStudentHomeData(studentId: Id<'students'>, asOfDay: string) {
       attendance: { query: homeAttendanceQuery, args: { studentId } },
       announcements: { query: pinnedQuery, args: {} },
       finance: { query: api.dashboardReports.familyFinance, args: { studentId } },
+      events: { query: api.app.listEvents, args: {} },
     }
     return Object.fromEntries(Object.entries(all).filter(([source]) => !paused.has(source as HomeTileSource)))
   }, [studentId, asOfDay, paused])
@@ -65,6 +72,7 @@ function useStudentHomeData(studentId: Id<'students'>, asOfDay: string) {
     attendance: results.attendance as Loadable<HomeAttendance>,
     announcements: results.announcements as Loadable<PinnedAnnouncement[]>,
     finance: toHomeFinance(results.finance as Loadable<FamilyFinance>),
+    events: useAgendaEvents(results.events as Loadable<ListedEventRow[]>),
     retry,
   }
 }
@@ -73,8 +81,8 @@ function useStudentHomeData(studentId: Id<'students'>, asOfDay: string) {
 export function StudentHome({ studentId }: { studentId: Id<'students'> }) {
   const now = useNow()
   const asOfDay = chicagoDateKey(now)
-  const { summary, attendance, announcements, finance, retry } = useStudentHomeData(studentId, asOfDay)
+  const { summary, attendance, announcements, finance, events, retry } = useStudentHomeData(studentId, asOfDay)
   const signup = useLiveSignupSource()
   const handlers = useMemo<StudentHomeHandlers>(() => ({ signup, retry }), [signup, retry])
-  return <StudentHomeView summary={summary} attendance={attendance} announcements={announcements} finance={finance} now={now} handlers={handlers} />
+  return <StudentHomeView summary={summary} attendance={attendance} announcements={announcements} finance={finance} events={events} now={now} handlers={handlers} />
 }

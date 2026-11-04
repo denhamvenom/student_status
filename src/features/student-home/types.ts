@@ -1,4 +1,5 @@
 import type { SignupWizardSource } from '../event-signup/types'
+import type { AgendaEvent } from './agenda'
 import type { HomeAttendance, PinnedAnnouncement, StudentHomeSummary } from './contract'
 
 /** A query result as useQueries reports it: undefined while loading, an Error when it failed. */
@@ -11,7 +12,7 @@ export type HomeFinance =
   | { state: 'failed' }
 
 /** Data sources that can be retried independently. */
-export type HomeTileSource = 'summary' | 'attendance' | 'announcements' | 'finance'
+export type HomeTileSource = 'summary' | 'attendance' | 'announcements' | 'finance' | 'events'
 
 /** participation.signUp result. */
 export type SignUpResult = 'pending' | 'confirmed' | 'waitlist'
@@ -28,6 +29,8 @@ export type StudentHomeViewProps = {
   attendance: Loadable<HomeAttendance>
   announcements: Loadable<PinnedAnnouncement[]>
   finance: Loadable<HomeFinance>
+  /** The Student's visible events (app.listEvents) for Next up and This week. */
+  events: Loadable<AgendaEvent[]>
   /** Browser clock (useNow); every soon/past decision uses it. */
   now: number
   handlers: StudentHomeHandlers

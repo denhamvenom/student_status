@@ -28,3 +28,8 @@
 @media(max-width:767px){.optionRow{align-items:stretch}.formActions>*{flex:1 1 auto}}
 .list{padding-left:0!important;list-style:none}
 .slotRow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--border-default)}
+/* New event and Team meeting disclosures ("More", "All details", optional Extras sections): closed until asked for. */
+.disclosure{display:flex;flex-direction:column;gap:12px;min-width:0;padding:10px 12px;border:1px solid var(--border-default);border-radius:8px}
+.disclosure>summary{min-height:28px;font-weight:700;cursor:pointer}
+.disclosure[open]>summary{margin-bottom:12px}
+.disclosure>summary small{margin-left:6px;color:var(--text-muted);font-size:13px;font-weight:400}

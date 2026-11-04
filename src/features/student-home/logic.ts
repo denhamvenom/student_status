@@ -1,5 +1,6 @@
 import type { Id } from '../../../convex/_generated/dataModel'
 import type { HomeAttendance, OpenSignup, PinnedAnnouncement, RoomChoice, StudentHomeSummary, UpcomingCompetition, WhatsLeftItem } from './contract'
+import { costLabel, formatWhen, requiredBadge } from './agenda'
 import { chicagoDateKey, formatShortDate } from './format'
 import { homeCopy } from './copy'
 
@@ -211,9 +212,19 @@ export function heroCards(summary: Pick<StudentHomeSummary, 'whatsLeft' | 'paren
 
 // Open signups --------------------------------------------------------------
 
-/** Signups whose close time has not passed, closing soonest first. */
+/** Signups still open for events that are not over, soonest event first (then closing soonest, then by name). */
 export function openSignupRows(signups: OpenSignup[], now: number) {
-  return signups.filter(signup => signup.signupClosesAt === null || signup.signupClosesAt > now).sort((a, b) => ascending(a.signupClosesAt, b.signupClosesAt) || a.startsAt - b.startsAt)
+  return signups
+    .filter(signup => (signup.signupClosesAt === null || signup.signupClosesAt > now) && Math.max(signup.startsAt, signup.endsAt) > now)
+    .sort((a, b) => a.startsAt - b.startsAt || ascending(a.signupClosesAt, b.signupClosesAt) || a.name.localeCompare(b.name))
+}
+
+/**
+ * The row's detail line: "Tue Nov 3, 6–8 PM · Optional · Free · Virtual (Discord)". Open signups are never required.
+ * The place comes from app.listEvents; it is left out while that is loading or the event is not there.
+ */
+export function openSignupDetails(signup: Pick<OpenSignup, 'startsAt' | 'endsAt' | 'feeCents'>, place: string | null | undefined) {
+  return [formatWhen(signup.startsAt, Math.max(signup.startsAt, signup.endsAt)), requiredBadge(false).label, costLabel(signup.feeCents), place || null].filter(Boolean).join(' · ')
 }
 
 export function openSignupsSummary(signups: OpenSignup[], now: number) {
