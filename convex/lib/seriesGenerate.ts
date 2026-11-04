@@ -215,13 +215,25 @@ export async function rowsFrom(ctx: QueryCtx | MutationCtx, seriesId: Id<"eventS
   return rows;
 }
 
-/** True when any Timeclock session exists on a Calendar instance linked to one of these rows (attendance would be orphaned). */
+/**
+ * True when attendance was taken for one of these rows (it would be orphaned): a Timeclock session on the Calendar instance
+ * a row links to, or, for any row including app-only meetings, an attendance record on an attendance meeting for the same
+ * occurrence: one linked to the row's event id, or one with no event link, on the row's Chicago date. Both the original
+ * occurrence date and the current one are checked, so a moved meeting is still found whatever time it was recorded at.
+ * (Manual Timeclock occurrences carry no event link, so they can't be matched to a meeting.)
+ */
 export async function sessionsExistOn(ctx: QueryCtx | MutationCtx, rows: Doc<"events">[]): Promise<boolean> {
   for (const row of rows) {
-    if (!row.calendarEventId) continue;
-    const occurrence = await ctx.db.query("timeclockOccurrences").withIndex("by_source_and_sourceKey", q => q.eq("source", "calendar").eq("sourceKey", row.calendarEventId!)).first();
-    if (!occurrence) continue;
-    if (await ctx.db.query("timeclockSessions").withIndex("by_occurrenceId", q => q.eq("occurrenceId", occurrence._id)).first()) return true;
+    if (row.calendarEventId) {
+      const occurrence = await ctx.db.query("timeclockOccurrences").withIndex("by_source_and_sourceKey", q => q.eq("source", "calendar").eq("sourceKey", row.calendarEventId!)).first();
+      if (occurrence && await ctx.db.query("timeclockSessions").withIndex("by_occurrenceId", q => q.eq("occurrenceId", occurrence._id)).first()) return true;
+    }
+    for (const date of new Set([row.seriesOccurrenceKey ?? chicagoDate(row.startsAt), chicagoDate(row.startsAt)])) {
+      const meetings = await ctx.db.query("attendanceMeetings").withIndex("by_seasonId_and_startsAt", q => q.eq("seasonId", row.seasonId).gte("startsAt", chicagoMidnight(date)).lt("startsAt", chicagoMidnight(addDays(date, 1)))).take(50);
+      for (const meeting of meetings) {
+        if ((meeting.eventId === row._id || meeting.eventId === undefined) && await ctx.db.query("attendanceRecords").withIndex("by_meetingId_and_studentId", q => q.eq("meetingId", meeting._id)).first()) return true;
+      }
+    }
   }
   return false;
 }

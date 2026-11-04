@@ -31,6 +31,8 @@ export const eventEditCopy = {
   close: 'Close',
   saved: 'Changes saved.',
   canceled: 'Event canceled.',
+  /** "This and all future meetings" canceled: "3 meetings canceled". */
+  meetingsCanceled: (count: number) => `${count} meeting${count === 1 ? '' : 's'} canceled`,
   cancelConfirm: 'Cancel this event? A connected Team Calendar entry is canceled too. Signups and fees are not changed.',
   coachOnlyGroup: 'Only the Coach can change required group meetings.',
   coachOnlyEvent: 'Only the Coach can change this event',
@@ -47,6 +49,12 @@ export function eventEditBlocker(isCoach: boolean, event: EditableEvent): string
   if (requiredGroup || event.assignmentScope === 'wholeTeam') return eventEditCopy.coachOnlyGroup
   if (event.assignmentScope === 'travelTeam') return eventEditCopy.coachOnlyEvent
   return null
+}
+
+/** The toast after canceling: how many meetings a series cancel removed (eventSeries.cancelFuture), else "Event canceled.". */
+export function cancelToastText(result: unknown): string {
+  const count = (result as { cancelled?: unknown } | null)?.cancelled
+  return typeof count === 'number' && count > 0 ? eventEditCopy.meetingsCanceled(count) : eventEditCopy.canceled
 }
 
 export const placeEditable = (event: EditableEvent) => !event.onsite && event.locationType !== 'virtual'

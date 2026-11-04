@@ -5,15 +5,16 @@ import { internalAction, internalMutation, internalQuery, type ActionCtx, type M
 import { boundCalendar, calendarError, configured, eventUrl, googleDetails, MEDIA_MARKER, notifySeriesRepresentative, token, validCalendarEventId, writeEnabled } from "./eventCalendar";
 import { chicagoDate, chicagoMidnight } from "./lib/calendarDates";
 import { toGoogleRecurrence } from "./lib/rrule";
-import { addDays, firstOccurrence, SERIES_TIME_ZONE } from "./lib/seriesRecurrence";
+import { addDays, firstOccurrence, SERIES_TIME_ZONE, zonedWallTimeToUtc } from "./lib/seriesRecurrence";
 import { chicagoLocalDateTime, createOccurrence, GENERATE_BATCH, isOccurrence, masterIdForSeries, ruleOf, sameRecurrence, seriesAudienceStudentIds, todayKey, truncateRecurrence, windowEndKey } from "./lib/seriesGenerate";
 
 /**
  * Google Calendar side of recurring meetings: one app series = one Google recurring master (RRULE) whose instances are
  * linked one-to-one to the series' events rows (calendarChoice "link", calendarEventId = instance id, eventCalendarClaims).
  *
- * Hard rule: an existing master's start/end/summary/location is never PATCHed; the only write to an existing master is the
- * UNTIL truncation (or deleting a master that has no past instance). "This and following" always creates a new series and
+ * Hard rule: an existing master's start/end/summary/location is never PATCHed; the only write to an existing master is its
+ * recurrence UNTIL (truncation, or a later UNTIL from "Change end date", eventSeries.setEndDate) or deleting a master that
+ * has no past instance. "This and following" always creates a new series and
  * master (eventSeries.editFuture). Instance ids are always read from events/{master}/instances, never synthesized.
  */
 
@@ -196,7 +197,9 @@ export const linkInstances = internalMutation({
         await ctx.db.delete(claim._id);
       }
       if (row) {
-        if (row.cancelled && !row.calendarChoice && !row.seriesDetached) continue;
+        // A meeting canceled here without a Calendar link (e.g. by a shortened end date that was later moved back out) whose
+        // instance is live again: link it and fall through to the override push below, which cancels that one instance in
+        // Team Calendar (an instance exception, no notices), so the app and Calendar agree.
         await replaceClaim(ctx, row._id, item.id);
         const fields = linkFields(row, series, item);
         if (!differs(row, item)) await ctx.db.patch(row._id, fields);
@@ -313,6 +316,14 @@ export async function truncateMasterNow(ctx: ActionCtx, seriesId: Id<"eventSerie
     const raw: unknown = await current.json();
     const detail = googleDetails(raw);
     const lines = raw && typeof raw === "object" && "recurrence" in raw && Array.isArray(raw.recurrence) ? raw.recurrence.filter((line): line is string => typeof line === "string") : [];
+    const recurrence = lines.some(line => /^RRULE:/i.test(line.trim())) ? truncateRecurrence(lines, untilMs) : null;
+    if (!deleteMaster && recurrence && sameRecurrence(recurrence, lines)) {
+      // Already ends there (an earlier job of several quick end-date changes wrote the latest end, maybe before its own
+      // result was stored here): success with no write, even when the stored copy is older.
+      await ctx.runMutation(internal.eventSeriesCalendar.markSeries, { seriesId, calendarSyncState: "synced", error: null, etag: detail.etag, recurrence: lines, providerUpdatedAt: detail.updatedAt });
+      await syncInstancesNow(ctx, seriesId, auth, false);
+      return true;
+    }
     if (snap.storedRecurrence && !sameRecurrence(lines, snap.recurrence)) return await fail("The repeat rule was changed in Team Calendar. Review the series before changing it here.", true);
     // Never write without the master's etag: an empty if-match would overwrite a concurrent Calendar edit. Retryable.
     if (!detail.etag) return await fail("Team Calendar didn't return the latest copy of this series. Try again.");
@@ -322,7 +333,7 @@ export async function truncateMasterNow(ctx: ActionCtx, seriesId: Id<"eventSerie
       await ctx.runMutation(internal.eventSeriesCalendar.markSeries, { seriesId, calendarSyncState: "synced", error: null });
       return true;
     }
-    const recurrence = truncateRecurrence(lines, untilMs);
+    if (!recurrence) throw new Error("The series has no repeat rule to end.");
     const patched = await fetch(eventUrl(snap.masterId), { method: "PATCH", headers: { authorization: auth, "content-type": "application/json", "if-match": detail.etag }, body: JSON.stringify({ recurrence }) });
     if (!patched.ok) return await fail(calendarError(patched.status), patched.status === 412);
     const latest = googleDetails(await patched.json());
@@ -349,6 +360,36 @@ export const splitMaster = internalAction({
 export const truncateMaster = internalAction({
   args: { seriesId: v.id("eventSeries"), untilMs: v.number(), deleteMaster: v.boolean() }, returns: v.null(),
   handler: async (ctx, args) => { await truncateMasterNow(ctx, args.seriesId, args.untilMs, args.deleteMaster); return null; },
+});
+
+export const seriesUntil = internalQuery({
+  args: { seriesId: v.id("eventSeries") }, returns: v.union(v.string(), v.null()),
+  handler: async (ctx, args) => (await ctx.db.get(args.seriesId))?.untilDate ?? null,
+});
+
+/**
+ * "Change end date": the master's recurrence gets UNTIL = the series' end date AS STORED WHEN THIS RUNS (so of several quick
+ * changes the latest always wins; an older `untilMs` argument from a queued job is ignored), earlier or later than before.
+ * Same if-match, recurrence-only PATCH as a truncation (start/end/summary/location are never written), skipped when the
+ * master already ends there. A later UNTIL adds instances, which the follow-up instance sync links to new silent meetings.
+ *
+ * Concurrent jobs: after each attempt the stored end is read again. If it changed meanwhile (another end-date change
+ * committed while this one wrote), or the attempt failed (e.g. 412 because another job wrote first, or a stored copy that
+ * another job hadn't updated yet), it tries again with the latest end, at most SET_UNTIL_ATTEMPTS times.
+ */
+const SET_UNTIL_ATTEMPTS = 3;
+export const setMasterUntil = internalAction({
+  args: { seriesId: v.id("eventSeries"), untilMs: v.optional(v.number()) }, returns: v.null(),
+  handler: async (ctx, args) => {
+    for (let attempt = 0; attempt < SET_UNTIL_ATTEMPTS; attempt++) {
+      const until: string | null = await ctx.runQuery(internal.eventSeriesCalendar.seriesUntil, { seriesId: args.seriesId });
+      if (until === null) return null;
+      const ok = await truncateMasterNow(ctx, args.seriesId, zonedWallTimeToUtc(addDays(until, 1), "00:00") - 1000, false);
+      const latest: string | null = await ctx.runQuery(internal.eventSeriesCalendar.seriesUntil, { seriesId: args.seriesId });
+      if (ok && latest === until) return null;
+    }
+    return null;
+  },
 });
 
 /**

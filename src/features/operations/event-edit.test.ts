@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { chicagoInputTime } from '@/lib/chicago-time'
-import { draftFrom, eventEditBlocker, eventEditValues, type EditableEvent } from './event-edit'
+import { cancelToastText, draftFrom, eventEditBlocker, eventEditValues, type EditableEvent } from './event-edit'
 
 const start = Date.UTC(2026, 10, 10, 23, 0) // Tuesday 5:00 PM Central
 const event: EditableEvent = { _id: 'e1', name: 'Build meeting', destination: 'Room 12', startsAt: start, endsAt: start + 2 * 3600_000 }
@@ -36,5 +36,17 @@ describe('eventEditValues', () => {
     { name: 'unreadable start', change: { start: '20261-11-10T17:00' } },
   ])('rejects $name', ({ change }) => {
     expect(eventEditValues(event, { ...draft, ...change })).toHaveProperty('error')
+  })
+})
+
+describe('cancelToastText', () => {
+  it.each([
+    [{ cancelled: 3 }, '3 meetings canceled'],
+    [{ cancelled: 1 }, '1 meeting canceled'],
+    // "This meeting only" and a single event return nothing to count.
+    [null, 'Event canceled.'],
+    [{ cancelled: 0 }, 'Event canceled.'],
+  ])('%o says %s', (result, text) => {
+    expect(cancelToastText(result)).toBe(text)
   })
 })

@@ -355,6 +355,30 @@ export const operationsText = {
     originalInterval: (date: string) => `original interval at ${date}`,
     addedInterval: (date: string) => `added interval at ${date}`,
   },
+  /** "Change end date" for a repeating series (convex/eventSeries.ts setEndDate). */
+  seriesEnd: {
+    change: 'Change end date',
+    title: 'Change end date',
+    description: 'Meetings after this date are canceled (one notice). Moving it later adds meetings.',
+    // Same label as the create sheet (event-setup team-meeting copy).
+    endsOn: 'Last meeting on or before',
+    noChange: 'No change',
+    onCalendar: 'Team Calendar is updated too.',
+    confirm: 'Change end date',
+    saving: 'Saving…',
+    close: 'Close',
+    saved: 'End date changed.',
+    checking: 'Checking…',
+    noMeetings: 'No meetings fall on or before that date.',
+    /** "Repeats every Tuesday until May 31, 2027"; "every 2 weeks on Tuesday and Thursday" for longer intervals. */
+    repeats: (days: string, intervalWeeks: number, until: string | null) => `Repeats ${intervalWeeks > 1 ? `every ${intervalWeeks} weeks on ${days}` : `every ${days}`}${until ? ` until ${until}` : ''}`,
+    canceledSeries: 'This repeating meeting was canceled.',
+    /** "Last meeting: December 15, 2026 · 4 meetings will be canceled: Dec 22, Dec 29, Jan 5 +1 more". */
+    lastMeeting: (date: string, canceled: number, dates: string[]) => `Last meeting: ${date} · ${canceled} meeting${canceled === 1 ? '' : 's'} will be canceled${dates.length ? `: ${dates.join(', ')}${canceled > dates.length ? ` +${canceled - dates.length} more` : ''}` : ''}`,
+    lastMeetingExtended: (date: string, added: number) => `Last meeting: ${date} · ${added === 0 ? 'no new meetings' : `${added} more meeting${added === 1 ? '' : 's'}`}`,
+    addedLater: 'They appear on the schedule as the date gets closer.',
+    continuesFrom: (date: string) => `This series continues as a newer series from ${date}.`,
+  },
   rooms: {
     selectionCloses: (deadline: string) => `Selection closes ${deadline}.`,
     invitedBy: (inviter: string, group: string) => `${inviter} invited you to ${group}`,

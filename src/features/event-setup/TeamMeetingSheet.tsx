@@ -14,11 +14,11 @@ import { previewDateLabel, MAX_SERIES_MEETINGS, weekdays } from './audience/repe
 import type { PickerIssue, Weekday } from './audience/types'
 import setupStyles from './EventSetup.module.css'
 import { useCreateSeries } from './series-support'
-import { isPlan, seasonEndDate, teamMeetingDefaults, teamMeetingEventArgs, teamMeetingPlan, teamMeetingPrefill, type TeamMeetingDraft, teamMeetingCopy as copy } from './team-meeting'
+import { firstSearchDate, isPlan, seasonEndDate, teamMeetingDefaults, teamMeetingEndDateLimits, teamMeetingEndIssue, teamMeetingEventArgs, teamMeetingFirstDate, teamMeetingPlan, teamMeetingPrefill, teamMeetingSummary, type TeamMeetingDraft, teamMeetingCopy as copy } from './team-meeting'
 
 /**
  * "+ Team meeting" on Events (Coach and Travel Lead): one sheet for the usual weekly meeting at our shop. Everything but the
- * day, time and subteams is preset; "More options" opens the full New event wizard with these answers filled in.
+ * day, time, subteams and end is preset; "More options" opens the full New event wizard with these answers filled in.
  */
 export function TeamMeetingButton({ isCoach }: { isCoach: boolean }) {
   const [open, setOpen] = useState(false)
@@ -41,18 +41,26 @@ function TeamMeetingForm({ isCoach, busy, setBusy, onDone }: { isCoach: boolean;
   const [daysTouched, setDaysTouched] = useState(false)
   const [issue, setIssue] = useState<PickerIssue | null>(null)
   const [error, setError] = useState('')
-  const [moreOpen, setMoreOpen] = useState(false)
   const set = (change: Partial<TeamMeetingDraft>) => { setDraft(prior => ({ ...prior, ...change })); setIssue(null); setError('') }
   const days = audienceCopy.weekdays
-  const plan = teamMeetingPlan(draft, now)
-  const pickDay = (day: Weekday) => { set({ weekdays: daysTouched ? toggleItem(draft.weekdays, day).sort((a, b) => a - b) : [day] }); setDaysTouched(true) }
   const fieldId = (field: string) => `${id}-${field}`
   const invalid = (field: string) => issue?.field === field || undefined
+  // The first meeting even while something else is unfinished, so the season end label and the date limits stay right.
+  const firstDate = teamMeetingFirstDate(draft, now) ?? firstSearchDate(now, draft.startTime)
+  const seasonEnd = seasonEndDate(firstDate)
+  const endLimits = teamMeetingEndDateLimits(firstDate)
+  // A chosen last date is checked as it changes, right under its input.
+  const endIssue = teamMeetingEndIssue(draft, firstDate)
+  const endErrorId = fieldId('end-date-error')
+  // How many meetings Create makes and their range, once the sheet is complete.
+  const preview = teamMeetingPlan(draft, now)
+  const summary = isPlan(preview) ? teamMeetingSummary(preview) : null
+  const pickDay = (day: Weekday) => { set({ weekdays: daysTouched ? toggleItem(draft.weekdays, day).sort((a, b) => a - b) : [day] }); setDaysTouched(true) }
 
   const submit = async () => {
     if (busy) return
     const current = teamMeetingPlan(draft, Date.now())
-    if (!isPlan(current)) { setIssue(current); if (current.field === 'count') setMoreOpen(true); requestAnimationFrame(() => document.getElementById(fieldId(current.field))?.focus()); return }
+    if (!isPlan(current)) { setIssue(current); requestAnimationFrame(() => document.getElementById(fieldId(current.field))?.focus()); return }
     setBusy(true); setError('')
     try {
       const args = teamMeetingEventArgs(draft, isCoach, parseChicagoInput(current.start), parseChicagoInput(current.end))
@@ -94,22 +102,26 @@ function TeamMeetingForm({ isCoach, busy, setBusy, onDone }: { isCoach: boolean;
       </div>
     </fieldset> : <><p className={styles.hint}>{copy.optionalOnly}</p><p className={styles.hint}>{copy.coachOnlyRequired}</p></>}
     <p className={styles.hint}>{copy.summary}</p>
-    {isPlan(plan) && <p className={styles.count} aria-live="polite">{copy.first(previewDateLabel(plan.firstDate))}</p>}
-    <details className={setupStyles.disclosure} open={moreOpen} onToggle={e => setMoreOpen(e.currentTarget.open)}>
-      <summary>{copy.more}</summary>
-      <fieldset className={styles.group} disabled={busy}>
-        <legend>{copy.repeatEnds}</legend>
-        <div className={styles.choices}>
-          <RadioChoice name={`${id}-ends`} value="seasonEnd" checked={draft.ends === 'seasonEnd'} label={copy.seasonEnd(previewDateLabel(seasonEndDate(isPlan(plan) ? plan.firstDate : new Date(now).toISOString().slice(0, 10))))} onSelect={() => set({ ends: 'seasonEnd' })} />
-          <RadioChoice name={`${id}-ends`} value="afterCount" checked={draft.ends === 'afterCount'} label={copy.afterCount} onSelect={() => set({ ends: 'afterCount' })} />
-          {draft.ends === 'afterCount' && <label className={`${styles.field} ${styles.endField}`} htmlFor={fieldId('count')}>{copy.count}
-            <Input id={fieldId('count')} type="number" min="1" max={MAX_SERIES_MEETINGS} step="1" inputMode="numeric" value={draft.count > 0 ? String(draft.count) : ''} aria-invalid={invalid('count')} onChange={e => set({ count: e.target.value === '' ? 0 : Number(e.target.value) })} />
-          </label>}
-        </div>
-      </fieldset>
-    </details>
-    {issue && <p role="alert" className={styles.error}>{issue.message}</p>}
+    {draft.weekdays.length > 0 && <p className={styles.count} aria-live="polite">{copy.first(previewDateLabel(firstDate))}</p>}
+    <fieldset id={fieldId('repeat-ends')} tabIndex={-1} className={styles.group} aria-invalid={invalid('repeat-ends')} disabled={busy}>
+      <legend>{copy.repeatEnds}</legend>
+      <div className={styles.choices}>
+        <RadioChoice name={`${id}-ends`} value="seasonEnd" checked={draft.ends === 'seasonEnd'} label={copy.seasonEnd(previewDateLabel(seasonEnd))} onSelect={() => set({ ends: 'seasonEnd' })} />
+        <RadioChoice name={`${id}-ends`} value="onDate" checked={draft.ends === 'onDate'} label={copy.onDate} onSelect={() => set({ ends: 'onDate', endDate: draft.endDate || seasonEnd })} />
+        {draft.ends === 'onDate' && <label className={`${styles.field} ${styles.endField}`} htmlFor={fieldId('end-date')}>{copy.endDate}
+          <Input id={fieldId('end-date')} type="date" value={draft.endDate} min={endLimits.min} max={endLimits.max} aria-invalid={!!endIssue || invalid('end-date')} aria-describedby={endIssue ? endErrorId : undefined} onChange={e => set({ endDate: e.target.value })} />
+          {endIssue && <span id={endErrorId} role="alert" className={styles.error}>{endIssue.message}</span>}
+        </label>}
+        <RadioChoice name={`${id}-ends`} value="afterCount" checked={draft.ends === 'afterCount'} label={copy.afterCount} onSelect={() => set({ ends: 'afterCount' })} />
+        {draft.ends === 'afterCount' && <label className={`${styles.field} ${styles.endField}`} htmlFor={fieldId('count')}>{copy.count}
+          <Input id={fieldId('count')} type="number" min="1" max={MAX_SERIES_MEETINGS} step="1" inputMode="numeric" value={draft.count > 0 ? String(draft.count) : ''} aria-invalid={invalid('count')} onChange={e => set({ count: e.target.value === '' ? 0 : Number(e.target.value) })} />
+        </label>}
+      </div>
+    </fieldset>
+    {/* A chosen-date problem already shows under the date input. */}
+    {issue && !(issue.field === 'end-date' && endIssue) && <p role="alert" className={styles.error}>{issue.message}</p>}
     {error && <p role="alert" className={styles.error}>{error}</p>}
+    {summary && <p className={styles.count} aria-live="polite">{summary}</p>}
     <div className={styles.actions}>
       <Button type="button" variant="ghost" disabled={busy} onClick={onDone}>{copy.cancel}</Button>
       <Button type="button" variant="outline" disabled={busy} onClick={moreOptions}>{copy.moreOptions}</Button>
