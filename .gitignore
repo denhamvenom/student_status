@@ -64,3 +64,6 @@ Desktop.ini
 .agents/skills/*
 !.agents/skills/student-status-context-checkpoint/
 !.agents/skills/student-status-prototype-verification/
+
+# Local PandaCode tooling artifacts
+.pandacode/

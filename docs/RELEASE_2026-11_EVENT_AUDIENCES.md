@@ -1,6 +1,6 @@
 # Release runbook: event audiences, Mentor invitations and recurring meetings (November 2026)
 
-Status: **runbook only — not deployed.** Production actions need the owner's explicit approval for this release. Nothing here authorizes a deploy, and old receipts do not either. When the release is done, record what actually happened in a receipt in `docs/releases/`.
+Status: **released November 4, 2026** (PR #65, main `99515ed`). What actually happened is recorded in the [release receipt](releases/RELEASE_2026-11-04_EVENT_AUDIENCES.md). This runbook remains the reference for its steps; it authorizes no further production action.
 
 Behavior reference: [EVENT_AUDIENCES_AND_SERIES.md](EVENT_AUDIENCES_AND_SERIES.md) and [EVENT_CALENDAR_SYNC.md](EVENT_CALENDAR_SYNC.md) (section "Recurring series (RRULE)"). Deploy rules: [DEPLOYMENT.md](DEPLOYMENT.md).
 

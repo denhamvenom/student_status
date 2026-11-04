@@ -74,6 +74,21 @@ Read this before changing parent linking, consent/PDF, finance, rooms/waitlists 
 - Signing up from Home opens a sheet with the fee, spots left (counts only, never names) and what happens next. "Fundraise" replaces "Pay now" on Home and opens the fundraiser section of Money; the Money page's fundraiser card keeps "Pay Now" (October 27: same link).
 - Participation rings: Meetings counts held meetings this season (from August, excluding Outreach) and resets with a new season; Outreach is attended of held this season; Build hours is clocked time at Build meetings from kickoff, against a per-season target a Coach sets on the Season page.
 
+## Event audiences and recurring meetings
+
+November 2026 sprint decisions (released November 4, 2026; behavior in [EVENT_AUDIENCES_AND_SERIES.md](EVENT_AUDIENCES_AND_SERIES.md)).
+
+- **One native Google series per app series.** An app series on Team Calendar is one Google recurring master (RRULE), not one Google event per meeting. Single-meeting edits become instance exceptions.
+- **"This and all future" always splits.** Editing or cancelling from a meeting onward ends the old series the day before and moves later meetings into a new series; it never rewrites earlier meetings. It is refused if Timeclock attendance exists on or after the chosen meeting.
+- **Tuesday meetings adopt the existing Google series.** A Coach imports the existing Tuesday "Team Meeting" Google series instead of creating an app-owned one; meetings link to the existing Google instance IDs that Timeclock already uses, so Tuesday attendance history stays attached. Import makes no Google write and sends no notifications. The duplicate guard refuses an overlapping app series. The empty `attendanceMeetings` table stays unused.
+- **Virtual events never need permission forms.** Virtual events also have no overnight, rooming or travel (server-enforced).
+- **Mandatory group events are Coach-only.** Only a Coach can create or edit a required Everyone (Whole Team) or required Subteams event or series; Travel Leads can create optional events and required events for specific students.
+- **Location wording stays "Virtual (Discord)".**
+- **Season end is May 31.** The `+ Team meeting` fast path defaults a repeating meeting to end on the next May 31 (`seasonEndDate`).
+- **Family event projection.** Students and Parents receive events only through the minimized family projection (`familyEvent` in `convex/lib/eventProjection.ts`); fields not meant for families are never returned to them.
+- **Travel Lead canonical rule.** Travel Lead authority means `role === "coach"` or (`role === "mentor"` and `travelLead`), evaluated on the session-resolved viewer (a Parent acts as a Travel Lead only in a session where that granted staff role is selected). A `travelLead` flag on any other account grants nothing. New code uses this rule; older loose checks are listed for tightening in HANDOFF.md.
+- **Mentor invitations on Coach-only events (current policy).** A Travel Lead can add or remove Mentor invitations on any current event, including Coach-only required events; revisit only if the owner asks (KNOWN_GAPS).
+
 ## Attendance breakdown
 
 - October 27–28 owner decisions. Required meetings are non-Outreach sessions on Tuesdays before Build Season kickoff and Mondays from kickoff (America/Chicago); they drive Home's ring and are worded "Required meetings". Other meetings are the remaining non-Outreach sessions, listed by date and title when provided.
