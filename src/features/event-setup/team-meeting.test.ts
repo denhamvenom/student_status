@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { parseChicagoInput } from '@/lib/chicago-time'
 import type { Weekday } from './audience/types'
-import { firstSearchDate, isPlan, seasonEndDate, teamMeetingDefaults, teamMeetingEventArgs, teamMeetingPlan } from './team-meeting'
+import { firstSearchDate, isPlan, seasonEndDate, teamMeetingCopy, teamMeetingDefaults, teamMeetingEndDateLimits, teamMeetingEventArgs, teamMeetingPlan, teamMeetingPrefill, teamMeetingSummary } from './team-meeting'
 
 // Tuesday, November 3, 2026 in Central Time.
 const at = (time: string) => parseChicagoInput(`2026-11-03T${time}`)
@@ -38,10 +38,74 @@ describe('Team meeting first meeting and season end', () => {
     [{ weekdays: [] }, 'days'],
     [{ endTime: '17:00' }, 'ends'],
     // Five days a week until the end of May is more than the 100-meeting series limit.
-    [{ weekdays: [1, 2, 3, 4, 5] }, 'count'],
+    [{ weekdays: [1, 2, 3, 4, 5] }, 'repeat-ends'],
+    [{ weekdays: [1, 2, 3, 4, 5], ends: 'afterCount', count: 101 }, 'count'],
   ] as const)('%o is refused on %s', (change, field) => {
     const plan = teamMeetingPlan({ ...teamMeetingDefaults(true), ...change, weekdays: [...('weekdays' in change ? change.weekdays : [2])] as Weekday[] }, at('09:00'))
     expect(isPlan(plan) ? null : plan.field).toBe(field)
+  })
+})
+
+describe('Team meeting ending on a chosen date', () => {
+  // First meeting: Tuesday, November 3, 2026 (before 6 PM).
+  const onDate = (endDate: string) => ({ ...teamMeetingDefaults(true), ends: 'onDate' as const, endDate })
+
+  it('defaults to season end, not a chosen date', () => {
+    expect(teamMeetingDefaults(true).ends).toBe('seasonEnd')
+  })
+
+  it('maps the chosen date to an onDate repeat ending that day', () => {
+    const plan = teamMeetingPlan(onDate('2026-12-15'), at('09:00'))
+    expect(isPlan(plan) && plan.repeat).toMatchObject({ repeats: true, intervalWeeks: 1, weekdays: [2], ends: 'onDate', endDate: '2026-12-15' })
+  })
+
+  it.each([
+    ['the first meeting day itself', '2026-11-03'],
+    ['exactly 366 days after the first meeting', '2027-11-04'],
+  ])('allows %s', (_, endDate) => {
+    expect(isPlan(teamMeetingPlan(onDate(endDate), at('09:00')))).toBe(true)
+  })
+
+  it('limits the date input from the first meeting through 366 days later', () => {
+    expect(teamMeetingEndDateLimits('2026-11-03')).toEqual({ min: '2026-11-03', max: '2027-11-04' })
+  })
+
+  it.each([
+    ['empty', '', teamMeetingCopy.needEndDate],
+    ['not a real date', '2027-02-30', teamMeetingCopy.needEndDate],
+    ['before the first meeting', '2026-11-02', teamMeetingCopy.endBeforeFirst('Tue, Nov 3, 2026')],
+    ['more than 366 days out', '2027-11-05', teamMeetingCopy.endTooFar('Thu, Nov 4, 2027')],
+  ])('refuses a date that is %s, on the date field', (_, endDate, message) => {
+    expect(teamMeetingPlan(onDate(endDate), at('09:00'))).toEqual({ field: 'end-date', message })
+  })
+
+  it('refuses a chosen date that adds more than 100 meetings, on the date field', () => {
+    const plan = teamMeetingPlan({ ...onDate('2027-11-04'), weekdays: [1, 2, 3] }, at('09:00'))
+    expect(isPlan(plan) ? null : plan.field).toBe('end-date')
+  })
+
+  it('"More options" carries the chosen end date into the wizard', () => {
+    expect(teamMeetingPrefill(onDate('2027-03-02'), true, at('09:00')).repeat).toMatchObject({ ends: 'onDate', endDate: '2027-03-02', weekdays: [2] })
+  })
+
+  it('"More options" still carries an unfinished chosen date, for the wizard to flag', () => {
+    expect(teamMeetingPrefill({ ...onDate('2026-10-01'), name: '' }, true, at('09:00'))).toMatchObject({ start: '2026-11-03T18:00', repeat: { ends: 'onDate', endDate: '2026-10-01' } })
+  })
+
+  it('"More options" ends at season end by default', () => {
+    expect(teamMeetingPrefill(teamMeetingDefaults(true), true, at('09:00')).repeat).toMatchObject({ ends: 'onDate', endDate: '2027-05-31' })
+  })
+})
+
+describe('Team meeting count before Create', () => {
+  it.each([
+    ['a chosen end once tonight is past the meeting time', { ends: 'onDate', endDate: '2026-12-22' }, at('19:30'), '7 meetings · Nov 10 – Dec 22'],
+    ['season end, spanning the new year', {}, at('09:00'), '30 meetings · Nov 3, 2026 – May 25, 2027'],
+    ['two days a week for three meetings', { weekdays: [2, 4], ends: 'afterCount', count: 3 }, at('09:00'), '3 meetings · Nov 3 – Nov 10'],
+    ['a single meeting', { ends: 'afterCount', count: 1 }, at('09:00'), '1 meeting · Nov 3'],
+  ] as const)('counts %s', (_, change, now, text) => {
+    const plan = teamMeetingPlan({ ...teamMeetingDefaults(true), ...change, weekdays: [...('weekdays' in change ? change.weekdays : [2])] as Weekday[] }, now)
+    expect(isPlan(plan) && teamMeetingSummary(plan)).toBe(text)
   })
 })
 

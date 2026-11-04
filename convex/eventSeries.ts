@@ -1,7 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { action, internalMutation, internalQuery, mutation, query, type MutationCtx } from "./_generated/server";
+import { action, internalMutation, internalQuery, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { boundCalendar, configured, eventUrl, googleDetails, invalidatePermissionCoverage, token, updateEventDetails, validCalendarEventId, writeEnabled } from "./eventCalendar";
 import { syncInstancesNow } from "./eventSeriesCalendar";
 import { scheduleEventArchive } from "./eventArchive";
@@ -12,8 +12,8 @@ import { savedPublicError } from "./lib/publicErrors";
 import { parseGoogleRecurrence } from "./lib/rrule";
 import { requireSeasonFinanceReady } from "./lib/seasonFinance";
 import type { AssignmentScope, SignupMode } from "./lib/eventAudienceRules";
-import { chicagoLocalDateTime, generateRuleOccurrences, seriesProgress, hasOccurrenceFrom, isOccurrence, occurrenceStart, rowsFrom, ruleOf, seriesAudienceStudentIds, seriesFieldsFromRule, sessionsExistOn, todayKey, windowEndKey, windowEndMs } from "./lib/seriesGenerate";
-import { addDays, firstOccurrence, occurrencesBetween, SERIES_TIME_ZONE, splitRuleAt, validateSeriesRule, type SeriesRule } from "./lib/seriesRecurrence";
+import { chicagoLocalDateTime, generateRuleOccurrences, seriesProgress, hasOccurrenceFrom, isOccurrence, occurrenceStart, rowsFrom, ruleOf, seriesAudienceStudentIds, seriesFieldsFromRule, sessionsExistOn, todayKey, WINDOW_DAYS, windowEndKey, windowEndMs } from "./lib/seriesGenerate";
+import { addDays, firstOccurrence, isLocalDate, MAX_OCCURRENCES_PER_QUERY, occurrencesBetween, SERIES_TIME_ZONE, splitRuleAt, validateSeriesRule, type SeriesRule } from "./lib/seriesRecurrence";
 import { assignSubteamMember, isSubteamMandatory } from "./lib/subteamEnrollment";
 import { onsiteLocation, teamTransportEnabled } from "./lib/transportation";
 import { assignWholeTeamMember } from "./lib/wholeTeam";
@@ -27,6 +27,7 @@ import { assignWholeTeamMember } from "./lib/wholeTeam";
  * Generated meetings never notify (createEventCore suppressNotifications + silent enrollment). Adopting a Google series
  * sends nothing. "This meeting only" edits use the single-event path and its notices. "This and following" and "cancel
  * following" send one representative notice for the first affected meeting only (dedupe per event), never one per meeting.
+ * "Change end date" (setEndDate) sends the same single representative cancellation when it shortens, nothing when it extends.
  */
 
 const MAX_NAME = 250;
@@ -46,17 +47,25 @@ type TemplateArgs = {
   audienceKind: "everyone" | "subteams" | "students" | "mentorsOnly"; audienceSubteams?: string[]; mandatory?: boolean; audienceStudentIds?: Id<"students">[]; mentorInviteUserIds?: Id<"appUsers">[]; inviteSubteamMentors?: boolean; locationType?: "inPerson" | "virtual";
 };
 
+const STAFF_ONLY = "Only a Coach or Travel Lead can manage recurring events.";
+const COACH_ONLY_GROUP = "Only a Coach can change a required series for the whole team or a subteam.";
+const isSeriesStaff = (user: AppUser) => user.role === "coach" || (user.role === "mentor" && user.travelLead);
 /** Coach, or a Mentor with Travel Lead (a Parent's selected Travel Lead role resolves to that). A stored flag on any other role grants nothing. */
 function requireSeriesStaff(user: AppUser) {
-  if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can manage recurring events.");
+  if (!isSeriesStaff(user)) throw new ConvexError(STAFF_ONLY);
 }
 function requireCoach(user: AppUser, message: string) {
   if (user.role !== "coach") throw new ConvexError(message);
 }
-/** Mandatory Whole Team / subteam series are Coach-only, like single events. */
+/** Why this user may not change the series, or null. Mandatory Whole Team / subteam series are Coach-only, like single events. */
+function seriesEditBlocker(user: AppUser, series: Doc<"eventSeries">): string | null {
+  if (!isSeriesStaff(user)) return STAFF_ONLY;
+  if (series.template.mandatory && (series.template.audienceKind === "everyone" || series.template.audienceKind === "subteams") && user.role !== "coach") return COACH_ONLY_GROUP;
+  return null;
+}
 function requireSeriesEditor(user: AppUser, series: Doc<"eventSeries">) {
-  requireSeriesStaff(user);
-  if (series.template.mandatory && (series.template.audienceKind === "everyone" || series.template.audienceKind === "subteams")) requireCoach(user, "Only a Coach can change a required series for the whole team or a subteam.");
+  const blocker = seriesEditBlocker(user, series);
+  if (blocker) throw new ConvexError(blocker);
 }
 
 /** The same audience, location and fee rules as admin.createEvent, producing the stored template. */
@@ -363,19 +372,237 @@ export const editFuture = mutation({
 /**
  * Cancels every meeting from `fromKey` on and ends the series the day before. On Team Calendar the claims are dropped first,
  * then the master gets UNTIL (or is deleted when nothing of it is in the past). One representative cancellation notice.
+ * Returns how many meetings were canceled (scheduled ones not already canceled, plus later ones of an ending series).
  */
 export const cancelFuture = mutation({
-  args: { seriesId: v.id("eventSeries"), fromKey: v.string() }, returns: v.null(),
+  args: { seriesId: v.id("eventSeries"), fromKey: v.string() }, returns: v.object({ cancelled: v.number() }),
   handler: async (ctx, args) => {
     const { user, series, rule, rows } = await requireFutureSplit(ctx, args.seriesId, args.fromKey);
     const split = splitRuleAt(rule, args.fromKey);
     const representative = rows.find(row => !row.cancelled) ?? null;
+    const cancelled = removedMeetingKeys(rule, rows, args.fromKey).length;
     for (const row of rows) await cancelRowQuietly(ctx, row, user._id);
     await ctx.db.patch(series._id, { untilDate: addDays(args.fromKey, -1), count: undefined, ...(split.before === null ? { status: "cancelled" as const } : {}) });
     if (representative) await notifyEventCancelled(ctx, { eventId: representative._id });
     if (series.calendarMasterId) await ctx.scheduler.runAfter(0, internal.eventSeriesCalendar.truncateMaster, { seriesId: series._id, untilMs: occurrenceStart(rule, args.fromKey) - 1000, deleteMaster: split.before === null });
     await audit(ctx, user, "eventSeries", series._id, "cancelFuture", { untilDate: series.untilDate ?? null, count: series.count ?? null }, { fromKey: args.fromKey });
-    return null;
+    return { cancelled };
+  },
+});
+
+// ---------- change the end date ----------
+
+const MAX_PREVIEW_ROWS = 201;
+const SERIES_STATUSES = ["active", "ended", "cancelled", "needsReview", "conflict"] as const;
+
+/** The same calendar date one year later (Feb 29 becomes Mar 1), matching validateSeriesRule's one-year limit. */
+function oneYearAfter(date: string): string {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(Date.UTC(year + 1, month - 1, day)).toISOString().slice(0, 10);
+}
+
+/** "May 31, 2027" for a YYYY-MM-DD date (no time zone shift). */
+function longDate(key: string): string {
+  return new Date(`${key}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+}
+
+/**
+ * The date this series was split at ("this and following"), or null if no newer series was split off it: from then on the
+ * newer series (whatever its status) owns the dates, so this series must end the day before. Uses the split key editFuture
+ * records in the audit log in the same transaction as the split; the successor's first meeting can be later when the split
+ * changed the weekdays, so it (and the successor's earliest row) only serve as a fallback. Bounded scans.
+ */
+async function successorStart(ctx: QueryCtx, series: Doc<"eventSeries">): Promise<string | null> {
+  const successors: Doc<"eventSeries">[] = [];
+  for (const status of SERIES_STATUSES) {
+    const rows = await ctx.db.query("eventSeries").withIndex("by_seasonId_and_status", q => q.eq("seasonId", series.seasonId).eq("status", status)).take(200);
+    successors.push(...rows.filter(row => row.predecessorSeriesId === series._id));
+  }
+  if (!successors.length) return null;
+  const ids = new Set<string>(successors.map(row => row._id));
+  const dates: string[] = successors.map(row => row.startDate);
+  for (const successor of successors) {
+    const first = await ctx.db.query("events").withIndex("by_seriesId_and_seriesOccurrenceKey", q => q.eq("seriesId", successor._id)).first();
+    if (first?.seriesOccurrenceKey) dates.push(first.seriesOccurrenceKey);
+  }
+  const entries = await ctx.db.query("audit").withIndex("by_entity_and_entityId", q => q.eq("entity", "eventSeries").eq("entityId", series._id)).take(500);
+  for (const entry of entries) {
+    if (entry.action !== "editFuture" || !entry.afterJson) continue;
+    try {
+      const after = JSON.parse(entry.afterJson) as { newSeriesId?: unknown; fromKey?: unknown };
+      if (typeof after.newSeriesId === "string" && ids.has(after.newSeriesId) && typeof after.fromKey === "string" && isLocalDate(after.fromKey)) dates.push(after.fromKey);
+    } catch { /* an unreadable entry adds nothing; the successor dates still apply */ }
+  }
+  return dates.reduce((earliest, date) => date < earliest ? date : earliest);
+}
+
+/** Latest allowed end: one year after the start, and the day before a successor series starts. */
+function latestEnd(series: Doc<"eventSeries">, successor: string | null): string {
+  const yearEnd = oneYearAfter(series.startDate);
+  return successor !== null && addDays(successor, -1) < yearEnd ? addDays(successor, -1) : yearEnd;
+}
+
+/** Every meeting date of `rule` in [fromKey, toKeyExclusive), paging past the per-call occurrence cap. */
+function ruleKeys(rule: SeriesRule, fromKey: string, toKeyExclusive: string): string[] {
+  const keys: string[] = [];
+  for (let cursor = fromKey; ;) {
+    const page = occurrencesBetween(rule, cursor, toKeyExclusive);
+    keys.push(...page.map(occurrence => occurrence.occurrenceKey));
+    if (page.length < MAX_OCCURRENCES_PER_QUERY) return keys;
+    cursor = addDays(page.at(-1)!.occurrenceKey, 1);
+  }
+}
+
+/**
+ * Dates an extension adds: meetings of the new rule after the current end (and from today and the start on) through the
+ * new end that have no row yet, in order. Those inside the 8-week window are added now; the rest by the daily job as their
+ * dates get closer. Meetings the series already had (generated or not) aren't counted.
+ */
+async function meetingsToAdd(ctx: QueryCtx, series: Doc<"eventSeries">, rule: SeriesRule, endDate: string, now: number): Promise<string[]> {
+  const today = todayKey(now), currentEnd = currentEndKey(series);
+  const fromKey = [series.startDate, today, currentEnd === null ? today : addDays(currentEnd, 1)].reduce((latest, key) => key > latest ? key : latest);
+  const rows = await ctx.db.query("events").withIndex("by_seriesId_and_seriesOccurrenceKey", q => q.eq("seriesId", series._id).gte("seriesOccurrenceKey", fromKey)).take(MAX_PREVIEW_ROWS);
+  const known = new Set(rows.map(row => row.seriesOccurrenceKey));
+  return ruleKeys(rule, fromKey, addDays(endDate, 1)).filter(key => !known.has(key));
+}
+
+/**
+ * Dates of the meetings from `fromKey` on that ending the series there removes, in order: its rows not already canceled, plus
+ * the later meetings of `rule` (the current rule) not generated yet when the series has an end. A never-ending series counts
+ * only its scheduled rows.
+ */
+function removedMeetingKeys(rule: SeriesRule, rows: Doc<"events">[], fromKey: string): string[] {
+  const known = new Set(rows.map(row => row.seriesOccurrenceKey));
+  const removed = rows.filter(row => !row.cancelled && row.seriesOccurrenceKey).map(row => row.seriesOccurrenceKey!);
+  if (rule.endsOnDate !== undefined || rule.maxOccurrences !== undefined) removed.push(...ruleKeys(rule, fromKey, addDays(fromKey, 367)).filter(key => !known.has(key)));
+  return removed.sort();
+}
+
+/** Date of the series' last meeting under its current rule, or null when it never ends. */
+function currentEndKey(series: Doc<"eventSeries">): string | null {
+  if (series.untilDate !== undefined) return series.untilDate;
+  if (series.count === undefined) return null;
+  const rule = ruleOf(series);
+  const all = occurrencesBetween(rule, series.startDate, addDays(series.startDate, 7 * rule.intervalWeeks * series.count + 7));
+  return all.at(-1)?.occurrenceKey ?? series.startDate;
+}
+
+type EndDatePlan = { problem: string; rule?: undefined; shortening?: undefined; unchanged?: undefined; lastMeetingDate?: undefined } | { problem: null; rule: SeriesRule; shortening: boolean; unchanged: boolean; lastMeetingDate: string | null };
+
+/**
+ * Checks a new end date: YYYY-MM-DD, today (Chicago) or later, not before the series starts, at most one year after it
+ * starts, and before a successor series starts. Shortening is any date before the current last meeting (or any date for a
+ * series that never ended).
+ */
+function endDatePlan(series: Doc<"eventSeries">, endDate: string, today: string, successor: string | null): EndDatePlan {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate) || !isLocalDate(endDate)) return { problem: "Choose a valid end date." };
+  if (endDate < today) return { problem: "Choose today or a later date." };
+  if (endDate < series.startDate) return { problem: "The end date can't be before the series starts." };
+  if (successor !== null && endDate >= successor) return { problem: `This series continues as a newer series from ${longDate(successor)}. Choose ${longDate(addDays(successor, -1))} or earlier, or change the newer series.` };
+  const { endsOnDate: _e, maxOccurrences: _m, ...base } = ruleOf(series);
+  const rule: SeriesRule = { ...base, endsOnDate: endDate };
+  const errors = validateSeriesRule(rule);
+  if (errors.length) return { problem: errors[0] };
+  const interval = Math.max(1, rule.intervalWeeks);
+  const window = occurrencesBetween(rule, addDays(endDate, -7 * interval - 7) > series.startDate ? addDays(endDate, -7 * interval - 7) : series.startDate, addDays(endDate, 1));
+  const current = currentEndKey(series);
+  return { problem: null, rule, shortening: current === null || endDate < current, unchanged: current === endDate, lastMeetingDate: window.at(-1)?.occurrenceKey ?? null };
+}
+
+/**
+ * Changes only when a series ends (no split): the rule gets UNTIL = endDate. Shortening cancels the meetings after the date
+ * (refused once attendance was taken on one) with ONE representative cancellation notice, like cancelFuture; on Team
+ * Calendar the master's recurrence gets the earlier UNTIL. Extending sends nothing: meetings up to the new end are added
+ * silently now (and by the daily job); on Team Calendar only the master's recurrence UNTIL is moved later (its
+ * start/summary/location are never written), then the new instances are linked. A series split by "this and following"
+ * can't be extended (or reopened) into its successor's dates.
+ *
+ * Meetings canceled by an earlier shortening stay canceled in the app when the end moves later again (their notice was
+ * already sent; restoring would need another). On Team Calendar their re-appearing instances are re-linked and canceled
+ * there as instance exceptions (eventSeriesCalendar.linkInstances -> eventCalendar.push), so both sides agree.
+ */
+export const setEndDate = mutation({
+  args: { seriesId: v.id("eventSeries"), endDate: v.string() },
+  returns: v.object({ cancelled: v.number(), lastMeetingDate: v.union(v.string(), v.null()) }),
+  handler: async (ctx, args) => {
+    const user = await viewer(ctx);
+    const season = await activeSeason(ctx);
+    const series = await ctx.db.get(args.seriesId);
+    if (!series || series.seasonId !== season._id) throw new ConvexError("This series is no longer available. Reload to see the latest.");
+    requireSeriesEditor(user, series);
+    if (series.status !== "active" && series.status !== "ended") throw new ConvexError("This series needs review or was canceled. Reload to see the latest.");
+    const now = Date.now(), today = todayKey(now);
+    const plan = endDatePlan(series, args.endDate, today, await successorStart(ctx, series));
+    if (plan.problem !== null) throw new ConvexError(plan.problem);
+    if (series.calendarMasterId && !writeEnabled()) throw new ConvexError("Calendar updates are turned off in this copy of Venom Status, so this Team Calendar series can't be changed here.");
+    const rows = plan.shortening ? await rowsFrom(ctx, series._id, addDays(args.endDate, 1)) : [];
+    if (await sessionsExistOn(ctx, rows)) throw new ConvexError("Attendance has already been taken for a meeting after that date. Choose a later end date.");
+    const live = rows.filter(row => !row.cancelled);
+    for (const row of rows) await cancelRowQuietly(ctx, row, user._id);
+    const reopen = series.status === "ended" && hasOccurrenceFrom(plan.rule, today);
+    await ctx.db.patch(series._id, { untilDate: args.endDate, count: undefined, ...(reopen ? { status: "active" as const } : {}) });
+    // At most one notice per person for the whole operation: the first canceled meeting stands for the rest.
+    if (live[0]) await notifyEventCancelled(ctx, { eventId: live[0]._id });
+    // The Calendar job reads the series' end when it runs, so the last of several quick changes wins.
+    if (series.calendarMasterId) await ctx.scheduler.runAfter(0, internal.eventSeriesCalendar.setMasterUntil, { seriesId: series._id });
+    else if (!plan.shortening && (series.status === "active" || reopen)) {
+      const fresh = (await ctx.db.get(series._id))!;
+      const fromKey = fresh.startDate > today ? fresh.startDate : today;
+      const toKey = windowEndKey(now) > addDays(fromKey, 1) ? windowEndKey(now) : addDays(fromKey, 1);
+      const generated = await generateRuleOccurrences(ctx, fresh, fromKey, toKey);
+      if (generated.more) await ctx.scheduler.runAfter(0, internal.eventSeries.generate, { seriesId: series._id, toKey });
+      else await ctx.db.patch(series._id, { generatedThrough: Math.max(fresh.generatedThrough ?? 0, windowEndMs(now)) });
+    }
+    await audit(ctx, user, "eventSeries", series._id, "setEndDate", { untilDate: series.untilDate ?? null, count: series.count ?? null }, { endDate: args.endDate, cancelled: live.length });
+    return { cancelled: live.length, lastMeetingDate: plan.lastMeetingDate };
+  },
+});
+
+/**
+ * Event page: how the series repeats and ends, whether this user may change the end, the latest allowed end (one year, or
+ * the day before a newer series split off this one: `continuesFrom`), and for a typed date a preview: the last meeting, how
+ * many meetings would be canceled (and the first dates) or added up to the new end, or that nothing changes. Staff only.
+ */
+export const endDateDetails = query({
+  args: { seriesId: v.id("eventSeries"), endDate: v.optional(v.string()) },
+  returns: v.union(v.null(), v.object({
+    weekdays: v.array(v.number()), intervalWeeks: v.number(), startDate: v.string(), endDate: v.union(v.string(), v.null()), status: v.string(), onCalendar: v.boolean(),
+    minEndDate: v.string(), maxEndDate: v.string(), continuesFrom: v.union(v.string(), v.null()), seasonEndDate: v.union(v.string(), v.null()), blocker: v.union(v.string(), v.null()), windowDays: v.number(),
+    preview: v.union(v.null(), v.object({ endDate: v.string(), problem: v.union(v.string(), v.null()), lastMeetingDate: v.union(v.string(), v.null()), cancelCount: v.number(), cancelDates: v.array(v.string()), addCount: v.number(), laterAddedAutomatically: v.boolean(), shortening: v.boolean(), unchanged: v.boolean() })),
+  })),
+  handler: async (ctx, args) => {
+    const user = await viewer(ctx);
+    // Not staff: nothing to show (the page asks only for Coaches and Travel Leads; this reveals nothing either way).
+    if (!isSeriesStaff(user)) return null;
+    const season = await activeSeason(ctx);
+    const series = await ctx.db.get(args.seriesId);
+    if (!series || series.seasonId !== season._id) return null;
+    const now = Date.now(), today = todayKey(now);
+    const successor = await successorStart(ctx, series);
+    const statusBlocker = series.status === "active" || series.status === "ended" ? null : "This series needs review or was canceled, so its end date can't be changed here.";
+    let preview = null;
+    if (args.endDate !== undefined) {
+      const plan = endDatePlan(series, args.endDate, today, successor);
+      let removed: string[] = [], added: string[] = [];
+      if (plan.problem === null && plan.shortening) {
+        const rows = await ctx.db.query("events").withIndex("by_seriesId_and_seriesOccurrenceKey", q => q.eq("seriesId", series._id).gt("seriesOccurrenceKey", args.endDate!)).take(MAX_PREVIEW_ROWS);
+        removed = removedMeetingKeys(ruleOf(series), rows, addDays(args.endDate, 1));
+      } else if (plan.problem === null && !plan.unchanged) added = await meetingsToAdd(ctx, series, plan.rule, args.endDate, now);
+      const windowEnd = windowEndKey(now);
+      preview = {
+        endDate: args.endDate, problem: plan.problem, lastMeetingDate: plan.lastMeetingDate ?? null, cancelCount: removed.length, cancelDates: removed.slice(0, 3), addCount: added.length,
+        shortening: plan.shortening ?? false, unchanged: plan.unchanged ?? false,
+        // Some added meetings fall after the 8-week window: they appear on the schedule as their dates get closer.
+        laterAddedAutomatically: added.some(key => key >= windowEnd),
+      };
+    }
+    return {
+      weekdays: series.weekdays, intervalWeeks: series.intervalWeeks, startDate: series.startDate, endDate: currentEndKey(series), status: series.status, onCalendar: !!series.calendarMasterId,
+      minEndDate: series.startDate > today ? series.startDate : today, maxEndDate: latestEnd(series, successor), continuesFrom: successor,
+      // Season end dates are stored as that calendar date at 23:59:59 UTC (seasonTransition).
+      seasonEndDate: season.endsAt !== undefined ? new Date(season.endsAt).toISOString().slice(0, 10) : null,
+      blocker: seriesEditBlocker(user, series) ?? statusBlocker, windowDays: WINDOW_DAYS, preview,
+    };
   },
 });
 

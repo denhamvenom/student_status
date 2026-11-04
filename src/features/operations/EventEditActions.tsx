@@ -12,13 +12,15 @@ import { ConfirmAction } from '../../ConfirmAction'
 import { SeriesScopeDialog } from '../event-setup/audience/SeriesScopeDialog'
 import { dateTimeBounds } from '../event-setup/new-event-defaults'
 import { useChangeOccurrence, type OccurrenceChange } from '../event-setup/series-support'
-import { draftFrom, eventEditBlocker, eventEditCopy as copy, eventEditValues, placeEditable, type EditableEvent, type EventDraft } from './event-edit'
+import { cancelToastText, draftFrom, eventEditBlocker, eventEditCopy as copy, eventEditValues, placeEditable, type EditableEvent, type EventDraft } from './event-edit'
+import { ChangeSeriesEndDate } from './SeriesEndDate'
+import type { SeriesEndDetails } from './series-end-date'
 
 /**
  * Edit event and Cancel event at the top of an event page, for a Coach and for a Travel Lead where allowed.
  * A meeting from a repeating series first asks "This meeting only" or "This and all future meetings".
  */
-export function EventEditActions({ event, isCoach }: { event: EditableEvent; isCoach: boolean }) {
+export function EventEditActions({ event, isCoach, seriesEnd }: { event: EditableEvent; isCoach: boolean; seriesEnd?: SeriesEndDetails | null }) {
   const id = useId()
   const update = useMutation(api.eventCalendar.update)
   const changeOccurrence = useChangeOccurrence()
@@ -33,6 +35,8 @@ export function EventEditActions({ event, isCoach }: { event: EditableEvent; isC
   const eventId = event._id as Id<'events'>
   const expectedRevision = event.calendarRevision ?? 0
   const series = !!event.seriesId && !!event.seriesOccurrenceKey
+  // The series' own rule (convex/eventSeries.ts requireSeriesEditor) also applies to its end date.
+  const endBlocker = blocker ?? seriesEnd?.blocker ?? null
   const stale = draft !== null && openedRevision !== null && openedRevision !== expectedRevision
   if (event.cancelled) return null
   const openEdit = () => { setError(''); setDraft(draftFrom(event)); setOpenedRevision(expectedRevision) }
@@ -57,8 +61,9 @@ export function EventEditActions({ event, isCoach }: { event: EditableEvent; isC
       {series
         ? <Button type="button" variant="outline" disabled={!!blocker} aria-describedby={blocker ? `${id}-blocked` : undefined} onClick={() => setSeriesChange({ kind: 'cancel' })}>{copy.cancel}</Button>
         : <ConfirmAction disabled={!!blocker} description={copy.cancelConfirm} onConfirm={async () => { await update({ eventId, expectedRevision, cancelled: true }); toast.success(copy.canceled) }}>{copy.cancel}</ConfirmAction>}
+      {series && seriesEnd && <ChangeSeriesEndDate seriesId={event.seriesId!} details={seriesEnd} blocker={endBlocker} describedBy={`${id}-blocked`} />}
     </div>
-    {blocker && <p id={`${id}-blocked`} className="muted">{blocker}</p>}
+    {(blocker ?? endBlocker) && <p id={`${id}-blocked`} className="muted">{blocker ?? endBlocker}</p>}
     <Dialog open={draft !== null && seriesChange === null} disablePointerDismissal onOpenChange={open => { if (!open && !busy) setDraft(null) }}>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain sm:max-w-lg">
         {draft && <form className="form-grid" onSubmit={e => void save(e)}>
@@ -84,8 +89,8 @@ export function EventEditActions({ event, isCoach }: { event: EditableEvent; isC
     </Dialog>
     {series && <SeriesScopeDialog open={seriesChange !== null} mode={seriesChange?.kind === 'cancel' ? 'cancel' : 'edit'} onClose={() => setSeriesChange(null)} onConfirm={async scope => {
       if (!seriesChange) return
-      await changeOccurrence({ event: { _id: event._id, seriesId: event.seriesId, seriesOccurrenceKey: event.seriesOccurrenceKey, startsAt: event.startsAt, endsAt: event.endsAt }, expectedRevision: seriesChange.kind === 'edit' ? openedRevision ?? expectedRevision : expectedRevision, scope, change: seriesChange })
-      toast.success(seriesChange.kind === 'cancel' ? copy.canceled : copy.saved)
+      const result = await changeOccurrence({ event: { _id: event._id, seriesId: event.seriesId, seriesOccurrenceKey: event.seriesOccurrenceKey, startsAt: event.startsAt, endsAt: event.endsAt }, expectedRevision: seriesChange.kind === 'edit' ? openedRevision ?? expectedRevision : expectedRevision, scope, change: seriesChange })
+      toast.success(seriesChange.kind === 'cancel' ? cancelToastText(result) : copy.saved)
       setDraft(null)
     }} />}
   </div>
