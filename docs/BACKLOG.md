@@ -18,6 +18,11 @@ Accepted deferrals are listed in [KNOWN_GAPS.md](KNOWN_GAPS.md); consult them on
 
 - Fee due dates (owner, October 27): let a Coach set a due date on a fee so Highlights can flag a payment as past due before the event starts. Until then "past due" means unpaid after the event start. This is a money change; read DECISIONS.md first.
 - Student Home release prerequisites: before kickoff (January 9, 2027), and with owner approval, run Recalculate attendance on production so the new build-hours totals fill in, and set each season's build-hours target on the Season page.
+- Mentor home page (owner, November 4, 2026; next sprint): a designed Mentor home like the Parent and Student homes, replacing the interim stack.
+- Travel Lead check tightening: change about 20 pre-existing loose checks to `coach || (mentor && travelLead)`; line list in [HANDOFF.md](../HANDOFF.md#next), gap in KNOWN_GAPS.
+- Roster bulk edit and assigning CAD/Leadership from the roster subteam dropdown.
+- Student Home wording: carousel, FIRST registration/Consent & Release jargon, doubled "optional" label on open signups.
+- Owner decision: whether Travel Leads keep adding/removing Mentor invitations on Coach-only required events (current policy allows it).
 - Remind my parent (owner, October 27): a Student Home button that emails the linked parent about a FIRST registration, permission form or payment waiting on them, through the existing parent email service.
 
 ## Testing
@@ -29,7 +34,7 @@ Accepted deferrals are listed in [KNOWN_GAPS.md](KNOWN_GAPS.md); consult them on
 - Keep the >500-record pagination/cancellation boundaries; do not remove synthetic fixtures just to reduce runtime. Historical suite counts are checkpoint evidence. Live subscription delivery, physical devices and real-inbox acceptance are not established by static rendering, helper tests or source review.
 - Preserve accepted visual evidence; do not reopen completed G1–G7/approved PDF/rollout decisions merely because old tables say pending. Confirm any genuinely remaining Pay-device issue and CSV display deferral with the owner.
 - The approved conservative cleanup added adult privilege and Parent travel ownership denials. Do not continue to list those specific protections as missing; reconcile the remaining audit gaps with source before adding tests.
-- Recorded verification failures/limits include Windows temporary-module ENOENT, long fee-cancellation test timeouts and an intermittent bulk-invitation daily-limit assertion. No fresh suite was run in the documentation work; do not weaken assertions or present targeted reruns as a clean full-suite result.
+- Recorded verification failures/limits include Windows temporary-module ENOENT, long fee-cancellation test timeouts and an intermittent bulk-invitation daily-limit assertion. As of November 4, 2026 the owner accepts full-suite load timeouts (`feeBulk`, `bulkInvites`, `financeExport`, `wholeTeam` and others; each passes alone) as a known issue. No fresh suite was run in the documentation work; do not weaken assertions or present targeted reruns as a clean full-suite result.
 - **Confirmed October 22 by owner — Timeclock physical devices:** the requested tablet/two-phone concurrent clocking and reconnection checks passed. The earlier physical-device evidence gap is closed by owner confirmation; no new rehearsal was run here. Preserve accepted single-device role/sign-in evidence and use an ordinary Mentor, not a shared Coach session. The older same-computer click attempt was inconclusive and is not the evidence for this confirmation.
 - Historical context: the owner deferred physical-device checks on October 18 without blocking rollout; the October 22 success confirmation supersedes their deferred status. Mounted frontend regression gaps above remain separate from the successful device rehearsal.
 - The original Pay contrast report was not reproduced. Released gold/dark styling has representative candidate evidence; root cause on the reporting device remains unconfirmed. CSV cents headings remain deferred.

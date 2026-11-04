@@ -1,12 +1,21 @@
 # Handoff
 
-November 2, 2026 | main `ddc3234`
+November 4, 2026 | main `99515ed`
+
+## Event audiences, subteams, Mentor invitations, virtual events and recurring meetings (released)
+
+PR #65 merged as main `99515ed` (source `e4e7e7a`). Production Convex amicable-eel-413 deployed first from `e4e7e7a` (dry run: 13 new indexes, no deletions, schema valid). Workers: student-status `89e8593b-4884-4153-ad8a-8fd0eeceecb3`, timeclock `d7fdb73e-710c-4aa7-b254-4ec835ae1ada` (rollback `a3c262e4-5a58-4523-a0b1-214a6f01a25d` / `a1312d52-1db1-412e-87ba-8371725c2cc5`). Behavior: [EVENT_AUDIENCES_AND_SERIES.md](docs/EVENT_AUDIENCES_AND_SERIES.md). [Release receipt](docs/releases/RELEASE_2026-11-04_EVENT_AUDIENCES.md)
+
+Owner follow-ups (not yet verified):
+- Confirm cron "extend recurring meetings" (`15 10 * * *` UTC) in the production Convex dashboard and the first successful `eventSeries:tick` run in the logs.
+- A Coach imports the Tuesday "Team Meeting" series (from August 25) via Events › ⋯ More › Import from Team Calendar, not after 4 PM on a Tuesday; then check the next Tuesday's Timeclock session attaches with no duplicate.
+- Signed-in role smoke tests (Coach, Travel Lead, Mentor `/invited`, Student, Parent) per runbook section 5.4.
 
 ## PWA install and push notifications (released)
 
 PR #61 merged as main `ccd9145` (commits `6dcc68f`, `604a486`); PR #62 (Home install banner, frontend only) merged as main `ddc3234`. Installable app, service worker, Web Push (VAPID), inbox, per-category preferences, quiet hours, instant triggers, R1–R7 reminders and 5 PM digests. Production Convex deployed first from `604a486` (additive schema, new crons); production VAPID env vars set by the owner. Not verified: real iPhone/Android install and push on production; signed-in production walkthrough; Worker version IDs. [Release receipt](docs/releases/RELEASE_2026-11-02_PWA_PUSH_NOTIFICATIONS.md)
 
-Follow-ups: Inbox items lack an Urgent badge; rotate the development `DEVELOPER_SIGN_IN_KEY`; owner decisions on sign-in session length and virtual-event permission forms.
+Follow-ups: Inbox items lack an Urgent badge; owner decision on sign-in session length. The development `DEVELOPER_SIGN_IN_KEY` rotation was handled by the owner; virtual events never need permission forms (owner decision, see DECISIONS).
 
 ## New Event setup steps (released)
 
@@ -50,9 +59,15 @@ Clocking, PIN controls, automatic closing, fixed event roster and historical imp
 
 ## Next
 
-- Sprint 2 (event audiences, subteams including CAD/Leadership, mentor invites, Virtual (Discord) location, recurring meetings) on a new branch off main. Its untracked drafts are in this checkout (`convex/lib/eventAudienceRules*`, `convex/lib/rrule*`, `convex/lib/seriesRecurrence*`, `src/features/event-setup/audience/`) and must use the helpers in `convex/lib/notificationTriggers.ts` and `convex/lib/eventAudience.ts`.
+- **Next sprint: Mentor home page**, designed like the Parent and Student homes (replaces the interim Mentor Home stack).
+- Tighten about 20 pre-existing loose Travel Lead checks (`role === "coach" || travelLead`, which trusts a stored flag on any role) to the canonical rule `coach || (mentor && travelLead)` used by `mentorInvites.requireInviter` (`viewer()` resolves a Parent's selected Travel Lead role to that shape). Lines as of main `99515ed`, in `convex/`:
+  - Coach-or-Travel-Lead gates: `app.ts:52,196`; `eventEnrollment.ts:18`; `eventOperations.ts:14`; `lib/eventSignupExtras.ts:22`; `participation.ts:107,167`; `permissionVersions.ts:12`; `rooms.ts:78,219,260,276,306`; `studentHome.ts:289`; `workflowSummaries.ts:9`.
+  - Mentor-blocking checks (`mentor && !travelLead`): `app.ts:51,101,126,252`; `announcements.ts:141`; `dashboardReports.ts:39`; `financeDetails.ts:39`.
+- Roster bulk edit, and assigning CAD/Leadership from the roster subteam dropdown.
+- Student Home wording: the Highlights carousel, FIRST registration and Consent & Release jargon, and the doubled "optional" label on open signups.
+- Owner decision: whether a Travel Lead may keep adding/removing Mentor invitations on Coach-only required events (current policy allows it).
+- Flaky full-suite load timeouts (`feeBulk`, `bulkInvites`, `financeExport`, `wholeTeam` and others; each passes alone) are an accepted known issue; do not present targeted reruns as a clean full suite.
 - Install the app and check push on a real iPhone (Home Screen) and an Android phone against production.
-- A Coach or Parent does a signed-in production check of Parent Home.
 
 ## Top open risks
 

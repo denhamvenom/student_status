@@ -36,6 +36,7 @@ Main is connected to automatic Cloudflare builds for both frontends according to
 - [Release receipts](docs/releases/)
 - [Timeclock contracts](docs/TIMECLOCK_BACKEND_HANDOFF.md)
 - [Zeffy donation import](docs/ZEFFY_SYNC.md)
+- [Event audiences, Mentor invitations and recurring meetings](docs/EVENT_AUDIENCES_AND_SERIES.md)
 
 Use synthetic records in tests and documentation; real student records, signed PDFs, exports and secrets never belong in Git/GitHub. The four files in `demo/` preserve the original prototype and its reference guides; later explicit decisions supersede conflicting prototype behavior. Fonts and brand assets are bundled locally.
 
