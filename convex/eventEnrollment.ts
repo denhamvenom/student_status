@@ -7,6 +7,7 @@ import { internalMutation, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { activeSeason, audit, viewer } from "./lib/access";
 import { assignWholeTeamMember } from "./lib/wholeTeam";
+import { assignSubteamMember, isSubteamMandatory } from "./lib/subteamEnrollment";
 import { notifyEventAssigned } from "./lib/notificationTriggers";
 
 export const status = query({
@@ -45,12 +46,13 @@ export const processPage = internalMutation({
     if (!job || job.state !== "running" || job.cursor !== args.expectedCursor) return null;
     const event = await ctx.db.get(job.eventId); const actor = await ctx.db.get(job.actorId); const season = await activeSeason(ctx);
     if (event?.cancelled) return stopCancelled(ctx, event);
-    if (!event || event.archived || event.cancelled || event.seasonId !== season._id || event.assignmentScope !== "wholeTeam" || event.signupMode !== "assigned") throw new Error("Whole Team event is unavailable; Coach review is required.");
+    const subteamEvent = !!event && isSubteamMandatory(event);
+    if (!event || event.archived || event.cancelled || event.seasonId !== season._id || event.signupMode !== "assigned" || (!subteamEvent && event.assignmentScope !== "wholeTeam")) throw new Error("Whole Team event is unavailable; Coach review is required.");
     if (!actor?.active || actor.role !== "coach") throw new Error("Enrollment actor is unavailable; a Coach must retry.");
     const page = await ctx.db.query("eventEnrollmentMembers").withIndex("by_jobId", q => q.eq("jobId", job._id)).paginate({ cursor: job.cursor, numItems: 1 });
     for (const member of page.page) {
       const student = await ctx.db.get(member.studentId);
-      if (student) await assignWholeTeamMember(ctx, actor, event, student, job._id);
+      if (student) await (subteamEvent ? assignSubteamMember : assignWholeTeamMember)(ctx, actor, event, student, job._id);
     }
     await notifyEventAssigned(ctx, { eventId: event._id, studentIds: page.page.map(member => member.studentId) });
     const state = page.isDone ? "complete" as const : "running" as const;
@@ -92,7 +94,8 @@ export const retry = mutation({
     await requireSeasonFinancialRetry(ctx, season._id, job._id);
     await ctx.db.patch(job._id, { actorId: actor._id, state: "running", lastError: undefined, updatedAt: Date.now() });
     await ctx.db.patch(event._id, { enrollmentState: "running" });
-    await ctx.scheduler.runAfter(0, internal.eventEnrollment.run, { jobId: job._id });
+    // Series occurrences enroll silently (the series sends one notice at creation); never send a per-occurrence push on retry.
+    await ctx.scheduler.runAfter(0, event.seriesId ? internal.eventSeries.runEnrollment : internal.eventEnrollment.run, { jobId: job._id });
     await audit(ctx, actor, "events", event._id, "retryWholeTeamEnrollment", "failed", "running");
     return null;
   },

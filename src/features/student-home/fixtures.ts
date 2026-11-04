@@ -2,6 +2,7 @@ import type { GenericId } from 'convex/values'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { parseChicagoInput } from '@/lib/chicago-time'
 import type { HomeAttendance, OpenSignup, PinnedAnnouncement, SignupAvailability, StudentHomeSummary, WhatsLeftItem } from './contract'
+import type { AgendaEvent } from './agenda'
 import type { HomeFinance } from './types'
 
 /*
@@ -30,6 +31,8 @@ export type StudentHomeFixture = {
   availability: Record<string, SignupAvailability>
   /** Events whose Sign up fails in the preview, to show the error state. */
   failingSignups?: string[]
+  /** Next up and This week (app.listEvents); none when missing. */
+  events?: AgendaEvent[]
 }
 
 const season2027 = { name: '2026–2027 season', startsAt: at('2026-08-01T00:00'), kickoffAt: at('2027-01-09T00:00') }
@@ -112,6 +115,12 @@ const busyWeek: StudentHomeFixture = {
     [eventId('showcase')]: { ...availabilityFor(busySignups[3], null, null, 'closed'), signupMode: 'assigned' },
   },
   failingSignups: [eventId('stem-night')],
+  events: [
+    { eventId: eventId('meeting-tue'), name: 'Team meeting', startsAt: at('2026-10-27T18:00'), endsAt: at('2026-10-27T20:00'), place: 'DSHS STEM Center (on site)', feeCents: 0, required: true, status: 'confirmed' },
+    { eventId: eventId('cad-night'), name: 'CAD night', startsAt: at('2026-10-28T19:00'), endsAt: at('2026-10-28T20:30'), place: 'Virtual (Discord)', feeCents: 0, required: false, status: null },
+    { eventId: eventId('meeting-thu'), name: 'Team meeting', startsAt: at('2026-10-29T18:00'), endsAt: at('2026-10-29T20:00'), place: 'DSHS STEM Center (on site)', feeCents: 0, required: true, status: 'confirmed' },
+    { eventId: eventId('car-wash'), name: 'Fall car wash', startsAt: at('2026-10-31T09:00'), endsAt: at('2026-10-31T13:00'), place: 'Denham Springs Fire Station 1', feeCents: 1500, required: false, status: 'pending' },
+  ],
 }
 
 // All done: nothing of the Student's own and no to-do cards (the room is final); one item waits for a

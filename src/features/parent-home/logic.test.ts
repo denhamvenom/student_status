@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { WhatsLeftItem } from '../student-home/contract'
 import type { ParentHomeSummary } from './contract'
-import { groupWork, paidPercent, parentAllSet, parentItemAction, parentItemHref, upcomingEvent } from './logic'
+import type { Id } from '../../../convex/_generated/dataModel'
+import type { AgendaEvent } from '../student-home/agenda'
+import { at } from '../student-home/fixtures'
+import { formsSummary, groupWork, paidPercent, parentAllSet, parentItemAction, parentItemHref, parentNext, parentWeek, upcomingEvent } from './logic'
 
 const item = (owner: WhatsLeftItem['owner'], kind: WhatsLeftItem['kind'] = 'requirement'): WhatsLeftItem => ({ key: `${owner}:${kind}`, owner, kind, eventId: null, eventName: null, label: null, dueAt: null, href: null })
 
@@ -37,5 +40,35 @@ describe('Parent Home decisions', () => {
   ] as const)('routes %s to its action', (kind, href, action) => {
     expect(parentItemHref(item('parent', kind), 'student-1')).toBe(href)
     expect(parentItemAction(item('parent', kind))).toBe(action)
+  })
+
+  it('fills the Next line from the event list and keeps the summary status', () => {
+    const eventId = 'regional' as Id<'events'>
+    const summary: ParentHomeSummary = { studentId: 's' as Id<'students'>, whatsLeft: [], nextEvent: { eventId, name: 'Regional', startsAt: at('2026-11-03T18:00'), location: 'Kansas City', status: 'confirmed' } }
+    const listed: AgendaEvent = { eventId, name: 'Regional', startsAt: at('2026-11-03T18:00'), endsAt: at('2026-11-03T20:00'), place: 'DSHS STEM Center (on site)', feeCents: 0, required: false, status: null }
+    const other: AgendaEvent = { ...listed, eventId: 'meeting' as Id<'events'>, name: 'Meeting', startsAt: at('2026-11-05T18:00'), endsAt: at('2026-11-05T20:00') }
+    const now = at('2026-11-02T12:00')
+    const next = parentNext(summary, [listed, other], now)
+    expect(next).toMatchObject({ line: 'Tue Nov 3, 6–8 PM · DSHS STEM Center (on site) · Free · Signed up', required: false })
+    expect(parentWeek([listed, other], next, now).map(event => event.name)).toEqual(['Meeting'])
+    // Not in the event list (still loading or failed): the summary's own place and status, no Required/Optional.
+    expect(parentNext(summary, [], now)).toMatchObject({ line: 'Tue Nov 3, 6 PM · Kansas City · Signed up', required: null })
+  })
+
+  type Coverage = { eventId: string; state: 'required' | 'pending' | 'accepted' | 'correction' }
+  it.each([
+    { paused: true, coverage: [] as Coverage[], names: ['Regional', 'Scrimmage'], message: 'Forms open soon — we’ll notify you.' },
+    { paused: false, coverage: [{ eventId: 'scrimmage', state: 'accepted' }] as Coverage[], names: ['Regional'], message: '1 event needs a signed form.' },
+    { paused: true, coverage: [{ eventId: 'regional', state: 'pending' }, { eventId: 'scrimmage', state: 'accepted' }] as Coverage[], names: [], message: 'Nothing to sign right now.' },
+    { paused: false, coverage: [{ eventId: 'regional', state: 'correction' }] as Coverage[], names: ['Regional', 'Scrimmage'], message: '2 events need a signed form.' },
+  ])('Forms summary: $message', ({ paused, coverage, names, message }) => {
+    const events = [
+      { eventId: 'scrimmage', name: 'Scrimmage', startsAt: at('2026-11-20T08:00'), endsAt: at('2026-11-20T17:00') },
+      { eventId: 'past', name: 'Past', startsAt: at('2026-10-01T08:00'), endsAt: at('2026-10-01T17:00') },
+      { eventId: 'regional', name: 'Regional', startsAt: at('2026-11-10T08:00'), endsAt: at('2026-11-12T17:00') },
+    ]
+    const result = formsSummary({ events, coverage, signingPaused: paused, now: at('2026-11-03T12:00') })
+    expect(result.needForm.map(event => event.name)).toEqual(names)
+    expect(result.message).toBe(message)
   })
 })

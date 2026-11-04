@@ -4,6 +4,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { audit, ownStudent, studentAccess, viewer } from "./lib/access";
 import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
+import { requireStudentOrParentCanSeeEvent } from "./lib/eventVisibility";
 import { MAX_SHIFTS, activeShifts, cleanShift, activeStudentIds, checkListSizes, checkShiftSettings, checkShifts, eventShiftSignups, liveEvent, replaceShifts, requireEventStaff } from "./lib/eventSignupExtras";
 
 const studentName = (student: Doc<"students">) => student.legalName || student.preferredName || "Student";
@@ -20,13 +21,16 @@ export const forEvent = query({
   returns: v.object({ shiftsEnabled: v.boolean(), minShiftsPerStudent: v.number(), maxShiftsPerStudent: v.union(v.number(), v.null()), signupClosesAt: v.union(v.number(), v.null()), shifts: v.array(shiftCount), studentId: v.union(v.id("students"), v.null()), selectedShiftIds: v.array(v.id("eventShifts")) }),
   handler: async (ctx, args) => {
     const user = await viewer(ctx);
-    let studentId: Id<"students"> | null = null;
+    let student: Doc<"students"> | null = null;
     if (user.role === "student") {
-      studentId = (await ownStudent(ctx, user))._id;
-      if (args.studentId && args.studentId !== studentId) throw new ConvexError("You can see only your own shifts.");
-    } else if (args.studentId) studentId = (await studentAccess(ctx, user, args.studentId))._id;
+      student = await ownStudent(ctx, user);
+      if (args.studentId && args.studentId !== student._id) throw new ConvexError("You can see only your own shifts.");
+    } else if (args.studentId) student = await studentAccess(ctx, user, args.studentId);
     else if (user.role === "parent") throw new ConvexError("Choose your student to see their shifts.");
+    const studentId: Id<"students"> | null = student?._id ?? null;
     const event = await liveEvent(ctx, args.eventId);
+    // Same audience gate as app.eventDetail: no Mentors-only or out-of-audience targeted events for Students and Parents.
+    await requireStudentOrParentCanSeeEvent(ctx, user, event, student);
     const shifts = await activeShifts(ctx, event._id);
     const places = await eventShiftSignups(ctx, event._id);
     const active = await activeStudentIds(ctx, places.map(p => p.studentId));

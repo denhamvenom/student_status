@@ -1,4 +1,5 @@
 import type { Id } from '../../../convex/_generated/dataModel'
+import type { AgendaEvent } from '../student-home/agenda'
 import type { WhatsLeftItem } from '../student-home/contract'
 import type { ParentHomeFinance, ParentHomeSummary, ParentPinnedAnnouncement } from './contract'
 
@@ -11,8 +12,15 @@ const summary = (whatsLeft: WhatsLeftItem[]): ParentHomeSummary => ({ studentId,
 const finance = (chargedCents: number, paidCents: number, dueCents: number): ParentHomeFinance => ({ state: 'ready', chargedCents, paidCents, dueCents, personalAvailableCents: dueCents > 0 ? 0 : 2500, fundraisingAvailableCents: dueCents > 0 ? 0 : 1200 } as ParentHomeFinance)
 const announcements: ParentPinnedAnnouncement[] = [{ id: 'preview-pin' as ParentPinnedAnnouncement['id'], title: 'Regional travel reminder', body: 'Please check the event details before Friday.', authorName: 'Coach Rivera', authorRole: 'coach', pinnedAt: now, showUntil: null }]
 
+const hour = 3600000
+const events: AgendaEvent[] = [
+  { eventId: 'preview-meeting' as Id<'events'>, name: 'Team meeting', startsAt: now + 26 * hour, endsAt: now + 28 * hour, place: 'DSHS STEM Center (on site)', feeCents: 0, required: true, status: null },
+  { eventId: 'preview-cad' as Id<'events'>, name: 'CAD night', startsAt: now + 51 * hour, endsAt: now + 52.5 * hour, place: 'Virtual (Discord)', feeCents: 0, required: false, status: null },
+  { eventId, name: 'River City Regional', startsAt: now + 72 * hour, endsAt: now + 80 * hour, place: 'Kansas City', feeCents: 8500, required: false, status: null },
+]
+
 export const parentHomeFixtures = {
-  urgent: { now, summary: summary(urgentWork), finance: finance(18000, 6000, 12000), announcements },
-  allDone: { now, summary: summary([work('student', 'roomChoice', 'student')]), finance: finance(18000, 18000, 0), announcements },
-  noFees: { now, summary: summary([]), finance: finance(0, 0, 0), announcements: [] as ParentPinnedAnnouncement[] },
+  urgent: { now, summary: summary(urgentWork), finance: finance(18000, 6000, 12000), announcements, events },
+  allDone: { now, summary: summary([work('student', 'roomChoice', 'student')]), finance: finance(18000, 18000, 0), announcements, events },
+  noFees: { now, summary: summary([]), finance: finance(0, 0, 0), announcements: [] as ParentPinnedAnnouncement[], events: [] as AgendaEvent[] },
 }

@@ -84,10 +84,10 @@ export default function StudentHomePreview() {
   const summary = useMemo(() => ({ ...fixture.summary, openSignups: fixture.summary.openSignups.filter(signup => !joined.ids.includes(signup.eventId)) }), [fixture, joined.ids])
   const failure = new Error('Preview failure')
   const props: StudentHomeViewProps = state === 'loading'
-    ? { summary: undefined, attendance: undefined, announcements: undefined, finance: undefined, now: fixture.now, handlers }
+    ? { summary: undefined, attendance: undefined, announcements: undefined, finance: undefined, events: undefined, now: fixture.now, handlers }
     : state === 'errors'
-      ? { summary: failure, attendance: failure, announcements: failure, finance: { state: 'failed' }, now: fixture.now, handlers }
-      : { summary, attendance: fixture.attendance, announcements: fixture.announcements, finance: fixture.finance, now: fixture.now, handlers }
+      ? { summary: failure, attendance: failure, announcements: failure, finance: { state: 'failed' }, events: failure, now: fixture.now, handlers }
+      : { summary, attendance: fixture.attendance, announcements: fixture.announcements, finance: fixture.finance, events: fixture.events ?? [], now: fixture.now, handlers }
   const link = (next: PreviewState, nextTheme = theme) => `${previewPath}?state=${next}&theme=${nextTheme}`
 
   // Same frame as main.tsx: the shell, then the public footer.

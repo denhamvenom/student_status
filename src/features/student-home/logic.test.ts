@@ -5,7 +5,7 @@ import type { HomeAttendance, OpenSignup, PinnedAnnouncement, RoomChoice, Studen
 import { homeCopy } from './copy'
 import { at } from './fixtures'
 import { formatDateRange } from './format'
-import { calendarDaysUntil, countdownTarget, countdownValue, dueShowsDate, heroCards, highlightActions, HOUR_MS, isWithinSoon, openSignupsSummary, participationView, percentAttended, roomDeadlineView, signupDateLine, SOON_MS, upcomingMilestones, whatsLeftSummary } from './logic'
+import { calendarDaysUntil, DAY_MS, countdownTarget, countdownValue, dueShowsDate, heroCards, highlightActions, HOUR_MS, isWithinSoon, openSignupDetails, openSignupRows, openSignupsSummary, participationView, percentAttended, roomDeadlineView, signupDateLine, SOON_MS, upcomingMilestones, whatsLeftSummary } from './logic'
 import { actionContent } from './tiles/ActionCard'
 
 const NOW = at('2026-10-26T12:00')
@@ -240,6 +240,21 @@ describe('closing soon', () => {
     expect(result.closingSoon).toBe(1)
     expect(result.tone).toBe('urgent')
     expect(openSignupsSummary([signup('far', NOW + 20 * 24 * HOUR_MS)], NOW).tone).toBe('quiet')
+  })
+
+  it('hides events that are over and lists the soonest event first', () => {
+    const timed = (key: string, startsAt: number, endsAt: number) => ({ ...signup(key, null), startsAt, endsAt })
+    const rows = openSignupRows([timed('later', NOW + 9 * DAY_MS, NOW + 9 * DAY_MS + HOUR_MS), timed('over', NOW - 3 * HOUR_MS, NOW - HOUR_MS), timed('under way', NOW - HOUR_MS, NOW + HOUR_MS), timed('tomorrow', NOW + DAY_MS, NOW + DAY_MS + HOUR_MS)], NOW)
+    expect(rows.map(row => row.name)).toEqual(['under way', 'tomorrow', 'later'])
+  })
+
+  it.each([
+    ['virtual, free', 0, 'Virtual (Discord)', 'Tue Nov 3, 6–8 PM · Optional · Free · Virtual (Discord)'],
+    ['place with a fee', 8500, 'Austin Convention Center', 'Tue Nov 3, 6–8 PM · Optional · $85 · Austin Convention Center'],
+    ['place not loaded', 1250, undefined, 'Tue Nov 3, 6–8 PM · Optional · $12.50'],
+  ])('details line: %s', (_label, feeCents, place, expected) => {
+    const startsAt = at('2026-11-03T18:00')
+    expect(openSignupDetails({ startsAt, endsAt: startsAt + 2 * HOUR_MS, feeCents }, place)).toBe(expected)
   })
 })
 

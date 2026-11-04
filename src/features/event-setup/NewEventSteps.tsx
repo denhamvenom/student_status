@@ -9,6 +9,7 @@ import { ConfirmAction } from '../../ConfirmAction'
 import { eventSetupCopy, questionKindLabels } from '../../copy/event-setup-copy'
 import styles from './EventSetup.module.css'
 import { MAX_QUESTIONS, MAX_REQUIREMENTS, blankQuestion, isChoice, newDraftId, sortedShifts, type DraftQuestion, type DraftRequirement, type DraftShift, type QuestionKind } from './new-event-extras'
+import { dateTimeBounds } from './new-event-defaults'
 import { MAX_SHIFTS, endFollowingStart, eventWindow, nextShiftTimes, overlappingShifts, planShifts, shiftPlaces, shiftTime, shiftTimesIssue, timeSpan } from './shift-plan'
 
 const copy = eventSetupCopy.newEventSteps
@@ -20,7 +21,7 @@ type Window = { startsAt: number; endsAt: number }
 type Invalid = { field: string | null; message: string }
 
 /** Skip always either advances (nothing to discard) or opens the in-app confirm that names how many unfinished items go. */
-function SkipButton({ onSkip, skipCount }: { onSkip: () => void; skipCount: number }) {
+export function SkipButton({ onSkip, skipCount }: { onSkip: () => void; skipCount: number }) {
   return <div>{skipCount > 0 ? <ConfirmAction description={copy.skipConfirm(skipCount)} onConfirm={async () => onSkip()}>{copy.skip}</ConfirmAction> : <Button type="button" variant="outline" onClick={onSkip}>{copy.skip}</Button>}</div>
 }
 
@@ -79,8 +80,8 @@ export function SlotsStep({ event, shifts, onShifts, max, min, onMax, onMin, inv
     <section className={styles.panel} aria-labelledby={`${id}-add`}>
       <h3 id={`${id}-add`}>{copy.slotsAddTitle}</h3>
       <div className={styles.fields}>
-        <label>{shiftCopy.starts}<Input type="datetime-local" value={times.start} aria-invalid={tried && !!timesIssue} onChange={e => setDraft(prior => ({ ...prior, suggested: false, start: e.target.value, end: endFollowingStart(times.start, times.end, e.target.value) }))} /></label>
-        <label>{shiftCopy.ends}<Input type="datetime-local" value={times.end} aria-invalid={tried && !!timesIssue} onChange={e => setDraft(prior => ({ ...prior, suggested: false, start: times.start, end: e.target.value }))} /></label>
+        <label>{shiftCopy.starts}<Input type="datetime-local" min={dateTimeBounds.min} max={dateTimeBounds.max} value={times.start} aria-invalid={tried && !!timesIssue} onChange={e => setDraft(prior => ({ ...prior, suggested: false, start: e.target.value, end: endFollowingStart(times.start, times.end, e.target.value) }))} /></label>
+        <label>{shiftCopy.ends}<Input type="datetime-local" min={dateTimeBounds.min} max={dateTimeBounds.max} value={times.end} aria-invalid={tried && !!timesIssue} onChange={e => setDraft(prior => ({ ...prior, suggested: false, start: times.start, end: e.target.value }))} /></label>
         <label>{shiftCopy.label}<Input value={draft.label} maxLength={80} placeholder={shiftCopy.labelPlaceholder} onChange={e => setDraft({ ...draft, label: e.target.value })} /></label>
         <label>{shiftCopy.capacity}<Input type="number" min="1" max="500" step="1" inputMode="numeric" value={draft.capacity} onChange={e => setDraft({ ...draft, capacity: e.target.value })} /><span className={styles.hint}>{shiftCopy.capacityHint}</span></label>
       </div>
@@ -110,7 +111,7 @@ export function SlotsStep({ event, shifts, onShifts, max, min, onMax, onMin, inv
 }
 
 /** Signup questions: add, remove and reorder drafts. Nothing is saved until Create event. */
-export function QuestionsStep({ questions, onQuestions, invalid, onSkip, skipCount }: { questions: DraftQuestion[]; onQuestions: (questions: DraftQuestion[]) => void; invalid: Invalid; onSkip: () => void; skipCount: number }) {
+export function QuestionsStep({ questions, onQuestions, invalid, onSkip, skipCount = 0 }: { questions: DraftQuestion[]; onQuestions: (questions: DraftQuestion[]) => void; invalid: Invalid; onSkip?: () => void; skipCount?: number }) {
   const change = (qid: string, patch: Partial<DraftQuestion>) => onQuestions(questions.map(q => q.id === qid ? { ...q, ...patch } : q))
   const move = (index: number, by: -1 | 1) => { const next = [...questions]; [next[index], next[index + by]] = [next[index + by], next[index]]; onQuestions(next) }
   return <div className={styles.stack}>
@@ -143,12 +144,12 @@ export function QuestionsStep({ questions, onQuestions, invalid, onSkip, skipCou
       </section>
     })}
     <div><Button type="button" variant="outline" disabled={questions.length >= MAX_QUESTIONS} onClick={() => onQuestions([...questions, blankQuestion(newDraftId('q'))])}>{copy.addQuestion}</Button></div>
-    <SkipButton onSkip={onSkip} skipCount={skipCount} />
+    {onSkip && <SkipButton onSkip={onSkip} skipCount={skipCount} />}
   </div>
 }
 
 /** Things students must do: custom requirement drafts with the event page's fields. */
-export function RequirementsStep({ requirements, onRequirements, invalid, onSkip, skipCount }: { requirements: DraftRequirement[]; onRequirements: (requirements: DraftRequirement[]) => void; invalid: Invalid; onSkip: () => void; skipCount: number }) {
+export function RequirementsStep({ requirements, onRequirements, invalid, onSkip, skipCount = 0 }: { requirements: DraftRequirement[]; onRequirements: (requirements: DraftRequirement[]) => void; invalid: Invalid; onSkip?: () => void; skipCount?: number }) {
   const change = (rid: string, patch: Partial<DraftRequirement>) => onRequirements(requirements.map(r => r.id === rid ? { ...r, ...patch } : r))
   return <div className={styles.stack}>
     <p className={styles.intro}>{copy.requirementsPurpose}</p>
@@ -160,13 +161,13 @@ export function RequirementsStep({ requirements, onRequirements, invalid, onSkip
         <label>{copy.requirementInstructions}<Input value={r.instructions} maxLength={1000} onChange={e => change(r.id, { instructions: e.target.value })} /></label>
         <div className={styles.fields}>
           <label>{copy.requirementLink}<Input type="url" inputMode="url" value={r.url} maxLength={500} onChange={e => change(r.id, { url: e.target.value })} /></label>
-          <label>{copy.requirementDueLabel}<Input type="datetime-local" value={r.dueAt} onChange={e => change(r.id, { dueAt: e.target.value })} /></label>
+          <label>{copy.requirementDueLabel}<Input type="datetime-local" min={dateTimeBounds.min} max={dateTimeBounds.max} value={r.dueAt} onChange={e => change(r.id, { dueAt: e.target.value })} /></label>
         </div>
         {bad && <p id={`${fieldId}-error`} className="open-text">{invalid.message}</p>}
         <div className={styles.formActions}><Button type="button" variant="outline" aria-label={copy.removeItem(name)} onClick={() => onRequirements(requirements.filter(x => x.id !== r.id))}>{copy.remove}</Button></div>
       </section>
     })}
     <div><Button type="button" variant="outline" disabled={requirements.length >= MAX_REQUIREMENTS} onClick={() => onRequirements([...requirements, { id: newDraftId('r'), label: '', instructions: '', url: '', dueAt: '' }])}>{requirements.length ? copy.addRequirement : copy.addFirstRequirement}</Button>{requirements.length >= MAX_REQUIREMENTS && <p role="status" className={styles.intro}>{copy.requirementsFull}</p>}</div>
-    <SkipButton onSkip={onSkip} skipCount={skipCount} />
+    {onSkip && <SkipButton onSkip={onSkip} skipCount={skipCount} />}
   </div>
 }

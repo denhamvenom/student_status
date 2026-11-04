@@ -18,7 +18,8 @@ const drivingFields = {
   driverState, driverFingerprint: v.union(v.string(), v.null()), canDrive: v.boolean(),
   vehicleName: v.string(), passengerSeats: v.union(v.number(), v.null()), towCapable: v.boolean(), approved: v.boolean(),
 };
-const profile = v.object({ ...basicFields, ...drivingFields, travelLead: v.boolean() });
+// `subteams`: the signed-in Coach or Mentor's own subteams (Mentor Home shows them); [] when none are set.
+const profile = v.object({ ...basicFields, ...drivingFields, travelLead: v.boolean(), subteams: v.array(v.string()) });
 const drivingInput = v.object({ expectedDriverFingerprint: v.union(v.string(), v.null()), canDrive: v.boolean(), vehicleName: v.string(), passengerSeats: v.union(v.number(), v.null()), towCapable: v.boolean() });
 type Ctx = QueryCtx | MutationCtx;
 type DriverState = "owned" | "none" | "coachReviewRequired" | "capacityReview" | "seasonUnavailable";
@@ -207,7 +208,7 @@ export const own = query({
   args: {}, returns: profile,
   handler: async ctx => {
     const actor = await viewer(ctx); requireRole(actor, "coach", "mentor");
-    return { ...basics(actor), travelLead: actor.travelLead, ...drivingDetails(await driverContext(ctx, actor)) };
+    return { ...basics(actor), travelLead: actor.travelLead, subteams: actor.subteams ?? [], ...drivingDetails(await driverContext(ctx, actor)) };
   },
 });
 

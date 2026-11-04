@@ -44,3 +44,9 @@
 @media(max-width:767px){.wizard{max-width:100%}.panel{padding:24px}.dateGrid{grid-template-columns:1fr}.actions{flex-wrap:wrap}.actions a{padding-left:0}.review{grid-template-columns:minmax(85px,auto) minmax(0,1fr)}}
 
 .actions .cancel{min-height:44px;padding:0 10px;border:0;background:none;color:var(--text-muted);font-size:15px;font-weight:400}
+/* Who's going wraps the audience picker so a server problem can move focus to it. */
+.whoStep{display:flex;flex-direction:column;gap:14px;min-width:0}
+.calendarChoices label{min-height:44px;align-items:center}
+.calendarChoices label small{display:block}
+.actions:has(.discardQuestion){flex-wrap:wrap}
+.discardQuestion{flex:1 1 100%;margin:0;font-weight:600}

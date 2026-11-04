@@ -6,6 +6,7 @@ import type { StudentHomeSummary } from "../src/features/student-home/contract";
 import type { ParentHomeSummary } from "../src/features/parent-home/contract";
 import { activeSeason, ownStudent, studentAccess, viewer } from "./lib/access";
 import { enrollmentPending } from "./lib/eventEnrollmentState";
+import { eventVisibleToStudents } from "./lib/eventAudience";
 import { coverageFor } from "./lib/permissionCoverage";
 import { permissionSigningPaused } from "./lib/permissionSigningMode";
 import { roomSelectionState, studentReadiness, type RoomSelectionState } from "./lib/readModels";
@@ -217,8 +218,13 @@ async function buildSummary(ctx: QueryCtx, student: Doc<"students">, asOfDay: st
     const seen = new Set<string>();
     const uniqueItems = whatsLeft.filter(item => !seen.has(item.key) && !!seen.add(item.key));
 
+    // Events not for this student (outside the saved audience, and not on them already) stay off Home; legacy events still show.
+    const onEvent = new Set(participations.keys());
+    const forStudent: Doc<"events">[] = [];
+    for (const event of events) if (await eventVisibleToStudents(ctx, event, [student], onEvent)) forStudent.push(event);
+
     const openSignups: StudentHomeSummary["openSignups"] = [];
-    for (const event of events) {
+    for (const event of forStudent) {
       if (event.signupMode === "assigned" || enrollmentPending(event)) continue;
       const participant = participations.get(event._id);
       if (participant && participant.status !== "withdrawn") continue;
@@ -260,7 +266,7 @@ async function buildSummary(ctx: QueryCtx, student: Doc<"students">, asOfDay: st
       openSignups,
       roomChoices,
       // Every fetched Competition, so ones that ended but are not archived yet cannot push out the next one; the browser picks by time.
-      competitions: events.filter(event => event.type === "Competition").map(event => ({ eventId: event._id, name: event.name, startsAt: event.startsAt, endsAt: event.endsAt })),
+      competitions: forStudent.filter(event => event.type === "Competition").map(event => ({ eventId: event._id, name: event.name, startsAt: event.startsAt, endsAt: event.endsAt })),
     };
 }
 

@@ -113,6 +113,8 @@ describe("Whole Team enrollment", () => {
   });
 
   it("enrolls in 100 upcoming events using rebuilt funding without rescanning financial history", async () => {
+    vi.useFakeTimers();
+    try {
     const f = await fixture();
     await f.t.run(async ctx => {
       for (let i = 0; i < 100; i++) {
@@ -143,9 +145,11 @@ describe("Whole Team enrollment", () => {
       await syncWholeTeamMembership({ ...ctx, db }, actor!, student!);
       return counts;
     });
-    // Ledger reads here are indexed idempotency checks, never lifetime-history scans.
-    expect(queries.ledgerEntries).toBe(100);
-    expect(queries.participants).toBe(100);
+    // Ledger reads here are indexed idempotency checks, never lifetime-history scans; one bounded page of 50 runs inline.
+    expect(queries.ledgerEntries).toBe(50);
+    expect(queries.participants).toBe(50);
+    // The remaining events are enrolled by a scheduled background page instead of failing the roster change.
+    await f.t.finishAllScheduledFunctions(vi.runAllTimers);
     for (let step = 0; step < 120; step++) {
       const jobs = await f.t.run(ctx => ctx.db.query("financialAllocationJobs").withIndex("by_studentId_and_state", q => q.eq("studentId", f.ids.students[2]).eq("state", "running")).take(2));
       if (!jobs.length) break;
@@ -158,6 +162,7 @@ describe("Whole Team enrollment", () => {
     const allocations = rows.entries.filter(e => e.kind === "allocation");
     expect(allocations.reduce((total, e) => total + e.amountCents, 0)).toBe(10000);
     expect(new Set(allocations.map(e => e.sourceKind))).toEqual(new Set(["payment", "fundraiser"]));
+    } finally { vi.useRealTimers(); }
   });
 
   it("keeps provisioning pending until the stable snapshot finishes and guards duplicate progress", async () => {

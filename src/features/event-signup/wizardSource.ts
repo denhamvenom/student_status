@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useMutation, useQueries } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
-import { eventLocation, transportationLabel } from '@/lib/event-place'
+import { eventLocation, hasTravel, transportationLabel } from '@/lib/event-place'
 import type { SignupAvailability, StudentHomeSummary } from '../student-home/contract'
 import { chicagoDateKey } from '../student-home/format'
 import type { EventFacts, SignupWizardSource } from './types'
@@ -15,7 +15,7 @@ function useAvailability(eventId: Id<'events'>): Loadable<SignupAvailability> {
   return useQueries(queries).availability as Loadable<SignupAvailability>
 }
 
-type EventDoc = { destination?: string; onsite?: boolean; travel?: string }
+type EventDoc = { destination?: string; onsite?: boolean; travel?: string; locationType?: string }
 
 /** Place and transport from app.eventDetail (the event page's own query). */
 function useEventFacts(eventId: Id<'events'>): Loadable<EventFacts> {
@@ -23,7 +23,7 @@ function useEventFacts(eventId: Id<'events'>): Loadable<EventFacts> {
   const detail = useQueries(queries).detail as Loadable<{ event: EventDoc }>
   if (detail === undefined || detail instanceof Error) return detail
   const { event } = detail
-  return { place: eventLocation({ destination: event.destination ?? '', onsite: event.onsite }), ride: event.onsite || !event.travel ? null : transportationLabel(event.travel) }
+  return { place: eventLocation({ destination: event.destination ?? '', onsite: event.onsite, locationType: event.locationType }), ride: !hasTravel(event) || !event.travel ? null : transportationLabel(event.travel) }
 }
 
 /** Home's summary (shared with Home when it is open, since the query and day match). */

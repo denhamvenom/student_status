@@ -13,14 +13,14 @@ export const eventCopy = {
   title: 'New event',
   description: 'Set up a competition, outreach event, team activity or fundraiser.',
   backToEvents: '← Events',
-  stepCount: (step: number, total: number) => `New event · step ${step} of ${total}`,
+  stepCount: (step: number, total: number) => `Step ${step} of ${total}`,
   steps: uiCopy.wizard.steps,
   actions: uiCopy.wizard,
   types: { competition: 'Competition', outreach: 'Outreach', team: 'Team activity', fundraiser: 'Fundraiser' },
   fields: {
-    name: 'Name', type: 'Type', starts: 'Starts', ends: 'Ends', destination: 'Destination', onsite: 'On site (DSHS STEM Center)',
+    name: 'Name', type: 'Type', starts: 'Starts', ends: 'Ends', destination: 'Destination',
     capacity: 'Participant limit (optional)', fee: 'Event fee (USD)',
-    permission: 'Permission form', first: 'Require FIRST registration for this event',
+    permission: 'Permission form', first: 'FIRST registration needed',
     travelArrangement: 'Travel arrangement', overnight: 'Overnight event',
     rooming: 'Enable room selection', roomDeadline: 'Room selection deadline',
   },
@@ -40,14 +40,15 @@ export const eventCopy = {
     coachOnly: 'Only a Coach can add the Travel Team or Whole Team automatically. Use Open Registration so students can sign up.',
   },
   notes: {
-    fee: 'Pending signups are charged only when confirmed. You can add other charges on the Money page later.',
+    fee: 'Charged when a signup is confirmed.',
+    /** Event page Travel section for an at-our-shop event (no longer shown in New event, which asks Where once). */
+    onsite: 'On-site events happen at the DSHS STEM Center, so there is no transportation or overnight stay to plan.',
     requiredPayment: 'Required payment is tracked because this event has a fee.',
     drivers: 'Drivers and passenger seats are assigned from the event page after creation.',
     ownRide: 'Families arrange their own transportation. The app will not manage drivers or student rides.',
-    onsite: 'On-site events happen at the DSHS STEM Center, so there is no transportation or overnight stay to plan.',
     /** Beside On site and Students pick shifts when a Fundraiser ticks them, so they aren't cleared by mistake. */
     fundraiserDefault: 'Checked for fundraisers',
-    fundraiser: 'Fundraisers start on site at the DSHS STEM Center with Open Registration, no fee, no permission form and no FIRST registration. Student shifts are suggested; change any of these as needed.',
+    fundraiser: 'Fundraiser defaults: at our shop, open signup, free, shifts on.',
   },
   review: {
     event: 'Event', type: 'Type', dates: 'Dates', destination: 'Destination',

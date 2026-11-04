@@ -9,7 +9,7 @@ export function eventDraftIssue(draft: EventDraft, step?: number): EventDraftIss
     if (!Number.isFinite(parseChicagoInput(draft.start))) return issue(0, 'event-start', 'Enter a valid Central Time start.')
     if (!Number.isFinite(parseChicagoInput(draft.end))) return issue(0, 'event-end', 'Enter a valid Central Time end.')
     if (parseChicagoInput(draft.end) < parseChicagoInput(draft.start)) return issue(0, 'event-end', 'The end must be at or after the start.')
-    if (!draft.onsite && !draft.destination.trim() && (!draft.calendarChoice || draft.calendarChoice === 'create')) return issue(0, 'event-destination', 'Enter the destination.')
+    if (!draft.onsite && !draft.destination.trim() && (!draft.calendarChoice || draft.calendarChoice === 'create' || draft.calendarChoice === 'none')) return issue(0, 'event-destination', 'Enter the destination.')
   }
   if ((step === undefined || step === 1) && draft.mode === 'open' && draft.capacity && (!Number.isSafeInteger(Number(draft.capacity)) || Number(draft.capacity) < 1)) return issue(1, 'event-capacity', 'Enter a whole-number participant limit of at least 1, or leave it blank.')
   if ((step === undefined || step === 2) && (!draft.fee.trim() || !Number.isSafeInteger(Math.round(Number(draft.fee) * 100)) || Number(draft.fee) < 0)) return issue(2, 'event-fee', 'Enter a valid event fee, or 0 for no fee.')
