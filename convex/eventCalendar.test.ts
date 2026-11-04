@@ -61,19 +61,19 @@ describe("Venom Status Calendar link", () => {
 
   it("reserves links uniquely, protects stale edits, and imports only a linked occurrence", async () => {
     const f = await fixture();
-    await expect(f.mentor.mutation(api.eventCalendar.connect, { eventId: f.ids.event, calendarChoice: { kind: "link", eventId: "cal-occurrence-1" } })).rejects.toThrow("Coach or Travel Lead");
-    await f.coach.mutation(api.eventCalendar.connect, { eventId: f.ids.event, calendarChoice: { kind: "link", eventId: "cal-occurrence-1" } });
+    await expect(f.mentor.mutation(api.eventCalendar.connect, { eventId: f.ids.event, calendarChoice: { kind: "link", eventId: "cal_occurrence_1" } })).rejects.toThrow("Coach or Travel Lead");
+    await f.coach.mutation(api.eventCalendar.connect, { eventId: f.ids.event, calendarChoice: { kind: "link", eventId: "cal_occurrence_1" } });
     const status = await f.coach.query(api.eventCalendar.status, { eventId: f.ids.event });
-    expect(status).toMatchObject({ state: "disabled", calendarEventId: "cal-occurrence-1", revision: 1 });
+    expect(status).toMatchObject({ state: "disabled", calendarEventId: "cal_occurrence_1", revision: 1 });
     await expect(f.coach.mutation(api.eventCalendar.update, { eventId: f.ids.event, expectedRevision: 0, name: "Wrong" })).rejects.toThrow("changed since");
     await f.t.mutation(internal.eventCalendar.applyObserved, { eventId: "unlinked", title: "Ignore", location: "Elsewhere", start: 1, end: 2, allDay: false, recurring: false, cancelled: false, etag: "other", description: "" });
     expect((await f.t.run(ctx => ctx.db.get(f.ids.event)))?.name).toBe("Practice");
     const duplicate = await f.t.run(async ctx => ctx.db.insert("events", { seasonId: f.ids.season, name: "Second", type: "Team", startsAt: 100, endsAt: 200, destination: "Gym", travel: "None", overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "open", allowWithdrawal: true, permissionRequired: false, firstRequired: false, archived: false }));
-    await expect(f.coach.mutation(api.eventCalendar.connect, { eventId: duplicate, calendarChoice: { kind: "link", eventId: "cal-occurrence-1" } })).rejects.toThrow("already connected");
+    await expect(f.coach.mutation(api.eventCalendar.connect, { eventId: duplicate, calendarChoice: { kind: "link", eventId: "cal_occurrence_1" } })).rejects.toThrow("already connected");
     await f.t.mutation(internal.eventCalendar.finishPush, { eventId: f.ids.event, revision: 1, error: "The selected Calendar event is no longer available.", replaceable: true });
     expect((await f.coach.query(api.eventCalendar.status, { eventId: f.ids.event })).canReselect).toBe(true);
-    await f.coach.mutation(api.eventCalendar.connect, { eventId: f.ids.event, calendarChoice: { kind: "link", eventId: "cal-occurrence-4" } });
-    const claims = await f.t.run(async ctx => ({ old: await ctx.db.query("eventCalendarClaims").withIndex("by_calendarEventId", q => q.eq("calendarEventId", "cal-occurrence-1")).unique(), next: await ctx.db.query("eventCalendarClaims").withIndex("by_calendarEventId", q => q.eq("calendarEventId", "cal-occurrence-4")).unique() }));
+    await f.coach.mutation(api.eventCalendar.connect, { eventId: f.ids.event, calendarChoice: { kind: "link", eventId: "cal_occurrence_4" } });
+    const claims = await f.t.run(async ctx => ({ old: await ctx.db.query("eventCalendarClaims").withIndex("by_calendarEventId", q => q.eq("calendarEventId", "cal_occurrence_1")).unique(), next: await ctx.db.query("eventCalendarClaims").withIndex("by_calendarEventId", q => q.eq("calendarEventId", "cal_occurrence_4")).unique() }));
     expect(claims.old).toBeNull();
     expect(claims.next?.eventId).toBe(f.ids.event);
   });
@@ -81,13 +81,13 @@ describe("Venom Status Calendar link", () => {
   it("adopts linked all-day occurrence and cancellation without erasing its details", async () => {
     const f = await fixture();
     await f.t.run(async ctx => {
-      await ctx.db.patch(f.ids.event, { calendarChoice: "link", calendarEventId: "cal-occurrence-2", calendarSyncState: "synced", calendarEtag: "old", calendarRevision: 1, calendarActorId: f.ids.coach });
-      await ctx.db.insert("eventCalendarClaims", { calendarEventId: "cal-occurrence-2", eventId: f.ids.event });
+      await ctx.db.patch(f.ids.event, { calendarChoice: "link", calendarEventId: "cal_occurrence_2", calendarSyncState: "synced", calendarEtag: "old", calendarRevision: 1, calendarActorId: f.ids.coach });
+      await ctx.db.insert("eventCalendarClaims", { calendarEventId: "cal_occurrence_2", eventId: f.ids.event });
     });
-    await f.t.mutation(internal.eventCalendar.applyObserved, { eventId: "cal-occurrence-2", title: "Tournament", location: "Arena", start: chicagoMidnight("2026-11-01"), end: chicagoMidnight("2026-11-02"), allDay: true, allDayStartDate: "2026-11-01", allDayEndDate: "2026-11-02", recurring: true, cancelled: false, etag: "new", providerUpdatedAt: 2000, description: "Bring gear\nMedia Support Requested" });
+    await f.t.mutation(internal.eventCalendar.applyObserved, { eventId: "cal_occurrence_2", title: "Tournament", location: "Arena", start: chicagoMidnight("2026-11-01"), end: chicagoMidnight("2026-11-02"), allDay: true, allDayStartDate: "2026-11-01", allDayEndDate: "2026-11-02", recurring: true, cancelled: false, etag: "new", providerUpdatedAt: 2000, description: "Bring gear\nMedia Support Requested" });
     expect(await f.coach.query(api.eventCalendar.status, { eventId: f.ids.event })).toMatchObject({ state: "disabled", allDay: true, recurring: true, mediaSupportRequested: true, revision: 2 });
-    await f.t.mutation(internal.eventCalendar.applyObserved, { eventId: "cal-occurrence-2", title: "", location: "", allDay: false, recurring: false, cancelled: true, etag: "cancelled", providerUpdatedAt: 3000, description: "" });
-    await f.t.mutation(internal.eventCalendar.applyObserved, { eventId: "cal-occurrence-2", title: "Stale", location: "Old", start: 100, end: 200, allDay: false, recurring: false, cancelled: false, etag: "stale", providerUpdatedAt: 2500, description: "" });
+    await f.t.mutation(internal.eventCalendar.applyObserved, { eventId: "cal_occurrence_2", title: "", location: "", allDay: false, recurring: false, cancelled: true, etag: "cancelled", providerUpdatedAt: 3000, description: "" });
+    await f.t.mutation(internal.eventCalendar.applyObserved, { eventId: "cal_occurrence_2", title: "Stale", location: "Old", start: 100, end: 200, allDay: false, recurring: false, cancelled: false, etag: "stale", providerUpdatedAt: 2500, description: "" });
     const event = await f.t.run(ctx => ctx.db.get(f.ids.event));
     expect(event).toMatchObject({ name: "Tournament", destination: "Arena", cancelled: true, mediaSupportRequested: true, calendarRevision: 3 });
   });
@@ -97,11 +97,11 @@ describe("Venom Status Calendar link", () => {
     const ids = await f.t.run(async ctx => {
       const student = await ctx.db.insert("students", { seasonId: f.ids.season, legalName: "Synthetic Student", preferredName: "Synthetic", email: "student@synthetic.test", subteam: "Other", active: true, travelTeam: false, roomCategoryLocked: false, allergies: { state: "none" }, medications: { state: "none" } });
       const coverage = await ctx.db.insert("permissionCoverage", { seasonId: f.ids.season, studentId: student, eventId: f.ids.event, state: "accepted", revision: 3, updatedAt: 1, updatedBy: f.ids.coach });
-      await ctx.db.patch(f.ids.event, { calendarChoice: "link", calendarEventId: "cal-occurrence-3", calendarSyncState: "synced", calendarEtag: "old", calendarRevision: 1, calendarActorId: f.ids.coach, signupClosesAt: chicagoMidnight("2026-11-03") });
-      await ctx.db.insert("eventCalendarClaims", { calendarEventId: "cal-occurrence-3", eventId: f.ids.event });
+      await ctx.db.patch(f.ids.event, { calendarChoice: "link", calendarEventId: "cal_occurrence_3", calendarSyncState: "synced", calendarEtag: "old", calendarRevision: 1, calendarActorId: f.ids.coach, signupClosesAt: chicagoMidnight("2026-11-03") });
+      await ctx.db.insert("eventCalendarClaims", { calendarEventId: "cal_occurrence_3", eventId: f.ids.event });
       return { coverage };
     });
-    await f.t.mutation(internal.eventCalendar.applyObserved, { eventId: "cal-occurrence-3", title: "New practice time", location: "Gym", start: chicagoMidnight("2026-11-02"), end: chicagoMidnight("2026-11-03"), allDay: false, recurring: false, cancelled: false, etag: "new", providerUpdatedAt: 1000, description: "" });
+    await f.t.mutation(internal.eventCalendar.applyObserved, { eventId: "cal_occurrence_3", title: "New practice time", location: "Gym", start: chicagoMidnight("2026-11-02"), end: chicagoMidnight("2026-11-03"), allDay: false, recurring: false, cancelled: false, etag: "new", providerUpdatedAt: 1000, description: "" });
     const coverage = await f.t.run(ctx => ctx.db.get(ids.coverage));
     expect(coverage).toMatchObject({ state: "required", revision: 4 });
     expect(coverage?.signatureRequestedAt).toBeTypeOf("number");

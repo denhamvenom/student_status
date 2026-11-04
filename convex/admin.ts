@@ -1,19 +1,19 @@
-import { scheduleEventArchive } from "./eventArchive";
 import { onsiteLocation, teamTransportEnabled } from "./lib/transportation";
 import { normalizeEmail, normalizePhone } from "./lib/contactValidation";
 import { requireSeasonFinanceReady } from "./lib/seasonFinance";
 import { ConvexError, v } from "convex/values";
-import { internal } from "./_generated/api";
 import { mutation, query } from "./_generated/server";
 import { activeSeason, audit, requireRole, requireSeasonProfileWritable, viewer } from "./lib/access";
-import { addCharge } from "./lib/money";
 import { refreshStudentFinance } from "./lib/financeSummaries";
 import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
 import { markRoomCategoryReview } from "./lib/profileCorrections";
 import { syncWholeTeamMembership } from "./lib/wholeTeam";
 import { subteamOptions } from "../src/lib/subteams";
 import { allocateInvitationCode } from "./lib/invitationCodes";
-import { notifyEventCreated, notifyJoinApproved } from "./lib/notificationTriggers";
+import { notifyJoinApproved } from "./lib/notificationTriggers";
+import { MAX_AUDIENCE_STUDENTS, MAX_MENTOR_INVITES, createEventCore, prepareEventAudience } from "./lib/createEventCore";
+import { studentInAudience } from "./lib/eventAudienceRules";
+import { syncSubteamMembership } from "./lib/subteamEnrollment";
 import { MAX_QUESTIONS, MAX_SHIFTS, checkListSizes, checkRequirementFields, checkShiftSettings, cleanQuestion, cleanShift, questionInput, shiftInput } from "./lib/eventSignupExtras";
 
 const MAX_REQUIREMENTS = 100;
@@ -22,7 +22,7 @@ export const listJoinRequests = query({
   args: {}, returns: v.any(),
   handler: async ctx => {
     const user = await viewer(ctx);
-    if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Only a Coach or Travel Lead can review Join requests.");
+    if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can review Join requests.");
     return await ctx.db.query("joinRequests").withIndex("by_status", q => q.eq("status", "pending")).take(100);
   },
 });
@@ -67,7 +67,7 @@ export const approveJoin = mutation({
   handler: async (ctx, args) => {
     await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const actor = await viewer(ctx);
-    if (actor.role !== "coach" && !actor.travelLead) throw new ConvexError("Only a Coach or Travel Lead can review Join requests.");
+    if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can review Join requests.");
     const request = await ctx.db.get(args.requestId); const season = await activeSeason(ctx);
     if (!request || request.seasonId !== season._id || request.status !== "pending") throw new ConvexError("This join request was already reviewed or is from an earlier season. Reload Join requests.");
     if (!args.approve) {
@@ -88,6 +88,7 @@ export const approveJoin = mutation({
       if (!student || student.seasonId !== season._id || student.userId || student.email !== request.email) throw new ConvexError("This student is already connected to an account or has a different email. Reload and choose another student.");
       await ctx.db.patch(student._id, { userId, active: true });
       await syncWholeTeamMembership(ctx, actor, { ...student, userId, active: true });
+      await syncSubteamMembership(ctx, actor, { ...student, userId, active: true });
     } else {
       const studentId = await ctx.db.insert("students", { seasonId: season._id, userId, legalName: `${request.firstName} ${request.lastName}`, preferredName: request.firstName, firstName: request.firstName, lastName: request.lastName, structuredNameReviewed: false, email: request.email, subteam: "", active: true, travelTeam: false, roomCategoryLocked: false, allergies: { state: "unknown" }, medications: { state: "unknown" } });
       const student = await ctx.db.get(studentId);
@@ -105,17 +106,20 @@ export const approveJoin = mutation({
 });
 
 export const createEvent = mutation({
-  args: { isOutreach: v.optional(v.boolean()), onsite: v.optional(v.boolean()), name: v.string(), type: v.union(v.literal("Competition"), v.literal("Outreach"), v.literal("Team"), v.literal("Fundraiser")), startsAt: v.number(), endsAt: v.number(), destination: v.string(), travel: v.string(), overnight: v.boolean(), roomingEnabled: v.boolean(), roomDeadline: v.optional(v.number()), feeCents: v.number(), signupMode: v.union(v.literal("assigned"), v.literal("open"), v.literal("approval")), assignmentScope: v.optional(v.union(v.literal("selected"), v.literal("travelTeam"), v.literal("wholeTeam"))), assignedStudentIds: v.optional(v.array(v.id("students"))), capacity: v.optional(v.number()), signupClosesAt: v.optional(v.number()), allowWithdrawal: v.boolean(), permissionRequired: v.boolean(), firstRequired: v.boolean(), mediaSupportRequested: v.optional(v.boolean()), shiftsEnabled: v.optional(v.boolean()), maxShiftsPerStudent: v.optional(v.number()), minShiftsPerStudent: v.optional(v.number()), calendarChoice: v.optional(v.union(v.object({ kind: v.literal("create") }), v.object({ kind: v.literal("link"), eventId: v.string() }))), requirements: v.array(v.object({ key: v.string(), label: v.string(), instructions: v.optional(v.string()), url: v.optional(v.string()), dueAt: v.optional(v.number()) })), shifts: v.optional(v.array(shiftInput)), questions: v.optional(v.array(questionInput)) }, returns: v.id("events"),
-  handler: async (ctx, args) => {
+  args: { isOutreach: v.optional(v.boolean()), onsite: v.optional(v.boolean()), name: v.string(), type: v.union(v.literal("Competition"), v.literal("Outreach"), v.literal("Team"), v.literal("Fundraiser")), startsAt: v.number(), endsAt: v.number(), destination: v.string(), travel: v.string(), overnight: v.boolean(), roomingEnabled: v.boolean(), roomDeadline: v.optional(v.number()), feeCents: v.number(), signupMode: v.union(v.literal("assigned"), v.literal("open"), v.literal("approval")), assignmentScope: v.optional(v.union(v.literal("selected"), v.literal("travelTeam"), v.literal("wholeTeam"))), assignedStudentIds: v.optional(v.array(v.id("students"))), capacity: v.optional(v.number()), signupClosesAt: v.optional(v.number()), allowWithdrawal: v.boolean(), permissionRequired: v.boolean(), firstRequired: v.boolean(), mediaSupportRequested: v.optional(v.boolean()), shiftsEnabled: v.optional(v.boolean()), maxShiftsPerStudent: v.optional(v.number()), minShiftsPerStudent: v.optional(v.number()), calendarChoice: v.optional(v.union(v.object({ kind: v.literal("create") }), v.object({ kind: v.literal("link"), eventId: v.string() }), v.object({ kind: v.literal("none") }))), requirements: v.array(v.object({ key: v.string(), label: v.string(), instructions: v.optional(v.string()), url: v.optional(v.string()), dueAt: v.optional(v.number()) })), shifts: v.optional(v.array(shiftInput)), questions: v.optional(v.array(questionInput)), audienceKind: v.optional(v.union(v.literal("everyone"), v.literal("subteams"), v.literal("students"), v.literal("mentorsOnly"))), audienceSubteams: v.optional(v.array(v.string())), mandatory: v.optional(v.boolean()), audienceStudentIds: v.optional(v.array(v.id("students"))), mentorInviteUserIds: v.optional(v.array(v.id("appUsers"))), inviteSubteamMentors: v.optional(v.boolean()), locationType: v.optional(v.union(v.literal("inPerson"), v.literal("virtual"))) }, returns: v.id("events"),
+  handler: async (ctx, raw) => {
     // Oversized lists are rejected before any database read.
-    if ((args.shifts?.length ?? 0) > MAX_SHIFTS) throw new ConvexError("An event can have up to 100 shifts. Remove some shifts.");
-    if ((args.questions?.length ?? 0) > MAX_QUESTIONS) throw new ConvexError("An event can have up to 25 questions. Remove some questions.");
-    if (args.requirements.length > MAX_REQUIREMENTS) throw new ConvexError("An event can have up to 100 requirements. Remove some requirements.");
-    for (const question of args.questions ?? []) checkListSizes({ options: question.options });
+    if ((raw.shifts?.length ?? 0) > MAX_SHIFTS) throw new ConvexError("An event can have up to 100 shifts. Remove some shifts.");
+    if ((raw.questions?.length ?? 0) > MAX_QUESTIONS) throw new ConvexError("An event can have up to 25 questions. Remove some questions.");
+    if (raw.requirements.length > MAX_REQUIREMENTS) throw new ConvexError("An event can have up to 100 requirements. Remove some requirements.");
+    if ((raw.mentorInviteUserIds?.length ?? 0) > MAX_MENTOR_INVITES || (raw.audienceStudentIds?.length ?? 0) > MAX_AUDIENCE_STUDENTS) throw new ConvexError("Choose up to 200 Mentors and up to 200 students.");
+    for (const question of raw.questions ?? []) checkListSizes({ options: question.options });
     await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const user = await viewer(ctx);
-    if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Only a Coach or Travel Lead can create events.");
+    if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can create events.");
     const season = await activeSeason(ctx);
+    const prepared = await prepareEventAudience(ctx, user, season, raw);
+    const args = prepared.args;
     if (!args.name.trim() || args.endsAt < args.startsAt || !Number.isSafeInteger(args.feeCents) || args.feeCents < 0 || args.capacity !== undefined && (!Number.isSafeInteger(args.capacity) || args.capacity < 1)) throw new ConvexError("Check the event: it needs a name, an end after the start, a fee of $0 or more, and a capacity of at least 1 if set.");
     if (args.signupMode !== "assigned" && (args.assignmentScope || args.assignedStudentIds?.length)) throw new ConvexError("Students can be chosen in advance only for assigned events. Change the signup type or clear the chosen students.");
     if ((args.assignmentScope === "travelTeam" || args.assignmentScope === "wholeTeam") && user.role !== "coach") throw new ConvexError("Only a Coach can assign the Travel Team or Whole Team automatically.");
@@ -132,7 +136,9 @@ export const createEvent = mutation({
     const cleanShifts = shiftRows.map(shift => cleanShift(shift, args));
     const cleanQuestions = questionRows.map(question => cleanQuestion(question));
     args.requirements.forEach(checkRequirementFields);
-    const { requirements, assignedStudentIds, calendarChoice, onsite, shifts: _shifts, questions: _questions, ...fields } = args;
+    // { kind: "none" } ("Don't add to Team Calendar") stores no Calendar link and schedules no push, same as omitting the choice.
+    // A Coach or Travel Lead can connect the event later with eventCalendar.connect.
+    const { requirements, assignedStudentIds, calendarChoice: rawCalendarChoice, onsite, shifts: _shifts, questions: _questions, audienceStudentIds: _audienceStudentIds, mentorInviteUserIds: _mentorInviteUserIds, inviteSubteamMentors: _inviteSubteamMentors, ...fields } = args;
     // A Fundraiser counts as Outreach only when the flag is set, so the title-based Outreach fallback never applies.
     const eventFields = { ...fields, ...(onsite ? { onsite: true, destination: onsiteLocation, travel: onsiteLocation } : {}), ...(args.type === "Fundraiser" ? { isOutreach: args.isOutreach ?? false } : {}) };
     let assigned = [...new Set(assignedStudentIds ?? [])];
@@ -141,46 +147,17 @@ export const createEvent = mutation({
       if (students.length > 500) throw new ConvexError("The roster is too large to assign automatically. Choose students instead.");
       assigned = students.filter(x => x.active && (args.assignmentScope === "wholeTeam" || x.travelTeam)).map(x => x._id);
     }
-    if (assigned.length > (args.assignmentScope === "wholeTeam" ? 500 : 100)) throw new ConvexError("Choose up to 100 students when creating an event. Add more after it is created.");
+    const subteamMandatory = args.audienceKind === "subteams" && args.mandatory === true;
+    if (subteamMandatory) {
+      const students = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(501);
+      if (students.length > 500) throw new ConvexError("The roster is too large to assign automatically. Choose students instead.");
+      assigned = students.filter(x => studentInAudience({ signupMode: "assigned", audienceKind: "subteams", audienceSubteams: args.audienceSubteams, mandatory: true }, x, false)).map(x => x._id);
+    }
+    if (assigned.length > (args.assignmentScope === "wholeTeam" || subteamMandatory ? 500 : 100)) throw new ConvexError("Choose up to 100 students when creating an event. Add more after it is created.");
     if (args.capacity !== undefined && assigned.length > args.capacity) throw new ConvexError("More students are chosen than the event's capacity. Choose fewer students or raise the capacity.");
     for (const studentId of assigned) { const student = await ctx.db.get(studentId); if (!student || !student.active || student.seasonId !== season._id) throw new ConvexError("A chosen student is no longer on the current roster. Reload and choose again."); }
-    const id = await ctx.db.insert("events", { ...eventFields, transportEnabled: teamTransportEnabled(eventFields), name: args.name.trim(), seasonId: season._id, archived: false, ...(calendarChoice ? { calendarChoice: calendarChoice.kind, calendarEventId: calendarChoice.kind === "link" ? calendarChoice.eventId : undefined, calendarSyncState: "pending" as const, calendarRevision: 1, calendarActorId: user._id } : {}), ...(args.assignmentScope === "wholeTeam" ? { wholeTeamParticipantCount: 0, enrollmentState: "running" as const } : {}) });
-    if (calendarChoice?.kind === "link") {
-      const claim = await ctx.db.query("eventCalendarClaims").withIndex("by_calendarEventId", q => q.eq("calendarEventId", calendarChoice.eventId)).unique();
-      if (claim) throw new ConvexError("This Calendar entry is already connected to another event. Choose a different entry.");
-      await ctx.db.insert("eventCalendarClaims", { calendarEventId: calendarChoice.eventId, eventId: id });
-    }
-    const keys = new Set<string>();
-    for (const requirement of requirements) {
-      if (!requirement.key.trim() || keys.has(requirement.key) || ["pay", "perm", "first", "room"].includes(requirement.key)) throw new ConvexError("Each requirement needs its own short name, and pay, perm, first and room are reserved. Change the short name.");
-      keys.add(requirement.key);
-      await ctx.db.insert("requirements", { ...requirement, eventId: id });
-    }
-    for (const shift of cleanShifts) {
-      const shiftId = await ctx.db.insert("eventShifts", { eventId: id, ...shift });
-      await audit(ctx, user, "eventShifts", shiftId, "create", null, shift);
-    }
-    for (const [order, question] of cleanQuestions.entries()) {
-      const questionId = await ctx.db.insert("eventQuestions", { eventId: id, order, ...question });
-      await audit(ctx, user, "eventQuestions", questionId, "create", null, question);
-    }
-    for (const studentId of args.assignmentScope === "wholeTeam" ? [] : assigned) {
-      const now = Date.now();
-      await ctx.db.insert("participants", { eventId: id, studentId, status: "confirmed", createdAt: now, updatedAt: now });
-      if (args.feeCents > 0) await addCharge(ctx, user, studentId, args.name.trim(), args.feeCents, args.startsAt, `eventFee:${id}:${studentId}`, id);
-    }
-    if (args.assignmentScope === "wholeTeam") {
-      const now = Date.now();
-      const jobId = await ctx.db.insert("eventEnrollmentJobs", { requiredFinancialProjectionVersion: 4, eventId: id, actorId: user._id, state: "running", cursor: null, processed: 0, startedAt: now, updatedAt: now });
-      for (const studentId of assigned) await ctx.db.insert("eventEnrollmentMembers", { jobId, studentId });
-      await ctx.db.patch(id, { enrollmentJobId: jobId });
-      await ctx.scheduler.runAfter(0, internal.eventEnrollment.run, { jobId });
-    }
-    if (calendarChoice) await ctx.scheduler.runAfter(0, internal.eventCalendar.push, { eventId: id, revision: 1 });
-    await scheduleEventArchive(ctx, id);
-    await audit(ctx, user, "events", id, "create", null, eventFields);
-    await notifyEventCreated(ctx, { eventId: id, assignedStudentIds: assigned });
-    return id;
+    const calendarChoice = rawCalendarChoice?.kind === "none" ? undefined : rawCalendarChoice;
+    return await createEventCore(ctx, user, season, { eventFields, requirements, shifts: cleanShifts, questions: cleanQuestions, calendarChoice, assigned, audienceStudentIds: prepared.audienceStudentIds, mentorInvites: prepared.mentorInvites });
   },
 });
 
@@ -203,6 +180,7 @@ export const updateRoster = mutation({
     const changes = { ...fields, ...(proposedSubteam !== undefined ? { subteam: proposedSubteam } : {}), ...(args.legalName !== undefined ? { legalName: args.legalName.trim() } : {}), ...(args.preferredName !== undefined ? { preferredName: args.preferredName.trim() } : {}), ...(args.roomCategory !== undefined ? { roomCategoryLocked: true } : {}), ...(args.active === false && student.active ? { archivedAt: Date.now() } : {}), profileRevision: (student.profileRevision ?? 0) + 1 };
     await ctx.db.patch(student._id, changes);
     if (args.active === true && !student.active) await syncWholeTeamMembership(ctx, user, { ...student, ...changes });
+    if ((args.active === true && !student.active) || (proposedSubteam !== undefined && proposedSubteam !== student.subteam)) await syncSubteamMembership(ctx, user, { ...student, ...changes });
     await audit(ctx, user, "students", student._id, "updateRoster", { profileRevision: student.profileRevision ?? 0, active: student.active, roomCategory: student.roomCategory, legalName: student.legalName, archivedAt: student.archivedAt ?? null }, { ...changes, archivedAt: changes.archivedAt ?? student.archivedAt ?? null }, reason?.trim());
     return null;
   },
@@ -236,10 +214,10 @@ export const setMeetingCancelled = mutation({
 
 export const createDriver = mutation({
   args: { name: v.string(), phone: v.string(), email: v.string(), seats: v.number(), approved: v.boolean() }, returns: v.id("drivers"),
-  handler: async (ctx, args) => { const user = await viewer(ctx); if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Only a Coach or Travel Lead can manage drivers."); if (!Number.isSafeInteger(args.seats) || args.seats < 0) throw new ConvexError("Enter passenger seats as a whole number, not counting the driver."); const season = await activeSeason(ctx); return await ctx.db.insert("drivers", { ...args, email: normalizeEmail(args.email, "Driver email"), phone: normalizePhone(args.phone, "Driver phone"), seasonId: season._id }); },
+  handler: async (ctx, args) => { const user = await viewer(ctx); if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can manage drivers."); if (!Number.isSafeInteger(args.seats) || args.seats < 0) throw new ConvexError("Enter passenger seats as a whole number, not counting the driver."); const season = await activeSeason(ctx); return await ctx.db.insert("drivers", { ...args, email: normalizeEmail(args.email, "Driver email"), phone: normalizePhone(args.phone, "Driver phone"), seasonId: season._id }); },
 });
 
 export const assignDriver = mutation({
   args: { eventId: v.id("events"), driverId: v.id("drivers"), seats: v.number(), notes: v.optional(v.string()) }, returns: v.null(),
-  handler: async (ctx, args) => { const user = await viewer(ctx); if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Only a Coach or Travel Lead can manage transport."); const event = await ctx.db.get(args.eventId); const driver = await ctx.db.get(args.driverId); const season = await activeSeason(ctx); if (!event || !driver || event.seasonId !== season._id || event.seasonId !== driver.seasonId || !driver.approved || !Number.isSafeInteger(args.seats) || args.seats < 0 || args.seats > driver.seats) throw new ConvexError("Choose an approved driver from this season, with passenger seats from 0 up to the vehicle's seats."); requireEnrollmentComplete(event); if (!teamTransportEnabled(event)) throw new ConvexError("Drivers and rides aren't managed for this event. Choose team transport in the event's Transport settings to manage them."); const prior = await ctx.db.query("eventVehicles").withIndex("by_eventId_and_driverId", q => q.eq("eventId", event._id).eq("driverId", driver._id)).unique(); if (prior) await ctx.db.patch(prior._id, { seats: args.seats, notes: args.notes }); else await ctx.db.insert("eventVehicles", args); return null; },
+  handler: async (ctx, args) => { const user = await viewer(ctx); if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can manage transport."); const event = await ctx.db.get(args.eventId); const driver = await ctx.db.get(args.driverId); const season = await activeSeason(ctx); if (!event || !driver || event.seasonId !== season._id || event.seasonId !== driver.seasonId || !driver.approved || !Number.isSafeInteger(args.seats) || args.seats < 0 || args.seats > driver.seats) throw new ConvexError("Choose an approved driver from this season, with passenger seats from 0 up to the vehicle's seats."); requireEnrollmentComplete(event); if (!teamTransportEnabled(event)) throw new ConvexError("Drivers and rides aren't managed for this event. Choose team transport in the event's Transport settings to manage them."); const prior = await ctx.db.query("eventVehicles").withIndex("by_eventId_and_driverId", q => q.eq("eventId", event._id).eq("driverId", driver._id)).unique(); if (prior) await ctx.db.patch(prior._id, { seats: args.seats, notes: args.notes }); else await ctx.db.insert("eventVehicles", args); return null; },
 });

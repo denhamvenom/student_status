@@ -4,6 +4,7 @@ import type { Doc } from "./_generated/dataModel";
 import { audit, ownStudent, viewer } from "./lib/access";
 import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
 import { MAX_QUESTIONS, MAX_QUESTION_ROWS, activeQuestions, answerInput, answerValue, checkAnswers, checkListSizes, cleanQuestion, liveEvent, questionKind, questionRows, requireEventStaff, saveAnswers } from "./lib/eventSignupExtras";
+import { requireStudentOrParentCanSeeEvent } from "./lib/eventVisibility";
 
 const questionResult = v.object({ questionId: v.id("eventQuestions"), order: v.number(), kind: questionKind, prompt: v.string(), options: v.union(v.array(v.string()), v.null()), required: v.boolean(), archived: v.boolean() });
 const answerResult = v.object({ questionId: v.id("eventQuestions"), value: answerValue });
@@ -77,6 +78,8 @@ export const forSignup = query({
     const user = await viewer(ctx); const student = await ownStudent(ctx, user);
     const event = await ctx.db.get(args.eventId);
     if (!event || event.seasonId !== student.seasonId || event.archived) throw new ConvexError("This event is no longer available. Reload to see current events.");
+    // Same audience gate as app.eventDetail: no Mentors-only or out-of-audience targeted events.
+    await requireStudentOrParentCanSeeEvent(ctx, user, event, student);
     const questions = await activeQuestions(ctx, event._id);
     const answers = await ctx.db.query("eventQuestionAnswers").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(MAX_QUESTION_ROWS);
     return { questions: questions.map(project), answers: answers.filter(a => questions.some(q => q._id === a.questionId)).map(a => ({ questionId: a.questionId, value: a.value })) };

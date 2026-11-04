@@ -101,7 +101,7 @@ export const workspace = query({
     const events: Infer<typeof consentEventValidator>[] = [];
     for (const participant of participation) {
       const event = await ctx.db.get(participant.eventId);
-      if (participant.status === "confirmed" && event && !event.archived && event.seasonId === student.seasonId && !enrollmentPending(event)) events.push(...await selectedEvents(ctx, student, [event._id]));
+      if (participant.status === "confirmed" && event && !event.archived && !event.cancelled && event.seasonId === student.seasonId && !enrollmentPending(event)) events.push(...await selectedEvents(ctx, student, [event._id]));
     }
     events.sort((a,b) => a.startsAt - b.startsAt || a.eventId.localeCompare(b.eventId));
     const coverage = await Promise.all(events.map(async event => {const row = await coverageFor(ctx, student._id, event.eventId); return {eventId: event.eventId, state: row?.state ?? "required" as const, revision: row?.revision ?? 0, submissionId: row?.latestSubmissionId ?? null, reviewId: row?.latestReviewId ?? null, reason: row?.reason ?? null, field: row?.correctionField ?? null, signatureRequestedAt: row?.signatureRequestedAt ?? null}}));

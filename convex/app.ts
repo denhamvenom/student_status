@@ -3,7 +3,11 @@ import { enrollmentPending } from "./lib/eventEnrollmentState";
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
-import { activeSeason, identity, linkedStudents, maybeViewer, mentorEvent, mentorStudent, privateStudent, publicStudent, requireRole, studentAccess, viewer as requireViewer, audit } from "./lib/access";
+import { seriesProgress } from "./lib/seriesGenerate";
+import { eventVisibleFor, parentLinkedStudentsFallback, parentLinkedStudentsOrNull, participationOn, requireStudentOrParentCanSeeEvent } from "./lib/eventVisibility";
+import { resolveAudience } from "./lib/eventAudienceRules";
+import { eventDetailReturns, familyEvent, listEventsReturns } from "./lib/eventProjection";
+import { activeSeason, identity, linkedStudents, maybeViewer, mentorEvent, mentorStudent, privateStudent, publicStudent, studentGroups, requireRole, studentAccess, viewer as requireViewer, audit } from "./lib/access";
 import { attendanceFor, financeFor, studentReadiness } from "./lib/readModels";
 import { coverageFor } from "./lib/permissionCoverage";
 import { fieldTripApproved } from "../src/lib/field-trip-approved";
@@ -39,24 +43,52 @@ export const studentProfile = query({
 });
 
 export const listEvents = query({
-  args: {}, returns: v.any(),
+  args: {}, returns: listEventsReturns,
   handler: async ctx => {
     const user = await requireViewer(ctx);
     const season = await activeSeason(ctx);
     const events = await ctx.db.query("events").withIndex("by_seasonId_and_archived_and_endsAt", q => q.eq("seasonId", season._id).eq("archived", false)).take(200).then(rows => rows.sort((a, b) => a.startsAt - b.startsAt));
     if (user.role === "mentor" && !user.travelLead) return events.filter(x => !x.archived).map(event => ({ event: mentorEvent(event), participation: null }));
     if (user.role === "coach" || user.travelLead) return events.filter(x => !x.archived).map(event => ({ event, participation: null }));
-    if (user.role === "parent") return events.filter(x => !x.archived).map(event => ({ event, participation: null }));
+    // Students and Parents see only events for them: legacy events, events a student is on, or whose audience includes a student.
+    // Participation is a point lookup per candidate event (by_eventId_and_studentId), so a long signup history can't hide events.
+    if (user.role === "parent") {
+      const linked = await parentLinkedStudentsOrNull(ctx);
+      if (!linked) {
+        // Fail closed while Family links are being prepared or need review: only legacy events and events a linked student is
+        // actually on. Targeted, subteam and Mentors-only events are never shown on audience alone.
+        const fallback = await parentLinkedStudentsFallback(ctx, user._id, season._id);
+        const visible = [];
+        for (const event of events) {
+          if (event.archived) continue;
+          if (resolveAudience(event).legacy) { visible.push({ event: familyEvent(event), participation: null }); continue; }
+          for (const student of fallback) {
+            const row = await participationOn(ctx, event._id, student._id);
+            if (row && row.status !== "withdrawn") { visible.push({ event: familyEvent(event), participation: null }); break; }
+          }
+        }
+        return visible;
+      }
+      const visible = [];
+      for (const event of events) if (!event.archived && await eventVisibleFor(ctx, event, linked, true)) visible.push({ event: familyEvent(event), participation: null });
+      return visible;
+    }
     const students = await linkedStudents(ctx, user);
     const student = students[0];
     if (!student) return [];
-    const participations = await ctx.db.query("participants").withIndex("by_studentId", q => q.eq("studentId", student._id)).take(200);
-    return events.filter(x => !x.archived && (x.signupMode !== "assigned" || participations.some(p => p.eventId === x._id && p.status !== "withdrawn"))).map(event => ({ event, participation: participations.find(x => x.eventId === event._id)?.status ?? null }));
+    const visible = [];
+    for (const x of events) {
+      if (x.archived) continue;
+      const participation = await participationOn(ctx, x._id, student._id);
+      if (x.signupMode === "assigned" && !(participation && participation.status !== "withdrawn")) continue;
+      if (participation || await eventVisibleFor(ctx, x, [student], true)) visible.push({ event: familyEvent(x), participation: participation?.status ?? null });
+    }
+    return visible;
   },
 });
 
 export const eventDetail = query({
-  args: { eventId: v.id("events"), studentId: v.optional(v.id("students")) }, returns: v.any(),
+  args: { eventId: v.id("events"), studentId: v.optional(v.id("students")) }, returns: eventDetailReturns,
   handler: async (ctx, args) => {
     const user = await requireViewer(ctx);
     const event = await ctx.db.get(args.eventId);
@@ -67,12 +99,23 @@ export const eventDetail = query({
       return { event, participation: null, requirements: [], readiness: null };
     }
     if (user.role === "mentor" && !user.travelLead) return { event: mentorEvent(event), participation: null, requirements: [], readiness: null };
+    // Staff (Coach, Travel Lead) also get where a series meeting sits: meetings exist through a rolling window and more are
+    // added automatically. `series` is null for a single event and absent for Students and Parents.
+    const staff = user.role === "coach" || (user.role === "mentor" && user.travelLead);
+    const seriesDoc = staff && event.seriesId ? await ctx.db.get(event.seriesId) : null;
+    const staffSeries = staff ? { series: seriesDoc ? { seriesId: seriesDoc._id, name: seriesDoc.name, status: seriesDoc.status, ...seriesProgress(seriesDoc) } : null } : {};
+    const student = args.studentId ? await studentAccess(ctx, user, args.studentId) : null;
+    // Students and Parents never get a Mentors-only event, nor a targeted event outside their students' audience that none
+    // of them is on; while a Parent's Family links are still being prepared, only events a linked student is on (same rule as
+    // listEvents). Same message as a missing event, so ids reveal nothing.
+    await requireStudentOrParentCanSeeEvent(ctx, user, event, student);
+    // Students and Parents get the family projection (no Calendar sync state, Media Support or staff settings).
+    const shown = user.role === "student" || user.role === "parent" ? familyEvent(event) : event;
     const requirements = await ctx.db.query("requirements").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(100);
-    if (!args.studentId) return { event, participation: null, requirements, readiness: null };
-    const student = await studentAccess(ctx, user, args.studentId);
+    if (!student) return { event: shown, participation: null, requirements, readiness: null, ...staffSeries };
     const readiness = await studentReadiness(ctx, event, student);
     const visibleReadiness = user.role === "parent" && await permissionSigningPaused(ctx) && readiness.state === "open" ? {...readiness, open: readiness.open.filter(item => item !== "Permission accepted"), state: readiness.open.every(item => item === "Permission accepted") ? "notApplicable" as const : readiness.state} : readiness;
-    return { event, participation: readiness.participation, requirements, readiness: visibleReadiness };
+    return { event: shown, participation: readiness.participation, requirements, readiness: visibleReadiness, ...staffSeries };
   },
 });
 
@@ -118,7 +161,7 @@ export const studentDashboard = query({
       if (event.archived || event.cancelled || (!participation && event.signupMode === "assigned")) continue;
       const readiness = await studentReadiness(ctx, event, student);
       const visibleReadiness = user.role === "parent" && await permissionSigningPaused(ctx) && readiness.state === "open" ? {...readiness, open: readiness.open.filter(item => item !== "Permission accepted"), state: readiness.open.every(item => item === "Permission accepted") ? "notApplicable" as const : readiness.state} : readiness;
-      rows.push({ event, participation, readiness: visibleReadiness });
+      rows.push({ event: user.role === "student" || user.role === "parent" ? familyEvent(event) : event, participation, readiness: visibleReadiness });
       if (participation === "confirmed" && readiness.state === "open") {
         const custom = await ctx.db.query("requirements").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(100);
         for (const item of readiness.open) {
@@ -153,7 +196,8 @@ export const teamRoster = query({
     if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Only a Coach or Travel Lead can open the team roster.");
     const season = await activeSeason(ctx);
     const students = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(500);
-    return students.map(student => ({ ...(user.role === "coach" ? privateStudent(student) : publicStudent(student)), fundraiserConnected: !!student.fundraiserUrl }));
+    // Travel Lead gets the public fields plus groups and profileRevision (to call setStudentSecondaryAndLeadership); no health or contact data.
+    return students.map(student => ({ ...(user.role === "coach" ? privateStudent(student) : { ...publicStudent(student), ...studentGroups(student), profileRevision: student.profileRevision ?? 0 }), fundraiserConnected: !!student.fundraiserUrl }));
   },
 });
 

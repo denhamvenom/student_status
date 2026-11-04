@@ -15,7 +15,7 @@ const balanceValidator = v.object({ state: v.union(v.literal("ready"), v.literal
 const accountValidator = v.object({ linkage: v.union(v.literal("linked"), v.literal("unlinked"), v.literal("unavailable")), access: v.union(v.literal("active"), v.literal("inactive"), v.literal("unknown")) });
 const eventValidator = v.union(v.null(), v.object({ eventId: v.id("events"), name: v.string(), startsAt: v.number(), participation: v.union(v.literal("confirmed"), v.literal("pending"), v.literal("waitlist"), v.literal("withdrawn"), v.null()), state: v.union(v.literal("ready"), v.literal("open"), v.literal("unknown")), open: v.array(v.string()) }));
 const rowValidator = v.object({ studentId: v.id("students"), name: v.string(), subteam: v.string(), travelTeam: v.boolean(), active: v.boolean(), profileRevision: v.number(), fundraiserConnected: v.boolean(), firstRegistrationState: v.union(v.literal("needsCompletion"),v.literal("awaitingVerification"),v.literal("verified")), account: accountValidator, balance: balanceValidator, nextEvent: eventValidator, readinessCoverage: v.union(v.literal("complete"), v.literal("unknown"), v.literal("notApplicable")), missingSummary: v.array(v.string()) });
-const directoryRowValidator = v.object({studentId:v.id("students"), name:v.string(), lastName:v.string(), subteam:v.string(), travelTeam:v.boolean(), active:v.boolean(), connected:v.boolean(), grade:v.union(v.string(),v.null())});
+const directoryRowValidator = v.object({studentId:v.id("students"), name:v.string(), lastName:v.string(), subteam:v.string(), travelTeam:v.boolean(), active:v.boolean(), connected:v.boolean(), grade:v.union(v.string(),v.null()), secondarySubteam:v.union(v.string(),v.null()), leadership:v.boolean()});
 
 /** A bounded page of minimal roster data; the client completes these pages before sorting. */
 export const directory = query({
@@ -34,7 +34,9 @@ export const directory = query({
       const final=tokens.at(-1)?.replace(/\.$/,"")??"";
       const fallback=/^(jr|sr|ii|iii|iv|v)$/i.test(final)&&tokens.length>1?tokens.at(-2)??final:tokens.at(-1)??"";
       const lastName=student.lastName?.trim()||fallback;
-      return {studentId:student._id,name,lastName,subteam:student.subteam,travelTeam:student.travelTeam,active:student.active,connected:student.userId!==undefined,grade:draft?.grade??student.consentProfileV2?.grade??null};
+      return {studentId:student._id,name,lastName,subteam:student.subteam,travelTeam:student.travelTeam,active:student.active,connected:student.userId!==undefined,grade:draft?.grade??student.consentProfileV2?.grade??null,
+        // Group fields so the CAD and Leadership filters work from these pages (no capped teamRoster read).
+        secondarySubteam:student.secondarySubteam??null,leadership:student.leadership??false};
     }))};
   },
 });
@@ -131,7 +133,7 @@ export const list = query({
   },
 });
 
-const detailValidator = v.object({ ...rowValidator.fields, legalName: v.string(), preferredName: v.string(), email: v.string(), shirtSize: v.union(v.string(), v.null()), roomCategory: v.union(v.string(), v.null()), guardianName: v.union(v.string(), v.null()), guardianRelationship: v.union(v.string(), v.null()), guardianPhone: v.union(v.string(), v.null()), emergencyName: v.union(v.string(), v.null()), emergencyRelationship: v.union(v.string(), v.null()), emergencyPhone: v.union(v.string(), v.null()), allergies: v.object({ state: v.string(), text: v.optional(v.string()) }), medications: v.object({ state: v.string(), text: v.optional(v.string()) }), otcAuthorization: v.union(v.string(), v.null()), structuredConsentProfileComplete: v.boolean(), profileSetupRequired: v.boolean(), parents: v.array(v.object({name:v.string(),linked:v.boolean(),access:v.union(v.literal("active"),v.literal("inactive"),v.literal("unknown"))})), parentCoverage:v.union(v.literal("complete"),v.literal("unknown")) });
+const detailValidator = v.object({ ...rowValidator.fields, legalName: v.string(), preferredName: v.string(), email: v.string(), shirtSize: v.union(v.string(), v.null()), roomCategory: v.union(v.string(), v.null()), guardianName: v.union(v.string(), v.null()), guardianRelationship: v.union(v.string(), v.null()), guardianPhone: v.union(v.string(), v.null()), emergencyName: v.union(v.string(), v.null()), emergencyRelationship: v.union(v.string(), v.null()), emergencyPhone: v.union(v.string(), v.null()), allergies: v.object({ state: v.string(), text: v.optional(v.string()) }), medications: v.object({ state: v.string(), text: v.optional(v.string()) }), otcAuthorization: v.union(v.string(), v.null()), structuredConsentProfileComplete: v.boolean(), profileSetupRequired: v.boolean(), secondarySubteam: v.union(v.string(), v.null()), leadership: v.boolean(), parents: v.array(v.object({name:v.string(),linked:v.boolean(),access:v.union(v.literal("active"),v.literal("inactive"),v.literal("unknown"))})), parentCoverage:v.union(v.literal("complete"),v.literal("unknown")) });
 export const detail = query({
   args: { studentId: v.id("students"), asOf: v.number() }, returns: detailValidator,
   handler: async (ctx, args) => {
@@ -148,6 +150,6 @@ export const detail = query({
     }));
     const projected = privateStudent(student);
     const confirmedProfile = projected.structuredConsentProfileComplete ? student.consentProfileV2 : null;
-    return { ...row, legalName: student.legalName, preferredName: student.preferredName, email: student.email, shirtSize: student.shirtSize ?? null, roomCategory: student.roomCategory ?? null, guardianName: confirmedProfile?.guardian.name ?? student.guardianName ?? null, guardianRelationship: confirmedProfile?.guardian.relationship ?? student.guardianRelationship ?? null, guardianPhone: confirmedProfile?.guardian.phone ?? student.guardianPhone ?? null, emergencyName: projected.emergencyName, emergencyRelationship: projected.emergencyRelationship, emergencyPhone: projected.emergencyPhone, allergies: projected.allergies, medications: projected.medications, otcAuthorization: projected.otcAuthorization, structuredConsentProfileComplete: projected.structuredConsentProfileComplete, profileSetupRequired: student.profileCompletedAt === undefined, parents, parentCoverage:links.length>20?"unknown" as const:"complete" as const };
+    return { ...row, legalName: student.legalName, preferredName: student.preferredName, email: student.email, shirtSize: student.shirtSize ?? null, roomCategory: student.roomCategory ?? null, guardianName: confirmedProfile?.guardian.name ?? student.guardianName ?? null, guardianRelationship: confirmedProfile?.guardian.relationship ?? student.guardianRelationship ?? null, guardianPhone: confirmedProfile?.guardian.phone ?? student.guardianPhone ?? null, emergencyName: projected.emergencyName, emergencyRelationship: projected.emergencyRelationship, emergencyPhone: projected.emergencyPhone, allergies: projected.allergies, medications: projected.medications, otcAuthorization: projected.otcAuthorization, structuredConsentProfileComplete: projected.structuredConsentProfileComplete, profileSetupRequired: student.profileCompletedAt === undefined, secondarySubteam: projected.secondarySubteam, leadership: projected.leadership, parents, parentCoverage:links.length>20?"unknown" as const:"complete" as const };
   },
 });

@@ -13,16 +13,62 @@ import { notifyEventScheduleChange } from "./lib/notificationTriggers";
 
 const calendarBase = "https://www.googleapis.com/calendar/v3/calendars/";
 const mediaMarker = "Media Support Requested";
+export const MEDIA_MARKER = mediaMarker;
 const writeScope = "https://www.googleapis.com/auth/calendar.events";
 const productionCloudUrl = "https://amicable-eel-413.convex.cloud";
 const choice = v.union(v.object({ kind: v.literal("create") }), v.object({ kind: v.literal("link"), eventId: v.string() }));
-const observedArgs = { eventId: v.string(), title: v.string(), location: v.string(), start: v.optional(v.number()), end: v.optional(v.number()), allDay: v.boolean(), allDayStartDate: v.optional(v.string()), allDayEndDate: v.optional(v.string()), recurring: v.boolean(), cancelled: v.boolean(), etag: v.optional(v.string()), providerUpdatedAt: v.optional(v.number()), authoritativeGone: v.optional(v.boolean()), expectedRevision: v.optional(v.number()), description: v.string() };
+const observedArgs = { eventId: v.string(), title: v.string(), location: v.string(), start: v.optional(v.number()), end: v.optional(v.number()), allDay: v.boolean(), allDayStartDate: v.optional(v.string()), allDayEndDate: v.optional(v.string()), recurring: v.boolean(), cancelled: v.boolean(), etag: v.optional(v.string()), providerUpdatedAt: v.optional(v.number()), authoritativeGone: v.optional(v.boolean()), expectedRevision: v.optional(v.number()), description: v.string(),
+  /** Series reconcile (eventSeriesCalendar.linkInstances) sends one representative notice per series per sync itself. */
+  suppressNotice: v.optional(v.boolean()),
+  /**
+   * Main Team Calendar sync paths (calendar.ts refresh, reconcileOne/reconcileLinked): a series meeting's notice is not sent
+   * here; its before-state is returned so the action sends one notice per series per sync (sendDeferredSeriesNotices).
+   */
+  deferSeriesNotice: v.optional(v.boolean()) };
+const deferredNotice = v.object({ seriesId: v.id("eventSeries"), eventId: v.id("events"), key: v.string(), name: v.string(), destination: v.string(), startsAt: v.number(), endsAt: v.number(), cancelled: v.boolean() });
+export type DeferredSeriesNotice = typeof deferredNotice.type;
 
-function configured() { return !!(env.TIMECLOCK_CALENDAR_ID && env.TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_EMAIL && env.TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_PRIVATE_KEY); }
-function writeEnabled() { return configured() && env.CONVEX_CLOUD_URL === productionCloudUrl && env.STUDENT_STATUS_CALENDAR_WRITE_ENABLED === "true"; }
-function eventUrl(eventId?: string) { return `${calendarBase}${encodeURIComponent(env.TIMECLOCK_CALENDAR_ID!)}/events${eventId ? `/${encodeURIComponent(eventId)}` : ""}`; }
-async function token(write: boolean) { return serviceToken(env.TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_EMAIL!, env.TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_PRIVATE_KEY!, write ? writeScope : undefined); }
-function calendarError(status: number) {
+/**
+ * At most ONE schedule notice per series per sync. A Google "all events" edit (e.g. a new location) or several single-meeting
+ * cancellations would otherwise notify every audience member once per meeting. `befores` are the changed meetings as they
+ * were before the sync; the representative is the first upcoming one (earliest occurrence key; the earliest changed meeting
+ * if none is upcoming) and its own change decides the notice (cancelled, restored or changed). Other changed meetings are
+ * already saved and visible in the app, with permission coverage reset by applyObserved.
+ */
+export async function notifySeriesRepresentative(ctx: MutationCtx, befores: Doc<"events">[]) {
+  if (!befores.length) return;
+  const now = Date.now();
+  const ordered = [...befores].sort((a, b) => (a.seriesOccurrenceKey ?? "").localeCompare(b.seriesOccurrenceKey ?? "") || a.startsAt - b.startsAt);
+  await notifyEventScheduleChange(ctx, ordered.find(row => row.endsAt >= now) ?? ordered[0]);
+}
+
+/** Collects deferred series notices across one sync (an action) and sends them once per series at the end. */
+export function seriesNoticeCollector() {
+  const items: DeferredSeriesNotice[] = [];
+  return {
+    add(result: DeferredSeriesNotice | null) { if (result && items.length < 2000) items.push(result); },
+    async flush(ctx: ActionCtx) {
+      if (!items.length) return;
+      const batch = items.splice(0, items.length);
+      try { await ctx.runMutation(internal.eventCalendar.sendDeferredSeriesNotices, { items: batch }); } catch (error) {
+        // A failed notice must not fail the Calendar sync; the changes themselves are already saved.
+        console.error("Series schedule notices could not be sent.", error instanceof Error ? error.message : "unknown error");
+      }
+    },
+  };
+}
+export type SeriesNoticeCollector = ReturnType<typeof seriesNoticeCollector>;
+
+export function configured() { return !!(env.TIMECLOCK_CALENDAR_ID && env.TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_EMAIL && env.TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_PRIVATE_KEY); }
+export function writeEnabled() { return configured() && env.CONVEX_CLOUD_URL === productionCloudUrl && env.STUDENT_STATUS_CALENDAR_WRITE_ENABLED === "true"; }
+/** Google Calendar event, master and instance ids (base32hex, or "<master>_<start>" instances) — nothing else reaches a URL. */
+export function validCalendarEventId(id: string) { return /^[A-Za-z0-9_]{1,1024}$/.test(id); }
+export function eventUrl(eventId?: string) {
+  if (eventId !== undefined && !validCalendarEventId(eventId)) throw new Error("Invalid Team Calendar event id.");
+  return `${calendarBase}${encodeURIComponent(env.TIMECLOCK_CALENDAR_ID!)}/events${eventId !== undefined ? `/${encodeURIComponent(eventId)}` : ""}`;
+}
+export async function token(write: boolean) { return serviceToken(env.TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_EMAIL!, env.TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_PRIVATE_KEY!, write ? writeScope : undefined); }
+export function calendarError(status: number) {
   if (status === 401 || status === 403) return "Venom Status can't edit Team Calendar. Ask the Calendar owner to give Venom Status editor access, then try again.";
   if (status === 404) return "The selected Calendar entry no longer exists. Choose another entry or try again.";
   if (status === 412) return "This entry changed in Team Calendar. Reload Calendar details, then try again.";
@@ -49,7 +95,7 @@ function dateOnly(value: unknown): string | null {
   const date = (value as { date?: unknown }).date;
   return typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(Date.parse(`${date}T12:00:00Z`)) ? date : null;
 }
-function googleDetails(raw: unknown) {
+export function googleDetails(raw: unknown) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("Calendar returned an invalid event.");
   const item = raw as Record<string, unknown>;
   const startDate = dateOnly(item.start), endDate = dateOnly(item.end);
@@ -63,8 +109,8 @@ function safeDeadlines(event: Doc<"events">, startsAt: number) {
     ...(event.roomDeadline !== undefined && event.roomDeadline > startsAt ? { roomDeadline: startsAt } : {}),
   };
 }
-function requireStaff(actor: Doc<"appUsers">) { if (actor.role !== "coach" && !actor.travelLead) throw new ConvexError("Only a Coach or Travel Lead can manage Calendar events."); }
-async function boundCalendar(ctx: { runQuery: (reference: typeof internal.eventCalendar.sourceBound, args: { calendarIdHash: string }) => Promise<boolean> }) {
+function requireStaff(actor: Doc<"appUsers">) { if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can manage Calendar events."); }
+export async function boundCalendar(ctx: { runQuery: (reference: typeof internal.eventCalendar.sourceBound, args: { calendarIdHash: string }) => Promise<boolean> }) {
   return configured() && await ctx.runQuery(internal.eventCalendar.sourceBound, { calendarIdHash: await hashId(env.TIMECLOCK_CALENDAR_ID!) });
 }
 async function activeEvent(ctx: MutationCtx, eventId: Id<"events">) {
@@ -73,7 +119,27 @@ async function activeEvent(ctx: MutationCtx, eventId: Id<"events">) {
   if (!event || event.seasonId !== season._id || event.archived) throw new ConvexError("This event is no longer active. It may have moved to Past events. Reload to see current events.");
   return { actor, event };
 }
-async function invalidatePermissionCoverage(ctx: MutationCtx, event: Doc<"events">, actorId: Id<"appUsers">) {
+/**
+ * A series meeting is edited under the series' rules (same as eventSeries.editOccurrence): a mandatory Whole Team or
+ * subteam series is Coach-only, so a Travel Lead can't change or cancel its meetings through the single-event path.
+ */
+async function requireSeriesOccurrenceEditor(ctx: MutationCtx, actor: Doc<"appUsers">, seriesId: Id<"eventSeries">) {
+  const series = await ctx.db.get(seriesId);
+  if (!series) throw new ConvexError("This series is no longer available. Reload to see the latest.");
+  if (series.template.mandatory && (series.template.audienceKind === "everyone" || series.template.audienceKind === "subteams") && actor.role !== "coach") throw new ConvexError("Only a Coach can change a required series for the whole team or a subteam.");
+}
+/**
+ * Who may change, connect or retry one event's Calendar details: a Coach always; a Travel Lead only for events that aren't
+ * Coach-only. Coach-only single events are the ones only a Coach can create: Travel Team or Whole Team assignment, or required
+ * for the whole team or a subteam. Series meetings follow the series' rules (requireSeriesOccurrenceEditor).
+ */
+async function requireEventEditor(ctx: MutationCtx, actor: Doc<"appUsers">, event: Doc<"events">) {
+  if (event.seriesId) return await requireSeriesOccurrenceEditor(ctx, actor, event.seriesId);
+  if (actor.role === "coach") return;
+  const groupRequired = event.audienceKind !== undefined && event.mandatory === true && (event.audienceKind === "everyone" || event.audienceKind === "subteams");
+  if (event.assignmentScope === "travelTeam" || event.assignmentScope === "wholeTeam" || groupRequired) throw new ConvexError("Only a Coach can change a Travel Team, Whole Team or required group event.");
+}
+export async function invalidatePermissionCoverage(ctx: MutationCtx, event: Doc<"events">, actorId: Id<"appUsers">) {
   const rows = await ctx.db.query("permissionCoverage").withIndex("by_seasonId_and_eventId", q => q.eq("seasonId", event.seasonId).eq("eventId", event._id)).take(501);
   if (rows.length > 500) throw new ConvexError("This event has too many permission forms to update its schedule here. Contact a Coach.");
   const now = Date.now();
@@ -136,6 +202,8 @@ export const connect = mutation({
   args: { eventId: v.id("events"), calendarChoice: choice }, returns: v.null(),
   handler: async (ctx, args) => {
     const { actor, event } = await activeEvent(ctx, args.eventId);
+    await requireEventEditor(ctx, actor, event);
+    if (args.calendarChoice.kind === "link" && !validCalendarEventId(args.calendarChoice.eventId)) throw new ConvexError("Choose a Team Calendar event from the list, then try again.");
     const replacing = event.calendarChoice === "link" && event.calendarSyncState === "failed" && !!event.calendarLinkReplaceable && !event.calendarEtag;
     if (event.calendarChoice && !replacing) throw new ConvexError("This event is already connected to Team Calendar. Reload to see it.");
     if (replacing) {
@@ -157,33 +225,54 @@ export const connect = mutation({
   },
 });
 
+/** Shown when another person saved this event after the editor opened it (matched by the edit form, keep the wording). */
+export const EVENT_CHANGED_MESSAGE = "This event changed since you opened it. Someone else saved a change. Reload to see the latest, then try again.";
+
+export const updateArgs = { eventId: v.id("events"), expectedRevision: v.optional(v.number()), name: v.optional(v.string()), destination: v.optional(v.string()), startsAt: v.optional(v.number()), endsAt: v.optional(v.number()), mediaSupportRequested: v.optional(v.boolean()), cancelled: v.optional(v.boolean()) };
+export type UpdateEventDetailsArgs = { eventId: Id<"events">; expectedRevision?: number; name?: string; destination?: string; startsAt?: number; endsAt?: number; mediaSupportRequested?: boolean; cancelled?: boolean };
+
 export const update = mutation({
-  args: { eventId: v.id("events"), expectedRevision: v.optional(v.number()), name: v.optional(v.string()), destination: v.optional(v.string()), startsAt: v.optional(v.number()), endsAt: v.optional(v.number()), mediaSupportRequested: v.optional(v.boolean()), cancelled: v.optional(v.boolean()) }, returns: v.null(),
-  handler: async (ctx, args) => {
+  args: updateArgs, returns: v.null(),
+  handler: (ctx, args) => updateEventDetails(ctx, args),
+});
+
+/**
+ * The single-event edit path (also "this meeting only" for a series occurrence, see eventSeries.editOccurrence).
+ * A series occurrence may change its title, place or schedule without a Calendar link, and any material change marks it
+ * `seriesDetached` so later series edits keep its override.
+ */
+export async function updateEventDetails(ctx: MutationCtx, args: UpdateEventDetailsArgs): Promise<null> {
+  {
     const { actor, event } = await activeEvent(ctx, args.eventId);
-    if (event.calendarChoice && args.expectedRevision !== (event.calendarRevision ?? 0)) throw new ConvexError("This event changed since you opened it. Reload to see the latest, then try again.");
+    await requireEventEditor(ctx, actor, event);
+    // Optimistic concurrency: the edit form sends the revision it opened with, so two staff editing at once can't silently
+    // overwrite each other. A Team Calendar event always needs it; any other event is checked whenever the client sends it
+    // (the app's edit forms always do). calendarRevision is bumped on every edit below, on Team Calendar or not.
+    if ((event.calendarChoice || args.expectedRevision !== undefined) && args.expectedRevision !== (event.calendarRevision ?? 0)) throw new ConvexError(EVENT_CHANGED_MESSAGE);
     const name = args.name?.trim() ?? event.name, destination = args.destination?.trim() ?? event.destination;
     const startsAt = args.startsAt ?? event.startsAt, endsAt = args.endsAt ?? event.endsAt;
     if (!name || name.length > 250 || destination.length > 500 || !Number.isFinite(startsAt) || !Number.isFinite(endsAt) || endsAt <= startsAt) throw new ConvexError("Enter a title up to 250 characters, a place up to 500, and an end time after the start.");
     if (event.onsite && destination !== event.destination && destination !== eventLocation(event)) throw new ConvexError("This event is on site at the DSHS STEM Center, so its location stays On site. Change the title or schedule instead.");
-    if (!event.calendarChoice && (args.name !== undefined || args.destination !== undefined || args.startsAt !== undefined || args.endsAt !== undefined)) throw new ConvexError("Connect this event to Team Calendar before changing its title, place or schedule.");
+    // An event not on Team Calendar ("Don't add to Team Calendar") is edited here only: saved, noticed, and no Calendar push.
     if (event.calendarChoice === "link" && !event.calendarEtag && (args.name !== undefined || args.destination !== undefined || args.startsAt !== undefined || args.endsAt !== undefined)) throw new ConvexError("Wait for the Team Calendar connection to finish before changing the title, place or schedule.");
     const material = name !== event.name || destination !== event.destination || startsAt !== event.startsAt || endsAt !== event.endsAt || (args.cancelled ?? event.cancelled ?? false) !== (event.cancelled ?? false);
     if (material) await invalidatePermissionCoverage(ctx, event, actor._id);
     const revision = (event.calendarRevision ?? 0) + 1;
-    await ctx.db.patch(event._id, { name, destination, startsAt, endsAt, ...safeDeadlines(event, startsAt), mediaSupportRequested: args.mediaSupportRequested ?? event.mediaSupportRequested ?? false, cancelled: args.cancelled ?? event.cancelled ?? false, ...(event.calendarChoice ? { calendarSyncState: "pending" as const, calendarSyncError: undefined, calendarRevision: revision, calendarActorId: actor._id } : {}) });
+    await ctx.db.patch(event._id, { name, destination, startsAt, endsAt, ...safeDeadlines(event, startsAt), mediaSupportRequested: args.mediaSupportRequested ?? event.mediaSupportRequested ?? false, cancelled: args.cancelled ?? event.cancelled ?? false, ...(event.seriesId && material ? { seriesDetached: true } : {}), calendarRevision: revision, ...(event.calendarChoice ? { calendarSyncState: "pending" as const, calendarSyncError: undefined, calendarActorId: actor._id } : {}) });
     if (endsAt !== event.endsAt) await scheduleEventArchive(ctx, event._id);
     if (args.cancelled && !event.cancelled) await ctx.runMutation(internal.eventEnrollment.stopCancelledEnrollment, { eventId: event._id });
     await notifyEventScheduleChange(ctx, event);
     if (event.calendarChoice) await ctx.scheduler.runAfter(0, internal.eventCalendar.push, { eventId: event._id, revision });
     await audit(ctx, actor, "events", event._id, "updateCalendarDetails", { name: event.name, destination: event.destination, startsAt: event.startsAt, endsAt: event.endsAt, mediaSupportRequested: event.mediaSupportRequested, cancelled: event.cancelled }, { name, destination, startsAt, endsAt, mediaSupportRequested: args.mediaSupportRequested ?? event.mediaSupportRequested, cancelled: args.cancelled ?? event.cancelled });
     return null;
-  },
-});
+  }
+}
 
 export const retry = mutation({ args: { eventId: v.id("events") }, returns: v.null(), handler: async (ctx, args) => {
   const { actor, event } = await activeEvent(ctx, args.eventId);
   if (!event.calendarChoice) throw new ConvexError("Connect this event to Team Calendar first.");
+  // Retried under the same editor rules as update (Coach-only events and required group series are Coach-only).
+  await requireEventEditor(ctx, actor, event);
   const revision = (event.calendarRevision ?? 0) + 1;
   await ctx.db.patch(event._id, { calendarRevision: revision, calendarSyncState: "pending", calendarSyncError: undefined, calendarActorId: actor._id, calendarReconcileOnRetry: event.calendarSyncState === "conflict" });
   await ctx.scheduler.runAfter(0, internal.eventCalendar.push, { eventId: event._id, revision });
@@ -246,7 +335,9 @@ export const push = internalAction({ args: { eventId: v.id("events"), revision: 
       let etag = detail.etag;
       let updatedAt = detail.updatedAt;
       if (description !== detail.description || snapshot.cancelled) {
-        const patched = await fetch(eventUrl(detail.id), { method: "PATCH", headers: { authorization: auth, "content-type": "application/json", "if-match": detail.etag ?? "" }, body: JSON.stringify(snapshot.cancelled ? { status: "cancelled" } : { description }) });
+        // Never write without the entry's etag: an empty if-match would overwrite a concurrent Calendar edit.
+        if (!detail.etag) { await fail("Team Calendar didn't return the latest copy of this entry. Try again."); return null; }
+        const patched = await fetch(eventUrl(detail.id), { method: "PATCH", headers: { authorization: auth, "content-type": "application/json", "if-match": detail.etag }, body: JSON.stringify(snapshot.cancelled ? { status: "cancelled" } : { description }) });
         if (!patched.ok) { await fail(calendarError(patched.status), patched.status === 412); return null; }
         const patchedDetail = googleDetails(await patched.json());
         etag = patchedDetail.etag;
@@ -278,7 +369,8 @@ export const push = internalAction({ args: { eventId: v.id("events"), revision: 
       if (!response.ok) { await fail(calendarError(response.status)); return null; }
       let detail = googleDetails(await response.json());
       if (snapshot.cancelled) {
-        const patched = await fetch(eventUrl(detail.id), { method: "PATCH", headers: { authorization: auth, "content-type": "application/json", "if-match": detail.etag ?? "" }, body: JSON.stringify({ status: "cancelled" }) });
+        if (!detail.etag) { await fail("Team Calendar didn't return the latest copy of this entry. Try again."); return null; }
+        const patched = await fetch(eventUrl(detail.id), { method: "PATCH", headers: { authorization: auth, "content-type": "application/json", "if-match": detail.etag }, body: JSON.stringify({ status: "cancelled" }) });
         if (!patched.ok) { await fail(calendarError(patched.status), patched.status === 412); return null; }
         detail = googleDetails(await patched.json());
       }
@@ -322,24 +414,33 @@ export const observationRevision = internalQuery({ args: { calendarEventId: v.st
 } });
 
 /** A sparse cancellation has no timestamp; read the current event before applying it. */
-export async function reconcileOneNow(ctx: ActionCtx, calendarEventId: string): Promise<null> {
+export async function reconcileOneNow(ctx: ActionCtx, calendarEventId: string, notices?: SeriesNoticeCollector): Promise<null> {
+  const own = notices ? null : seriesNoticeCollector();
+  try { await reconcileOne_(ctx, calendarEventId, notices ?? own!); } finally { if (own) await own.flush(ctx); }
+  return null;
+}
+async function reconcileOne_(ctx: ActionCtx, calendarEventId: string, notices: SeriesNoticeCollector): Promise<null> {
   if (!await boundCalendar(ctx)) return null;
   const expectedRevision = await ctx.runQuery(internal.eventCalendar.observationRevision, { calendarEventId });
   if (expectedRevision === null) return null;
   const response = await fetch(eventUrl(calendarEventId), { headers: { authorization: `Bearer ${await token(false)}` } });
   if (response.status === 404) {
-    await ctx.runMutation(internal.eventCalendar.applyObserved, { eventId: calendarEventId, title: "", location: "", allDay: false, recurring: false, cancelled: true, authoritativeGone: true, expectedRevision, description: "" });
+    notices.add(await ctx.runMutation(internal.eventCalendar.applyObserved, { deferSeriesNotice: true, eventId: calendarEventId, title: "", location: "", allDay: false, recurring: false, cancelled: true, authoritativeGone: true, expectedRevision, description: "" }));
     return null;
   }
   if (!response.ok) throw new Error(calendarError(response.status));
   const detail = googleDetails(await response.json());
-  await ctx.runMutation(internal.eventCalendar.applyObserved, { eventId: calendarEventId, title: detail.title, location: detail.location, start: detail.startsAt ?? undefined, end: detail.endsAt ?? undefined, allDay: detail.allDay, allDayStartDate: detail.startDate ?? undefined, allDayEndDate: detail.endDate ?? undefined, recurring: detail.recurring, cancelled: detail.cancelled, etag: detail.etag, providerUpdatedAt: detail.updatedAt, authoritativeGone: detail.cancelled && detail.updatedAt === undefined, expectedRevision, description: detail.description });
+  notices.add(await ctx.runMutation(internal.eventCalendar.applyObserved, { deferSeriesNotice: true, eventId: calendarEventId, title: detail.title, location: detail.location, start: detail.startsAt ?? undefined, end: detail.endsAt ?? undefined, allDay: detail.allDay, allDayStartDate: detail.startDate ?? undefined, allDayEndDate: detail.endDate ?? undefined, recurring: detail.recurring, cancelled: detail.cancelled, etag: detail.etag, providerUpdatedAt: detail.updatedAt, authoritativeGone: detail.cancelled && detail.updatedAt === undefined, expectedRevision, description: detail.description }));
   return null;
 }
 export const reconcileOne = internalAction({ args: { calendarEventId: v.string() }, returns: v.null(), handler: (ctx, args) => reconcileOneNow(ctx, args.calendarEventId) });
 
 /** Full-token resets can miss old linked events; fetch every claimed event directly. */
-export async function reconcileLinkedNow(ctx: ActionCtx): Promise<null> {
+export async function reconcileLinkedNow(ctx: ActionCtx, notices?: SeriesNoticeCollector): Promise<null> {
+  const own = notices ? null : seriesNoticeCollector();
+  try { return await reconcileLinked_(ctx, notices ?? own!); } finally { if (own) await own.flush(ctx); }
+}
+async function reconcileLinked_(ctx: ActionCtx, notices: SeriesNoticeCollector): Promise<null> {
   if (!configured()) return null;
   if (!await boundCalendar(ctx)) throw new Error("Shared Calendar source changed before linked event reconciliation.");
   const auth = `Bearer ${await token(false)}`;
@@ -347,16 +448,17 @@ export async function reconcileLinkedNow(ctx: ActionCtx): Promise<null> {
   for (let page = 0; page < 20; page++) {
     const batch: { ids: string[]; cursor: string | null; done: boolean } = await ctx.runQuery(internal.eventCalendar.linkedPage, { cursor });
     for (const id of batch.ids) {
+      if (!validCalendarEventId(id)) continue;
       const expectedRevision = await ctx.runQuery(internal.eventCalendar.observationRevision, { calendarEventId: id });
       if (expectedRevision === null) continue;
       const response = await fetch(eventUrl(id), { headers: { authorization: auth } });
       if (response.status === 404) {
-        await ctx.runMutation(internal.eventCalendar.applyObserved, { eventId: id, title: "", location: "", allDay: false, recurring: false, cancelled: true, authoritativeGone: true, expectedRevision, description: "" });
+        notices.add(await ctx.runMutation(internal.eventCalendar.applyObserved, { deferSeriesNotice: true, eventId: id, title: "", location: "", allDay: false, recurring: false, cancelled: true, authoritativeGone: true, expectedRevision, description: "" }));
         continue;
       }
       if (!response.ok) throw new Error(calendarError(response.status));
       const detail = googleDetails(await response.json());
-      await ctx.runMutation(internal.eventCalendar.applyObserved, { eventId: id, title: detail.title, location: detail.location, start: detail.startsAt ?? undefined, end: detail.endsAt ?? undefined, allDay: detail.allDay, allDayStartDate: detail.startDate ?? undefined, allDayEndDate: detail.endDate ?? undefined, recurring: detail.recurring, cancelled: detail.cancelled, etag: detail.etag, providerUpdatedAt: detail.updatedAt, authoritativeGone: detail.cancelled && detail.updatedAt === undefined, expectedRevision, description: detail.description });
+      notices.add(await ctx.runMutation(internal.eventCalendar.applyObserved, { deferSeriesNotice: true, eventId: id, title: detail.title, location: detail.location, start: detail.startsAt ?? undefined, end: detail.endsAt ?? undefined, allDay: detail.allDay, allDayStartDate: detail.startDate ?? undefined, allDayEndDate: detail.endDate ?? undefined, recurring: detail.recurring, cancelled: detail.cancelled, etag: detail.etag, providerUpdatedAt: detail.updatedAt, authoritativeGone: detail.cancelled && detail.updatedAt === undefined, expectedRevision, description: detail.description }));
     }
     if (batch.done) return null;
     if (!batch.cursor) throw new Error("Calendar linked event pagination failed.");
@@ -366,7 +468,7 @@ export async function reconcileLinkedNow(ctx: ActionCtx): Promise<null> {
 }
 export const reconcileLinked = internalAction({ args: {}, returns: v.null(), handler: ctx => reconcileLinkedNow(ctx) });
 
-export const applyObserved = internalMutation({ args: observedArgs, returns: v.null(), handler: async (ctx, args) => {
+export const applyObserved = internalMutation({ args: observedArgs, returns: v.union(v.null(), deferredNotice), handler: async (ctx, args) => {
   const claim = await ctx.db.query("eventCalendarClaims").withIndex("by_calendarEventId", q => q.eq("calendarEventId", args.eventId)).unique();
   const event = claim ? await ctx.db.get(claim.eventId) : null;
   if (!event || !event.calendarChoice || event.calendarSyncState !== "synced") return null;
@@ -382,9 +484,32 @@ export const applyObserved = internalMutation({ args: observedArgs, returns: v.n
   const location = args.cancelled || event.onsite ? event.destination : args.location;
   const material = title !== event.name || location !== event.destination || (!args.cancelled && (args.start !== event.startsAt || args.end !== event.endsAt)) || args.cancelled !== (event.cancelled ?? false);
   if (material) await invalidatePermissionCoverage(ctx, event, event.calendarActorId!);
-  await ctx.db.patch(event._id, { name: title, destination: location, startsAt: args.start ?? event.startsAt, endsAt: args.end ?? event.endsAt, ...safeDeadlines(event, args.start ?? event.startsAt), cancelled: args.cancelled, mediaSupportRequested: args.cancelled ? event.mediaSupportRequested : args.description.split(/\r?\n/).some(line => line.trim() === mediaMarker), calendarAllDayStartDate: args.cancelled ? event.calendarAllDayStartDate : args.allDayStartDate, calendarAllDayEndDate: args.cancelled ? event.calendarAllDayEndDate : args.allDayEndDate, calendarRecurring: args.cancelled ? event.calendarRecurring : args.recurring, calendarEtag: args.etag, calendarProviderUpdatedAt: args.providerUpdatedAt ?? event.calendarProviderUpdatedAt, calendarRevision: (event.calendarRevision ?? 0) + 1, calendarSyncError: undefined });
+  await ctx.db.patch(event._id, { name: title, destination: location, startsAt: args.start ?? event.startsAt, endsAt: args.end ?? event.endsAt, ...safeDeadlines(event, args.start ?? event.startsAt), cancelled: args.cancelled, mediaSupportRequested: args.cancelled ? event.mediaSupportRequested : args.description.split(/\r?\n/).some(line => line.trim() === mediaMarker), calendarAllDayStartDate: args.cancelled ? event.calendarAllDayStartDate : args.allDayStartDate, calendarAllDayEndDate: args.cancelled ? event.calendarAllDayEndDate : args.allDayEndDate, calendarRecurring: args.cancelled ? event.calendarRecurring : args.recurring, ...(event.seriesId && material ? { seriesDetached: true } : {}), calendarEtag: args.etag, calendarProviderUpdatedAt: args.providerUpdatedAt ?? event.calendarProviderUpdatedAt, calendarRevision: (event.calendarRevision ?? 0) + 1, calendarSyncError: undefined });
     if (args.end !== undefined && args.end !== event.endsAt) await scheduleEventArchive(ctx, event._id);
   if (args.cancelled && !event.cancelled) await ctx.runMutation(internal.eventEnrollment.stopCancelledEnrollment, { eventId: event._id });
+  if (args.suppressNotice) return null;
+  if (args.deferSeriesNotice && event.seriesId) {
+    const after = await ctx.db.get(event._id);
+    const changed = !!after && ((after.cancelled ?? false) !== (event.cancelled ?? false) || after.startsAt !== event.startsAt || after.endsAt !== event.endsAt || after.destination !== event.destination);
+    return changed ? { seriesId: event.seriesId, eventId: event._id, key: event.seriesOccurrenceKey ?? "", name: event.name, destination: event.destination, startsAt: event.startsAt, endsAt: event.endsAt, cancelled: event.cancelled ?? false } : null;
+  }
   await notifyEventScheduleChange(ctx, event);
+  return null;
+} });
+
+/** One notice per series for the meetings a main Calendar sync changed (see notifySeriesRepresentative). */
+export const sendDeferredSeriesNotices = internalMutation({ args: { items: v.array(deferredNotice) }, returns: v.null(), handler: async (ctx, args) => {
+  const bySeries = new Map<Id<"eventSeries">, Doc<"events">[]>();
+  for (const item of args.items) {
+    const current = await ctx.db.get(item.eventId);
+    if (!current || current.seriesId !== item.seriesId) continue;
+    // The meeting as it was before the sync, so notifyEventScheduleChange compares it with the saved row.
+    const before: Doc<"events"> = { ...current, name: item.name, destination: item.destination, startsAt: item.startsAt, endsAt: item.endsAt, cancelled: item.cancelled, seriesOccurrenceKey: item.key || current.seriesOccurrenceKey };
+    const group = bySeries.get(item.seriesId) ?? [];
+    // The same meeting changed twice in one sync keeps its earliest before-state.
+    if (!group.some(row => row._id === before._id)) group.push(before);
+    bySeries.set(item.seriesId, group);
+  }
+  for (const befores of bySeries.values()) await notifySeriesRepresentative(ctx, befores);
   return null;
 } });

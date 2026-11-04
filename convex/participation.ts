@@ -8,6 +8,8 @@ import { activeSeason, audit, ownStudent, viewer } from "./lib/access";
 import { addCharge } from "./lib/money";
 import { enrollmentPending, requireEnrollmentComplete } from "./lib/eventEnrollmentState";
 import { activeQuestions, answerInput, checkAnswers, checkListSizes, checkShifts, clearShifts, replaceShifts, saveAnswers } from "./lib/eventSignupExtras";
+import { studentCanAccessEvent } from "./lib/eventAudience";
+import { resolveAudience } from "./lib/eventAudienceRules";
 import { notifyEventAssigned, queueSignupPendingDigest } from "./lib/notificationTriggers";
 
 async function reserved(ctx: MutationCtx, eventId: Id<"events">) {
@@ -29,6 +31,7 @@ export const signUp = mutation({
     const user = await viewer(ctx); const student = await ownStudent(ctx, user);
     const event = await ctx.db.get(args.eventId); const season = await activeSeason(ctx);
     if (!event || event.seasonId !== season._id || student.seasonId !== season._id || event.archived || event.cancelled || event.signupMode === "assigned") throw new ConvexError("You can't sign up for this event. It may be canceled, past, or assigned by a Coach.");
+    if (!await studentCanAccessEvent(ctx, event, student)) throw new ConvexError("You can't sign up for this event. It isn't open to your group.");
     if (event.signupClosesAt !== undefined && Date.now() > event.signupClosesAt) throw new ConvexError("Signup for this event has closed. Ask a Coach or Travel Lead if you still need to go.");
     const prior = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
     if (prior && prior.status !== "withdrawn") return prior.status;
@@ -76,7 +79,7 @@ export const signupAvailability = query({
   handler: async (ctx, args): Promise<SignupAvailability> => {
     const user = await viewer(ctx); const student = await ownStudent(ctx, user);
     const event = await ctx.db.get(args.eventId);
-    if (!event || event.seasonId !== student.seasonId) throw new ConvexError("This event is no longer available. Reload to see current events.");
+    if (!event || event.seasonId !== student.seasonId || !await studentCanAccessEvent(ctx, event, student)) throw new ConvexError("This event is no longer available. Reload to see current events.");
     const prior = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
     const signedUp = !!prior && prior.status !== "withdrawn";
     const withdrew = !signedUp && (await ctx.db.query("withdrawalRequests").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(100)).some(x => x.status === "approved");
@@ -105,6 +108,8 @@ export const setParticipation = mutation({
     const event = await ctx.db.get(args.eventId); const student = await ctx.db.get(args.studentId); const season = await activeSeason(ctx);
     if (!event || event.archived || event.cancelled || !student || !student.active || event.seasonId !== season._id || student.seasonId !== season._id) throw new ConvexError("This student or event is no longer active in the current season. Reload to see the latest.");
     requireEnrollmentComplete(event);
+    // Mentor-only events have no student audience; staff may still add students outside an optional audience (an intended override).
+    if (resolveAudience(event).kind === "mentorsOnly") throw new ConvexError("This event is for Mentors only, so students can't be added to it.");
     if (event.signupMode === "assigned" && user.role !== "coach") throw new ConvexError("Only a Coach can change signups for a required event.");
     if (event.signupMode === "assigned" && (args.status === "pending" || args.status === "waitlist")) throw new ConvexError("Students on a required event can't be Waiting for approval or Waitlisted. Choose Signed up instead.");
     const prior = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();

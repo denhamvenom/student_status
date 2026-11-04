@@ -32,6 +32,16 @@ async function effectiveViewer(ctx: Ctx, user: AppUser): Promise<AppUser> {
   return { ...user, role: selection.role === "parent" ? "parent" : "mentor", travelLead: selection.role === "travelLead", financialEdit: false, healthExport: false };
 }
 
+/**
+ * Background work (no signed-in session) acting for a stored user: a Parent whose current Coach grant is Travel Lead acts as a
+ * Travel Lead, resolved the same way effectiveViewer does when that role is selected (role "mentor", travelLead, no Money
+ * edit or health export). Everyone else is returned unchanged.
+ */
+export function grantedBackgroundActor(user: AppUser): AppUser {
+  if (user.role !== "parent" || !availableRoles(user).includes("travelLead")) return user;
+  return { ...user, role: "mentor", travelLead: true, financialEdit: false, healthExport: false };
+}
+
 export async function identity(ctx: Ctx) {
   const authUserId = await getAuthUserId(ctx);
   if (!authUserId) throw new ConvexError("You are not signed in. Sign in to continue.");
@@ -86,7 +96,7 @@ export async function studentAccess(ctx: Ctx, user: AppUser, studentId: Id<"stud
   const season = await activeSeason(ctx);
   if (!student.active || student.seasonId !== season._id) throw new ConvexError("This student is unavailable in the active season. Reload to see the current roster.");
   if ("scheduler" in ctx) await requireSeasonProfileWritable(ctx, season._id);
-  if (user.role === "coach" || (user.role !== "parent" && user.travelLead)) return student;
+  if (user.role === "coach" || (user.role === "mentor" && user.travelLead)) return student;
   if (user.role === "student" && student.userId === user._id) return student;
   if (user.role === "parent") {
     const link = await ctx.db.query("familyLinks").withIndex("by_parentUserId_and_studentId", q => q.eq("parentUserId", user._id).eq("studentId", studentId)).unique();
@@ -119,7 +129,17 @@ export function mentorStudent(student: Doc<"students">) {
 }
 
 export function mentorEvent(event: Doc<"events">) {
-  return { _id: event._id, name: event.name, type: event.type, startsAt: event.startsAt, endsAt: event.endsAt, destination: event.destination, ...(event.onsite ? { onsite: true } : {}), cancelled: event.cancelled ?? false, mediaSupportRequested: event.mediaSupportRequested ?? false, enrollmentState: event.enrollmentState ?? "complete" };
+  return { _id: event._id, name: event.name, type: event.type, startsAt: event.startsAt, endsAt: event.endsAt, destination: event.destination, ...(event.onsite ? { onsite: true } : {}), locationType: event.locationType ?? "inPerson" as const, cancelled: event.cancelled ?? false, mediaSupportRequested: event.mediaSupportRequested ?? false, enrollmentState: event.enrollmentState ?? "complete" };
+}
+
+/**
+ * Secondary subteam (CAD) and Leadership. Not personal data, but kept out of publicStudent so audiences that
+ * never saw them (Parent season pages with strict validators, readiness rows) are unchanged. Added to
+ * privateStudent (student self, linked Parent, Coach, Travel Lead via studentAccess) and to the Coach /
+ * Travel Lead roster projections. Mentors without Travel Lead never receive them.
+ */
+export function studentGroups(student: Doc<"students">) {
+  return { secondarySubteam: student.secondarySubteam ?? null, leadership: student.leadership ?? false };
 }
 
 export function privateStudent(student: Doc<"students">) {
@@ -127,7 +147,7 @@ export function privateStudent(student: Doc<"students">) {
   const profile = confirmed ? student.consentProfileV2! : null;
   const allergies = profile ? profile.allergies.state === "none" ? {state: "none" as const} : {state: "reported" as const, text: profile.allergies.entries.map(item => `${item.allergen}: ${item.severity}; ${item.reaction}; response: ${item.response}`).join("\n")} : student.allergies;
   const medications = profile ? profile.prescriptions.state === "none" ? {state: "none" as const} : {state: "reported" as const, text: profile.prescriptions.entries.map(item => `${item.name} ${item.dose}; ${item.timing}; ${item.reason}; carried by ${item.carriedBy}`).join("\n")} : student.medications;
-  return { ...publicStudent(student), profileRevision: student.profileRevision ?? 0, profileSetupRequired: student.profileCompletedAt === undefined, structuredConsentProfileComplete: confirmed, email: student.email, shirtSize: student.shirtSize ?? null, emergencyName: profile?.emergency.name ?? student.emergencyName ?? null, emergencyRelationship: profile?.emergency.relationship ?? student.emergencyRelationship ?? null, emergencyPhone: profile?.emergency.phone ?? student.emergencyPhone ?? null, allergies, medications, otcAuthorization: profile ? null : student.otcAuthorization ?? null };
+  return { ...publicStudent(student), ...studentGroups(student), profileRevision: student.profileRevision ?? 0, profileSetupRequired: student.profileCompletedAt === undefined, structuredConsentProfileComplete: confirmed, email: student.email, shirtSize: student.shirtSize ?? null, emergencyName: profile?.emergency.name ?? student.emergencyName ?? null, emergencyRelationship: profile?.emergency.relationship ?? student.emergencyRelationship ?? null, emergencyPhone: profile?.emergency.phone ?? student.emergencyPhone ?? null, allergies, medications, otcAuthorization: profile ? null : student.otcAuthorization ?? null };
 }
 
 export async function audit(ctx: MutationCtx, actor: AppUser, entity: string, entityId: string, action: string, before: unknown, after: unknown, reason?: string) {

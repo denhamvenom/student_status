@@ -3,7 +3,7 @@ import { internal } from "./_generated/api";
 import { normalizeCalendarEvent } from "./lib/calendarNormalize";
 import { chicagoMidnight } from "./lib/calendarDates";
 import { hashId, serviceToken } from "./lib/calendarAuth";
-import { reconcileLinkedNow, reconcileOneNow } from "./eventCalendar";
+import { reconcileLinkedNow, reconcileOneNow, seriesNoticeCollector } from "./eventCalendar";
 import { v } from "convex/values";
 import { isCalendarRefreshSlot } from "./lib/calendarSchedule";
 
@@ -15,6 +15,8 @@ async function refreshCalendar(ctx: ActionCtx): Promise<"refreshed" | "skipped" 
     const now = Date.now();
     const state = await ctx.runMutation(internal.calendarState.begin, { calendarIdHash: await hashId(calendarId), now });
     if (!state) return "skipped";
+    // Series meetings changed by this sync (e.g. a Google "all events" edit) get one notice per series, sent at the end.
+    const notices = seriesNoticeCollector();
     try {
       const token = await serviceToken(email, privateKey);
       let pageToken: string | undefined;
@@ -45,8 +47,8 @@ async function refreshCalendar(ctx: ActionCtx): Promise<"refreshed" | "skipped" 
           const event = normalizeCalendarEvent(item as Record<string, unknown>, now, state.generation);
           if (!event) throw new Error("Calendar event was invalid");
           await ctx.runMutation(internal.timeclock.applyCalendarOccurrence, event);
-          if (event.cancelled && event.providerUpdatedAt === undefined) await reconcileOneNow(ctx, event.sourceKey);
-          else await ctx.runMutation(internal.eventCalendar.applyObserved, { eventId: event.sourceKey, title: event.title, location: typeof (item as Record<string, unknown>).location === "string" ? (item as Record<string, unknown>).location as string : "", start: event.scheduledStart ?? (event.allDayStartDate ? chicagoMidnight(event.allDayStartDate) : undefined), end: event.scheduledEnd ?? (event.allDayEndDate ? chicagoMidnight(event.allDayEndDate) : undefined), allDay: event.allDay, allDayStartDate: event.allDayStartDate, allDayEndDate: event.allDayEndDate, recurring: !!event.recurringEventId, cancelled: event.cancelled, etag: event.providerVersion, providerUpdatedAt: event.providerUpdatedAt, description: typeof (item as Record<string, unknown>).description === "string" ? (item as Record<string, unknown>).description as string : "" });
+          if (event.cancelled && event.providerUpdatedAt === undefined) await reconcileOneNow(ctx, event.sourceKey, notices);
+          else notices.add(await ctx.runMutation(internal.eventCalendar.applyObserved, { deferSeriesNotice: true, eventId: event.sourceKey, title: event.title, location: typeof (item as Record<string, unknown>).location === "string" ? (item as Record<string, unknown>).location as string : "", start: event.scheduledStart ?? (event.allDayStartDate ? chicagoMidnight(event.allDayStartDate) : undefined), end: event.scheduledEnd ?? (event.allDayEndDate ? chicagoMidnight(event.allDayEndDate) : undefined), allDay: event.allDay, allDayStartDate: event.allDayStartDate, allDayEndDate: event.allDayEndDate, recurring: !!event.recurringEventId, cancelled: event.cancelled, etag: event.providerVersion, providerUpdatedAt: event.providerUpdatedAt, description: typeof (item as Record<string, unknown>).description === "string" ? (item as Record<string, unknown>).description as string : "" }));
         }
         pageToken = typeof payload.nextPageToken === "string" ? payload.nextPageToken : undefined;
         syncToken = typeof payload.nextSyncToken === "string" ? payload.nextSyncToken : undefined;
@@ -62,13 +64,16 @@ async function refreshCalendar(ctx: ActionCtx): Promise<"refreshed" | "skipped" 
           if (!progress.continueCursor || batch === 99) throw new Error("Calendar reconciliation exceeded its batch limit");
           cursor = progress.continueCursor;
         }
-        await reconcileLinkedNow(ctx);
+        await reconcileLinkedNow(ctx, notices);
       }
+      await notices.flush(ctx);
       await ctx.runMutation(internal.calendarState.finish, { generation: state.generation, now: Date.now(), syncToken });
       return "refreshed";
     } catch (error) {
       const message = error instanceof Error && /^(Calendar (?:token request failed|events request failed|events response was invalid|events list was invalid|event was invalid|did not return a sync token|sync exceeded its page limit|reconciliation exceeded its batch limit))/.test(error.message)
         ? error.message : "Calendar authentication or synchronization failed";
+      // Changes applied before the failure are saved; their series still get their one notice.
+      await notices.flush(ctx);
       await ctx.runMutation(internal.calendarState.finish, { generation: state.generation, now: Date.now(), error: message });
       return "failed";
     }
