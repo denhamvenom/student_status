@@ -1,6 +1,12 @@
 # Handoff
 
-November 4, 2026 | main `73fae9a`
+November 4, 2026 | main `08a5d71`
+
+## Coach email change fix and stable profile edit dialog (released)
+
+PR #71 merged as main `08a5d71` (source `d5427af`). Production Convex amicable-eel-413 deployed first (no schema change, no index deletions). A Coach email change is no longer blocked by an orphan Google sign-in; pending requests still block with clearer messages. The profile edit dialog stays open across the 60s refresh and Adults list reloads. Both sites returned 200 and the new bundle was served. [Release receipt](docs/releases/RELEASE_2026-11-04_PROFILE_EDIT_FIX.md)
+
+Owner follow-up (not yet verified): signed-in production walkthrough of the Coach email change and edit dialog (VERIFY).
 
 ## Coach profile edit, Timeclock early clock-out and PIN group clock-in, monthly attendance report (released)
 
