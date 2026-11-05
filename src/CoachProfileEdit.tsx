@@ -110,23 +110,40 @@ function AdultEditor({ userId, onCancel, onSaved, onBusy }: { userId: Id<'appUse
   return <AdultFields key={opened.profileRevision} profile={opened} stale={stale} onReload={reload} onCancel={onCancel} onSaved={onSaved} onBusy={onBusy}/>
 }
 
-function EditDialog({ label, title, trigger, children }: { label: string; title: string; trigger?: 'outline' | 'default'; children: (close: (message?: string) => void, setBusy: (busy: boolean) => void) => ReactNode }) {
-  const [open, setOpen] = useState(false)
+type EditorBody = (close: (message?: string) => void, setBusy: (busy: boolean) => void) => ReactNode
+
+/** The edit box itself. It closes only through `onDone`: Cancel, the close button, Escape or a successful save. */
+function EditDialogFrame({ title, open, onDone, finalFocus, children }: { title: string; open: boolean; onDone: (message?: string) => void; finalFocus?: () => HTMLElement | null; children: EditorBody }) {
   const [busy, setBusy] = useState(false)
+  const close = (message?: string) => { setBusy(false); onDone(message) }
+  // A stray click outside must not discard typed values.
+  return <Dialog open={open} disablePointerDismissal onOpenChange={next => { if (!next && !busy) close() }}>
+    <DialogContent showCloseButton={!busy} className={styles.dialog} finalFocus={finalFocus}>
+      <DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>Changes apply right away. Changing the email also changes how this person signs in.</DialogDescription></DialogHeader>
+      {open && children(close, setBusy)}
+    </DialogContent>
+  </Dialog>
+}
+
+function EditDialog({ label, title, trigger, children }: { label: string; title: string; trigger?: 'outline' | 'default'; children: EditorBody }) {
+  const [open, setOpen] = useState(false)
   const [saved, setSaved] = useState('')
   const triggerRef = useRef<HTMLButtonElement | null>(null)
-  const close = (message?: string) => { setOpen(false); setBusy(false); if (message) setSaved(message) }
   return <>
     <Button ref={triggerRef} type="button" variant={trigger ?? 'outline'} className={styles.trigger} onClick={() => { setSaved(''); setOpen(true) }}>{label}</Button>
     {saved && <p role="status" className="ready-text">{saved}</p>}
-    {/* A stray click outside must not discard typed values: the box closes only on Cancel, the close button, Escape or a successful save. */}
-    <Dialog open={open} disablePointerDismissal onOpenChange={next => { if (!next && !busy) setOpen(false) }}>
-      <DialogContent showCloseButton={!busy} className={styles.dialog} finalFocus={() => triggerRef.current?.isConnected ? triggerRef.current : null}>
-        <DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>Changes apply right away. Changing the email also changes how this person signs in.</DialogDescription></DialogHeader>
-        {open && children(close, setBusy)}
-      </DialogContent>
-    </Dialog>
+    <EditDialogFrame title={title} open={open} onDone={message => { setOpen(false); if (message) setSaved(message) }} finalFocus={() => triggerRef.current?.isConnected ? triggerRef.current : null}>{children}</EditDialogFrame>
   </>
+}
+
+export type AdultProfileTarget = { userId: Id<'appUsers'>; name: string }
+
+/**
+ * Controlled "Edit profile" box for a Coach, Mentor or Parent account, for hosts whose rows can unmount while it is
+ * open (a paginated list reloading). Render it outside those rows; it closes only through `onDone`.
+ */
+export function AdultProfileDialog({ target, onDone }: { target: AdultProfileTarget | null; onDone: (message?: string) => void }) {
+  return <EditDialogFrame title={`Edit profile: ${target?.name ?? ''}`} open={target !== null} onDone={onDone}>{(close, setBusy) => target && <AdultEditor key={target.userId} userId={target.userId} onCancel={() => close()} onSaved={close} onBusy={setBusy}/>}</EditDialogFrame>
 }
 
 /** Coach-only "Edit profile" for a Coach, Mentor or Parent account. The server enforces the Coach role. */
