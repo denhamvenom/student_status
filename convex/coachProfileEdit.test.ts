@@ -110,15 +110,74 @@ describe("coach profile edits", () => {
 
   it.each([
     ["an active account", "taken@example.invalid", "Another account already uses this email"],
-    ["a sign-in without a team account", "orphan@example.invalid", "already signed in with this email"],
     ["an invalid address", "not-an-email", "valid email"],
   ])("rejects an email used by %s without changing anything", async (_label, email, message) => {
     const f = await fixture();
-    await f.t.run(ctx => ctx.db.insert("users", { email: "orphan@example.invalid", emailVerificationTime: 1 }));
     await expect(f.coach.mutation(api.coachProfileEdit.updateAdultProfile, adultEdit(f.ids.mentor.user, { email }))).rejects.toThrow(message);
     await expect(f.coach.mutation(api.coachProfileEdit.updateStudentProfile, studentEdit(f, { email }))).rejects.toThrow(message);
     expect(await f.t.run(ctx => ctx.db.get(f.ids.mentor.auth))).toMatchObject({ email: "mentor@example.invalid" });
     expect(await f.t.run(ctx => ctx.db.get(f.ids.studentId))).toMatchObject({ email: "student@example.invalid" });
+  });
+
+  it("absorbs an earlier sign-in with no team account, so the next Google sign-in with the new email lands in the person's account", async () => {
+    const f = await fixture();
+    const school = "student.school@example.invalid";
+    const orphan = await f.t.run(async ctx => {
+      const auth = await ctx.db.insert("users", { email: school, name: "Student", emailVerificationTime: 1 });
+      const account = await ctx.db.insert("authAccounts", { userId: auth, provider: "google", providerAccountId: "google-school-sub", emailVerified: school });
+      const code = await ctx.db.insert("authVerificationCodes", { accountId: account, provider: "google", code: "hashed", expirationTime: Date.now() + 60_000 });
+      const session = await ctx.db.insert("authSessions", { userId: auth, expirationTime: Date.now() + 86_400_000 });
+      const token = await ctx.db.insert("authRefreshTokens", { sessionId: session, expirationTime: Date.now() + 86_400_000 });
+      // A request that was already decided is history, not a reason to refuse.
+      const request = await ctx.db.insert("joinRequests", { authUserId: auth, email: school, firstName: "Student", lastName: "Example", seasonId: f.ids.season, status: "declined", createdAt: 1, decidedAt: 2, decidedBy: f.ids.coach.user });
+      return { auth, account, code, session, token, request };
+    });
+    expect(await f.coach.mutation(api.coachProfileEdit.updateStudentProfile, studentEdit(f, { email: school }))).toEqual({ emailChanged: true, endedSessions: 1, removedGoogleLinks: 1 });
+    const state = await f.t.run(async ctx => ({
+      orphan: await ctx.db.get(orphan.auth), account: await ctx.db.get(orphan.account), code: await ctx.db.get(orphan.code),
+      session: await ctx.db.get(orphan.session), token: await ctx.db.get(orphan.token), request: await ctx.db.get(orphan.request),
+      logins: (await ctx.db.query("users").withIndex("email", q => q.eq("email", school)).collect()).map(row => row._id),
+      audit: (await ctx.db.query("audit").collect()).filter(row => row.action === "absorbOrphanSignIn").map(row => [row.entityId, row.reason]),
+    }));
+    expect(state).toMatchObject({ orphan: null, account: { userId: f.ids.student.auth }, code: null, session: null, token: null, request: { status: "declined" }, logins: [f.ids.student.auth], audit: [[orphan.auth, REASON]] });
+
+    // Convex Auth's own Google callback step resolves the existing link to the student's login.
+    await f.t.run(ctx => ctx.db.insert("authVerifiers", { signature: "synthetic-signature" }));
+    await f.t.mutation(internal.auth.store, { args: { type: "userOAuth", provider: "google", providerAccountId: "google-school-sub", profile: { email: school, emailVerified: true, name: "Student" }, signature: "synthetic-signature" } });
+    const after = await f.t.run(async ctx => ({
+      links: await ctx.db.query("authAccounts").withIndex("providerAndAccountId", q => q.eq("provider", "google").eq("providerAccountId", "google-school-sub")).collect(),
+      logins: (await ctx.db.query("users").withIndex("email", q => q.eq("email", school)).collect()).map(row => row._id),
+    }));
+    expect(after.links.map(row => row.userId)).toEqual([f.ids.student.auth]);
+    expect(after.logins).toEqual([f.ids.student.auth]);
+  });
+
+  it.each([
+    ["a pending join request", "Join requests → Requests & team code"],
+    ["a pending account connection request", "Join requests → Bulk Invite"],
+    ["another team account's login", "Another account already uses this email"],
+    ["an invited adult's email sign-in", "Another account already uses this email"],
+  ] as const)("keeps refusing an email held by a sign-in with %s", async (kind, message) => {
+    const f = await fixture();
+    const email = "held@example.invalid";
+    const held = await f.t.run(async ctx => {
+      const auth = await ctx.db.insert("users", { email, emailVerificationTime: 1 });
+      if (kind === "a pending join request") await ctx.db.insert("joinRequests", { authUserId: auth, email, firstName: "Held", lastName: "Example", seasonId: f.ids.season, status: "pending", createdAt: 1 });
+      if (kind === "a pending account connection request") {
+        const batchId = await ctx.db.insert("bulkInviteBatches", { seasonId: f.ids.season, createdBy: f.ids.coach.user, createdAt: 1, idempotencyKey: "synthetic", requestHash: "synthetic", inviteCount: 1, pendingCount: 1, connectedCount: 0, createdCount: 0, linkedCount: 0, skippedCount: 0 });
+        const inviteId = await ctx.db.insert("bulkStudentInvites", { batchId, seasonId: f.ids.season, studentId: f.ids.studentId, code: "synthetic", codeHash: "synthetic", status: "pending", createdBy: f.ids.coach.user, createdAt: 1 });
+        await ctx.db.insert("bulkInviteConnectionRequests", { authUserId: auth, inviteId, codeHash: "synthetic", studentId: f.ids.studentId, seasonId: f.ids.season, googleName: "Held", googleEmail: email, status: "pending", createdAt: 1 });
+      }
+      // The team account's own email differs from the login's, so only the login lookup can find it.
+      if (kind === "another team account's login") await ctx.db.insert("appUsers", { authUserId: auth, email: "elsewhere@example.invalid", name: "Elsewhere", role: "mentor", active: true, travelLead: false, financialEdit: false });
+      if (kind === "an invited adult's email sign-in") await ctx.db.insert("adultEmailIdentities", { authUserId: auth, email, createdAt: 1 });
+      return auth;
+    });
+    await expect(f.coach.mutation(api.coachProfileEdit.updateStudentProfile, studentEdit(f, { email }))).rejects.toThrow(message);
+    await expect(f.coach.mutation(api.coachProfileEdit.updateAdultProfile, adultEdit(f.ids.mentor.user, { email }))).rejects.toThrow(message);
+    expect(await f.t.run(ctx => ctx.db.get(held))).toMatchObject({ email });
+    expect(await f.t.run(ctx => ctx.db.get(f.ids.studentId))).toMatchObject({ email: "student@example.invalid" });
+    expect(await f.t.run(ctx => ctx.db.get(f.ids.mentor.auth))).toMatchObject({ email: "mentor@example.invalid" });
   });
 
   it("rejects stale revisions and a Coach changing their own sign-in email", async () => {
