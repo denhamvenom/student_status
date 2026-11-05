@@ -1,6 +1,18 @@
 # Handoff
 
-November 4, 2026 | main `99515ed`
+November 4, 2026 | main `73fae9a`
+
+## Coach profile edit, Timeclock early clock-out and PIN group clock-in, monthly attendance report (released)
+
+PR #69 merged as main `73fae9a` (source `1fcbe7d`). Production Convex amicable-eel-413 deployed first from `1fcbe7d`, adding one index (`parentInvitations.by_parentEmail_and_status`) with no deletions. Workers: student-status `2362b93d-3808-4a59-8b43-13f8ec180c1e`, timeclock `2ebed04d-b623-4d4b-b04c-0d6517a7785e` (rollback `3da2dea9-78bb-4b92-90e7-6658f4d4e741` / `c4478644-fd2c-48c7-9cf6-1c87d04d6d00`). Both sites returned 200 and served the new bundles. [Release receipt](docs/releases/RELEASE_2026-11-04_PROFILE_TIMECLOCK_ATTENDANCE.md)
+
+Owner follow-ups (not yet verified):
+- Confirm `TIMECLOCK_OPERATOR_PIN` is set on production; group clock-in fails without it (VERIFY).
+- Signed-in production walkthrough: Coach profile and email edit, monthly report as Student and Parent, early clock-out and PIN group clock-in (VERIFY).
+
+## Repeating meetings end date (released)
+
+PR #67 merged as main `1a02e86` (source `fbc16a6`); production Convex deployed first (no schema change). [Release receipt](docs/releases/RELEASE_2026-11-04_SERIES_END_DATE.md)
 
 ## Event audiences, subteams, Mentor invitations, virtual events and recurring meetings (released)
 
