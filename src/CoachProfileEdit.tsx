@@ -47,6 +47,17 @@ function ReasonField({ value, onChange, disabled, emailChanged }: { value: strin
   return <label className={styles.field}>{emailChanged ? 'Reason for the email change' : 'Reason (optional)'}<Input value={value} required={emailChanged} maxLength={REASON_MAX} disabled={disabled} onChange={event => onChange(event.target.value)}/></label>
 }
 
+/**
+ * Runs a confirmed save with the edit box locked (it cannot be dismissed mid-save) and any failure shown inside the
+ * box as well as in the confirmation, so it is still there after the Coach closes the confirmation.
+ */
+function confirmedSave(save: () => Promise<void>, setBusy: (busy: boolean) => void, onBusy: (busy: boolean) => void, setError: (error: string) => void) {
+  return async () => {
+    setBusy(true); onBusy(true); setError('')
+    try { await save() } catch (cause) { setError(userFacingError(cause, failed)); throw cause } finally { setBusy(false); onBusy(false) }
+  }
+}
+
 /** Save directly, or freeze the change behind ConfirmAction when the login email moves. */
 function SaveControls({ busy, stale, emailChanged, invalid, onCancel, onReload, run }: { busy: boolean; stale: boolean; emailChanged: boolean; invalid: boolean; onCancel: () => void; onReload: () => void; run: () => Promise<unknown> }) {
   return <>
@@ -74,6 +85,7 @@ function AdultFields({ profile, stale, onReload, onCancel, onSaved, onBusy }: { 
     const result = await update({ userId: profile.userId, expectedProfileRevision: profile.profileRevision, name, email, phone, reason: reason.trim() || undefined })
     onSaved(savedMessage(result, email))
   }
+  const confirmed = confirmedSave(save, setBusy, onBusy, setError)
   const submit = async (event: FormEvent) => {
     event.preventDefault(); if (busy || stale || emailChanged) return
     setBusy(true); onBusy(true); setError('')
@@ -87,7 +99,7 @@ function AdultFields({ profile, stale, onReload, onCancel, onSaved, onBusy }: { 
     <label className={styles.field}>Phone<Input type="tel" autoComplete="off" maxLength={50} value={phone} disabled={busy} onChange={event => setPhone(event.target.value)}/></label>
     <ReasonField value={reason} onChange={setReason} disabled={busy} emailChanged={emailChanged}/>
     {error && <p role="alert" className="open-text">{error}</p>}
-    <SaveControls busy={busy} stale={stale} emailChanged={emailChanged} invalid={!name.trim() || !email.trim() || (emailChanged && !reason.trim())} onCancel={onCancel} onReload={onReload} run={save}/>
+    <SaveControls busy={busy} stale={stale} emailChanged={emailChanged} invalid={!name.trim() || !email.trim() || (emailChanged && !reason.trim())} onCancel={onCancel} onReload={onReload} run={confirmed}/>
   </form>
 }
 
@@ -107,7 +119,8 @@ function EditDialog({ label, title, trigger, children }: { label: string; title:
   return <>
     <Button ref={triggerRef} type="button" variant={trigger ?? 'outline'} className={styles.trigger} onClick={() => { setSaved(''); setOpen(true) }}>{label}</Button>
     {saved && <p role="status" className="ready-text">{saved}</p>}
-    <Dialog open={open} onOpenChange={next => { if (!next && !busy) setOpen(false) }}>
+    {/* A stray click outside must not discard typed values: the box closes only on Cancel, the close button, Escape or a successful save. */}
+    <Dialog open={open} disablePointerDismissal onOpenChange={next => { if (!next && !busy) setOpen(false) }}>
       <DialogContent showCloseButton={!busy} className={styles.dialog} finalFocus={() => triggerRef.current?.isConnected ? triggerRef.current : null}>
         <DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>Changes apply right away. Changing the email also changes how this person signs in.</DialogDescription></DialogHeader>
         {open && children(close, setBusy)}
@@ -135,6 +148,7 @@ function StudentFields({ profile, stale, onReload, onCancel, onSaved, onBusy }: 
     const result = await update({ studentId: profile.studentId, expectedRevision: profile.profileRevision, legalName, preferredName, email, shirtSize: shirtSize || null, reason: reason.trim() || undefined })
     onSaved(profile.signIn === 'linked' ? savedMessage(result, email) : 'Profile saved.')
   }
+  const confirmed = confirmedSave(save, setBusy, onBusy, setError)
   const confirmEmail = emailChanged && profile.signIn === 'linked'
   const submit = async (event: FormEvent) => {
     event.preventDefault(); if (busy || stale || confirmEmail) return
@@ -151,7 +165,7 @@ function StudentFields({ profile, stale, onReload, onCancel, onSaved, onBusy }: 
     <p className={styles.muted}>Health, emergency and guardian details stay with the permission form.</p>
     <ReasonField value={reason} onChange={setReason} disabled={busy} emailChanged={emailChanged}/>
     {error && <p role="alert" className="open-text">{error}</p>}
-    <SaveControls busy={busy} stale={stale} emailChanged={confirmEmail} invalid={!legalName.trim() || !preferredName.trim() || !email.trim() || (emailChanged && !reason.trim())} onCancel={onCancel} onReload={onReload} run={save}/>
+    <SaveControls busy={busy} stale={stale} emailChanged={confirmEmail} invalid={!legalName.trim() || !preferredName.trim() || !email.trim() || (emailChanged && !reason.trim())} onCancel={onCancel} onReload={onReload} run={confirmed}/>
   </form>
 }
 

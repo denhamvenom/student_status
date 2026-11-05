@@ -24,7 +24,12 @@ function Fact({label,children}:{label:string;children:React.ReactNode}){return <
 function Money({label,cents}:{label:string;cents:number|null}){return <Fact label={label}>{cents===null?'Unavailable':reportMoney(cents)}</Fact>}
 function RecordContent({studentId}:{studentId:Id<'students'>}){
   const archiveTrigger=useRef<HTMLButtonElement|null>(null); const [asOf,setAsOf]=useState(()=>Date.now());useEffect(()=>{const timer=setInterval(()=>setAsOf(Date.now()),60000);return()=>clearInterval(timer)},[])
-  const healthStatus=useQuery(api.workflowSummaries.healthStatus,{studentId});const data=useQuery(api.coachRoster.detail,{studentId,asOf}),update=useMutation(api.admin.updateRoster)
+  const healthStatus=useQuery(api.workflowSummaries.healthStatus,{studentId});const latest=useQuery(api.coachRoster.detail,{studentId,asOf}),update=useMutation(api.admin.updateRoster)
+  // The minute tick changes `asOf`, and useQuery answers undefined until the new result arrives. Keep the last record so
+  // the page, and any open dialog such as Edit profile with the Coach's typed values, is not unmounted every minute.
+  const [loaded,setLoaded]=useState(latest)
+  if(latest!==undefined&&latest!==loaded)setLoaded(latest)
+  const data=latest??loaded
   const [open,setOpen]=useState(false),[reason,setReason]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState(''),[selectedRevision,setSelectedRevision]=useState<number|null>(null)
   if(!data)return <div className={styles.root}><Link to="/team">← Team</Link><p role="status">Loading student record…</p></div>
   const stale=open&&selectedRevision!==data.profileRevision
