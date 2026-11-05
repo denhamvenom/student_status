@@ -11,3 +11,8 @@ export function startVisibleClock(onTick: () => void, intervalMs: number) {
 export function hasElapsedSession(selected: boolean, effectiveEnd: number | null, now: number, clockState?: string) {
   return selected && (effectiveEnd === null || now >= effectiveEnd || (clockState !== undefined && clockState !== "open"));
 }
+
+/** A student clock-out needs confirmation only before the meeting's SCHEDULED end; extensions do not count, since sessions auto-close at the effective end. */
+export function isEarlyClockOut(now: number, scheduledEnd: number | null | undefined) {
+  return typeof scheduledEnd === "number" && Number.isFinite(scheduledEnd) && now < scheduledEnd;
+}

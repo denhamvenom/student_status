@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { hasElapsedSession, startVisibleClock } from "../apps/timeclock/src/visibleClock";
+import { hasElapsedSession, isEarlyClockOut, startVisibleClock } from "../apps/timeclock/src/visibleClock";
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
@@ -27,5 +27,21 @@ describe("visible Timeclock clock", () => {
     stop();
     vi.advanceTimersByTime(15000);
     expect(updates).toHaveLength(2);
+  });
+});
+
+describe("early clock-out confirmation", () => {
+  const end = Date.UTC(2026, 10, 4, 2, 0); // 8:00 PM Chicago
+  it.each([
+    ["before the scheduled end", end - 60_000, end, true],
+    ["one millisecond before the scheduled end", end - 1, end, true],
+    ["exactly at the scheduled end", end, end, false],
+    // The session was extended past `end`; only the scheduled end matters, so no prompt.
+    ["after the scheduled end while the session is extended", end + 60_000, end, false],
+    ["with no scheduled end", end - 60_000, null, false],
+    ["with an undefined end", end - 60_000, undefined, false],
+    ["with an invalid end", end - 60_000, Number.NaN, false],
+  ] as const)("decides %s", (_label, now, scheduledEnd, early) => {
+    expect(isEarlyClockOut(now, scheduledEnd)).toBe(early);
   });
 });

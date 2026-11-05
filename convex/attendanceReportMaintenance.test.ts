@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 import { describe, expect, it, vi } from "vitest";
 import { createTest } from "../testUtils";
+import rateLimiter from "@convex-dev/rate-limiter/test";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import type { Id } from "./_generated/dataModel";
@@ -12,7 +13,7 @@ const start=Date.parse("2026-10-13T21:00:00Z");
 type T=ReturnType<typeof createTest>;
 
 async function fixture(state:"open"|"closed"="closed",studentsCount=1){
-  const t=createTest(schema,modules);
+  const t=createTest(schema,modules);rateLimiter.register(t);
   const ids=await t.run(async ctx=>{
     const auth=await ctx.db.insert("users",{email:"attendance-report-coach@example.invalid"});
     const coach=await ctx.db.insert("appUsers",{authUserId:auth,email:"attendance-report-coach@example.invalid",name:"Synthetic Coach",role:"coach",travelLead:false,financialEdit:false,active:true});
@@ -174,13 +175,14 @@ describe("attendance projection maintenance",()=>{
   });
   it("coalesces actual group in and bulk out invalidation once per session and ignores command replay",async()=>{
     vi.useFakeTimers();vi.setSystemTime(start+hour/2);
+    const oldPin=process.env.TIMECLOCK_OPERATOR_PIN;const pin="synthetic-test-pin-3190";process.env.TIMECLOCK_OPERATOR_PIN=pin;
     try{
       const f=await fixture("open",2);
       await f.t.run(async ctx=>{
         for(const interval of f.ids.intervals)await ctx.db.delete(interval);
         for(const student of f.ids.students)await ctx.db.patch(student,{firstName:"Synthetic",lastName:`Report${student}`,structuredNameReviewed:true});
       });
-      const args={sessionId:f.ids.session,mode:"in" as const,expectedRevision:1,expected:f.ids.students.map(studentId=>({studentId,intervalId:null})),key:"group-projection-in"};
+      const args={sessionId:f.ids.session,mode:"in" as const,expectedRevision:1,expected:f.ids.students.map(studentId=>({studentId,intervalId:null})),pin,key:"group-projection-in"};
       expect(await f.coach.mutation(api.timeclock.clockGroup,args)).toMatchObject({ok:true,count:2});
       const state=await f.t.run(ctx=>ctx.db.query("timeclockSessionReportStates").withIndex("by_sessionId",q=>q.eq("sessionId",f.ids.session)).unique());
       expect(state?.reportGeneration).toBe(1);
@@ -189,7 +191,7 @@ describe("attendance projection maintenance",()=>{
       vi.setSystemTime(start+1.5*hour);
       expect(await f.coach.mutation(api.timeclock.clockOutAll,{sessionId:f.ids.session,expectedRevision:1,key:"group-projection-out"})).toMatchObject({ok:true,count:2});
       expect((await f.t.run(ctx=>ctx.db.get(state!._id)))?.reportGeneration).toBe(2);
-    }finally{vi.useRealTimers()}
+    }finally{vi.useRealTimers();if(oldPin===undefined)delete process.env.TIMECLOCK_OPERATOR_PIN;else process.env.TIMECLOCK_OPERATOR_PIN=oldPin}
   });
   it("invalidates actual calendar schedule updates and cancellation with revision fencing",async()=>{
     vi.useFakeTimers();vi.setSystemTime(start+hour);
