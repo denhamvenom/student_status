@@ -115,6 +115,32 @@ describe("timeclock transactions", () => {
     expect(second).toHaveLength(0);
   });
 
+  it("requires the operator PIN for group clock-in while individual clock-in stays PIN-free", async () => {
+    const f = await fixture();
+    const oldPin = process.env.TIMECLOCK_OPERATOR_PIN;
+    const pin = "synthetic-test-pin-3190";
+    const group = { sessionId: f.ids.sessionA, mode: "in" as const, expectedRevision: 1, expected: [{ studentId: f.ids.student, intervalId: null }, { studentId: f.ids.student2, intervalId: null }] };
+    const openIntervals = () => f.t.run(ctx => ctx.db.query("timeclockIntervals").withIndex("by_sessionId_and_outAt", q => q.eq("sessionId", f.ids.sessionA).eq("outAt", undefined)).take(3));
+    try {
+      delete process.env.TIMECLOCK_OPERATOR_PIN;
+      expect(await f.mentor.mutation(api.timeclock.clockGroup, { ...group, pin, key: "group-pin-unset-01" })).toMatchObject({ ok: false, code: "PIN_UNCONFIGURED" });
+      process.env.TIMECLOCK_OPERATOR_PIN = pin;
+      for (const [attempt, code] of [[undefined, "PIN_REQUIRED"], ["", "PIN_REQUIRED"], ["000000", "PIN_INVALID"]] as const) {
+        expect(await f.mentor.mutation(api.timeclock.clockGroup, { ...group, pin: attempt, key: `group-pin-deny-${code}-${attempt?.length ?? "none"}` })).toMatchObject({ ok: false, code });
+      }
+      // A single-student request through the Group control still checks a supplied PIN.
+      expect(await f.mentor.mutation(api.timeclock.clockGroup, { ...group, expected: group.expected.slice(0, 1), pin: "000000", key: "group-pin-single-bad" })).toMatchObject({ ok: false, code: "PIN_INVALID" });
+      expect(await openIntervals()).toHaveLength(0);
+      expect(await f.mentor.mutation(api.timeclock.clockGroup, { ...group, pin, key: "group-pin-accept-01" })).toMatchObject({ ok: true, count: 2 });
+      expect(await openIntervals()).toHaveLength(2);
+      // Individual clock-out and clock-in (one student, no PIN) are unchanged.
+      const [lock] = await f.t.run(ctx => ctx.db.query("timeclockStudentLocks").withIndex("by_studentId", q => q.eq("studentId", f.ids.student)).take(1));
+      expect((await f.mentor.mutation(api.timeclock.clockGroup, { sessionId: f.ids.sessionA, mode: "out", expectedRevision: 1, expected: [{ studentId: f.ids.student, intervalId: lock.intervalId }], key: "group-pin-indiv-out" })).ok).toBe(true);
+      expect((await f.mentor.mutation(api.timeclock.clockGroup, { sessionId: f.ids.sessionA, mode: "in", expectedRevision: 1, expected: [{ studentId: f.ids.student, intervalId: null }], key: "group-pin-indiv-in1" })).ok).toBe(true);
+      expect(await openIntervals()).toHaveLength(2);
+    } finally { if (oldPin === undefined) delete process.env.TIMECLOCK_OPERATOR_PIN; else process.env.TIMECLOCK_OPERATOR_PIN = oldPin; }
+  });
+
   it("serializes concurrent clock-ins for the same student across events", async () => {
     const f = await fixture();
     const expected = [{ studentId: f.ids.student, intervalId: null }];

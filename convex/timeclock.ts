@@ -338,7 +338,11 @@ export const clockGroup = mutation({
         if (args.mode === "out" && locks[i]?.sessionId !== session._id) return fail("NOT_IN_EVENT", { studentId: args.expected[i].studentId });
         if (args.mode === "transfer" && locks[i]?.sessionId === session._id) return fail("TRANSFER_CONFLICT", { studentId: args.expected[i].studentId });
       }
-      if (args.mode === "transfer") {
+      // Transfers and group clock-ins (more than one student) need the operator PIN.
+      // A one-student clock-in is the individual tap and stays PIN-free; a supplied
+      // PIN is still verified so the Group control cannot pass with a wrong PIN.
+      const pinGated = args.mode === "transfer" || (args.mode === "in" && args.expected.length > 1);
+      if (pinGated || args.pin !== undefined) {
         if (!args.pin) return fail("PIN_REQUIRED");
         const verified = await verifyTimeclockPin(ctx, actor, args.pin);
         if (!verified.ok) return fail(verified.reason === "unconfigured" ? "PIN_UNCONFIGURED" : verified.reason === "rate_limited" ? "PIN_RATE_LIMITED" : "PIN_INVALID");

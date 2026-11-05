@@ -23,10 +23,11 @@ export const studentShellCopy = {
   switchRole: 'Switch role', // Same label as RoleSwitchButton (docs/LANGUAGE.md, Parent with staff access).
 } as const
 
-/** The menu item a page belongs to: event detail and rooming stay under Events; /setup and unknown pages match nothing. */
+/** The menu item a page belongs to: event detail and rooming stay under Events, the monthly report under Attendance; /setup and unknown pages match nothing. */
 export function studentNavPath(pathname: string): string | null {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname
   if (path === '/events' || path.startsWith('/events/')) return '/events'
+  if (path === '/attendance/report') return '/attendance'
   return studentNavItems.some(item => item.path === path) ? path : null
 }
 

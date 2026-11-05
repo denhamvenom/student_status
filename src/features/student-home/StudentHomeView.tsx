@@ -1,4 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
+import { Link } from 'react-router'
+import { dashboardButtonVariants } from '@/components/dashboard/styles'
+import { reportCopy } from '../attendance-report/copy'
 import { HeroStack, type HeroSlide } from '@/components/dashboard/HeroStack'
 import { TileError, TileErrorBoundary } from '@/components/dashboard/TileErrorBoundary'
 import { RingsSkeleton, TileSkeleton } from '@/components/dashboard/TileSkeleton'
@@ -134,7 +137,7 @@ export function StudentHomeView({ summary, attendance, announcements, finance, e
         {/* Balance due sits in the right column on desktop and last on phones; only one copy is ever displayed. */}
         <div className="hidden lg:block"><Balance finance={finance} summary={summary} handlers={handlers} /></div>
       </div>
-      <div className="min-w-0 lg:col-span-2">{participation}</div>
+      <div className="flex min-w-0 flex-col gap-2 lg:col-span-2">{participation}<Link to="/attendance/report" className={`${dashboardButtonVariants({ tone: 'soft', size: 'md' })} self-start`}>{reportCopy.seeFullReport}</Link></div>
       <div className="lg:hidden"><Balance finance={finance} summary={summary} handlers={handlers} /></div>
     </div>
   </div>

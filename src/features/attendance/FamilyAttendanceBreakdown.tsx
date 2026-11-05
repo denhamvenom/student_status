@@ -1,6 +1,8 @@
 import { useId, useState } from 'react'
 import { cn } from 'cn'
 import { useQuery, usePaginatedQuery } from 'convex/react'
+import { Link } from 'react-router'
+import { reportCopy } from '../attendance-report/copy'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { DashboardTile, TileTitle } from '@/components/dashboard/DashboardTile'
@@ -90,7 +92,10 @@ export function FamilyAttendanceBreakdown({ studentId }: { studentId: Id<'studen
       ? { kind: 'build', label: copy.buildHours, value: copy.hours(formatHours(build.minutes)), text: false, detail: build.target ? copy.ofTarget(build.target) : copy.sinceKickoff, action: copy.seeBuildDays }
       : { kind: 'build', label: copy.buildHours, value: copy.startsAtKickoff, text: true, detail: null, action: copy.seeBuildDays },
   ]
-  return <div className="grid gap-4 sm:grid-cols-2">
-    {tiles.map(tile => <SummaryTile key={tile.kind} tile={tile} studentId={studentId} updating={data.state === 'updating'} build={build} />)}
+  return <div className="flex flex-col gap-4">
+    <Link to="/attendance/report" className={cn(dashboardButtonVariants({ tone: 'soft', size: 'md' }), 'self-start')}>{reportCopy.seeFullReport}</Link>
+    <div className="grid gap-4 sm:grid-cols-2">
+      {tiles.map(tile => <SummaryTile key={tile.kind} tile={tile} studentId={studentId} updating={data.state === 'updating'} build={build} />)}
+    </div>
   </div>
 }
