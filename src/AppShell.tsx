@@ -30,7 +30,7 @@ export function AppShell({ children, viewer, familyContext, role = "coach" }: { 
   const signOut = useSignOut()
   const [more, setMore] = useState(false)
   const { pathname } = useLocation()
-  const activePath = pathname.startsWith('/events/archive') ? '/events/archive' : pathname.startsWith('/events/') ? '/events' : role === 'coach' && (pathname === '/team' || pathname.startsWith('/team/')) || role === 'mentor' && pathname === '/myprofile' ? '/' : pathname
+  const activePath = pathname === '/attendance/report' ? '/attendance' : pathname.startsWith('/events/archive') ? '/events/archive' : pathname.startsWith('/events/') ? '/events' : role === 'coach' && (pathname === '/team' || pathname.startsWith('/team/')) || role === 'mentor' && pathname === '/myprofile' ? '/' : pathname
   const [previousPath, setPreviousPath] = useState(pathname)
   if (previousPath !== pathname) { setPreviousPath(pathname); setMore(false) }
   const [themeError, setThemeError] = useState('')
