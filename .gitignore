@@ -43,7 +43,9 @@ private-data/
 
 # Locally downloaded agent skills/caches (keep project instructions tracked)
 .agents/
-.claude/
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
 .codex/
 skills-lock.json
 
