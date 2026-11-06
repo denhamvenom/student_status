@@ -219,9 +219,14 @@ describe("staff travel category", () => {
   ])("$title: Travel offered = $travel, and push delivery follows the same rule", async ({ role, travelLead, travel }) => {
     vi.setSystemTime(OPEN_NOW);
     const { f, id, who } = await staffFixture(role, travelLead);
-    const categories = (await who.query(api.notifications.getMyPreferences, {})).map(p => p.category);
+    const preferences = await who.query(api.notifications.getMyPreferences, {});
+    const categories = preferences.map(p => p.category);
     expect(categories).toEqual(expect.arrayContaining(["schedule", "announcements", "events", "staff"]));
     expect(categories.includes("travel")).toBe(travel);
+    // Mentor meeting digest updates (M4/M5) have their own Mentor-only "Meetings and events" row, on by default; a Coach doesn't see it.
+    expect(categories.includes("mentorEvents")).toBe(role === "mentor");
+    if (role === "mentor") expect(preferences.find(p => p.category === "mentorEvents")).toMatchObject({ label: "Meetings and events", enabled: true });
+    expect(preferences.filter(p => p.includesMentorMeetings)).toEqual([]);
     const toggle = who.mutation(api.notifications.setCategoryEnabled, { category: "travel", enabled: false });
     if (travel) await toggle; else await expect(toggle).rejects.toThrow("does not apply");
 
@@ -253,7 +258,8 @@ describe("parent with staff access", () => {
     const asParent = f.t.withIdentity({ subject: `${ids.auth}|${ids.parentSession}` });
     for (const who of [asLead, asParent]) {
       const categories = (await who.query(api.notifications.getMyPreferences, {})).map(p => p.category);
-      expect(categories).toEqual(["schedule", "announcements", "forms", "events", "money", "travel", "staff"]);
+      // A Parent with staff access counts as a Mentor too, so "Meetings and events" is listed.
+      expect(categories).toEqual(["schedule", "announcements", "forms", "events", "money", "travel", "staff", "mentorEvents"]);
     }
     await asLead.mutation(api.notifications.setCategoryEnabled, { category: "forms", enabled: false });
     expect((await asParent.query(api.notifications.getMyPreferences, {})).find(p => p.category === "forms")?.enabled).toBe(false);

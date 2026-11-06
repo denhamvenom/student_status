@@ -50,7 +50,7 @@ export function NotificationPreferences() {
             <span className="flex min-w-0 flex-1 flex-col gap-1">
               <span className="font-bold">{row.label}</span>
               <span id={`notification-pref-${row.category}`} className="muted flex flex-col gap-1 text-sm font-normal">
-                <span>{row.description}</span>
+                <span>{copy.descriptions[row.category] ?? row.description}</span>
                 {row.urgentByDefault && <span className="flex flex-wrap items-center gap-2"><span className="badge badge-todo">{copy.urgent}</span><span>{copy.urgentHelp}</span></span>}
               </span>
             </span>

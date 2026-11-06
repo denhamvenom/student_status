@@ -1,12 +1,15 @@
 // Turns the New event "Who's going" choices into createEvent arguments, and describes a saved event's audience
 // in plain words for event pages. Pure: no Convex calls, so the rules are tested directly.
+import type { FunctionArgs } from 'convex/server'
+import type { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { resolveAudience, type AudienceEventFields } from '../../../convex/lib/eventAudienceRules'
 import { subteamDisplay } from '@/lib/subteams'
+import { onsitePlace, virtualPlace } from '@/lib/event-place'
 import { uiCopy } from '@/lib/ui-copy'
 import { audienceCopy } from './audience/audience-copy'
 import { invitedMentorIds } from './audience/audience-rules'
-import type { AudienceValue, LocationType, MentorInviteValue, MentorOption } from './audience/types'
+import type { AudienceValue, LocationType, MentorInviteValue, MentorOption, Where } from './audience/types'
 
 /** Travel Team stays the Coach's legacy one-tap choice; everything else goes through the audience picker. */
 export type WhoChoice = { travelTeam: boolean; audience: AudienceValue; mentors: MentorInviteValue }
@@ -142,4 +145,52 @@ export function seriesProgressNote(series: SeriesProgress | null | undefined): s
   const planned = series.plannedMeetingCount ? ` ${series.plannedMeetingCount} meetings are planned in total.` : ''
   if (series.moreMeetingsScheduled) return `${weeks ? `More meetings are added automatically, ${weeks} weeks ahead.` : 'More meetings are added automatically.'}${planned}`
   return planned ? planned.trim() : null
+}
+
+/**
+ * A Mentor's new meeting (Mentor mode of the New event wizard): always an optional Team meeting with no fee, travel,
+ * overnight stay, rooms, forms or Team Calendar entry. The backend enforces the same limits (convex/lib/mentorMeetings.ts).
+ */
+export type MentorMeetingDraft = {
+  name: string
+  startsAt: number
+  endsAt: number
+  where: Where
+  /** Only used for "Somewhere else". */
+  destination: string
+  audience: AudienceValue
+  /** Subteams audience only: also invite the Mentors of those subteams. */
+  inviteSubteamMentors: boolean
+  /** Mentors picked one by one (only when the Mentor list could be read). */
+  mentorIds: readonly string[]
+}
+
+/** Where a Mentor meeting happens, as stored. Mentor meetings have no on-site flag, so the shop is written out. */
+export const mentorMeetingPlace = (where: Where, destination: string) => where === 'virtual' ? virtualPlace : where === 'shop' ? onsitePlace : destination.trim()
+
+type MentorAudienceArgs = Pick<AudienceCreateArgs, 'audienceSubteams' | 'audienceStudentIds' | 'inviteSubteamMentors' | 'mentorInviteUserIds' | 'locationType'> & { audienceKind: NonNullable<AudienceCreateArgs['audienceKind']> }
+
+function mentorAudienceArgs(draft: MentorMeetingDraft): MentorAudienceArgs {
+  const audience = draft.audience
+  return {
+    audienceKind: audience.kind === 'mentors' ? 'mentorsOnly' : audience.kind,
+    locationType: draft.where === 'virtual' ? 'virtual' : 'inPerson',
+    ...(audience.kind === 'subteams' ? { audienceSubteams: [...audience.subteams] } : {}),
+    ...(audience.kind === 'students' ? { audienceStudentIds: [...audience.studentIds] as Id<'students'>[] } : {}),
+    ...(audience.kind === 'subteams' && draft.inviteSubteamMentors ? { inviteSubteamMentors: true } : {}),
+    ...(draft.mentorIds.length ? { mentorInviteUserIds: [...new Set(draft.mentorIds)] as Id<'appUsers'>[] } : {}),
+  }
+}
+
+/** mentorMeetings.createMeeting arguments for a one-time meeting. Required is never sent: Mentor meetings are optional. */
+export function mentorMeetingCreateArgs(draft: MentorMeetingDraft): FunctionArgs<typeof api.mentorMeetings.createMeeting> {
+  return { name: draft.name.trim(), startsAt: draft.startsAt, endsAt: draft.endsAt, destination: mentorMeetingPlace(draft.where, draft.destination), ...mentorAudienceArgs(draft) }
+}
+
+/** admin.createEvent-shaped arguments for a repeating Mentor meeting; seriesCreateArgs turns them into eventSeries.create. */
+export function mentorMeetingEventArgs(draft: MentorMeetingDraft): FunctionArgs<typeof api.admin.createEvent> {
+  return {
+    ...mentorMeetingCreateArgs(draft), type: 'Team', travel: 'None', overnight: false, roomingEnabled: false, feeCents: 0, signupMode: 'open', mandatory: false,
+    allowWithdrawal: true, permissionRequired: false, firstRequired: false, requirements: [], calendarChoice: { kind: 'none' },
+  }
 }

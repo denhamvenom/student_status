@@ -82,7 +82,10 @@ describe("recurring meeting series", () => {
     expect(participants).toHaveLength(8 * f.ids.students.length);
     const invites = await f.t.run(ctx => ctx.db.query("eventMentorInvites").take(100));
     expect(invites).toHaveLength(8);
-    const sent = await notifications(f.t);
+    const all = await notifications(f.t);
+    // M4: one "new meeting" digest item for the series' first meeting, to the uninvited Mentor who can sign up (not the invited one).
+    expect(all.filter(row => row.pushStatus === "digest").map(row => [row.userId, row.dedupeKey])).toEqual([[f.ids.lead.id, `${f.ids.lead.id}:m4:${firstEventId}`]]);
+    const sent = all.filter(row => row.pushStatus !== "digest");
     expect(sent.every(row => row.dedupeKey?.endsWith(`series:${firstEventId}`))).toBe(true);
     expect(sent.map(row => row.userId).sort()).toEqual([...new Set(sent.map(row => row.userId))].sort());
     expect(sent).toHaveLength(f.ids.students.length + 1);
@@ -91,14 +94,46 @@ describe("recurring meeting series", () => {
   it("applies the single-event role rules", async () => {
     const f = await fixture();
     const args = { name: "Meeting", ...template, audienceKind: "everyone" as const, rule: weeklyFrom(2) };
-    await expect(f.mentor.mutation(api.eventSeries.create, args)).rejects.toThrow("Coach or Travel Lead");
+    // A plain Mentor may create an optional Team series; a required one is still refused.
+    await expect(f.mentor.mutation(api.eventSeries.create, { ...args, mandatory: true })).rejects.toThrow("Mentors can't create required meetings");
     await expect(f.lead.mutation(api.eventSeries.create, { ...args, mandatory: true })).rejects.toThrow("Only Coaches can make an event mandatory");
     await expect(f.lead.mutation(api.eventSeries.create, { ...args, audienceKind: "subteams", audienceSubteams: ["Build"], mandatory: true })).rejects.toThrow("Only Coaches can make an event mandatory");
     const { seriesId } = await f.lead.mutation(api.eventSeries.create, args);
     expect(await f.lead.query(api.eventSeries.list, {})).toEqual([expect.objectContaining({ seriesId, name: "Meeting", mandatory: false })]);
     await expect(f.mentor.query(api.eventSeries.list, {})).rejects.toThrow("Coach or Travel Lead");
+    await expect(f.mentor.mutation(api.eventSeries.create, { ...args, name: "Mentor meeting", rule: weeklyFrom(3) })).resolves.toMatchObject({ seriesId: expect.anything() });
     await expect(f.lead.action(api.eventSeries.googleSeriesCandidates, {})).rejects.toThrow("Only a Coach");
     await expect(f.coach.mutation(api.eventSeries.create, { ...args, rule: { ...weeklyFrom(-7) } })).rejects.toThrow("today or later");
+  });
+
+  it("generates a plain Mentor's optional series and stops one that is no longer Mentor-safe or whose Mentor left", async () => {
+    vi.useFakeTimers();
+    const f = await fixture();
+    const args = { ...template, audienceKind: "everyone" as const, rule: weeklyFrom(1) };
+    const { seriesId } = await f.mentor.mutation(api.eventSeries.create, { name: "Mentor build night", ...args });
+    await f.drain();
+    expect(await rows(f.t, seriesId)).toHaveLength(8);
+    expect(await f.t.run(ctx => ctx.db.get(seriesId))).toMatchObject({ status: "active" });
+
+    // A required audience on a Mentor's series (e.g. changed later) is beyond the Mentor limits: generation stops for review.
+    const { seriesId: requiredId } = await f.mentor.mutation(api.eventSeries.create, { name: "Mentor required", ...args, rule: { ...weeklyFrom(1), localStartTime: "16:00", durationMinutes: 60 } });
+    await f.t.run(async ctx => {
+      const series = (await ctx.db.get(requiredId))!;
+      await ctx.db.patch(requiredId, { template: { ...series.template, mandatory: true, assignmentScope: "wholeTeam" } });
+      for (const row of await ctx.db.query("events").withIndex("by_seriesId_and_seriesOccurrenceKey", q => q.eq("seriesId", requiredId)).take(50)) await ctx.db.delete(row._id);
+    });
+    await f.t.mutation(internal.eventSeries.generate, { seriesId: requiredId, toKey: addDays(today(), 56) });
+    expect(await rows(f.t, requiredId)).toHaveLength(0);
+    expect(await f.t.run(ctx => ctx.db.get(requiredId))).toMatchObject({ status: "needsReview" });
+
+    // A deactivated Mentor's series goes to review too.
+    await f.t.run(async ctx => {
+      for (const row of await ctx.db.query("events").withIndex("by_seriesId_and_seriesOccurrenceKey", q => q.eq("seriesId", seriesId)).take(50)) await ctx.db.delete(row._id);
+      await ctx.db.patch(f.ids.mentor.id, { active: false });
+    });
+    await f.t.mutation(internal.eventSeries.generate, { seriesId, toKey: addDays(today(), 56) });
+    expect(await rows(f.t, seriesId)).toHaveLength(0);
+    expect(await f.t.run(ctx => ctx.db.get(seriesId))).toMatchObject({ status: "needsReview" });
   });
 
   it("splits 'this and following' only after today and before any attendance, re-pointing the same rows", async () => {

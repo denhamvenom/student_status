@@ -10,7 +10,7 @@ import { enrollmentPending, requireEnrollmentComplete } from "./lib/eventEnrollm
 import { activeQuestions, answerInput, checkAnswers, checkListSizes, checkShifts, clearShifts, replaceShifts, saveAnswers } from "./lib/eventSignupExtras";
 import { studentCanAccessEvent } from "./lib/eventAudience";
 import { resolveAudience } from "./lib/eventAudienceRules";
-import { notifyEventAssigned, queueSignupPendingDigest } from "./lib/notificationTriggers";
+import { notifyEventAssigned, queueMentorMeetingActivityDigest, queueSignupPendingDigest } from "./lib/notificationTriggers";
 
 async function reserved(ctx: MutationCtx, eventId: Id<"events">) {
   const rows = await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", eventId)).take(501);
@@ -52,6 +52,9 @@ export const signUp = mutation({
     else if (status === "waitlist" && prior) await clearShifts(ctx, event._id, student._id);
     await audit(ctx, user, "participants", `${event._id}:${student._id}`, "signup", prior?.status ?? null, status);
     if (status === "pending") await queueSignupPendingDigest(ctx, { eventId: event._id });
+    // M5 to the Mentor who created the meeting (no-op for other events). Waitlisted signups are not reported.
+    if (status === "confirmed") await queueMentorMeetingActivityDigest(ctx, { eventId: event._id, activity: "studentJoined" });
+    else if (status === "pending") await queueMentorMeetingActivityDigest(ctx, { eventId: event._id, activity: "signupPending" });
     return status;
   },
 });

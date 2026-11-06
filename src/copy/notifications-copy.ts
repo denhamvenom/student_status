@@ -53,6 +53,13 @@ export const notificationsCopy = {
     retry: 'Try again',
     retryLabel: (label: string) => `Try saving ${label} again`,
     loading: 'Loading your choices…',
+    /**
+     * Our own words for a category, in place of the server's description. "mentorEvents" (Meetings and events) is listed by
+     * the server only for Mentors and Parents with Mentor access.
+     */
+    descriptions: {
+      mentorEvents: 'New events and meetings you can join, and activity on meetings you created (who signed up or dropped out). They come together in one summary at 5 PM.',
+    } as Partial<Record<string, string>>,
   },
   devices: {
     title: 'Your devices',

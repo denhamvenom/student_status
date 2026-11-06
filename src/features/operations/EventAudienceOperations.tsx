@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useMutation, useQuery } from 'convex/react'
+import { useMemo, useState } from 'react'
+import { useMutation, useQueries, useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import type { AudienceEventFields } from '../../../convex/lib/eventAudienceRules'
@@ -11,27 +11,14 @@ import { defaultAudience, defaultMentorInvite } from '../event-setup/audience/au
 import { eventAudienceLabel, eventLocationTypeLabel, eventRequiredLabel } from '../event-setup/event-audience-wiring'
 import styles from './Operations.module.css'
 import { audienceDisplayLabel } from './event-page'
+import { answerLabels, groupMentors, joinedLabels, totalsLine, type EventMentor, type EventMentorSummary } from '../mentor-invites/coach-view'
+import { eventMentorsCopy } from '../mentor-invites/copy'
 
 type AudienceEvent = AudienceEventFields & { locationType?: string; archived?: boolean; cancelled?: boolean }
 
-const copy = {
-  title: 'Who it’s for',
-  audience: 'Who it’s for',
-  required: 'Required',
-  where: 'Where',
-  invite: 'Invite more mentors',
-  inviteButton: 'Send invitations',
-  inviting: 'Sending…',
-  invited: (count: number) => count === 0 ? 'Those mentors were already invited.' : count === 1 ? '1 mentor invited.' : `${count} mentors invited.`,
-  invitedTitle: 'Invited mentors',
-  loadingInvites: 'Loading invited mentors…',
-  noInvites: 'No mentors invited yet.',
-  status: { invited: 'No answer yet', accepted: 'Accepted', declined: 'Declined' },
-  source: { individual: 'Invited by name', subteam: 'Invited with subteam' },
-  failed: 'Invitations were not sent. Please try again.',
-} as const
+const copy = eventMentorsCopy
 
-/** Coach / Travel Lead event page: audience, required, in person or virtual, and mentor invitations. */
+/** Coach / Travel Lead event page: audience, required, in person or virtual, the event's Mentors (with answers) and invitations. */
 export function EventAudienceOperations({ eventId, event }: { eventId: Id<'events'>; event: AudienceEvent }) {
   const open = !event.archived && !event.cancelled
   const audience = audienceDisplayLabel(event, eventAudienceLabel(event))
@@ -39,18 +26,55 @@ export function EventAudienceOperations({ eventId, event }: { eventId: Id<'event
     <div className="detail"><span>{copy.audience}</span><strong>{audience}</strong></div>
     <div className="detail"><span>{copy.required}</span><strong>{eventRequiredLabel(event)}</strong></div>
     <div className="detail"><span>{copy.where}</span><strong>{eventLocationTypeLabel(event)}</strong></div>
-    <InvitedMentors eventId={eventId} />
+    <EventMentors eventId={eventId} />
     {open && <InviteMoreMentors eventId={eventId} />}
   </CardContent></Card></div></details>
 }
 
-function InvitedMentors({ eventId }: { eventId: Id<'events'> }) {
-  const invites = useQuery(api.mentorInvites.forEvent, { eventId })
-  return <section aria-label={copy.invitedTitle} className="space-y-2">
-    <h3 className="font-semibold">{copy.invitedTitle}</h3>
-    {invites === undefined ? <p className="muted" role="status">{copy.loadingInvites}</p>
-      : invites.length === 0 ? <p className="muted">{copy.noInvites}</p>
-      : <ul className="simple-list">{invites.map(invite => <li key={invite.mentorUserId} className="split-line"><span>{invite.name} <small className="muted">· {copy.source[invite.source]}</small></span><span className={`badge ${invite.status === 'accepted' ? 'badge-ready' : invite.status === 'declined' ? 'badge-open' : 'badge-pending'}`}>{copy.status[invite.status]}</span></li>)}</ul>}
+const badge = (tone: 'ready' | 'pending' | 'open') => `badge badge-${tone}`
+
+function MentorRow({ mentor, questions }: { mentor: EventMentor; questions: EventMentorSummary['questions'] }) {
+  const answers = answerLabels(mentor, questions)
+  return <li className="flex flex-col gap-1.5 border-b border-[var(--border-default)] py-2.5 last:border-b-0">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <strong className="min-w-0 break-words">{mentor.name}</strong>
+      <span className={badge(mentor.status === 'accepted' ? 'ready' : mentor.status === 'declined' ? 'open' : 'pending')}>{copy.status[mentor.status]}</span>
+    </div>
+    <p className="muted m-0 text-sm">{joinedLabels(mentor).join(' · ')}</p>
+    {answers.length > 0 && <p className="m-0 flex flex-wrap gap-1.5">{answers.map(answer => <span key={answer.text} className={badge(answer.tone === 'yes' ? 'ready' : 'pending')}>{answer.text}</span>)}</p>}
+  </li>
+}
+
+/**
+ * The event's Mentors for a Coach or Travel Lead: going, waiting for an answer and can't go, each with how they joined
+ * (invited, signed up themselves, series choice) and, for going Mentors, Can drive / Needs hotel room; totals on top.
+ * A Parent acting as Travel Lead gets the same list. If the list can't load (the event moved, or access changed), a short
+ * reload message is shown in place.
+ */
+function EventMentors({ eventId }: { eventId: Id<'events'> }) {
+  const results = useQueries(useMemo(() => ({ summary: { query: api.mentorInvites.forEventSummary, args: { eventId } } }), [eventId]))
+  const summary = results.summary as EventMentorSummary | Error | undefined
+  const body = (() => {
+    if (summary === undefined) return <p className="muted" role="status">{copy.loading}</p>
+    if (summary instanceof Error) return <p className="muted">{copy.unavailable}</p>
+    if (!summary.mentors.length) return <p className="muted">{copy.none}</p>
+    const groups = groupMentors(summary.mentors)
+    const totals = totalsLine(summary)
+    const unanswered = copy.unanswered(summary.counts.unansweredDrive, summary.counts.unansweredHotel)
+    const group = (key: keyof typeof groups) => groups[key].length > 0 && <section key={key} aria-label={copy.groups[key]} className="space-y-1">
+      <h4 className="m-0 text-sm font-semibold">{copy.groups[key]} · {groups[key].length}</h4>
+      <ul className="m-0 list-none p-0">{groups[key].map(mentor => <MentorRow key={mentor.mentorUserId} mentor={mentor} questions={summary.questions} />)}</ul>
+    </section>
+    return <>
+      <p className="m-0">{copy.counts(summary.counts.accepted, summary.counts.invited, summary.counts.declined)}</p>
+      {totals && <p className="m-0 font-semibold">{totals}</p>}
+      {unanswered && <p className="muted m-0 text-sm">{unanswered}</p>}
+      {group('going')}{group('waiting')}{group('declined')}
+    </>
+  })()
+  return <section aria-label={copy.mentorsTitle} className="space-y-2">
+    <h3 className="font-semibold">{copy.mentorsTitle}</h3>
+    {body}
   </section>
 }
 

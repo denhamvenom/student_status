@@ -63,7 +63,10 @@ describe("Travel Lead checks for Mentor invitations and event creation", () => {
     const f: Fixture = await fixture();
     const who = f.as(f.ids[caller]);
     expect(await who.mutation(api.mentorInvites.addMentorInvites, { eventId: f.ids.event, mentorUserIds: [f.ids.target.id] })).toBe(1);
+    // Mentor sign-ups and answers (forEvent, forEventSummary) are for a Coach or any Travel Lead, including a Parent acting as
+    // one: Parents with a Mentor/Travel Lead grant are Mentors first, Parents second (owner decision, Nov 6 2026).
     expect(await who.query(api.mentorInvites.forEvent, { eventId: f.ids.event })).toEqual([expect.objectContaining({ mentorUserId: f.ids.target.id, status: "invited" })]);
+    expect((await who.query(api.mentorInvites.forEventSummary, { eventId: f.ids.event })).counts).toMatchObject({ invited: 1, accepted: 0 });
     await who.mutation(api.mentorInvites.removeMentorInvite, { eventId: f.ids.event, mentorUserId: f.ids.target.id });
     expect(await f.inviteCount()).toBe(0);
     const eventId = await who.mutation(api.admin.createEvent, eventArgs());

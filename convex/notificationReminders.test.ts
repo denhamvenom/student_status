@@ -107,3 +107,64 @@ describe("R6 unpaid balance", () => {
     expect(await f.titles(f.ids.a.parent)).toEqual(["Balance reminder"]);
   });
 });
+
+describe("Mentor reminders", () => {
+  async function withMentors(f: Awaited<ReturnType<typeof fixture>>, eventId: Id<"events">) {
+    return await f.t.run(async ctx => {
+      const mentor = async (key: string) => {
+        const authUserId = await ctx.db.insert("users", { email: `${key}@example.invalid` });
+        return ctx.db.insert("appUsers", { authUserId, email: `${key}@example.invalid`, name: key, role: "mentor", active: true, travelLead: false, financialEdit: false, subteams: ["Build"] });
+      };
+      const ids = { creator: await mentor("creator"), invited: await mentor("invited"), accepted: await mentor("accepted"), self: await mentor("self"), declined: await mentor("declined"), outsider: await mentor("outsider") };
+      await ctx.db.patch(eventId, { createdBy: ids.creator });
+      for (const [who, status, source] of [[ids.invited, "invited", "individual"], [ids.accepted, "accepted", "subteam"], [ids.self, "accepted", "self"], [ids.declined, "declined", "individual"]] as const) {
+        await ctx.db.insert("eventMentorInvites", { eventId, mentorUserId: who, source, status, invitedBy: ids.creator, createdAt: 0 });
+      }
+      return ids;
+    });
+  }
+
+  it("M2: Mentors going to tomorrow's meeting (accepted, self sign-up) get the 6 PM reminder once; others don't, including the creator of a non-Mentor-meeting event", async () => {
+    const f = await fixture();
+    const meeting = await f.event({ name: "Build Night", type: "Team", startsAt: Date.parse("2026-01-15T14:00:00Z"), endsAt: Date.parse("2026-01-15T18:00:00Z") });
+    await f.join(meeting, f.ids.a.id);
+    const m = await withMentors(f, meeting);
+    await f.runAt("2026-01-14T23:00:00Z"); // 5 PM: not the reminder hour
+    expect(await f.titles(m.accepted)).toEqual([]);
+    await f.runAt("2026-01-15T00:00:00Z"); // 6 PM CST
+    await f.runAt("2026-01-15T00:00:00Z");
+    for (const userId of [m.accepted, m.self, f.ids.a.userId, f.ids.a.parent]) expect(await f.titles(userId)).toEqual(["Tomorrow: Build Night"]);
+    // The fixture event has travel (not a Mentor meeting), so its creator is treated like anyone else: not signed up, no reminder.
+    for (const userId of [m.creator, m.invited, m.declined, m.outsider]) expect(await f.titles(userId)).toEqual([]);
+    const body = await f.t.run(async ctx => (await ctx.db.query("notifications").withIndex("by_userId_and_createdAt", q => q.eq("userId", m.self)).first())?.body);
+    expect(body).toBe("Starts at 8:00 AM at Synthetic Arena.");
+  });
+
+  it("M2: the creator of a Mentor meeting counts as going and gets the 6 PM reminder without an invite row", async () => {
+    const f = await fixture();
+    const meeting = await f.event({ name: "Mentor Night", type: "Team", travel: "None", audienceKind: "everyone", mandatory: false, startsAt: Date.parse("2026-01-15T14:00:00Z"), endsAt: Date.parse("2026-01-15T18:00:00Z") });
+    const m = await withMentors(f, meeting);
+    await f.runAt("2026-01-15T00:00:00Z"); // 6 PM CST
+    expect(await f.titles(m.creator)).toEqual(["Tomorrow: Mentor Night"]);
+  });
+
+  it("M3: an unanswered invitation is reminded at 5 PM three days before, once per invitation; not for other days, answers or canceled meetings", async () => {
+    const f = await fixture();
+    // Wed 2026-01-14 5 PM CST; Sat 2026-01-17 is three days out.
+    const meeting = await f.event({ name: "Saturday Build", type: "Team", startsAt: Date.parse("2026-01-17T15:00:00Z"), endsAt: Date.parse("2026-01-17T18:00:00Z") });
+    const sooner = await f.event({ name: "Friday Build", type: "Team", startsAt: Date.parse("2026-01-16T15:00:00Z"), endsAt: Date.parse("2026-01-16T18:00:00Z") });
+    const cancelled = await f.event({ name: "Canceled Build", type: "Team", cancelled: true, startsAt: Date.parse("2026-01-17T15:00:00Z"), endsAt: Date.parse("2026-01-17T18:00:00Z") });
+    const m = await withMentors(f, meeting);
+    await f.t.run(async ctx => {
+      for (const eventId of [sooner, cancelled]) await ctx.db.insert("eventMentorInvites", { eventId, mentorUserId: m.invited, source: "individual", status: "invited", invitedBy: m.creator, createdAt: 0 });
+    });
+    await f.runAt("2026-01-14T22:00:00Z"); // 4 PM: not M3's hour
+    expect(await f.titles(m.invited)).toEqual([]);
+    await f.runAt("2026-01-14T23:00:00Z");
+    await f.runAt("2026-01-14T23:00:00Z");
+    expect(await f.titles(m.invited)).toEqual(["Reply to your invitation: Saturday Build"]);
+    const row = await f.t.run(async ctx => await ctx.db.query("notifications").withIndex("by_userId_and_createdAt", q => q.eq("userId", m.invited)).first());
+    expect(row).toMatchObject({ category: "events", url: `/events/${meeting}`, body: "Sat, Jan 17 at 9:00 AM at Synthetic Arena. Open the meeting to accept or decline." });
+    for (const userId of [m.accepted, m.self, m.declined, m.creator, m.outsider, f.ids.a.userId, f.ids.a.parent]) expect(await f.titles(userId)).toEqual([]);
+  });
+});

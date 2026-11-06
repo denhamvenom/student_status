@@ -5,6 +5,8 @@ import { internalMutation, type MutationCtx } from "./_generated/server";
 import { effectiveChargeCents } from "./lib/chargeObligation";
 import { eventEligibleStudentIds } from "./lib/eventAudience";
 import { effectiveChargeDueAt } from "./lib/feeDefinitions";
+import { listMeetingMentors, MAX_MEETING_MENTORS } from "./lib/mentorMeetings";
+import { M3_DAYS_BEFORE, mentorInviteReminderDue, remindsMentorTomorrow } from "./lib/notificationReminderRules";
 import { notifyUsers, parentUserIdsForStudents, studentUserIds } from "./lib/notify";
 import { permissionAccepted } from "./lib/permissionCoverage";
 import {
@@ -12,7 +14,7 @@ import {
 } from "./lib/reminderSchedule";
 
 /**
- * Scheduled reminders R1–R7. The hourly cron calls `hourly`, which starts each reminder only at its Chicago local hour
+ * Scheduled reminders R1–R7, plus Mentor reminders M2 (with R1) and M3 (runMentorInvites; see lib/notificationReminderRules.ts). The hourly cron calls `hourly`, which starts each reminder only at its Chicago local hour
  * (see lib/reminderSchedule.ts). Every pass is paginated with continuation scheduling, and every send uses a notifyUsers
  * dedupeKey (per user), so re-runs are harmless. Text follows the PII rule in lib/notify.ts: no amounts, health, rooming or other students' names.
  */
@@ -28,6 +30,7 @@ type EventArgs = { kind: ReminderKind; eventId: Id<"events">; now: number; curso
 const runRef = makeFunctionReference<"mutation", RunArgs, null>("notificationReminders:run");
 const eventRef = makeFunctionReference<"mutation", EventArgs, null>("notificationReminders:runEvent");
 const chargesRef = makeFunctionReference<"mutation", { studentId: Id<"students">; now: number; cursor: string | null }, null>("notificationReminders:runCharges");
+const mentorInvitesRef = makeFunctionReference<"mutation", { now: number; cursor: string | null }, null>("notificationReminders:runMentorInvites");
 
 async function activeSeasonOrNull(ctx: MutationCtx) {
   return await ctx.db.query("seasons").withIndex("by_status", q => q.eq("status", "active")).unique();
@@ -41,6 +44,7 @@ export const hourly = internalMutation({
   handler: async ctx => {
     const now = Date.now();
     for (const reminder of remindersDue(now)) await ctx.scheduler.runAfter(0, runRef, { kind: reminder, now, cursor: null });
+    if (mentorInviteReminderDue(now)) await ctx.scheduler.runAfter(0, mentorInvitesRef, { now, cursor: null });
     return null;
   },
 });
@@ -106,7 +110,9 @@ export const runEvent = internalMutation({
     const page = await ctx.db.query("participants").withIndex("by_eventId_and_status", q => q.eq("eventId", event._id).eq("status", "confirmed")).paginate({ numItems: PEOPLE_PER_PAGE, cursor: args.cursor });
     const studentIds = page.page.map(row => row.studentId);
     if (args.kind === "r1EventTomorrow") {
-      const userIds = [...await studentUserIds(ctx, studentIds), ...await parentUserIdsForStudents(ctx, studentIds)];
+      // M2: Mentors going to the meeting get the same notice on the first page; the shared dedupeKey keeps one per person.
+      const mentors = args.cursor === null ? (await listMeetingMentors(ctx, event._id)).filter(remindsMentorTomorrow).map(mentor => mentor.userId) : [];
+      const userIds = [...await studentUserIds(ctx, studentIds), ...await parentUserIdsForStudents(ctx, studentIds), ...mentors];
       const place = event.destination.trim();
       if (userIds.length) await notifyUsers(ctx, { userIds, category: "events", url, dedupeKey: `r1:${event._id}:${args.tag}`, title: `Tomorrow: ${event.name}`, body: `Starts at ${formatChicagoTime(event.startsAt)}${place ? ` at ${place}` : ""}.` });
     } else if (args.kind === "r2PermissionMissing") {
@@ -128,6 +134,31 @@ export const runEvent = internalMutation({
       if (userIds.length) await notifyUsers(ctx, { userIds, category: "events", url, dedupeKey: `r5:${requirement._id}:${args.tag}`, title: `Due soon: ${requirement.label}`, body: `For ${event.name}, due ${formatChicagoDay(requirement.dueAt)} at ${formatChicagoTime(requirement.dueAt)}.` });
     }
     if (!page.isDone) await ctx.scheduler.runAfter(0, eventRef, { ...args, cursor: page.continueCursor });
+    return null;
+  },
+});
+
+/**
+ * M3: Mentors whose invitation to a meeting three days out is still unanswered ("invited"), at 5 PM Chicago. Once per
+ * invitation (dedupeKey per invite row), so a re-run or a later page never repeats it.
+ */
+export const runMentorInvites = internalMutation({
+  args: { now: v.number(), cursor: v.union(v.string(), v.null()) }, returns: v.null(),
+  handler: async (ctx, args) => {
+    const season = await activeSeasonOrNull(ctx);
+    if (!season) return null;
+    const window = chicagoDayWindow(args.now, M3_DAYS_BEFORE);
+    const page = await ctx.db.query("events").withIndex("by_seasonId_and_archived_and_endsAt", q => q.eq("seasonId", season._id).eq("archived", false).gte("endsAt", Math.max(args.now, window.start))).paginate({ numItems: EVENTS_PER_PAGE, cursor: args.cursor });
+    for (const event of page.page) {
+      if (!live(event) || !within(event.startsAt, window)) continue;
+      const invites = await ctx.db.query("eventMentorInvites").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(MAX_MEETING_MENTORS);
+      const place = event.destination.trim();
+      for (const invite of invites) {
+        if (invite.status !== "invited") continue;
+        await notifyUsers(ctx, { userIds: [invite.mentorUserId], category: "events", url: `/events/${event._id}`, dedupeKey: `m3:${invite._id}`, title: `Reply to your invitation: ${event.name}`, body: `${formatChicagoDay(event.startsAt)} at ${formatChicagoTime(event.startsAt)}${place ? ` at ${place}` : ""}. Open the meeting to accept or decline.` });
+      }
+    }
+    if (!page.isDone) await ctx.scheduler.runAfter(0, mentorInvitesRef, { ...args, cursor: page.continueCursor });
     return null;
   },
 });

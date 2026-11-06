@@ -39,8 +39,8 @@ describe("mentorInvites.forEvent", () => {
     const f = await fixture();
     const rows = await f.coach.query(api.mentorInvites.forEvent, { eventId: f.ids.event });
     expect(rows).toEqual([
-      { mentorUserId: f.ids.lead.id, name: "pg-lead", status: "invited", source: "subteam" },
-      { mentorUserId: f.ids.mentor.id, name: "pg-mentor", status: "accepted", source: "individual" },
+      { mentorUserId: f.ids.lead.id, name: "pg-lead", status: "invited", source: "subteam", canDriveStudents: null, needsHotelRoom: null, seriesScope: null, seriesCount: null },
+      { mentorUserId: f.ids.mentor.id, name: "pg-mentor", status: "accepted", source: "individual", canDriveStudents: null, needsHotelRoom: null, seriesScope: null, seriesCount: null },
     ]);
     expect(await f.lead.query(api.mentorInvites.forEvent, { eventId: f.ids.event })).toHaveLength(2);
     for (const who of [f.student, f.mentor, f.parent]) await expect(who.query(api.mentorInvites.forEvent, { eventId: f.ids.event })).rejects.toThrow("Only a Coach or Travel Lead");

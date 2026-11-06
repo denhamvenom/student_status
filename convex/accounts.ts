@@ -11,6 +11,7 @@ import { availableRoles } from "./lib/access";
 import { deleteUserPushSubscriptions } from "./lib/notify";
 import { getAuthSessionId } from "@convex-dev/auth/server";
 import { newToken, tokenHash, verifiedAdult } from "./lib/invitationIdentity";
+import { isMentorCapable, removeLostMentorSignups } from "./lib/mentorMeetings";
 
 const RESEND_COOLDOWN_MS = 60 * 60_000;
 const resendAvailableAt = (row: Doc<"adultInvitations">) => Math.max(row.emailQueuedAt ?? row.createdAt, row.emailSentAt ?? row.createdAt) + RESEND_COOLDOWN_MS;
@@ -40,6 +41,8 @@ export const updateParentStaffAccess = mutation({
     if (!user.active && args.staffAccess !== null) throw new ConvexError("This Parent account is inactive. Reactivate it before giving staff access.");
     await ctx.db.patch(user._id, { parentStaffAccess: args.staffAccess ?? undefined, accessRevision: (user.accessRevision ?? 0) + 1 });
     if (args.staffAccess !== (user.parentStaffAccess ?? null)) await deleteUserPushSubscriptions(ctx, user._id);
+    // Removing a Mentor / Travel Lead grant ends Mentor access: end their series sign-ups and take them off upcoming events.
+    if (isMentorCapable(user)) await removeLostMentorSignups(ctx, user._id, Date.now());
     await audit(ctx, actor, "appUsers", user._id, "updateParentStaffAccess", { staffAccess: user.parentStaffAccess ?? null }, { staffAccess: args.staffAccess }, args.reason.trim());
     return null;
   },
@@ -213,6 +216,8 @@ export const updateAdult = mutation({
     const patch = { role: args.role, travelLead: args.travelLead, financialEdit: args.financialEdit, healthExport: args.healthExport, active: args.active, accessRevision: (user.accessRevision ?? 0) + 1, ...(user.active && !args.active ? { archivedAt: Date.now() } : {}) };
     await ctx.db.patch(user._id, patch);
     if (!args.active || args.role !== user.role || args.travelLead !== user.travelLead) await deleteUserPushSubscriptions(ctx, user._id);
+    // A Mentor deactivated (archived) or moved to Coach is no longer a Mentor: end their series sign-ups and upcoming event rows.
+    if (isMentorCapable(user)) await removeLostMentorSignups(ctx, user._id, Date.now());
     await audit(ctx, actor, "appUsers", user._id, "updateAdultAccess", { ...summary(user), archivedAt: user.archivedAt ?? null }, { ...patch, archivedAt: patch.archivedAt ?? user.archivedAt ?? null }, args.reason.trim());
     return null;
   },

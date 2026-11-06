@@ -140,7 +140,7 @@ export const createEvent = mutation({
     // A Coach or Travel Lead can connect the event later with eventCalendar.connect.
     const { requirements, assignedStudentIds, calendarChoice: rawCalendarChoice, onsite, shifts: _shifts, questions: _questions, audienceStudentIds: _audienceStudentIds, mentorInviteUserIds: _mentorInviteUserIds, inviteSubteamMentors: _inviteSubteamMentors, ...fields } = args;
     // A Fundraiser counts as Outreach only when the flag is set, so the title-based Outreach fallback never applies.
-    const eventFields = { ...fields, ...(onsite ? { onsite: true, destination: onsiteLocation, travel: onsiteLocation } : {}), ...(args.type === "Fundraiser" ? { isOutreach: args.isOutreach ?? false } : {}) };
+    const eventFields = { ...fields, createdBy: user._id, ...(onsite ? { onsite: true, destination: onsiteLocation, travel: onsiteLocation } : {}), ...(args.type === "Fundraiser" ? { isOutreach: args.isOutreach ?? false } : {}) };
     let assigned = [...new Set(assignedStudentIds ?? [])];
     if (args.assignmentScope === "travelTeam" || args.assignmentScope === "wholeTeam") {
       const students = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(501);

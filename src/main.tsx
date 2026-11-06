@@ -21,6 +21,7 @@ const convexUrl = import.meta.env.VITE_CONVEX_URL
 // Development-only Student Home preview with synthetic fixtures; Vite drops this chunk from production builds.
 const StudentHomePreview = import.meta.env.DEV ? lazy(() => import('./features/student-home/preview/StudentHomePreview')) : null
 const ParentHomePreview = import.meta.env.DEV ? lazy(() => import('./features/parent-home/preview/ParentHomePreview')) : null
+const MentorHomePreview = import.meta.env.DEV ? lazy(() => import('./features/mentor-home/preview/MentorHomePreview')) : null
 const client = convexUrl ? new ConvexReactClient(convexUrl) : null
 class AppErrorBoundary extends React.Component<{children:React.ReactNode},{error:unknown}> {
   state={error:null as unknown}
@@ -34,6 +35,7 @@ const router = createBrowserRouter([
   {path:'/terms',element:<AppErrorBoundary><TermsPage /></AppErrorBoundary>},
   ...(StudentHomePreview?[{path:'/__student-home-preview',element:<AppErrorBoundary><Suspense fallback={null}><StudentHomePreview /></Suspense></AppErrorBoundary>}]:[]),
   ...(ParentHomePreview?[{path:'/__parent-home-preview',element:<AppErrorBoundary><Suspense fallback={null}><ParentHomePreview /></Suspense></AppErrorBoundary>}]:[]),
+  ...(MentorHomePreview?[{path:'/__mentor-home-preview',element:<AppErrorBoundary><Suspense fallback={null}><MentorHomePreview /></Suspense></AppErrorBoundary>}]:[]),
   {path:'*',element:<AppErrorBoundary>{app}</AppErrorBoundary>},
 ])
 captureInstallPrompt()

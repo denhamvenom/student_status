@@ -7,7 +7,8 @@ import { syncInstancesNow } from "./eventSeriesCalendar";
 import { scheduleEventArchive } from "./eventArchive";
 import { activeSeason, audit, viewer, type AppUser } from "./lib/access";
 import { MAX_AUDIENCE_STUDENTS, MAX_MENTOR_INVITES, prepareEventAudience } from "./lib/createEventCore";
-import { notifyEventCancelled, notifyEventScheduleChange, notifyEventSeriesCreated } from "./lib/notificationTriggers";
+import { canMentorManageEvent, carrySeriesSignups, isMentorCapable, isMentorSeriesNow, MENTOR_ONLY_MESSAGE, mentorActor, mentorUpdateEvent, requireInvitableMeetingMentors, requireMentorMeetingFields } from "./lib/mentorMeetings";
+import { notifyEventCancelled, notifyEventScheduleChange, notifyEventSeriesCreated, queueMentorMeetingOpenDigest } from "./lib/notificationTriggers";
 import { savedPublicError } from "./lib/publicErrors";
 import { parseGoogleRecurrence } from "./lib/rrule";
 import { requireSeasonFinanceReady } from "./lib/seasonFinance";
@@ -54,12 +55,38 @@ const isSeriesStaff = (user: AppUser) => user.role === "coach" || (user.role ===
 function requireSeriesStaff(user: AppUser) {
   if (!isSeriesStaff(user)) throw new ConvexError(STAFF_ONLY);
 }
+/** A Mentor without Travel Lead. They manage only their own optional Team meeting series (lib/mentorMeetings limits). */
+const isPlainMentor = (user: AppUser) => user.role === "mentor" && !user.travelLead;
+
+/**
+ * The session user for series functions. Coaches and Travel Leads (a Parent's selected Travel Lead role included) as they
+ * are. Otherwise the stored account decides (lib/mentorMeetings isMentorCapable): a Mentor, or a Parent with Mentor staff
+ * access whatever role their session selected, acts as a plain Mentor; null for a session that is not a Mentor (a
+ * deactivated or archived Mentor). Callers refuse null.
+ */
+async function seriesUserOrNull(ctx: QueryCtx | MutationCtx): Promise<AppUser | null> {
+  const user = await viewer(ctx);
+  if (isSeriesStaff(user)) return user;
+  const stored = await ctx.db.get(user._id);
+  if (isMentorCapable(stored)) return stored.role === "mentor" ? user : mentorActor(stored);
+  return isPlainMentor(user) ? null : user;
+}
+async function seriesUser(ctx: QueryCtx | MutationCtx): Promise<AppUser> {
+  const user = await seriesUserOrNull(ctx);
+  if (!user) throw new ConvexError(MENTOR_ONLY_MESSAGE);
+  return user;
+}
+const MENTOR_OWN_ONLY = `${STAFF_ONLY} A Mentor can change only repeating meetings they created.`;
 function requireCoach(user: AppUser, message: string) {
   if (user.role !== "coach") throw new ConvexError(message);
 }
 /** Why this user may not change the series, or null. Mandatory Whole Team / subteam series are Coach-only, like single events. */
 function seriesEditBlocker(user: AppUser, series: Doc<"eventSeries">): string | null {
-  if (!isSeriesStaff(user)) return STAFF_ONLY;
+  if (!isSeriesStaff(user)) {
+    if (!isPlainMentor(user)) return STAFF_ONLY;
+    // A Mentor edits only a series they created that is still a Mentor-safe Team meeting and not on Team Calendar.
+    return series.createdBy === user._id && isMentorSeriesNow(series) ? null : MENTOR_OWN_ONLY;
+  }
   if (series.template.mandatory && (series.template.audienceKind === "everyone" || series.template.audienceKind === "subteams") && user.role !== "coach") return COACH_ONLY_GROUP;
   return null;
 }
@@ -67,11 +94,28 @@ function requireSeriesEditor(user: AppUser, series: Doc<"eventSeries">) {
   const blocker = seriesEditBlocker(user, series);
   if (blocker) throw new ConvexError(blocker);
 }
+const COACH_CHANGED_MEETING = "A Coach changed a meeting in this series. Ask a Coach to make this change.";
+/**
+ * seriesEditBlocker checks only the template. A Coach can change one meeting of a Mentor series (capacity, withdrawal,
+ * Outreach) without detaching it, and that meeting then stops being the Mentor's to manage (canMentorManageEvent). So a
+ * plain Mentor's series-wide change (this and following, end date) is refused when it would touch such a meeting.
+ */
+async function requireMentorOwnsRows(ctx: MutationCtx, user: AppUser, rows: Doc<"events">[]) {
+  if (!isPlainMentor(user)) return;
+  const seriesCache = new Map<Id<"eventSeries">, Doc<"eventSeries"> | null>();
+  for (const row of rows) if (!row.cancelled && !(await canMentorManageEvent(ctx, user, row, seriesCache))) throw new ConvexError(COACH_CHANGED_MEETING);
+}
 
 /** The same audience, location and fee rules as admin.createEvent, producing the stored template. */
 async function buildTemplate(ctx: MutationCtx, user: AppUser, season: Doc<"seasons">, name: string, raw: TemplateArgs) {
   if ((raw.mentorInviteUserIds?.length ?? 0) > MAX_MENTOR_INVITES || (raw.audienceStudentIds?.length ?? 0) > MAX_AUDIENCE_STUDENTS) throw new ConvexError("Choose up to 200 Mentors and up to 200 students.");
-  const input: TemplateArgs & { signupMode: SignupMode; roomDeadline?: number; assignmentScope?: AssignmentScope; assignedStudentIds?: Id<"students">[] } = { ...raw, signupMode: raw.signupMode ?? "open" };
+  // Server-side limit for Mentors: optional Team meetings only (no required audience, fee, travel, overnight, rooms or permission form).
+  if (isPlainMentor(user)) requireMentorMeetingFields(raw);
+  // Invitees may be Mentors or Parents with Mentor / Travel Lead staff access (isMentorCapable: such Parents are Mentors
+  // first, so they alone satisfy a Mentors-only series). The shared audience check takes them all, as createMeeting does.
+  const invitees = await requireInvitableMeetingMentors(ctx, raw.mentorInviteUserIds ?? []);
+  const mentorInviteUserIds = invitees.map(mentor => mentor._id);
+  const input: TemplateArgs & { signupMode: SignupMode; roomDeadline?: number; assignmentScope?: AssignmentScope; assignedStudentIds?: Id<"students">[] } = { ...raw, mentorInviteUserIds, signupMode: raw.signupMode ?? "open" };
   const prepared = await prepareEventAudience(ctx, user, season, input);
   const a = prepared.args;
   if (!name.trim() || name.trim().length > MAX_NAME || !Number.isSafeInteger(a.feeCents) || a.feeCents < 0 || a.capacity !== undefined && (!Number.isSafeInteger(a.capacity) || a.capacity < 1)) throw new ConvexError("Check the series: it needs a name up to 250 characters, a fee of $0 or more, and a capacity of at least 1 if set.");
@@ -87,8 +131,8 @@ async function buildTemplate(ctx: MutationCtx, user: AppUser, season: Doc<"seaso
   };
   return {
     template, audienceStudentIds: prepared.audienceStudentIds,
-    mentorInviteIds: prepared.mentorInvites.filter(invite => invite.source === "individual").map(invite => invite.mentorUserId),
-    subteamMentorInviteIds: prepared.mentorInvites.filter(invite => invite.source === "subteam").map(invite => invite.mentorUserId),
+    mentorInviteIds: [...prepared.mentorInvites.filter(invite => invite.source === "individual" && invite.mentorUserId !== user._id).map(invite => invite.mentorUserId)],
+    subteamMentorInviteIds: prepared.mentorInvites.filter(invite => invite.source === "subteam" && invite.mentorUserId !== user._id).map(invite => invite.mentorUserId),
   };
 }
 
@@ -133,8 +177,11 @@ export const create = mutation({
   handler: async (ctx, args) => {
     if ((args.mentorInviteUserIds?.length ?? 0) > MAX_MENTOR_INVITES || (args.audienceStudentIds?.length ?? 0) > MAX_AUDIENCE_STUDENTS || args.rule.weekdays.length > 7) throw new ConvexError("Choose up to 200 Mentors, 200 students and 7 days.");
     await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
-    const user = await viewer(ctx);
-    requireSeriesStaff(user);
+    const user = await seriesUser(ctx);
+    if (isPlainMentor(user)) {
+      requireMentorMeetingFields(args);
+      if (args.addToCalendar) throw new ConvexError("Only a Coach or Travel Lead can add a series to Team Calendar. Create it without Team Calendar.");
+    } else requireSeriesStaff(user);
     const season = await activeSeason(ctx);
     const now = Date.now();
     const rule = normalizedRule(ruleFromArgs(args.rule));
@@ -144,6 +191,7 @@ export const create = mutation({
     const { name: rawName, rule: _rule, addToCalendar, ...template } = args;
     const name = rawName.trim();
     const built = await buildTemplate(ctx, user, season, name, template);
+    if (isPlainMentor(user)) requireMentorMeetingFields(built.template); // the stored (mapped) template must still be Mentor-safe
     const seriesId = await ctx.db.insert("eventSeries", {
       seasonId: season._id, createdBy: user._id, createdAt: now, name, status: "active", origin: "created", template: built.template, ...seriesFieldsFromRule(rule), templateRevision: 1,
       mentorInviteIds: built.mentorInviteIds, subteamMentorInviteIds: built.subteamMentorInviteIds, audienceStudentIds: built.audienceStudentIds, generatedThrough: 0,
@@ -158,7 +206,10 @@ export const create = mutation({
     else await ctx.db.patch(seriesId, { generatedThrough: windowEndMs(now) });
     const first = await firstRow(ctx, seriesId);
     // Exactly one notice for the whole series.
-    if (first) await notifyEventSeriesCreated(ctx, { eventId: first._id, seriesName: name, studentIds: audience, staffUserIds: [...built.mentorInviteIds, ...built.subteamMentorInviteIds] });
+    if (first) {
+      await notifyEventSeriesCreated(ctx, { eventId: first._id, seriesName: name, studentIds: audience, staffUserIds: [...built.mentorInviteIds, ...built.subteamMentorInviteIds] });
+      await queueMentorMeetingOpenDigest(ctx, { eventId: first._id }); // M4, once for the series (its first meeting)
+    }
     if (addToCalendar) await ctx.scheduler.runAfter(0, internal.eventSeriesCalendar.createMaster, { seriesId });
     await audit(ctx, user, "eventSeries", seriesId, "create", null, { name, rule, addToCalendar: addToCalendar ?? false });
     return { seriesId, firstEventId: first?._id ?? null };
@@ -257,8 +308,8 @@ export const runEnrollment = internalMutation({
 // ---------- this meeting only ----------
 
 async function requireOccurrence(ctx: MutationCtx, eventId: Id<"events">) {
-  const user = await viewer(ctx);
-  requireSeriesStaff(user);
+  const user = await seriesUser(ctx);
+  if (!isPlainMentor(user)) requireSeriesStaff(user);
   const event = await ctx.db.get(eventId);
   if (!event?.seriesId) throw new ConvexError("This event isn't part of a recurring series. Reload to see the latest.");
   const series = await ctx.db.get(event.seriesId);
@@ -271,7 +322,9 @@ async function requireOccurrence(ctx: MutationCtx, eventId: Id<"events">) {
 export const editOccurrence = mutation({
   args: { eventId: v.id("events"), expectedRevision: v.optional(v.number()), name: v.optional(v.string()), destination: v.optional(v.string()), startsAt: v.optional(v.number()), endsAt: v.optional(v.number()), mediaSupportRequested: v.optional(v.boolean()) }, returns: v.null(),
   handler: async (ctx, args) => {
-    await requireOccurrence(ctx, args.eventId);
+    const { user } = await requireOccurrence(ctx, args.eventId);
+    // A Mentor edits only their own meeting, through the Mentor path (title, place and time; no Calendar or media changes).
+    if (isPlainMentor(user)) return await mentorUpdateEvent(ctx, user, { eventId: args.eventId, expectedRevision: args.expectedRevision, name: args.name, destination: args.destination, startsAt: args.startsAt, endsAt: args.endsAt });
     return await updateEventDetails(ctx, args);
   },
 });
@@ -280,7 +333,8 @@ export const editOccurrence = mutation({
 export const cancelOccurrence = mutation({
   args: { eventId: v.id("events"), expectedRevision: v.optional(v.number()) }, returns: v.null(),
   handler: async (ctx, args) => {
-    await requireOccurrence(ctx, args.eventId);
+    const { user } = await requireOccurrence(ctx, args.eventId);
+    if (isPlainMentor(user)) return await mentorUpdateEvent(ctx, user, { eventId: args.eventId, expectedRevision: args.expectedRevision, cancelled: true });
     return await updateEventDetails(ctx, { eventId: args.eventId, expectedRevision: args.expectedRevision, cancelled: true });
   },
 });
@@ -288,7 +342,7 @@ export const cancelOccurrence = mutation({
 // ---------- this and following ----------
 
 async function requireFutureSplit(ctx: MutationCtx, seriesId: Id<"eventSeries">, fromKey: string) {
-  const user = await viewer(ctx);
+  const user = await seriesUser(ctx);
   const series = await ctx.db.get(seriesId);
   const season = await activeSeason(ctx);
   if (!series || series.seasonId !== season._id) throw new ConvexError("This series is no longer available. Reload to see the latest.");
@@ -299,6 +353,7 @@ async function requireFutureSplit(ctx: MutationCtx, seriesId: Id<"eventSeries">,
   if (!isOccurrence(rule, fromKey)) throw new ConvexError("That date isn't a meeting in this series. Reload and choose a meeting.");
   if (series.calendarMasterId && !writeEnabled()) throw new ConvexError("Calendar updates are turned off in this copy of Venom Status, so this Team Calendar series can't be changed here.");
   const rows = await rowsFrom(ctx, series._id, fromKey);
+  await requireMentorOwnsRows(ctx, user, rows);
   if (await sessionsExistOn(ctx, rows)) throw new ConvexError("Attendance has already been taken for a meeting on or after that date. Choose a later meeting.");
   return { user, series, rule, rows };
 }
@@ -339,7 +394,14 @@ export const editFuture = mutation({
     const now = Date.now();
     const { _id: _oldId, _creationTime: _ct, calendarMasterId: oldMasterId, calendarEtag: _etag, calendarRecurrence: _rec, calendarSyncState: _state, calendarError: _err, calendarRevision: _rev, calendarProviderUpdatedAt: _upd, untilDate: _u, count: _c, ...copy } = series;
     // The new series is generated as the editor (who just passed requireSeriesEditor), not the original creator.
-    const newSeriesId = await ctx.db.insert("eventSeries", { ...copy, createdBy: user._id, name, createdAt: now, origin: "created", status: "active", template: { ...series.template, destination }, ...seriesFieldsFromRule(after), predecessorSeriesId: series._id, templateRevision: series.templateRevision + 1, ...(oldMasterId ? { calendarSyncState: "pending" as const } : {}) });
+    // A Mentor's series stays theirs when a Coach or Travel Lead edits it (the Mentor keeps managing it); otherwise the editor owns the new series.
+    const originalCreator = await ctx.db.get(series.createdBy);
+    // Only while the series is still a Mentor-safe one (same test as seriesEditBlocker); a former Travel Lead's fee/travel/Calendar series is owned by the editor.
+    // A Parent with Mentor staff access counts as a Mentor creator here (lib/mentorMeetings isMentorCapable).
+    const keepCreator = isMentorCapable(originalCreator) && !(originalCreator.role === "mentor" && originalCreator.travelLead) && isMentorSeriesNow(series);
+    const newSeriesId = await ctx.db.insert("eventSeries", { ...copy, createdBy: keepCreator ? series.createdBy : user._id, name, createdAt: now, origin: "created", status: "active", template: { ...series.template, destination }, ...seriesFieldsFromRule(after), predecessorSeriesId: series._id, templateRevision: series.templateRevision + 1, ...(oldMasterId ? { calendarSyncState: "pending" as const } : {}) });
+    // Mentors' series sign-ups continue on the new series (before it generates meetings); moved rows point at them.
+    await carrySeriesSignups(ctx, series._id, newSeriesId, args.fromKey, rows.filter(row => isOccurrence(after, row.seriesOccurrenceKey!)).map(row => row._id), now);
     // The old series ends the day before the split (COUNT becomes an end date).
     await ctx.db.patch(series._id, { untilDate: addDays(args.fromKey, -1), count: undefined, ...(split.before === null ? { status: "ended" as const } : {}) });
     let representative: Doc<"events"> | null = null;
@@ -525,7 +587,7 @@ export const setEndDate = mutation({
   args: { seriesId: v.id("eventSeries"), endDate: v.string() },
   returns: v.object({ cancelled: v.number(), lastMeetingDate: v.union(v.string(), v.null()) }),
   handler: async (ctx, args) => {
-    const user = await viewer(ctx);
+    const user = await seriesUser(ctx);
     const season = await activeSeason(ctx);
     const series = await ctx.db.get(args.seriesId);
     if (!series || series.seasonId !== season._id) throw new ConvexError("This series is no longer available. Reload to see the latest.");
@@ -536,6 +598,7 @@ export const setEndDate = mutation({
     if (plan.problem !== null) throw new ConvexError(plan.problem);
     if (series.calendarMasterId && !writeEnabled()) throw new ConvexError("Calendar updates are turned off in this copy of Venom Status, so this Team Calendar series can't be changed here.");
     const rows = plan.shortening ? await rowsFrom(ctx, series._id, addDays(args.endDate, 1)) : [];
+    await requireMentorOwnsRows(ctx, user, rows);
     if (await sessionsExistOn(ctx, rows)) throw new ConvexError("Attendance has already been taken for a meeting after that date. Choose a later end date.");
     const live = rows.filter(row => !row.cancelled);
     for (const row of rows) await cancelRowQuietly(ctx, row, user._id);
@@ -571,12 +634,14 @@ export const endDateDetails = query({
     preview: v.union(v.null(), v.object({ endDate: v.string(), problem: v.union(v.string(), v.null()), lastMeetingDate: v.union(v.string(), v.null()), cancelCount: v.number(), cancelDates: v.array(v.string()), addCount: v.number(), laterAddedAutomatically: v.boolean(), shortening: v.boolean(), unchanged: v.boolean() })),
   })),
   handler: async (ctx, args) => {
-    const user = await viewer(ctx);
-    // Not staff: nothing to show (the page asks only for Coaches and Travel Leads; this reveals nothing either way).
-    if (!isSeriesStaff(user)) return null;
+    const user = await seriesUserOrNull(ctx);
+    // Not staff or a Mentor: nothing to show (this reveals nothing either way).
+    if (!user || (!isSeriesStaff(user) && !isPlainMentor(user))) return null;
     const season = await activeSeason(ctx);
     const series = await ctx.db.get(args.seriesId);
     if (!series || series.seasonId !== season._id) return null;
+    // A Mentor sees the end-date details only of a series they may manage.
+    if (!isSeriesStaff(user) && seriesEditBlocker(user, series)) return null;
     const now = Date.now(), today = todayKey(now);
     const successor = await successorStart(ctx, series);
     const statusBlocker = series.status === "active" || series.status === "ended" ? null : "This series needs review or was canceled, so its end date can't be changed here.";
@@ -757,10 +822,12 @@ export const get = query({
   args: { seriesId: v.id("eventSeries"), fromKey: v.string() },
   returns: v.object({ series: seriesSummary, occurrences: v.array(v.object({ eventId: v.id("events"), key: v.string(), name: v.string(), startsAt: v.number(), endsAt: v.number(), cancelled: v.boolean(), detached: v.boolean(), calendarRevision: v.number(), calendarSyncState: v.union(v.string(), v.null()) })), nextKeys: v.array(v.string()) }),
   handler: async (ctx, args) => {
-    requireSeriesStaff(await viewer(ctx));
+    const user = await seriesUser(ctx);
+    if (!isPlainMentor(user)) requireSeriesStaff(user);
     const season = await activeSeason(ctx);
     const series = await ctx.db.get(args.seriesId);
     if (!series || series.seasonId !== season._id) throw new ConvexError("This series is no longer available. Reload to see the latest.");
+    if (!isSeriesStaff(user)) requireSeriesEditor(user, series);
     const rows = await ctx.db.query("events").withIndex("by_seriesId_and_seriesOccurrenceKey", q => q.eq("seriesId", series._id).gte("seriesOccurrenceKey", args.fromKey)).take(60);
     const rule = ruleOf(series);
     return {
