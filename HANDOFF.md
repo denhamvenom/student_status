@@ -1,6 +1,21 @@
 # Handoff
 
-November 4, 2026 | main `08a5d71`
+November 6, 2026 | main `08a5d71` (plus uncommitted withdrawal work, below)
+
+## Automatic withdrawal, Put back on event, Undo (implemented and reviewed, not deployed)
+
+Uncommitted in the working tree; no branch, PR, dev sync or production deploy yet. [Release receipt](docs/releases/RELEASE_2026-11-06_AUTOMATIC_WITHDRAWAL.md)
+
+- A student's withdrawal takes effect immediately (approved $0 `full` row, `autoWithdraw` audit, no Coach digest) only when the event has no fee, no charge with amount owed/applied, no pending request, no room membership/request, no team-transport seat, and is not Whole Team or Coach-assigned. Otherwise it stays pending review.
+- Coach/Travel Lead can "Put back on event" (`withdrawals.putBackOnEvent`, Event operations > Signups and capacity > Withdrawn). It does not reverse money (warning shown).
+- Student Undo (`withdrawals.undoWithdrawal`) of an automatic withdrawal until the earlier of signup close and event start; max 3 per event; rooms and shifts are not restored; parents cannot undo.
+- Shared fail-closed reader `convex/lib/withdrawalState.ts`: more than 100 withdrawal rows for one student/event throws an "Ask a Coach" error, which can block the Coach signups list or that student's Home.
+- Schema: `withdrawalRequests` gains optional `priorParticipation`, `reinstatedAt`, `reinstatedBy`, `reinstatedByStudent`. Needs a Convex sync: development first, production only with owner approval.
+
+Open items:
+- Persona checks pending for the withdrawal screens (Student, Coach, Travel Lead); blocked because development Student sign-in needs `DEVELOPER_SIGN_IN_KEY`, which this session did not have. Dev sync and production deploy not done.
+- "My attendance" month arrows bug report: likely disabled by design when the season start is in the current or a future month (development active season starts 2027-06-01). `/attendance` (More menu) shows `FamilyAttendanceBreakdown` without arrows; `/attendance/report` is `AttendanceReport`. Disabled arrows are only `opacity-60`, so they look broken. Live repro blocked by the same sign-in issue; production season `startsAt` unverified (VERIFY).
+- `convex/feeBulk.test.ts` times out (30s) in the full `bun run check` and `bulkInvites.test.ts` timed out once; both pass in isolation (feeBulk 9/9). Known flakiness, so the full check was not clean.
 
 ## Coach email change fix and stable profile edit dialog (released)
 
