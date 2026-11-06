@@ -1,8 +1,8 @@
 # Release 2026-11-06: automatic withdrawal, Put back on event, Undo
 
-Status: implemented and reviewed, not deployed. Uncommitted in the working tree. No owner approval for dev sync or production yet.
+Status: synced to development, not deployed to production. No owner approval for production yet.
 
-Branch / PR / commit: _fill in_
+Branch / PR / commit: `feat/auto-withdrawal-undo`, [PR #73](https://github.com/denhamvenom/student_status/pull/73) (open against main, not merged), commit `c2c571f`.
 
 ## What changed
 1. Automatic withdrawal: takes effect immediately (approved $0 `full` row with the automatic reason, `autoWithdraw` audit including `shiftSignupsCleared`, no Coach digest) when the event has no fee, no charges with amount owed or applied, no pending request, no room membership or request, no team-transport seat, and is not Whole Team or Coach-assigned (`signupMode` `assigned`). Otherwise unchanged: pending review.
@@ -19,16 +19,16 @@ Branch / PR / commit: _fill in_
 
 ## Not done
 - Browser and persona verification of the withdrawal screens: blocked, development Student sign-in needs `DEVELOPER_SIGN_IN_KEY`.
-- Development Convex sync; production deploy.
+- Merge to main; production deploy (needs owner approval).
 
-## Deployment evidence (fill in later)
+## Deployment evidence
 | Item | Value |
 | --- | --- |
-| Branch / PR / merge commit | _TBD_ |
-| Dev Convex sync (schema valid, no index deletions) | _TBD_ |
-| Production Convex (owner approval, dry run, deploy) | _TBD_ |
-| Worker `denham-venom-student-status` deployed / rollback | _TBD_ |
-| Post-release checks | _TBD_ |
+| Branch / PR / merge commit | `feat/auto-withdrawal-undo` at `c2c571f`; PR #73 open against main, not merged; merge commit pending |
+| Dev Convex sync (schema valid, no index deletions) | 2026-11-06, `bunx convex dev --once` to `third-bandicoot-18` (dev): functions ready, schema accepted with existing `withdrawalRequests` rows |
+| Production Convex (owner approval, dry run, deploy) | _Pending_ (needs owner approval) |
+| Worker `denham-venom-student-status` deployed / rollback | _Pending_ |
+| Post-release checks | _Pending_; browser/persona checks blocked (development Student sign-in) |
 
 ## Rollback
 Revert the commit. The new `withdrawalRequests` fields are optional, so existing rows stay valid and the schema change is backward compatible; Convex functions are forward-fixed by redeploying the reverted code. Withdrawals created or reinstated while the feature was live remain as data.
