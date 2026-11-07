@@ -13,7 +13,7 @@ import { clearShifts } from "./lib/eventSignupExtras";
 import { teamTransportEnabled } from "./lib/transportation";
 import { studentCanAccessEvent } from "./lib/eventAudience";
 import { resolveAudience } from "./lib/eventAudienceRules";
-import { notifyEventAssigned, notifyWithdrawalDecision, queueSignupPendingDigest, queueWithdrawalRequestDigest } from "./lib/notificationTriggers";
+import { notifyEventAssigned, notifyWithdrawalDecision, queueMentorMeetingActivityDigest, queueSignupPendingDigest, queueWithdrawalRequestDigest } from "./lib/notificationTriggers";
 
 import { ensureFinancialAccount, saveFinancialAccount } from "./lib/financialSources";
 import { makeFunctionReference } from "convex/server";
@@ -208,6 +208,8 @@ export const requestWithdrawal = mutation({
       const shiftSignupsCleared = await clearShifts(ctx, data.event._id, student._id);
       await ctx.db.patch(data.participant._id, { status: "withdrawn", updatedAt: now });
       await audit(ctx, user, "withdrawalRequests", id, "autoWithdraw", { participation: data.participant.status }, { status: "approved", participation: "withdrawn", eventId: args.eventId, studentId: student._id, shiftSignupsCleared }, AUTO_WITHDRAW_REASON);
+      // M5 to the Mentor who created the meeting (no-op for other events). Like signUp, only a Signed up student counts.
+      if (priorParticipation === "confirmed") await queueMentorMeetingActivityDigest(ctx, { eventId: args.eventId, activity: "studentLeft" });
       return id;
     }
     const id = await ctx.db.insert("withdrawalRequests", { eventId: args.eventId, studentId: student._id, participantId: data.participant._id, status: "pending", requestedBy: user._id, requestedAt: now, idempotencyKey: args.idempotencyKey });
@@ -268,6 +270,9 @@ export const undoWithdrawal = mutation({
     if (check.restore === "confirmed" && data.event.feeCents > 0 && data.charges.length === 0) await addCharge(ctx, user, student._id, data.event.name, data.event.feeCents, data.event.startsAt, `eventFee:${data.event._id}:${student._id}`, data.event._id);
     await audit(ctx, user, "withdrawalRequests", check.request._id, "undoWithdrawal", { participation: "withdrawn" }, { participation: check.restore, reinstatedAt: now });
     if (check.restore === "pending") await queueSignupPendingDigest(ctx, { eventId: data.event._id });
+    // M5, as for a new signup: back on as Signed up, or waiting for approval. A Waitlisted return is not reported.
+    if (check.restore === "confirmed") await queueMentorMeetingActivityDigest(ctx, { eventId: data.event._id, activity: "studentJoined" });
+    else if (check.restore === "pending") await queueMentorMeetingActivityDigest(ctx, { eventId: data.event._id, activity: "signupPending" });
     return check.restore;
   },
 });
@@ -313,6 +318,7 @@ export const putBackOnEvent = mutation({
       }
     }
     await notifyEventAssigned(ctx, { eventId: event._id, studentIds: [data.student._id] });
+    await queueMentorMeetingActivityDigest(ctx, { eventId: event._id, activity: "studentJoined" }); // M5
     return null;
   },
 });
@@ -391,6 +397,7 @@ export async function finalizeWithdrawal(ctx: MutationCtx, job: Doc<"financialOp
   if (!request || request.status !== "processing" || request.jobId !== job._id) throw new ConvexError("This changed since you opened it. Reload to see the latest, then try again.");
   const participant = await ctx.db.get(request.participantId);
   if (!participant || participant.studentId !== job.studentId || participant.eventId !== job.eventId || (request.wholeTeamLeave ? participant.status !== "withdrawn" : participant.status === "withdrawn")) throw new ConvexError("The signup changed. Review the request again.");
+  const leftSignedUp = participant.status === "confirmed";
   if (participant.status !== "withdrawn") {
     await removeRoomState(ctx, job.eventId, job.studentId, user);
     await clearShifts(ctx, job.eventId, job.studentId);
@@ -398,5 +405,7 @@ export async function finalizeWithdrawal(ctx: MutationCtx, job: Doc<"financialOp
   }
   await ctx.db.patch(request._id, { status: "approved", decidedBy: user._id, decidedAt: Date.now() });
   await notifyWithdrawalDecision(ctx, { requestId: request._id, approved: true });
+  // M5 to the Mentor who created the meeting; a Whole Team leave (already withdrawn) was not a drop-out here.
+  if (leftSignedUp) await queueMentorMeetingActivityDigest(ctx, { eventId: job.eventId, activity: "studentLeft" });
   await audit(ctx, user, "withdrawalRequests", request._id, "approve", { status: "processing", participation: participant.status }, { status: "approved", participation: "withdrawn", returnedCents: job.committedCents, retainedCents: request.retainedCents }, job.reason);
 }

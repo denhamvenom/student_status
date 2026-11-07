@@ -19,7 +19,6 @@ Accepted deferrals are listed in [KNOWN_GAPS.md](KNOWN_GAPS.md); consult them on
 - Fee due dates (owner, October 27): let a Coach set a due date on a fee so Highlights can flag a payment as past due before the event starts. Until then "past due" means unpaid after the event start. This is a money change; read DECISIONS.md first.
 - Student Home release prerequisites: before kickoff (January 9, 2027), and with owner approval, run Recalculate attendance on production so the new build-hours totals fill in, and set each season's build-hours target on the Season page.
 - Mentor Home follow-ups (November 7, 2026). The Mentor home page itself is built on `feat/mentor-home` and awaits release ([pre-release receipt](releases/RELEASE_2026-11-07_MENTOR_HOME.md)). Remaining:
-  - M5 "student dropped out" (`studentLeft`) notice to a Mentor meeting's creator: wire it after the owner's withdrawals branch lands.
   - Edit a one-time meeting to make it repeat (today it must be recreated as a series).
   - Join list filter and search.
   - Series row wording on the Join list when the Mentor is already signed up for some meetings.
