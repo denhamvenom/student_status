@@ -8,8 +8,8 @@ import { mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { activeSeason, audit, ownStudent, studentAccess, viewer } from "./lib/access";
-import { addCharge, effectiveChargeCents } from "./lib/money";
-import { clearShifts } from "./lib/eventSignupExtras";
+import { addCharge, addCharges, effectiveChargeCents } from "./lib/money";
+import { activeQuestions, checkAnswers, checkShifts, clearShifts, MAX_QUESTION_ROWS } from "./lib/eventSignupExtras";
 import { teamTransportEnabled } from "./lib/transportation";
 import { studentCanAccessEvent } from "./lib/eventAudience";
 import { resolveAudience } from "./lib/eventAudienceRules";
@@ -21,7 +21,7 @@ import { makeFunctionReference } from "convex/server";
 type Context = MutationCtx | QueryCtx;
 const decision = v.union(v.literal("full"), v.literal("retain"), v.literal("partial"), v.literal("deny"));
 const progressValidator = v.object({ jobId: v.id("financialOperationJobs"), state: v.union(v.literal("running"), v.literal("failed"), v.literal("complete")), committedCents: v.number(), totalCents: v.number(), lastError: v.union(v.string(), v.null()) });
-const previewResult = v.object({ progress: v.union(progressValidator, v.null()), canRetry: v.boolean(), eventName: v.string(), studentName: v.string(), allowWithdrawal: v.boolean(), wholeTeam: v.boolean(), coachAssigned: v.boolean(), wholeTeamLeft: v.boolean(), revision: v.string(), status: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("waitlist"), v.literal("withdrawn")), reviewRequired: v.boolean(), withdrawnImmediately: v.boolean(), canUndo: v.boolean(), undoUntil: v.number(), requestId: v.union(v.id("withdrawalRequests"), v.null()), requestStatus: v.union(v.literal("pending"), v.literal("processing"), v.literal("approved"), v.literal("denied"), v.null()), charges: v.array(v.object({ id: v.id("charges"), label: v.string(), category: v.union(v.literal("main"), v.literal("extra")), chargedCents: v.number(), originalChargedCents: v.number(), adjustedCents: v.number(), paidCents: v.number(), unpaidCents: v.number(), cancelledCents: v.number() })), paidMainCents: v.number(), paidExtraCents: v.number(), unpaidMainCents: v.number(), unpaidExtraCents: v.number() });
+const previewResult = v.object({ progress: v.union(progressValidator, v.null()), canRetry: v.boolean(), eventName: v.string(), studentName: v.string(), allowWithdrawal: v.boolean(), wholeTeam: v.boolean(), coachAssigned: v.boolean(), wholeTeamLeft: v.boolean(), revision: v.string(), status: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("waitlist"), v.literal("withdrawn")), reviewRequired: v.boolean(), withdrawnImmediately: v.boolean(), canUndo: v.boolean(), undoBlocked: v.union(v.string(), v.null()), undoUntil: v.number(), requestId: v.union(v.id("withdrawalRequests"), v.null()), requestStatus: v.union(v.literal("pending"), v.literal("processing"), v.literal("approved"), v.literal("denied"), v.null()), charges: v.array(v.object({ id: v.id("charges"), label: v.string(), category: v.union(v.literal("main"), v.literal("extra")), chargedCents: v.number(), originalChargedCents: v.number(), adjustedCents: v.number(), paidCents: v.number(), unpaidCents: v.number(), cancelledCents: v.number() })), paidMainCents: v.number(), paidExtraCents: v.number(), unpaidMainCents: v.number(), unpaidExtraCents: v.number() });
 
 async function details(ctx: Context, eventId: Id<"events">, studentId: Id<"students">) {
   const event = await ctx.db.get(eventId), student = await ctx.db.get(studentId), season = await activeSeason(ctx);
@@ -39,11 +39,14 @@ async function summary(ctx: Context, user: Doc<"appUsers">, data: Awaited<Return
   // A reinstated row is history only: it is not shown as the current request.
   const pending = data.requests.find(r => (r.status === "pending" || r.status === "processing")) ?? data.requests.filter(r => r.reinstatedAt === undefined).at(-1);
   const active = activeApprovedWithdrawal(data.requests);
-  const ownUndo = user.role === "student" && data.student.userId === user._id && typeof await undoCheck(ctx, data, Date.now()) !== "string";
+  const undo = user.role === "student" && data.student.userId === user._id ? await undoCheck(ctx, data, Date.now()) : null;
+  const ownUndo = !!undo && typeof undo !== "string";
+  // Only the signup-rule refusals are shown next to the withdrawal; any other refusal just hides Undo.
+  const undoBlocked = undo === UNDO_NEEDS_SHIFTS || undo === UNDO_NEEDS_ANSWERS ? undo : null;
   const job = pending?.jobId ? await ctx.db.get(pending.jobId) : null;
   const wholeTeamLeft = data.participant.status === "withdrawn" && data.event.assignmentScope === "wholeTeam" && !!await ctx.db.query("wholeTeamLeaveNotices").withIndex("by_participantId", q => q.eq("participantId", data.participant._id)).first();
   const progress = job ? { jobId: job._id, state: job.state, committedCents: job.committedCents, totalCents: job.amountCents, lastError: job.lastError ?? null } : null;
-  return { progress, canRetry: user.role === "coach" && job?.state === "failed", eventName: data.event.name, studentName: data.student.legalName || data.student.preferredName, allowWithdrawal: data.event.allowWithdrawal && !data.event.archived, wholeTeam: data.event.assignmentScope === "wholeTeam" && data.event.signupMode === "assigned", coachAssigned: data.event.signupMode === "assigned", wholeTeamLeft, revision: revision(data), status: data.participant.status, reviewRequired: data.participant.status === "withdrawn" || await withdrawalNeedsReview(ctx, data), withdrawnImmediately: data.participant.status === "withdrawn" && !!active && isAutomaticWithdrawal(active), canUndo: ownUndo, undoUntil: undoDeadline(data.event), requestId: pending?._id ?? null, requestStatus: pending?.status ?? null, charges, paidMainCents: charges.filter(c => c.category === "main").reduce((n, c) => n + c.paidCents, 0), paidExtraCents: charges.filter(c => c.category === "extra").reduce((n, c) => n + c.paidCents, 0), unpaidMainCents: charges.filter(c => c.category === "main").reduce((n, c) => n + c.unpaidCents, 0), unpaidExtraCents: charges.filter(c => c.category === "extra").reduce((n, c) => n + c.unpaidCents, 0) };
+  return { progress, canRetry: user.role === "coach" && job?.state === "failed", eventName: data.event.name, studentName: data.student.legalName || data.student.preferredName, allowWithdrawal: data.event.allowWithdrawal && !data.event.archived, wholeTeam: data.event.assignmentScope === "wholeTeam" && data.event.signupMode === "assigned", coachAssigned: data.event.signupMode === "assigned", wholeTeamLeft, revision: revision(data), status: data.participant.status, reviewRequired: data.participant.status === "withdrawn" || await withdrawalNeedsReview(ctx, data), withdrawnImmediately: data.participant.status === "withdrawn" && !!active && isAutomaticWithdrawal(active), canUndo: ownUndo, undoBlocked, undoUntil: undoDeadline(data.event), requestId: pending?._id ?? null, requestStatus: pending?.status ?? null, charges, paidMainCents: charges.filter(c => c.category === "main").reduce((n, c) => n + c.paidCents, 0), paidExtraCents: charges.filter(c => c.category === "extra").reduce((n, c) => n + c.paidCents, 0), unpaidMainCents: charges.filter(c => c.category === "main").reduce((n, c) => n + c.unpaidCents, 0), unpaidExtraCents: charges.filter(c => c.category === "extra").reduce((n, c) => n + c.unpaidCents, 0) };
 }
 
 type WithdrawalData = Awaited<ReturnType<typeof details>>;
@@ -95,7 +98,8 @@ function undoDeadline(event: Doc<"events">) {
  * Owner decision 2026-11-06: a student may undo their own automatic withdrawal (never a Coach-reviewed one) before the event
  * starts and before signup closes, whichever is first, while the event still takes signups from them (current, not archived
  * or canceled, not Coach-assigned, enrollment finished, still in the event's audience, an open place) and at most
- * STUDENT_UNDO_LIMIT times per event. Returns the status to restore, or why not. Rooms and shifts are not restored.
+ * STUDENT_UNDO_LIMIT times per event, and only when signUp's rules would still let them back (signupRuleBlocker).
+ * Returns the status to restore, or why not. Rooms and shifts are not restored.
  * A student who was Waitlisted rejoins at the end of the waitlist; nobody is ever moved up a status by an undo.
  */
 async function undoCheck(ctx: Context, data: WithdrawalData, now: number): Promise<{ restore: Restorable; request: Doc<"withdrawalRequests"> } | string> {
@@ -107,9 +111,53 @@ async function undoCheck(ctx: Context, data: WithdrawalData, now: number): Promi
   const event = data.event;
   if (event.archived || event.cancelled || event.signupMode === "assigned" || enrollmentPending(event) || now >= undoDeadline(event)) return closed;
   if (!await studentCanAccessEvent(ctx, event, data.student)) return closed;
-  const restore = request.priorParticipation;
-  const blocker = await placeBlocker(ctx, event, restore);
+  // Security review 2026-11-07: an undo follows signUp's rules. An approval event takes the student back as Waiting for approval at most.
+  const restore = request.priorParticipation === "confirmed" && event.signupMode === "approval" ? "pending" : request.priorParticipation;
+  const blocker = await placeBlocker(ctx, event, restore) ?? await signupRuleBlocker(ctx, event, data.student._id, restore);
   return blocker ?? { restore, request };
+}
+
+const UNDO_NEEDS_SHIFTS = "This event needs you to pick shifts, so Undo can't put you back. Ask a Coach to put you back on it.";
+const UNDO_NEEDS_ANSWERS = "This event has questions you haven't answered, so Undo can't put you back. Ask a Coach to put you back on it.";
+
+/**
+ * The shift and question checks signUp makes, run against what the student already has: shifts were cleared on withdrawal,
+ * so an event that requires shifts (outside the waitlist) can't be rejoined by Undo; stored answers must still satisfy the
+ * event's current active questions (new required questions, or changed options). Reads only.
+ */
+async function signupRuleBlocker(ctx: Context, event: Doc<"events">, studentId: Id<"students">, restore: Restorable) {
+  if (restore !== "waitlist" && await refused(() => checkShifts(ctx, event, studentId, []))) return UNDO_NEEDS_SHIFTS;
+  const questions = new Set((await activeQuestions(ctx, event._id)).map(q => q._id));
+  const stored = await ctx.db.query("eventQuestionAnswers").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", studentId)).take(MAX_QUESTION_ROWS + 1);
+  if (stored.length > MAX_QUESTION_ROWS) return UNDO_NEEDS_ANSWERS;
+  const answers = stored.filter(a => questions.has(a.questionId)).map(a => ({ questionId: a.questionId, value: a.value }));
+  if (await refused(() => checkAnswers(ctx, event._id, answers))) return UNDO_NEEDS_ANSWERS;
+  return null;
+}
+
+/** True when a signUp check refuses (a ConvexError); any other error still throws. */
+async function refused(check: () => Promise<unknown>) {
+  try { await check(); return false; } catch (error) { if (error instanceof ConvexError) return true; throw error; }
+}
+
+/**
+ * Adds the event's current fee when a returning student has no active main charge for it (none, or only cancelled or
+ * zeroed ones), so they owe the fee like a new signup. The first fee uses signUp's key. A later one links to the event's
+ * main fee definition under a key for this return, so it never duplicates and never reuses a cancelled charge.
+ * A canceled main fee definition means the Coach stopped this fee, so nothing is added.
+ */
+async function addReturnFee(ctx: MutationCtx, actor: Doc<"appUsers">, data: WithdrawalData, returnKey: string) {
+  const { event, student } = data;
+  if (event.feeCents <= 0) return;
+  if (data.charges.some(charge => (charge.category ?? "main") === "main" && effectiveChargeCents(charge) > 0)) return;
+  const key = `eventFee:${event._id}:${student._id}`;
+  if (!await ctx.db.query("ledgerEntries").withIndex("by_idempotencyKey", q => q.eq("idempotencyKey", key)).unique()) {
+    await addCharge(ctx, actor, student._id, event.name, event.feeCents, event.startsAt, key, event._id);
+    return;
+  }
+  const definition = await ctx.db.query("feeDefinitions").withIndex("by_seasonId_and_originKey", q => q.eq("seasonId", student.seasonId).eq("originKey", `event:${event._id}:main`)).unique();
+  if (!definition || definition.state !== "active" || definition.eventId !== event._id) return;
+  await addCharges(ctx, actor, student._id, [{ label: event.name, amountCents: event.feeCents, priority: event.startsAt, idempotencyKey: `${key}:return:${returnKey}`, eventId: event._id, category: "main", feeDefinitionId: definition._id }], `auto:${key}:return:${returnKey}`);
 }
 
 function revision(data: Awaited<ReturnType<typeof details>>) {
@@ -267,7 +315,7 @@ export const undoWithdrawal = mutation({
     if (typeof check === "string") throw new ConvexError(check);
     await ctx.db.patch(check.request._id, { reinstatedAt: now, reinstatedBy: user._id, reinstatedByStudent: true });
     await ctx.db.patch(data.participant._id, { status: check.restore, createdAt: check.restore === "waitlist" ? now : data.participant.createdAt, updatedAt: now });
-    if (check.restore === "confirmed" && data.event.feeCents > 0 && data.charges.length === 0) await addCharge(ctx, user, student._id, data.event.name, data.event.feeCents, data.event.startsAt, `eventFee:${data.event._id}:${student._id}`, data.event._id);
+    if (check.restore === "confirmed") await addReturnFee(ctx, user, data, check.request._id);
     await audit(ctx, user, "withdrawalRequests", check.request._id, "undoWithdrawal", { participation: "withdrawn" }, { participation: check.restore, reinstatedAt: now });
     if (check.restore === "pending") await queueSignupPendingDigest(ctx, { eventId: data.event._id });
     // M5, as for a new signup: back on as Signed up, or waiting for approval. A Waitlisted return is not reported.
@@ -280,8 +328,8 @@ export const undoWithdrawal = mutation({
 /**
  * Coach "Put back on event" for a withdrawn student (owner decision 2026-11-06). Permissions mirror setParticipation: a Coach for
  * any event, a Travel Lead only for events that are not Coach-assigned. The approved withdrawal is marked reinstated, never
- * deleted, and money already moved by a reviewed withdrawal stays where it is (no charge is re-created or re-allocated; the
- * event fee is added only when the student has no charge for this event at all). The student goes back to Signed up.
+ * deleted, and money already moved by a reviewed withdrawal stays where it is (no charge is reversed or re-allocated; the
+ * current event fee is added only when no active main charge remains, see addReturnFee). The student goes back to Signed up.
  */
 export const putBackOnEvent = mutation({
   args: { eventId: v.id("events"), studentId: v.id("students"), reason: v.optional(v.string()) }, returns: v.null(),
@@ -304,8 +352,8 @@ export const putBackOnEvent = mutation({
     const request = activeApprovedWithdrawal(data.requests);
     if (request) await ctx.db.patch(request._id, { reinstatedAt: now, reinstatedBy: user._id });
     await ctx.db.patch(data.participant._id, { status: "confirmed", createdAt: now, updatedAt: now });
-    // Fee only for a student with no charge for this event yet: an earlier fee (even one the withdrawal cancelled) is never re-added here.
-    if (event.feeCents > 0 && data.charges.length === 0) await addCharge(ctx, user, data.student._id, event.name, event.feeCents, event.startsAt, `eventFee:${event._id}:${data.student._id}`, event._id);
+    // Security review 2026-11-07: the returning student owes the current fee unless an active main charge for this event remains.
+    await addReturnFee(ctx, user, data, request?._id ?? `${data.participant._id}:${now}`);
     await audit(ctx, user, "participants", data.participant._id, "putBackOnEvent", { status: "withdrawn", withdrawalRequestId: request?._id ?? null, moneyDecision: !!request?.jobId }, { status: "confirmed" }, args.reason?.trim() || undefined);
     // The student is back, so their Whole Team leave notice is no longer news for Coaches.
     if (event.assignmentScope === "wholeTeam") {

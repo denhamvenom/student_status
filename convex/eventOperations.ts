@@ -9,7 +9,7 @@ import { addCharge } from "./lib/money";
 import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
 import { activeQuestions, activeShifts, clearShifts } from "./lib/eventSignupExtras";
 import { notifySignupDecision } from "./lib/notificationTriggers";
-import { activeApprovedWithdrawal, withdrawalHistory } from "./lib/withdrawalState";
+import { activeApprovedWithdrawal, recentWithdrawals } from "./lib/withdrawalState";
 
 function requireOperations(user: Doc<"appUsers">) {
   if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Only a Coach or Travel Lead can manage events.");
@@ -43,9 +43,10 @@ export const workspace = query({
     const reserved = participants.filter(p => p.status === "pending" || p.status === "confirmed").length;
     const waitlist = students.filter(p => p.status === "waitlist").sort((a, b) => a.signedUpAt - b.signedUpAt || a.participantId.localeCompare(b.participantId));
     // Withdrawn students for "Put back on event": whether a reviewed withdrawal moved money, and whether one is still in review.
+    // Display hints only, from each student's newest rows (putBackOnEvent re-checks the full history).
     const withdrawn = [];
     for (const row of students.filter(p => p.status === "withdrawn" && p.active)) {
-      const requests = await withdrawalHistory(ctx, event._id, row.studentId);
+      const requests = await recentWithdrawals(ctx, event._id, row.studentId);
       const approved = activeApprovedWithdrawal(requests);
       withdrawn.push({ ...row, moneyDecision: !!approved?.jobId, inReview: requests.some(r => r.status === "pending" || r.status === "processing") });
     }

@@ -15,6 +15,15 @@ export async function withdrawalHistory(ctx: QueryCtx | MutationCtx, eventId: Id
 }
 
 /**
+ * The newest withdrawal rows for one event and student, newest first, for display only (never for a decision). An open
+ * request or the approved withdrawal that still blocks re-enrollment is always among the newest rows: a new request can't
+ * start while either exists. Decisions use withdrawalHistory.
+ */
+export async function recentWithdrawals(ctx: QueryCtx | MutationCtx, eventId: Id<"events">, studentId: Id<"students">, count = 3) {
+  return await ctx.db.query("withdrawalRequests").withIndex("by_eventId_and_studentId", q => q.eq("eventId", eventId).eq("studentId", studentId)).order("desc").take(count);
+}
+
+/**
  * The approved withdrawal that still blocks re-enrollment, if any. A row a Coach put back (putBackOnEvent) or a student
  * undid (undoWithdrawal) carries reinstatedAt and no longer blocks anything; its history stays.
  */

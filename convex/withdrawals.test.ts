@@ -499,6 +499,82 @@ describe("a student undoing their own automatic withdrawal", () => {
   });
 });
 
+// Security review 2026-11-07: Undo follows signUp's rules for approval, shifts and questions.
+describe("undo following the event's signup rules", () => {
+  const addQuestion = (f: AutoWithdrawn, answered: boolean) => f.t.run(async ctx => {
+    const questionId = await ctx.db.insert("eventQuestions", { eventId: f.ids.event, order: 0, kind: "shortText", prompt: "T-shirt size?", required: true });
+    if (answered) await ctx.db.insert("eventQuestionAnswers", { eventId: f.ids.event, studentId: f.ids.student, questionId, value: "M", answeredBy: f.ids.studentUser.user, updatedAt: 0 });
+  });
+  const cases: { name: string; setup: (f: AutoWithdrawn) => Promise<unknown>; restored?: "pending" | "confirmed" | "waitlist"; blocked?: string }[] = [
+    { name: "an event that now needs approval", setup: f => f.t.run(ctx => ctx.db.patch(f.ids.event, { signupMode: "approval" })), restored: "pending" },
+    { name: "an event that now needs shifts", setup: f => f.t.run(ctx => ctx.db.patch(f.ids.event, { shiftsEnabled: true })), blocked: "pick shifts" },
+    { name: "a shifts event with no minimum", setup: f => f.t.run(ctx => ctx.db.patch(f.ids.event, { shiftsEnabled: true, minShiftsPerStudent: 0 })), restored: "confirmed" },
+    { name: "a new required question", setup: f => addQuestion(f, false), blocked: "questions you haven't answered" },
+    { name: "a required question already answered", setup: f => addQuestion(f, true), restored: "confirmed" },
+  ];
+  it.each(cases)("handles $name", async ({ setup, restored, blocked }) => {
+    const f = await autoWithdrawn();
+    await setup(f);
+    const preview = await f.student.query(api.withdrawals.withdrawalPreview, { eventId: f.ids.event, studentId: f.ids.student });
+    expect(preview).toMatchObject({ canUndo: !blocked, undoBlocked: blocked ? expect.stringContaining(blocked) : null });
+    if (blocked) {
+      await expect(f.student.mutation(api.withdrawals.undoWithdrawal, { eventId: f.ids.event })).rejects.toThrow(blocked);
+      expect((await f.t.run(ctx => ctx.db.get(f.requestId)))?.reinstatedAt).toBeUndefined();
+    } else expect(await f.student.mutation(api.withdrawals.undoWithdrawal, { eventId: f.ids.event })).toBe(restored);
+    expect((await f.t.run(ctx => ctx.db.get(f.ids.participant)))?.status).toBe(restored ?? "withdrawn");
+  });
+
+  it("lets a Waitlisted student back on the waitlist without shifts", async () => {
+    const f = await freeFixture();
+    await f.t.run(async ctx => { await ctx.db.patch(f.ids.event, { startsAt: Date.now() + DAY, endsAt: Date.now() + 2 * DAY }); await ctx.db.patch(f.ids.participant, { status: "waitlist" }); });
+    await f.student.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.event, idempotencyKey: "waitlist-shifts" });
+    await f.t.run(ctx => ctx.db.patch(f.ids.event, { shiftsEnabled: true }));
+    expect(await f.student.mutation(api.withdrawals.undoWithdrawal, { eventId: f.ids.event })).toBe("waitlist");
+  });
+});
+
+// Security review 2026-11-07: a returning student owes the current fee unless an active main charge for the event remains.
+describe("the event fee when a student comes back", () => {
+  const mainCharges = (f: { t: FreeFixture["t"] }, eventId: Id<"events">, studentId: Id<"students">) => f.t.run(async ctx => (await ctx.db.query("charges").withIndex("by_eventId_and_studentId", q => q.eq("eventId", eventId).eq("studentId", studentId)).take(20)).filter(c => (c.category ?? "main") === "main"));
+  const active = (c: { amountCents: number; adjustedCents?: number; cancelledCents?: number }) => c.amountCents + (c.adjustedCents ?? 0) - (c.cancelledCents ?? 0) > 0;
+
+  it.each([
+    { name: "keeps the unpaid fee and adds none", cancelUnpaidMain: false, decision: "retain" as const, added: false },
+    { name: "adds the current fee after the old one was returned and cancelled", cancelUnpaidMain: true, decision: "full" as const, added: true },
+  ])("Put back on event $name", async ({ cancelUnpaidMain, decision, added }) => {
+    const f = await fixture();
+    const requestId = await f.student.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.event, idempotencyKey: `fee-${decision}` });
+    const expectedRevision = (await f.coach.query(api.withdrawals.withdrawalPreview, { eventId: f.ids.event, studentId: f.ids.student })).revision;
+    await f.coach.mutation(api.withdrawals.reviewWithdrawal, { requestId, decision, cancelUnpaidMain, reason: "Synthetic decision", expectedRevision });
+    await finish(f);
+    const before = await mainCharges(f, f.ids.event, f.ids.student);
+    expect(before.some(active)).toBe(!added);
+    await f.coach.mutation(api.withdrawals.putBackOnEvent, { eventId: f.ids.event, studentId: f.ids.student });
+    const after = await mainCharges(f, f.ids.event, f.ids.student);
+    expect(after.length).toBe(before.length + (added ? 1 : 0));
+    expect(after.filter(active)).toHaveLength(1);
+    if (added) expect(after.find(c => !before.some(b => b._id === c._id))).toMatchObject({ amountCents: 10000 });
+  });
+
+  it("adds the current fee on Undo when the earlier fee was cancelled, linked to the event's fee, and only once", async () => {
+    const f = await autoWithdrawn();
+    await f.t.run(ctx => ctx.db.patch(f.ids.event, { feeCents: 5000 }));
+    await f.coach.mutation(api.withdrawals.putBackOnEvent, { eventId: f.ids.event, studentId: f.ids.student });
+    const [first] = await mainCharges(f, f.ids.event, f.ids.student);
+    expect(first).toMatchObject({ amountCents: 5000 });
+    // A Coach cancels that fee and makes the event free; the student then leaves without review.
+    await f.t.run(async ctx => { await ctx.db.patch(first._id, { cancelledCents: 5000, outstanding: false }); await ctx.db.patch(f.ids.event, { feeCents: 0 }); });
+    await f.student.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.event, idempotencyKey: "leave-after-cancel" });
+    expect((await f.t.run(ctx => ctx.db.get(f.ids.participant)))?.status).toBe("withdrawn");
+    await f.t.run(ctx => ctx.db.patch(f.ids.event, { feeCents: 6000 }));
+    expect(await f.student.mutation(api.withdrawals.undoWithdrawal, { eventId: f.ids.event })).toBe("confirmed");
+    expect(await f.student.mutation(api.withdrawals.undoWithdrawal, { eventId: f.ids.event })).toBe("confirmed");
+    const charges = await mainCharges(f, f.ids.event, f.ids.student);
+    expect(charges).toHaveLength(2);
+    expect(charges.filter(active)).toEqual([expect.objectContaining({ amountCents: 6000, feeDefinitionId: first.feeDefinitionId })]);
+  });
+});
+
 describe("Whole Team leave notice after Put back on event", () => {
   it("dismisses the student's open leave notice with an audit entry", async () => {
     const f = await freeFixture();
@@ -524,7 +600,6 @@ describe("withdrawal history beyond the read limit", () => {
     { name: "withdrawal preview", run: f => f.student.query(api.withdrawals.withdrawalPreview, { eventId: f.ids.event, studentId: f.ids.student }) },
     { name: "student undo", run: f => f.student.mutation(api.withdrawals.undoWithdrawal, { eventId: f.ids.event }) },
     { name: "Coach Put back on event", run: f => f.coach.mutation(api.withdrawals.putBackOnEvent, { eventId: f.ids.event, studentId: f.ids.student }) },
-    { name: "Coach event signups", run: f => f.coach.query(api.eventOperations.workspace, { eventId: f.ids.event }) },
     { name: "Whole Team auto-enrollment", run: f => f.t.run(async ctx => {
       await ctx.db.patch(f.ids.event, { signupMode: "assigned", assignmentScope: "wholeTeam", wholeTeamParticipantCount: 1 });
       await ctx.db.delete(f.ids.participant);
@@ -540,5 +615,17 @@ describe("withdrawal history beyond the read limit", () => {
       for (let i = 0; i < 101; i++) await ctx.db.insert("withdrawalRequests", { eventId: f.ids.event, studentId: f.ids.student, participantId: f.ids.participant, status: "approved", requestedBy: f.ids.studentUser.user, requestedAt: i, reinstatedAt: i, reinstatedBy: f.ids.coach.user, idempotencyKey: `history-${i}` });
     });
     await expect(run(f)).rejects.toThrow("too many withdrawal records");
+  });
+
+  // Security review 2026-11-07: the Coach's event signups read only each withdrawn student's newest rows.
+  it("still shows Coach event signups from the newest rows", async () => {
+    const f = await freeFixture();
+    await f.t.run(async ctx => {
+      await ctx.db.patch(f.ids.participant, { status: "withdrawn" });
+      for (let i = 0; i < 101; i++) await ctx.db.insert("withdrawalRequests", { eventId: f.ids.event, studentId: f.ids.student, participantId: f.ids.participant, status: "approved", requestedBy: f.ids.studentUser.user, requestedAt: i, reinstatedAt: i, reinstatedBy: f.ids.coach.user, idempotencyKey: `history-${i}` });
+      await ctx.db.insert("withdrawalRequests", { eventId: f.ids.event, studentId: f.ids.student, participantId: f.ids.participant, status: "pending", requestedBy: f.ids.studentUser.user, requestedAt: 200, idempotencyKey: "history-open" });
+    });
+    const workspace = await f.coach.query(api.eventOperations.workspace, { eventId: f.ids.event });
+    expect(workspace.withdrawn).toEqual([expect.objectContaining({ studentId: f.ids.student, inReview: true, moneyDecision: false })]);
   });
 });
