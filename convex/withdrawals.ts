@@ -148,26 +148,44 @@ async function refused(check: () => Promise<unknown>) {
  * key; a later one links to the event's main fee definition under a key for this return, so a retry never duplicates. A canceled
  * main fee definition means the Coach stopped this fee, so nothing is added (and nothing throws).
  */
-async function addReturnFee(ctx: MutationCtx, actor: Doc<"appUsers">, data: WithdrawalData, requestId: string) {
+async function addReturnFee(ctx: MutationCtx, actor: Doc<"appUsers">, data: WithdrawalData, requestId: string): Promise<{ amountCents: number; chargeId: Id<"charges"> | null }> {
+  const none = { amountCents: 0, chargeId: null };
   const { event, student } = data;
-  if (event.feeCents <= 0) return;
+  if (event.feeCents <= 0) return none;
   const key = `eventFee:${event._id}:${student._id}`;
   const definition = await ctx.db.query("feeDefinitions").withIndex("by_seasonId_and_originKey", q => q.eq("seasonId", student.seasonId).eq("originKey", `event:${event._id}:main`)).unique();
-  if (definition && (definition.state !== "active" || definition.eventId !== event._id)) return;
-  const mainIds = new Set(data.charges.filter(charge => (charge.category ?? "main") === "main").map(charge => charge._id));
+  if (definition && (definition.state !== "active" || definition.eventId !== event._id)) return none;
+  const mains = data.charges.filter(charge => (charge.category ?? "main") === "main");
+  const mainIds = new Set(mains.map(charge => charge._id));
   let amount = event.feeCents;
   if (mainIds.size > 0) {
     const prefix = `withdraw:${requestId}:cancel:`;
-    const entries = await ctx.db.query("ledgerEntries").withIndex("by_idempotencyKey", q => q.gte("idempotencyKey", prefix).lt("idempotencyKey", `${prefix}￿`)).take(101);
-    if (entries.length > 100) throw new ConvexError("This withdrawal changed too many fees to put back here. Ask a Coach for help.");
-    amount = Math.min(event.feeCents, entries.filter(entry => entry.kind === "cancellation" && entry.chargeId !== undefined && mainIds.has(entry.chargeId)).reduce((n, entry) => n + entry.amountCents, 0));
+    const found = await ctx.db.query("ledgerEntries").withIndex("by_idempotencyKey", q => q.gte("idempotencyKey", prefix).lt("idempotencyKey", `${prefix}￿`)).take(101);
+    if (found.length > 100) throw new ConvexError("This withdrawal changed too many fees to put back here. Ask a Coach for help.");
+    const entries = found.filter(entry => entry.kind === "cancellation" && entry.chargeId !== undefined && mainIds.has(entry.chargeId));
+    amount = Math.min(event.feeCents, entries.reduce((n, entry) => n + entry.amountCents, 0));
+    // Security review 2026-11-07 (M-A): a Coach may have re-charged the fee by hand while the student was withdrawn (a correction
+    // raising a charge, or a new main charge). Subtract however much the main total rose since the withdrawal, so it is never charged twice.
+    // Each cancelled charge is taken at what the withdrawal left it (newCents), a main charge created after the withdrawal at 0, and any
+    // other charge at its current value. A waiver lowers the total but can never push the amount above what was cancelled.
+    const last = new Map<string, (typeof entries)[number]>();
+    for (const entry of entries) { const seen = last.get(entry.chargeId!); if (!seen || entry.recordedAt >= seen.recordedAt) last.set(entry.chargeId!, entry); }
+    const withdrawnAt = Math.max(0, ...entries.map(entry => entry.recordedAt));
+    let current = 0, afterWithdrawal = 0;
+    for (const charge of mains) {
+      const effective = effectiveChargeCents(charge), entry = last.get(charge._id);
+      current += effective;
+      afterWithdrawal += entry ? entry.newCents : charge._creationTime > withdrawnAt ? 0 : effective;
+    }
+    amount = Math.max(0, amount - Math.max(0, current - afterWithdrawal));
   }
-  if (amount <= 0) return;
+  if (amount <= 0) return none;
   const baseFree = !await ctx.db.query("ledgerEntries").withIndex("by_idempotencyKey", q => q.eq("idempotencyKey", key)).unique();
   // Only a student with no main charge, or an event with no fee definition yet, uses signUp's key.
-  if (baseFree && (!definition || mainIds.size === 0)) { await addCharge(ctx, actor, student._id, event.name, amount, event.startsAt, key, event._id); return; }
-  if (!definition) return;
-  await addCharges(ctx, actor, student._id, [{ label: event.name, amountCents: amount, priority: event.startsAt, idempotencyKey: `${key}:return:${requestId}`, eventId: event._id, category: "main", feeDefinitionId: definition._id }], `auto:${key}:return:${requestId}`);
+  if (baseFree && (!definition || mainIds.size === 0)) return { amountCents: amount, chargeId: await addCharge(ctx, actor, student._id, event.name, amount, event.startsAt, key, event._id) };
+  if (!definition) return none;
+  const [chargeId] = await addCharges(ctx, actor, student._id, [{ label: event.name, amountCents: amount, priority: event.startsAt, idempotencyKey: `${key}:return:${requestId}`, eventId: event._id, category: "main", feeDefinitionId: definition._id }], `auto:${key}:return:${requestId}`);
+  return { amountCents: amount, chargeId: chargeId ?? null };
 }
 
 function revision(data: Awaited<ReturnType<typeof details>>) {
@@ -338,8 +356,8 @@ export const undoWithdrawal = mutation({
 /**
  * Coach "Put back on event" for a withdrawn student (owner decision 2026-11-06). Permissions mirror setParticipation: a Coach for
  * any event, a Travel Lead only for events that are not Coach-assigned. The approved withdrawal is marked reinstated, never
- * deleted, and money already moved by a reviewed withdrawal stays where it is (no charge is reversed or re-allocated; the
- * only the fee that withdrawal removed is added back, see addReturnFee). The student goes back to Signed up.
+ * deleted, and money already moved by a reviewed withdrawal stays where it is (no charge is reversed or re-allocated; only the
+ * fee that withdrawal removed is added back, see addReturnFee). The student goes back to Signed up.
  */
 export const putBackOnEvent = mutation({
   args: { eventId: v.id("events"), studentId: v.id("students"), reason: v.optional(v.string()) }, returns: v.null(),
@@ -363,8 +381,8 @@ export const putBackOnEvent = mutation({
     if (request) await ctx.db.patch(request._id, { reinstatedAt: now, reinstatedBy: user._id });
     await ctx.db.patch(data.participant._id, { status: "confirmed", createdAt: now, updatedAt: now });
     // Security review 2026-11-07: (M-1) add back only the main fee this withdrawal removed.
-    await addReturnFee(ctx, user, data, request?._id ?? `${data.participant._id}:${now}`);
-    await audit(ctx, user, "participants", data.participant._id, "putBackOnEvent", { status: "withdrawn", withdrawalRequestId: request?._id ?? null, moneyDecision: !!request?.jobId }, { status: "confirmed" }, args.reason?.trim() || undefined);
+    const restored = await addReturnFee(ctx, user, data, request?._id ?? `${data.participant._id}:${now}`);
+    await audit(ctx, user, "participants", data.participant._id, "putBackOnEvent", { status: "withdrawn", withdrawalRequestId: request?._id ?? null, moneyDecision: !!request?.jobId }, { status: "confirmed", restoredCents: restored.amountCents, chargeId: restored.chargeId }, args.reason?.trim() || undefined);
     // The student is back, so their Whole Team leave notice is no longer news for Coaches.
     if (event.assignmentScope === "wholeTeam") {
       const notices = await ctx.db.query("wholeTeamLeaveNotices").withIndex("by_participantId", q => q.eq("participantId", data.participant._id)).take(101);

@@ -357,8 +357,7 @@ describe("putting a withdrawn student back on an event", () => {
     expect(state.participant?.status).toBe("confirmed");
     expect(state.request).toMatchObject({ status: "approved", reinstatedBy: f.coachUser });
     expect(state.request?.reinstatedAt).toBeTypeOf("number");
-    expect(await auditsFor(f.t, f.participantId)).toContainEqual({ action: "putBackOnEvent", before: { status: "withdrawn", withdrawalRequestId: f.requestId, moneyDecision }, after: { status: "confirmed" } });
-    // 
+    expect(await auditsFor(f.t, f.participantId)).toContainEqual({ action: "putBackOnEvent", before: { status: "withdrawn", withdrawalRequestId: f.requestId, moneyDecision }, after: expect.objectContaining({ status: "confirmed" }) });
     // The put back never reverses the withdrawal's cancellation (a fee added back may take returned money, so applied can change).
     if (main && before) expect(await f.t.run(ctx => ctx.db.get(main))).toMatchObject({ cancelledCents: before.cancelledCents });
     await expect(f.coach.mutation(api.withdrawals.putBackOnEvent, { eventId: f.eventId, studentId: f.studentId })).rejects.toThrow("already on this event");
@@ -577,6 +576,35 @@ describe("the event fee when a student comes back", () => {
     expect(first.some(c => c.amountCents === 8000)).toBe(true);
     await f.coach.mutation(api.withdrawals.putBackOnEvent, { eventId: f.ids.event, studentId: f.ids.student });
     expect(await mainCharges(f, f.ids.event, f.ids.student)).toHaveLength(first.length);
+  });
+
+  // Security review 2026-11-07 (M-A): a Coach who already re-charged the fee by hand while the student was withdrawn is not charged twice.
+  describe("when a Coach already re-charged the fee by hand", () => {
+    const fullCancel = dispositions[3];
+    const putBack = async (f: Awaited<ReturnType<typeof reviewedWithdrawal>>["f"]) => {
+      const before = await mainCharges(f, f.ids.event, f.ids.student);
+      await f.coach.mutation(api.withdrawals.putBackOnEvent, { eventId: f.ids.event, studentId: f.ids.student });
+      const after = await mainCharges(f, f.ids.event, f.ids.student);
+      return after.filter(c => !before.some(b => b._id === c._id)).map(c => c.amountCents);
+    };
+    it("adds nothing after a correction raised the charge back to $100", async () => {
+      const { f } = await reviewedWithdrawal(fullCancel);
+      await f.t.run(ctx => ctx.db.patch(f.ids.main, { cancelledCents: 0 }));
+      expect(await putBack(f)).toEqual([]);
+      expect(await auditsFor(f.t, f.ids.participant)).toContainEqual(expect.objectContaining({ action: "putBackOnEvent", after: { status: "confirmed", restoredCents: 0, chargeId: null } }));
+    });
+    it("adds nothing after a Coach added a separate main charge", async () => {
+      const { f } = await reviewedWithdrawal(fullCancel);
+      await f.t.run(ctx => ctx.db.insert("charges", { studentId: f.ids.student, eventId: f.ids.event, label: "Travel again", category: "main", amountCents: 10000, appliedCents: 0, priority: 4, createdBy: f.ids.coach.user, createdAt: Date.now() }));
+      expect(await putBack(f)).toEqual([]);
+    });
+    it("adds only the rest after a partial re-charge of $40 and records it in the audit row", async () => {
+      const { f } = await reviewedWithdrawal(fullCancel);
+      await f.t.run(ctx => ctx.db.patch(f.ids.main, { cancelledCents: 6000 }));
+      expect(await putBack(f)).toEqual([6000]);
+      const audits = await auditsFor(f.t, f.ids.participant);
+      expect(audits).toContainEqual(expect.objectContaining({ action: "putBackOnEvent", after: expect.objectContaining({ restoredCents: 6000, chargeId: expect.any(String) }) }));
+    });
   });
 
   it("keeps a waived fee waived", async () => {
