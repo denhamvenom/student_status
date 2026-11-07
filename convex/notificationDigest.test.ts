@@ -5,6 +5,7 @@ import { createTest } from "../testUtils";
 import type { Doc, Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { queueDigestItem, queueMoneyDigest } from "./lib/digest";
+import { queueMentorMeetingActivityDigest, queueMentorMeetingOpenDigest } from "./lib/notificationTriggers";
 
 const modules = import.meta.glob("./**/*.ts");
 // Wed 2026-01-14 5:00 PM CST: digest hour, outside quiet hours.
@@ -123,5 +124,94 @@ describe("notification digest", () => {
     vi.runOnlyPendingTimers();
     await f.t.finishInProgressScheduledFunctions();
     expect(await f.sends()).toEqual([expect.objectContaining({ title: "To-dos: 1 withdrawal request, 2 signups to review", url: "/inbox" })]);
+  });
+});
+
+describe("Mentor meeting digest (M4/M5)", () => {
+  const HOUR = 3_600_000;
+  /** Mentors: creator (Build), build, elec (Electrical), quiet (Build, "Meetings and events" turned off), invited (Build, already invited). Build and creator have a device. */
+  async function mentors(f: Awaited<ReturnType<typeof fixture>>) {
+    return await f.t.run(async ctx => {
+      const mentor = async (key: string, subteams: string[]) => {
+        const authUserId = await ctx.db.insert("users", { email: `${key}@example.invalid` });
+        const id = await ctx.db.insert("appUsers", { authUserId, email: `${key}@example.invalid`, name: key, role: "mentor", active: true, travelLead: false, financialEdit: false, subteams });
+        return { id, authUserId };
+      };
+      const m = { creator: await mentor("creator", ["Build"]), build: await mentor("build", ["Build"]), elec: await mentor("elec", ["Electrical"]), quiet: await mentor("quiet", ["Build"]), invited: await mentor("invited", ["Build"]) };
+      await ctx.db.insert("notificationPreferences", { userId: m.quiet.id, disabledCategories: ["mentorEvents"], updatedAt: 0 });
+      for (const who of [m.build, m.creator]) await ctx.db.insert("pushSubscriptions", { userId: who.id, endpoint: `https://fcm.googleapis.com/fcm/send/${who.id}`, p256dh: "key", auth: "auth", deviceLabel: "Phone", createdAt: 0 });
+      return m;
+    });
+  }
+  const meeting = (f: Awaited<ReturnType<typeof fixture>>, createdBy: Id<"appUsers">, extra: Partial<Doc<"events">> = {}) => f.t.run(async ctx => {
+    const eventId = await ctx.db.insert("events", {
+      seasonId: (await ctx.db.query("seasons").first())!._id, name: "Build Night", type: "Team", startsAt: FLUSH_NOW + 2 * 86_400_000, endsAt: FLUSH_NOW + 2 * 86_400_000 + HOUR, destination: "Lab", travel: "None", overnight: false, roomingEnabled: false,
+      feeCents: 0, signupMode: "open", allowWithdrawal: true, permissionRequired: false, firstRequired: false, archived: false, audienceKind: "everyone", mandatory: false, createdBy, ...extra,
+    });
+    return eventId;
+  });
+  const flushAt5 = async (f: Awaited<ReturnType<typeof fixture>>) => {
+    vi.setSystemTime(FLUSH_NOW);
+    await f.t.mutation(flush, {});
+    await f.t.finishInProgressScheduledFunctions();
+  };
+
+  it("M4: a new event is queued once for Mentors who can sign up, never the creator or invited Mentors, and pushed only in the 5 PM summary", async () => {
+    const f = await fixture();
+    const m = await mentors(f);
+    vi.setSystemTime(FLUSH_NOW - 7 * HOUR); // Wed 10 AM Chicago: quiet hours; the digest still holds every push
+    const everyone = await meeting(f, m.creator.id);
+    const buildOnly = await meeting(f, m.creator.id, { name: "Build subteam", audienceKind: "subteams", audienceSubteams: ["Build"] });
+    const elecOnly = await meeting(f, m.creator.id, { name: "Electrical subteam", audienceKind: "subteams", audienceSubteams: ["Electrical"] });
+    const skipped = [await meeting(f, m.creator.id, { name: "Canceled", cancelled: true }), await meeting(f, m.creator.id, { name: "Over", startsAt: FLUSH_NOW - 9 * HOUR, endsAt: FLUSH_NOW - 8 * HOUR })];
+    // Every type of event is open to Mentors (owner decision, Nov 6 2026), specific-students ones included.
+    const students = await meeting(f, m.creator.id, { name: "Students", audienceKind: "students" });
+    const competition = await meeting(f, f.ids.coach, { name: "Competition", type: "Competition", audienceKind: undefined, mandatory: undefined });
+    await f.t.run(ctx => ctx.db.insert("eventMentorInvites", { eventId: everyone, mentorUserId: m.invited.id, source: "individual", status: "invited", invitedBy: m.creator.id, createdAt: 0 }));
+    for (const eventId of [everyone, everyone, buildOnly, elecOnly, ...skipped, students, competition]) await f.t.run(ctx => queueMentorMeetingOpenDigest(ctx, { eventId }));
+    const titles = async (userId: Id<"appUsers">) => (await f.inbox(userId)).map(row => [row.title, row.category, row.pushStatus]);
+    const row = (title: string, status = "digest") => [title, "mentorEvents", status];
+    expect(await titles(m.build.id)).toEqual([row("New meeting: Build Night"), row("New meeting: Build subteam"), row("New meeting: Students"), row("New event: Competition")]);
+    expect(await titles(m.elec.id)).toEqual([row("New meeting: Build Night"), row("New meeting: Electrical subteam"), row("New meeting: Students"), row("New event: Competition")]);
+    expect(await titles(m.quiet.id)).toEqual([row("New meeting: Build Night", "skipped"), row("New meeting: Build subteam", "skipped"), row("New meeting: Students", "skipped"), row("New event: Competition", "skipped")]);
+    // Already invited to Build Night, so not that one.
+    expect(await titles(m.invited.id)).toEqual([row("New meeting: Build subteam"), row("New meeting: Students"), row("New event: Competition")]);
+    // The creator hears only about what someone else created.
+    expect(await titles(m.creator.id)).toEqual([row("New event: Competition")]);
+    for (const userId of [f.ids.coach, f.ids.parent, f.ids.studentUser]) expect(await f.inbox(userId)).toEqual([]);
+    expect(await f.sends()).toEqual([]);
+    await flushAt5(f);
+    expect(await f.sends()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ title: "Meetings: 4 new events you can join", url: "/inbox" }),
+      expect.objectContaining({ title: "Meetings: 1 new event you can join", url: `/events/${competition}` }),
+    ]));
+    expect(await f.sends()).toHaveLength(2);
+  });
+
+  it("M5: sign-ups, drop-outs and pending approvals on a Mentor's meeting reach only that creator, never for their own action or a Coach's meeting", async () => {
+    const f = await fixture();
+    const m = await mentors(f);
+    const mine = await meeting(f, m.creator.id);
+    const quietOwn = await meeting(f, m.quiet.id, { name: "Quiet meeting" });
+    const coachOwn = await meeting(f, f.ids.coach, { name: "Coach meeting" });
+    const cancelled = await meeting(f, m.creator.id, { name: "Canceled", cancelled: true });
+    const asBuild = f.t.withIdentity({ subject: `${m.build.authUserId}|session` });
+    const asCreator = f.t.withIdentity({ subject: `${m.creator.authUserId}|session` });
+    await asBuild.run(ctx => queueMentorMeetingActivityDigest(ctx, { eventId: mine, activity: "mentorJoined" }));
+    await f.t.run(ctx => queueMentorMeetingActivityDigest(ctx, { eventId: mine, activity: "studentJoined" }));
+    await f.t.run(ctx => queueMentorMeetingActivityDigest(ctx, { eventId: mine, activity: "signupPending" }));
+    await asCreator.run(ctx => queueMentorMeetingActivityDigest(ctx, { eventId: mine, activity: "mentorLeft" }));
+    for (const eventId of [quietOwn, coachOwn, cancelled]) await asBuild.run(ctx => queueMentorMeetingActivityDigest(ctx, { eventId, activity: "mentorJoined" }));
+    const rows = await f.inbox(m.creator.id);
+    expect(rows.map(row => [row.title, row.body])).toEqual([
+      ["Mentor signed up: Build Night", "A Mentor signed up for your meeting on Fri, Jan 16. Open the meeting for details."],
+      ["Student signed up: Build Night", "A student signed up for your meeting on Fri, Jan 16. Open the meeting for details."],
+      ["Signup to approve: Build Night", "A student signup for your meeting on Fri, Jan 16 is waiting for approval. Open the meeting to review it."],
+    ]);
+    expect(rows.every(row => row.category === "mentorEvents" && row.pushStatus === "digest" && row.url === `/events/${mine}`)).toBe(true);
+    expect((await f.inbox(m.quiet.id)).map(row => row.pushStatus)).toEqual(["skipped"]);
+    for (const userId of [m.build.id, m.elec.id, f.ids.coach, f.ids.parent, f.ids.studentUser]) expect(await f.inbox(userId)).toEqual([]);
+    await flushAt5(f);
+    expect(await f.sends()).toEqual([expect.objectContaining({ title: "Meetings: 1 Mentor signed up, 1 student signed up, 1 signup request to approve", url: `/events/${mine}` })]);
   });
 });

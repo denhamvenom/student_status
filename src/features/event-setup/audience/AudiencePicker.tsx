@@ -21,10 +21,12 @@ type Props = {
   id?: string
   /** The Coach's one-tap Travel Team, shown as the first choice beside Everyone. Choosing any other kind calls onChange. */
   travelTeam?: { selected: boolean; label: string; helper: string; onSelect: () => void }
+  /** A Mentor's meeting is always optional: the Required question is replaced by this note. */
+  optionalOnly?: string
 }
 
 /** Who an event is for, and whether that group is signed up automatically. */
-export function AudiencePicker({ value, onChange, students, canAutoAssign, issue, id: givenId, travelTeam }: Props) {
+export function AudiencePicker({ value, onChange, students, canAutoAssign, issue, id: givenId, travelTeam, optionalOnly }: Props) {
   const copy = audienceCopy.audience
   const autoId = useId()
   const id = givenId ?? autoId
@@ -71,8 +73,9 @@ export function AudiencePicker({ value, onChange, students, canAutoAssign, issue
     </fieldset>}
 
     {/* A Travel Lead can't make a group required, so the question would only show a disabled Yes: say what happens instead. */}
-    {group && requiredApplies(value.kind) && locked && !value.required && <p id={`${id}-required`} tabIndex={-1} className={styles.hint}>{copy.optionalOnly}</p>}
-    {group && requiredApplies(value.kind) && (!locked || value.required) && <fieldset id={`${id}-required`} tabIndex={-1} className={styles.group} aria-invalid={invalid('required') || undefined} aria-describedby={locked ? `${id}-locked` : undefined}>
+    {group && requiredApplies(value.kind) && optionalOnly !== undefined && <p id={`${id}-required`} tabIndex={-1} className={styles.hint}>{optionalOnly}</p>}
+    {group && requiredApplies(value.kind) && optionalOnly === undefined && locked && !value.required && <p id={`${id}-required`} tabIndex={-1} className={styles.hint}>{copy.optionalOnly}</p>}
+    {group && requiredApplies(value.kind) && optionalOnly === undefined && (!locked || value.required) && <fieldset id={`${id}-required`} tabIndex={-1} className={styles.group} aria-invalid={invalid('required') || undefined} aria-describedby={locked ? `${id}-locked` : undefined}>
       <legend>{copy.requiredLegend}</legend>
       <div className={`${styles.choices} ${styles.inline}`}>
         <RadioChoice name={`${id}-required`} value="yes" checked={value.required} disabled={locked} label={copy.requiredYes.label} helper={locked ? <span id={`${id}-locked`}>{copy.coachOnly}</span> : copy.requiredYes.helper} onSelect={() => set({ required: true })} />

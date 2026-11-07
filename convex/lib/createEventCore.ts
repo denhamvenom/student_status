@@ -7,9 +7,10 @@ import { scheduleEventArchive } from "../eventArchive";
 import { audit } from "./access";
 import { addCharge } from "./money";
 import { teamTransportEnabled } from "./transportation";
-import { notifyEventCreated, notifyStaffInvited } from "./notificationTriggers";
+import { notifyEventCreated, notifyStaffInvited, queueMentorMeetingOpenDigest } from "./notificationTriggers";
 import { toStoredEventFields, validateAudienceInput, type AssignmentScope, type AudienceKind, type SignupMode } from "./eventAudienceRules";
 import { isSubteamMandatory } from "./subteamEnrollment";
+import { isMentorCapable, mentorMatchesSubteams } from "./mentorMeetings";
 import type { cleanQuestion, cleanShift } from "./eventSignupExtras";
 
 export const MAX_MENTOR_INVITES = 200;
@@ -45,23 +46,36 @@ type LegacyArgs = {
   overnight: boolean; roomingEnabled: boolean; roomDeadline?: number; travel: string; onsite?: boolean;
 };
 
-/** Active, non-archived Mentors (stored role) among the ids, in order and de-duplicated. */
+/**
+ * Invitable Mentors among the ids, in order and de-duplicated: active, non-archived Mentors and Parents with a current Mentor
+ * or Travel Lead staff-access grant (lib/mentorMeetings isMentorCapable: such Parents are Mentors first). Any other id is refused.
+ */
 export async function requireInvitableMentors(ctx: MutationCtx, ids: Id<"appUsers">[]): Promise<Id<"appUsers">[]> {
   const unique = [...new Set(ids)];
   if (unique.length > MAX_MENTOR_INVITES) throw new ConvexError("Invite up to 200 Mentors at a time.");
   for (const id of unique) {
-    const mentor = await ctx.db.get(id);
-    if (!mentor || mentor.role !== "mentor" || !mentor.active || mentor.archivedAt !== undefined) throw new ConvexError("Choose Mentors from the list. One of them is no longer available.");
+    if (!isMentorCapable(await ctx.db.get(id))) throw new ConvexError("Choose Mentors from the list. One of them is no longer available.");
   }
   return unique;
 }
 
-/** Mentors whose subteams overlap the given groups (bounded). */
+/** Accounts read per list (Mentor accounts, Parents with Mentor access, Parents with Travel Lead access) when inviting by subteam. */
+export const MAX_SUBTEAM_MENTOR_LIST = 500;
+export const TOO_MANY_SUBTEAM_MENTORS_MESSAGE = "There are too many Mentors to invite by subteam. Invite them individually.";
+
+/**
+ * Mentors whose subteams overlap the given groups (legacy names canonicalized; bounded): Mentor accounts and Parents with a
+ * current Mentor or Travel Lead staff-access grant (isMentorCapable). Each list is checked on its own: when any one holds more
+ * than MAX_SUBTEAM_MENTOR_LIST accounts the invite is refused with a clear message, never silently cut short.
+ */
 export async function mentorsForSubteams(ctx: MutationCtx, groups: readonly string[]): Promise<Id<"appUsers">[]> {
-  const wanted = new Set(groups);
-  const mentors = await ctx.db.query("appUsers").withIndex("by_role", q => q.eq("role", "mentor")).take(501);
-  if (mentors.length > 500) throw new ConvexError("There are too many Mentors to invite by subteam. Invite them individually.");
-  return mentors.filter(mentor => mentor.active && mentor.archivedAt === undefined && (mentor.subteams ?? []).some(group => wanted.has(group))).map(mentor => mentor._id);
+  const lists = [
+    await ctx.db.query("appUsers").withIndex("by_role", q => q.eq("role", "mentor")).take(MAX_SUBTEAM_MENTOR_LIST + 1),
+    await ctx.db.query("appUsers").withIndex("by_parentStaffAccess", q => q.eq("parentStaffAccess", "mentor")).take(MAX_SUBTEAM_MENTOR_LIST + 1),
+    await ctx.db.query("appUsers").withIndex("by_parentStaffAccess", q => q.eq("parentStaffAccess", "travelLead")).take(MAX_SUBTEAM_MENTOR_LIST + 1),
+  ];
+  if (lists.some(list => list.length > MAX_SUBTEAM_MENTOR_LIST)) throw new ConvexError(TOO_MANY_SUBTEAM_MENTORS_MESSAGE);
+  return lists.flat().filter(mentor => isMentorCapable(mentor) && mentorMatchesSubteams(mentor, groups)).map(mentor => mentor._id);
 }
 
 /**
@@ -154,6 +168,8 @@ export async function createEventCore(ctx: MutationCtx, user: Doc<"appUsers">, s
   await audit(ctx, user, "events", id, "create", null, eventFields);
   if (!options.suppressNotifications) {
     await notifyEventCreated(ctx, { eventId: id, assignedStudentIds: assigned });
+    // M4: "new event you can join" for every Mentor who could sign up (any event type; the trigger applies selfSignupEligible).
+    await queueMentorMeetingOpenDigest(ctx, { eventId: id });
     if (invites.length) await notifyStaffInvited(ctx, { eventId: id, staffUserIds: invites.map(invite => invite.mentorUserId) });
   }
   return id;

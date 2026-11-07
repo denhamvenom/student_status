@@ -17,11 +17,14 @@ type Props = {
   issue?: PickerIssue | null
   /** Id prefix; focus `${id}-${issue.field}` to move to the problem. */
   id?: string
+  /** Team meetings: "One time" / "Repeat this meeting" with helper text instead of "Does not repeat" / "Repeats weekly". */
+  meeting?: boolean
 }
 
-/** "Does not repeat" by default; otherwise every N weeks on chosen days, until a date or a number of meetings. */
-export function RepeatPicker({ value, onChange, startDate, issue, id: givenId }: Props) {
+/** "Does not repeat" (or "One time") by default; otherwise every N weeks on chosen days, until a date or a number of meetings. */
+export function RepeatPicker({ value, onChange, startDate, issue, id: givenId, meeting = false }: Props) {
   const copy = audienceCopy.repeat
+  const choice = meeting ? copy.meeting : { legend: copy.legend, none: copy.none, noneHelp: undefined, weekly: copy.weekly, weeklyHelp: undefined }
   const days = audienceCopy.weekdays
   const autoId = useId()
   const id = givenId ?? autoId
@@ -35,10 +38,10 @@ export function RepeatPicker({ value, onChange, startDate, issue, id: givenId }:
 
   return <div className={styles.stack}>
     <fieldset className={styles.group}>
-      <legend>{copy.legend}</legend>
+      <legend>{choice.legend}</legend>
       <div className={`${styles.choices} ${styles.inline}`}>
-        <RadioChoice name={`${id}-repeats`} value="no" checked={!value.repeats} label={copy.none} onSelect={() => set({ repeats: false })} />
-        <RadioChoice name={`${id}-repeats`} value="yes" checked={value.repeats} label={copy.weekly} onSelect={turnOn} />
+        <RadioChoice name={`${id}-repeats`} value="no" checked={!value.repeats} label={choice.none} helper={choice.noneHelp} onSelect={() => set({ repeats: false })} />
+        <RadioChoice name={`${id}-repeats`} value="yes" checked={value.repeats} label={choice.weekly} helper={choice.weeklyHelp} onSelect={turnOn} />
       </div>
     </fieldset>
 

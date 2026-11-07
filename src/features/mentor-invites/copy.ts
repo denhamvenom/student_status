@@ -1,10 +1,10 @@
 // Plain words for a Mentor's own event invitations.
 export const mentorInviteCopy = {
-  title: 'Invitations',
-  description: 'Events the Coach or a Travel Lead invited you to. Let them know if you can come.',
+  title: 'Your schedule',
+  description: 'Meetings and events you’re invited to or signed up for. Let people know if you can come.',
   loading: 'Loading your invitations…',
   failed: "Your invitations can't load right now. Refresh and try again.",
-  none: 'No invitations right now. You will get a notification when you are invited.',
+  none: 'Nothing on your schedule yet. Sign up for a meeting on Home, or wait for an invitation. You’ll get a notification when you’re invited.',
   virtual: 'Virtual (Discord)',
   noPlace: 'Place not set yet',
   invited: 'Waiting for your answer',
@@ -17,14 +17,57 @@ export const mentorInviteCopy = {
   acceptedSaved: (name: string) => `Thanks! You said you'll be at ${name}.`,
   declinedSaved: (name: string) => `Got it. You said you can't go to ${name}.`,
   retry: 'Your answer was not saved. Please try again.',
-  homeTitle: 'Your next invitations',
-  homeNone: 'No upcoming invitations right now.',
-  homeAll: 'See all invitations',
-  /** /events for a Mentor: the sentence is followed by a link to Invitations. */
-  eventsUnavailable: 'Mentors see the meetings they’re invited to under',
-  eventsLink: 'Invitations',
   undoDecline: "I'll be there after all",
   declinedStatus: "You said you can't go",
-  subteams: (list: string) => `Your subteams: ${list}`,
-  editProfile: 'Edit my profile',
+  opening: 'Opening…',
+  openFailed: 'This event could not open. Reload and try again.',
+} as const
+
+const mentors = (count: number) => count === 1 ? '1 Mentor' : `${count} Mentors`
+
+/** Coach / Travel Lead event page: who it's for, and each Mentor going, invited or not coming, with their answers. */
+export const eventMentorsCopy = {
+  title: 'Who it’s for',
+  audience: 'Who it’s for',
+  required: 'Required',
+  where: 'Where',
+  invite: 'Invite more Mentors',
+  inviteButton: 'Send invitations',
+  inviting: 'Sending…',
+  invited: (count: number) => count === 0 ? 'Those Mentors were already invited.' : count === 1 ? '1 Mentor invited.' : `${count} Mentors invited.`,
+  failed: 'Invitations were not sent. Please try again.',
+  mentorsTitle: 'Mentors',
+  /** The Mentors section's always-visible line: "3 going · 1 waiting · 2 can drive · 1 hotel room". */
+  header: {
+    going: (count: number) => `${count} going`,
+    waiting: (count: number) => `${count} waiting`,
+    canDrive: (count: number) => `${count} can drive`,
+    hotelRooms: (count: number) => count === 1 ? '1 hotel room' : `${count} hotel rooms`,
+    loading: 'Loading…',
+    unavailable: 'Couldn’t load',
+  },
+  loading: 'Loading Mentors…',
+  unavailable: 'Mentor sign-ups couldn’t be loaded. Reload the page to try again.',
+  none: 'No Mentors invited or signed up yet.',
+  groups: { going: 'Going', waiting: 'Waiting for an answer', declined: 'Can’t go' },
+  status: { invited: 'No answer yet', accepted: 'Going', declined: 'Can’t go' },
+  joined: {
+    invited: 'Invited',
+    subteam: 'Invited with subteam',
+    self: 'Signed up themselves',
+    seriesAll: 'Series: every meeting',
+    seriesOne: 'Series: just this one',
+    seriesNext: (count: number) => count === 1 ? 'Series: next meeting' : `Series: next ${count}`,
+  },
+  answers: { canDrive: 'Can drive', needsHotel: 'Needs hotel room', driveUnanswered: 'Driving: no answer yet', hotelUnanswered: 'Hotel: no answer yet' },
+  counts: (going: number, waiting: number, declined: number) => [`${going} going`, waiting ? `${waiting} no answer yet` : '', declined ? `${declined} can’t go` : ''].filter(Boolean).join(' · '),
+  drivers: (count: number) => `${mentors(count)} can drive`,
+  hotelRooms: (count: number) => count === 1 ? '1 hotel room needed' : `${count} hotel rooms needed`,
+  unanswered: (drive: number, hotel: number) => [drive ? `${mentors(drive)} haven’t said if they can drive` : '', hotel ? `${mentors(hotel)} haven’t said if they need a room` : ''].filter(Boolean).join(' · '),
+} as const
+
+/** Who created an event, on Coach and Travel Lead screens. */
+export const eventCreatorCopy = {
+  createdBy: (name: string, role: string) => `Created by ${name} (${role})`,
+  mentorMeeting: 'Mentor meeting',
 } as const

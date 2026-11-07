@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calendarChoiceArg, calendarReviewText, defaultCalendarChoice, eventTypeDefaults, isLinkedCalendar, newEventStepOrder, serverProblemStep, shownStep, stepChecks } from './new-event-defaults'
+import { calendarChoiceArg, calendarReviewText, defaultCalendarChoice, eventTypeDefaults, initialRepeat, isLinkedCalendar, newEventStepOrder, repeatOnBasics, serverProblemStep, shownStep, stepChecks } from './new-event-defaults'
 
 describe('New event Team Calendar choice', () => {
   it.each([
@@ -21,6 +21,18 @@ describe('New event Team Calendar choice', () => {
     expect(calendarChoiceArg(choice)).toEqual(arg)
     expect(calendarReviewText(choice)).toBe(review)
     expect(isLinkedCalendar(choice)).toBe(linked)
+  })
+})
+
+describe('New event repeat (owner decision, Nov 7 2026: one time by default)', () => {
+  const weekly = { repeats: true, intervalWeeks: 1, weekdays: [2], ends: 'onDate', endDate: '2027-05-31', count: 10 } as const
+  it('starts one time for every role, and keeps a repeating meeting handed over by the Team meeting sheet', () => {
+    expect(initialRepeat(null).repeats).toBe(false)
+    expect(initialRepeat(undefined).repeats).toBe(false)
+    expect(initialRepeat({ ...weekly, weekdays: [2] })).toMatchObject({ repeats: true, weekdays: [2] })
+  })
+  it.each([['Team', true], ['Competition', false], ['Outreach', false], ['Fundraiser', false]] as const)('%s asks "One time or repeating?" on Basics: %s', (type, onBasics) => {
+    expect(repeatOnBasics(type)).toBe(onBasics)
   })
 })
 

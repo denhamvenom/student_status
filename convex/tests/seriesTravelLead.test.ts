@@ -54,7 +54,7 @@ function seriesArgs(name: string, offsetDays = 1) {
 }
 
 const allowed: Caller[] = ["coach", "mentorLead", "parentLead"];
-const refused: Caller[] = ["studentFlagged", "parentFlagged", "parentInParentMode"];
+const refused: Caller[] = ["studentFlagged", "parentFlagged"];
 
 describe("Travel Lead checks for recurring series", () => {
   it.each(refused)("refuses %s for create, list and editOccurrence", async caller => {
@@ -67,6 +67,22 @@ describe("Travel Lead checks for recurring series", () => {
     await expect(who.query(api.eventSeries.list, {})).rejects.toThrow(REFUSAL);
     await expect(who.mutation(api.eventSeries.editOccurrence, { eventId: firstEventId!, name: "Hijacked" })).rejects.toThrow(REFUSAL);
     expect(await f.t.run(async ctx => (await ctx.db.query("eventSeries").take(10)).length)).toBe(1);
+    expect((await f.t.run(ctx => ctx.db.get(firstEventId!)))?.name).toBe("Coach meeting");
+    expect(await f.seriesRows(seriesId)).toHaveLength(before.length);
+  });
+
+  // Owner decision (Nov 6 2026): a Parent with staff access counts as a Mentor first, whatever role the session selected. In
+  // Parent mode they may create their own optional Team meeting series, but not list or change a Coach's series.
+  it("treats parentInParentMode as a Mentor: own series only, no staff list or Coach series edits", async () => {
+    vi.useFakeTimers();
+    const f = await fixture();
+    const { seriesId, firstEventId } = await f.as(f.ids.coach).mutation(api.eventSeries.create, seriesArgs("Coach meeting"));
+    const before = await f.seriesRows(seriesId);
+    const who = f.as(f.ids.parentInParentMode);
+    const own = await who.mutation(api.eventSeries.create, seriesArgs("Parent Mentor meeting"));
+    expect((await f.t.run(ctx => ctx.db.get(own.seriesId)))?.createdBy).toBe(f.ids.parentInParentMode.id);
+    await expect(who.query(api.eventSeries.list, {})).rejects.toThrow(REFUSAL);
+    await expect(who.mutation(api.eventSeries.editOccurrence, { eventId: firstEventId!, name: "Hijacked" })).rejects.toThrow(REFUSAL);
     expect((await f.t.run(ctx => ctx.db.get(firstEventId!)))?.name).toBe("Coach meeting");
     expect(await f.seriesRows(seriesId)).toHaveLength(before.length);
   });

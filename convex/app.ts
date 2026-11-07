@@ -7,6 +7,8 @@ import { seriesProgress } from "./lib/seriesGenerate";
 import { eventVisibleFor, parentLinkedStudentsFallback, parentLinkedStudentsOrNull, participationOn, requireStudentOrParentCanSeeEvent } from "./lib/eventVisibility";
 import { resolveAudience } from "./lib/eventAudienceRules";
 import { eventDetailReturns, familyEvent, listEventsReturns } from "./lib/eventProjection";
+import { creatorCaches, eventCreatorFor } from "./lib/eventCreator";
+import { seriesOf } from "./lib/mentorMeetings";
 import { activeSeason, identity, linkedStudents, maybeViewer, mentorEvent, mentorStudent, privateStudent, publicStudent, studentGroups, requireRole, studentAccess, viewer as requireViewer, audit } from "./lib/access";
 import { attendanceFor, financeFor, studentReadiness } from "./lib/readModels";
 import { coverageFor } from "./lib/permissionCoverage";
@@ -49,7 +51,13 @@ export const listEvents = query({
     const season = await activeSeason(ctx);
     const events = await ctx.db.query("events").withIndex("by_seasonId_and_archived_and_endsAt", q => q.eq("seasonId", season._id).eq("archived", false)).take(200).then(rows => rows.sort((a, b) => a.startsAt - b.startsAt));
     if (user.role === "mentor" && !user.travelLead) return events.filter(x => !x.archived).map(event => ({ event: mentorEvent(event), participation: null }));
-    if (user.role === "coach" || user.travelLead) return events.filter(x => !x.archived).map(event => ({ event, participation: null }));
+    if (user.role === "coach" || user.travelLead) {
+      // Coach and Travel Lead also see who created each event (name and role label only), read once per creator and series.
+      const caches = creatorCaches();
+      const rows = [];
+      for (const event of events) if (!event.archived) rows.push({ event, participation: null, createdBy: await eventCreatorFor(ctx, event, caches) });
+      return rows;
+    }
     // Students and Parents see only events for them: legacy events, events a student is on, or whose audience includes a student.
     // Participation is a point lookup per candidate event (by_eventId_and_studentId), so a long signup history can't hide events.
     if (user.role === "parent") {
@@ -100,10 +108,13 @@ export const eventDetail = query({
     }
     if (user.role === "mentor" && !user.travelLead) return { event: mentorEvent(event), participation: null, requirements: [], readiness: null };
     // Staff (Coach, Travel Lead) also get where a series meeting sits: meetings exist through a rolling window and more are
-    // added automatically. `series` is null for a single event and absent for Students and Parents.
+    // added automatically. `series` is null for a single event and absent for Students and Parents. `createdBy` (the creator's
+    // name and role label) is staff only too.
     const staff = user.role === "coach" || (user.role === "mentor" && user.travelLead);
-    const seriesDoc = staff && event.seriesId ? await ctx.db.get(event.seriesId) : null;
-    const staffSeries = staff ? { series: seriesDoc ? { seriesId: seriesDoc._id, name: seriesDoc.name, status: seriesDoc.status, ...seriesProgress(seriesDoc) } : null } : {};
+    // The series is read once through the creator caches, so eventCreatorFor reuses it.
+    const caches = creatorCaches();
+    const seriesDoc = staff && event.seriesId ? await seriesOf(ctx, event.seriesId, caches.series) : null;
+    const staffSeries = staff ? { series: seriesDoc ? { seriesId: seriesDoc._id, name: seriesDoc.name, status: seriesDoc.status, ...seriesProgress(seriesDoc) } : null, createdBy: await eventCreatorFor(ctx, event, caches) } : {};
     const student = args.studentId ? await studentAccess(ctx, user, args.studentId) : null;
     // Students and Parents never get a Mentors-only event, nor a targeted event outside their students' audience that none
     // of them is on; while a Parent's Family links are still being prepared, only events a linked student is on (same rule as

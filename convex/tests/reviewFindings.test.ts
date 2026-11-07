@@ -132,9 +132,15 @@ describe("series authorization and generation", () => {
     expect(invites).toHaveLength(0);
     expect((await f.t.run(ctx => ctx.db.get(seriesId)))?.mentorInviteIds).toEqual([]);
 
+    // Losing Travel Lead alone is not enough: an optional Team series for Everyone is within the plain-Mentor limits, so it keeps going.
     await f.t.run(ctx => ctx.db.patch(f.ids.lead.id, { travelLead: false }));
     await f.t.mutation(internal.eventSeries.generate, { seriesId, toKey: addDays(today(), 78) });
-    expect(await seriesRows(f, seriesId)).toHaveLength(9);
+    expect(await seriesRows(f, seriesId)).toHaveLength(11);
+    expect(await f.t.run(ctx => ctx.db.get(seriesId))).toMatchObject({ status: "active" });
+    // A deactivated creator can no longer manage anything: generation stops and the series goes to review.
+    await f.t.run(ctx => ctx.db.patch(f.ids.lead.id, { active: false }));
+    await f.t.mutation(internal.eventSeries.generate, { seriesId, toKey: addDays(today(), 92) });
+    expect(await seriesRows(f, seriesId)).toHaveLength(11);
     expect(await f.t.run(ctx => ctx.db.get(seriesId))).toMatchObject({ status: "needsReview", calendarError: expect.stringContaining("can no longer manage") });
   });
 });

@@ -1,9 +1,14 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { ConvexError } from "convex/values";
+import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
-import { queueDigestItem } from "./digest";
+import { MAX_DIGEST_USERS, queueDigestItem } from "./digest";
 import { eventEligibleStudentIds, eventParticipantStudentIds } from "./eventAudience";
+import { eventCreatorId, isMentorCapable, listMeetingMentors, MAX_MEETING_MENTORS, mentorMeetingCreatorId, selfSignupEligible } from "./mentorMeetings";
+import { MEETING_ACTIVITY, queueMentorDigestItem, type MeetingActivity } from "./notificationDigestRules";
 import { coachAndTravelLeadUserIds, notifyUsers, parentUserIdsForStudents, studentUserIds } from "./notify";
+import { chicagoDate } from "./calendarDates";
 import { formatChicagoDay, formatChicagoTime } from "./reminderSchedule";
 
 /**
@@ -34,6 +39,13 @@ function claim(ids: Id<"appUsers">[], taken: Set<Id<"appUsers">>) {
   return fresh;
 }
 
+/** The signed-in account making the change, or null (Calendar sync, scheduled work). */
+async function actorAppUser(ctx: MutationCtx): Promise<Doc<"appUsers"> | null> {
+  const authUserId = await getAuthUserId(ctx);
+  if (!authUserId) return null;
+  return await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", authUserId)).unique();
+}
+
 // ---------- Schedule (urgent unless a Travel Lead made the change; "Back on" is never urgent) ----------
 
 async function participantsAndParents(ctx: MutationCtx, event: Event) {
@@ -42,21 +54,28 @@ async function participantsAndParents(ctx: MutationCtx, event: Event) {
 }
 
 /**
+ * M1: the meeting's Mentors hear about its schedule changes: invited, accepted and self-signed-up Mentors, and a Mentor
+ * creator (even one who declined their own row). Never the account that made the change.
+ */
+async function meetingMentorIds(ctx: MutationCtx, eventId: Id<"events">): Promise<Id<"appUsers">[]> {
+  const actor = await actorAppUser(ctx);
+  return (await listMeetingMentors(ctx, eventId)).filter(mentor => (mentor.isCreator || mentor.status !== "declined") && mentor.userId !== actor?._id).map(mentor => mentor.userId);
+}
+
+/**
  * Urgent only when a Coach made the change or no one is signed in (Calendar sync observed it). A Travel Lead's change
  * (a Mentor, or a Parent with Travel Lead staff access) is a normal schedule notice.
  */
 async function scheduleChangeIsUrgent(ctx: MutationCtx): Promise<boolean> {
-  const authUserId = await getAuthUserId(ctx);
-  if (!authUserId) return true;
-  const actor = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", authUserId)).unique();
-  return actor?.role === "coach";
+  if (!await getAuthUserId(ctx)) return true;
+  return (await actorAppUser(ctx))?.role === "coach";
 }
 
-/** Students on the event and their Parents: the event was canceled. Once per event, however often it is toggled. */
+/** Students on the event, their Parents and the meeting's Mentors (M1): the event was canceled. Once per event, however often it is toggled. */
 export async function notifyEventCancelled(ctx: MutationCtx, args: { eventId: Id<"events">; urgent?: boolean }): Promise<void> {
   const event = await ctx.db.get(args.eventId);
   if (!event || ended(event)) return;
-  const userIds = await participantsAndParents(ctx, event);
+  const userIds = [...new Set([...await participantsAndParents(ctx, event), ...await meetingMentorIds(ctx, event._id)])];
   if (!userIds.length) return;
   await notifyUsers(ctx, { userIds, category: "schedule", urgent: args.urgent ?? true, url: eventUrl(event._id), dedupeKey: `cancelled:${event._id}`, title: `Canceled: ${event.name}`, body: `${event.name} on ${formatChicagoDay(event.startsAt)} is canceled. Open the event for details.` });
 }
@@ -65,20 +84,21 @@ export async function notifyEventCancelled(ctx: MutationCtx, args: { eventId: Id
 export async function notifyEventRestored(ctx: MutationCtx, args: { eventId: Id<"events"> }): Promise<void> {
   const event = await ctx.db.get(args.eventId);
   if (!event || event.cancelled || ended(event)) return;
-  const userIds = await participantsAndParents(ctx, event);
+  const userIds = [...new Set([...await participantsAndParents(ctx, event), ...await meetingMentorIds(ctx, event._id)])];
   if (!userIds.length) return;
   await notifyUsers(ctx, { userIds, category: "schedule", urgent: false, url: eventUrl(event._id), dedupeKey: `restored:${event._id}`, title: `Back on: ${event.name}`, body: `${event.name} is back on for ${when(event.startsAt)}. Open the event for details.` });
 }
 
 /**
- * Students on the event and their Parents: time or place changed. When the change reset permission coverage, Parents of
+ * Students on the event, their Parents and the meeting's Mentors (M1): time or place changed. When the change reset permission coverage, Parents of
  * students whose form must be signed again are sent to Forms instead of the event page.
  */
 export async function notifyEventChanged(ctx: MutationCtx, args: { eventId: Id<"events">; coverageReset: boolean }): Promise<void> {
   const event = await ctx.db.get(args.eventId);
   if (!event || event.cancelled || ended(event)) return;
   const studentIds = await eventParticipantStudentIds(ctx, event._id);
-  if (!studentIds.length) return;
+  const mentors = await meetingMentorIds(ctx, event._id);
+  if (!studentIds.length && !mentors.length) return;
   const place = event.destination.trim();
   const body = `Now ${when(event.startsAt)}${place ? ` at ${place}` : ""}. Open the event for details.`;
   const title = `Schedule changed: ${event.name}`;
@@ -93,7 +113,7 @@ export async function notifyEventChanged(ctx: MutationCtx, args: { eventId: Id<"
     if (parents.length) await notifyUsers(ctx, { ...base, userIds: parents, url: "/forms", body: `Now ${when(event.startsAt)}${place ? ` at ${place}` : ""}. A permission form needs a new signature.` });
   }
   const { students, parents } = await studentsAndParents(ctx, studentIds);
-  const rest = claim([...students, ...parents], taken);
+  const rest = claim([...students, ...parents, ...mentors], taken);
   if (rest.length) await notifyUsers(ctx, { ...base, userIds: rest, url: eventUrl(event._id), body });
 }
 
@@ -278,4 +298,100 @@ export async function queueJoinRequestDigest(ctx: MutationCtx): Promise<void> {
 
 export async function queueProfileCorrectionDigest(ctx: MutationCtx): Promise<void> {
   await queueStaff(ctx, { kind: "profileCorrection", url: "/adults", title: "Profile correction to review", body: "A family asked for a profile correction. Open the review list to decide." });
+}
+
+// ---------- Mentor meetings: 5 PM digest for Mentors ("mentorEvents" category, see lib/notificationDigestRules.ts) ----------
+
+/**
+ * M4: Mentors who can sign up for a new event of ANY type (selfSignupEligible: everything except events for other subteams
+ * only). Mentor accounts and Parents with Mentor or Travel Lead staff access (isMentorCapable). Not the creator, not the
+ * account creating it, not Mentors already invited. Queued for the 5 PM digest, once per Mentor per event. Call once when an
+ * event is created; for a new series pass its first meeting.
+ */
+export async function queueMentorMeetingOpenDigest(ctx: MutationCtx, args: { eventId: Id<"events"> }): Promise<void> {
+  const actor = await actorAppUser(ctx);
+  await queueMentorMeetingOpenDigestPage(ctx, { eventId: args.eventId, cursor: null, actorId: actor?._id });
+}
+
+/** Mentor accounts read per transaction for M4; further pages run as scheduled follow-up mutations. */
+export const OPEN_DIGEST_PAGE_SIZE = 200;
+
+/** M4 page size: the default when unset; a non-finite value is refused; otherwise a whole number from 1 to MAX_DIGEST_USERS. */
+export function openDigestPageSize(pageSize: number | undefined): number {
+  const size = pageSize ?? OPEN_DIGEST_PAGE_SIZE;
+  if (!Number.isFinite(size)) throw new ConvexError("The digest page size must be a finite number.");
+  return Math.max(1, Math.min(Math.floor(size), MAX_DIGEST_USERS));
+}
+
+/** Parents with each staff-access grant queued inline on M4's last Mentor page; a longer list is paged (OpenDigestPhase). */
+export const MAX_INLINE_PARENT_MENTORS = 200;
+
+/** Which accounts an M4 page reads: Mentor accounts (by_role), or Parents with Mentor / Travel Lead staff access (by_parentStaffAccess). */
+export type OpenDigestPhase = "mentor" | "parentMentor" | "parentTravelLead";
+const PARENT_ACCESS = { parentMentor: "mentor", parentTravelLead: "travelLead" } as const;
+
+/**
+ * One page of M4 recipients. The "mentor" phase (the default) reads Mentor accounts by the role index (`pageSize` at a time),
+ * queues the eligible ones, and while more remain schedules `internal.mentorMeetings.continueOpenDigest` for the next page, so
+ * every Mentor is covered without one transaction reading them all. Its last page also covers Parents with Mentor or Travel
+ * Lead staff access: a grant list of up to MAX_INLINE_PARENT_MENTORS is queued in the same transaction; a longer one is never
+ * cut short but paged in its own phase ("parentMentor" / "parentTravelLead", one paginated read per transaction).
+ * Re-checks the event each page. Returns the next cursor of the phase being paged, or null when that phase is done.
+ */
+export async function queueMentorMeetingOpenDigestPage(ctx: MutationCtx, args: { eventId: Id<"events">; cursor: string | null; actorId?: Id<"appUsers">; pageSize?: number; phase?: OpenDigestPhase }): Promise<string | null> {
+  const pageSize = openDigestPageSize(args.pageSize);
+  const phase = args.phase ?? "mentor";
+  const event = await ctx.db.get(args.eventId);
+  const now = Date.now();
+  if (!event || event.cancelled || ended(event)) return null;
+  const skip = new Set<Id<"appUsers">>();
+  const creatorId = await eventCreatorId(ctx, event);
+  if (creatorId) skip.add(creatorId);
+  if (args.actorId) skip.add(args.actorId);
+  for (const row of await ctx.db.query("eventMentorInvites").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(MAX_MEETING_MENTORS + 1)) skip.add(row.mentorUserId);
+  const eligible = (user: Doc<"appUsers">) => isMentorCapable(user) && !skip.has(user._id) && selfSignupEligible(user, event, now);
+  const place = event.destination.trim();
+  const queue = async (userIds: Id<"appUsers">[]) => {
+    if (!userIds.length) return;
+    await queueMentorDigestItem(ctx, { userIds, kind: "mentorMeetingOpen", url: eventUrl(event._id), dedupeKey: `m4:${event._id}`, title: `${event.type === "Team" ? "New meeting" : "New event"}: ${event.name}`, body: `${when(event.startsAt)}${place ? ` at ${place}` : ""}. Open it to sign up.` });
+  };
+  const schedule = (next: OpenDigestPhase, cursor: string | null) => ctx.scheduler.runAfter(0, internal.mentorMeetings.continueOpenDigest, {
+    eventId: args.eventId, cursor, ...(next !== "mentor" ? { phase: next } : {}), ...(args.actorId ? { actorId: args.actorId } : {}), ...(args.pageSize !== undefined ? { pageSize } : {}),
+  });
+  const page = phase === "mentor"
+    ? await ctx.db.query("appUsers").withIndex("by_role", q => q.eq("role", "mentor")).paginate({ numItems: pageSize, cursor: args.cursor })
+    : await ctx.db.query("appUsers").withIndex("by_parentStaffAccess", q => q.eq("parentStaffAccess", PARENT_ACCESS[phase])).paginate({ numItems: pageSize, cursor: args.cursor });
+  await queue(page.page.filter(eligible).map(user => user._id));
+  if (!page.isDone) {
+    await schedule(phase, page.continueCursor);
+    return page.continueCursor;
+  }
+  if (phase === "mentor") {
+    for (const next of ["parentMentor", "parentTravelLead"] as const) {
+      const parents = await ctx.db.query("appUsers").withIndex("by_parentStaffAccess", q => q.eq("parentStaffAccess", PARENT_ACCESS[next])).take(MAX_INLINE_PARENT_MENTORS + 1);
+      if (parents.length > MAX_INLINE_PARENT_MENTORS) await schedule(next, null); // too many for this transaction: page them all
+      else await queue(parents.filter(eligible).map(user => user._id));
+    }
+  }
+  return null;
+}
+
+/**
+ * M5: the Mentor who created the meeting (mentorMeetingCreatorId: its createdBy or the series creator, only while the event is
+ * still a Mentor meeting and the creator is still a Mentor, isMentorCapable): a Mentor or student
+ * signed up or dropped out, or a student signup is waiting for approval. Not sent when the creator did it, or for canceled,
+ * archived or past meetings. Queued for the 5 PM digest.
+ */
+export async function queueMentorMeetingActivityDigest(ctx: MutationCtx, args: { eventId: Id<"events">; activity: MeetingActivity }): Promise<void> {
+  const event = await ctx.db.get(args.eventId);
+  if (!event || event.cancelled || ended(event)) return;
+  const creatorId = await mentorMeetingCreatorId(ctx, event);
+  const creator = creatorId ? await ctx.db.get(creatorId) : null;
+  if (!isMentorCapable(creator)) return;
+  const actor = await actorAppUser(ctx);
+  if (actor?._id === creator._id) return;
+  const text = MEETING_ACTIVITY[args.activity];
+  // One item per meeting + actor + activity + Chicago day, so sign-up/withdraw toggling doesn't repeat for the creator.
+  const dedupeKey = `m5:${event._id}:${actor?._id ?? "system"}:${args.activity}:${chicagoDate(Date.now())}`;
+  await queueMentorDigestItem(ctx, { userIds: [creator._id], dedupeKey, kind: text.kind, url: eventUrl(event._id), title: text.title(event.name), body: text.body(formatChicagoDay(event.startsAt)) });
 }

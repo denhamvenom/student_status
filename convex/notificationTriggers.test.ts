@@ -49,7 +49,9 @@ async function fixture() {
   const join = (eventId: Id<"events">, studentIndexes: number[], status: "confirmed" | "pending" = "confirmed") => t.run(async ctx => {
     for (const i of studentIndexes) await ctx.db.insert("participants", { eventId, studentId: ids.students[i], status, createdAt: NOW, updatedAt: NOW });
   });
-  const inbox = () => t.run(ctx => ctx.db.query("notifications").take(200));
+  // Student/Parent/staff event notices only: the Mentor-only M4 digest ("mentorEvents", every new event a Mentor can sign up
+  // for) is covered in notificationDigest.test.ts and tests/mentorSignupV2.test.ts.
+  const inbox = async () => (await t.run(ctx => ctx.db.query("notifications").take(200))).filter(row => row.category !== "mentorEvents");
   const name = (userId: Id<"appUsers">) => {
     if (userId === ids.parentA.app) return "parentA";
     if (userId === ids.parentB.app) return "parentB";
@@ -256,5 +258,64 @@ describe("D3 staff digest", () => {
     expect(rows.every(row => row.category === "staff" && row.pushStatus === "digest" && !row.urgent)).toBe(true);
     const items = await f.t.run(ctx => ctx.db.query("notificationDigestItems").take(20));
     expect(items.map(item => item.kind).sort()).toEqual(["profileCorrection", "profileCorrection", "withdrawalRequest", "withdrawalRequest"]);
+  });
+});
+
+describe("M1 Mentor schedule notices", () => {
+  /**
+   * A Team meeting created by Mentor "creator", with Mentors invited / accepted / self-signed-up / declined, an outsider
+   * Mentor, student s0 confirmed, and Parent A (s0's Parent) also invited with Mentor staff access.
+   */
+  async function mentorFixture(extra: Record<string, unknown> = {}) {
+    const f = await fixture();
+    const m = await f.t.run(async ctx => {
+      const mentor = async (name: string, subteams: string[] = ["Build"]) => {
+        const auth = await ctx.db.insert("users", { email: `${name}@synthetic.test`, name });
+        const app = await ctx.db.insert("appUsers", { authUserId: auth, email: `${name}@synthetic.test`, name, role: "mentor", travelLead: false, financialEdit: false, active: true, subteams });
+        return { auth, app };
+      };
+      const creator = await mentor("creator"), invited = await mentor("invited"), accepted = await mentor("accepted"), self = await mentor("self"), declined = await mentor("declined"), outsider = await mentor("outsider", ["Electrical"]);
+      await ctx.db.patch(f.ids.parentA.app, { parentStaffAccess: "mentor" });
+      const eventId = await ctx.db.insert("events", {
+        seasonId: f.ids.season, name: "Team build", type: "Team", startsAt: NOW + 2 * DAY, endsAt: NOW + 2 * DAY + 3_600_000, destination: "Lab", travel: "None", overnight: false, roomingEnabled: false,
+        feeCents: 0, signupMode: "open", allowWithdrawal: true, permissionRequired: false, firstRequired: false, archived: false, audienceKind: "everyone", mandatory: false, createdBy: creator.app, ...extra,
+      });
+      const invite = (who: Id<"appUsers">, status: "invited" | "accepted" | "declined", source: "individual" | "self" = "individual") => ctx.db.insert("eventMentorInvites", { eventId, mentorUserId: who, source, status, invitedBy: creator.app, createdAt: NOW });
+      await invite(invited.app, "invited"); await invite(accepted.app, "accepted"); await invite(self.app, "accepted", "self"); await invite(declined.app, "declined"); await invite(f.ids.parentA.app, "accepted");
+      return { creator, invited, accepted, self, declined, outsider, eventId };
+    });
+    await f.join(m.eventId, [0]);
+    const names = new Map<Id<"appUsers">, string>([[m.creator.app, "creator"], [m.invited.app, "invited"], [m.accepted.app, "accepted"], [m.self.app, "self"], [m.declined.app, "declined"], [m.outsider.app, "outsider"]]);
+    const who = (userId: Id<"appUsers">) => names.get(userId) ?? f.name(userId);
+    const rows = async () => (await f.inbox()).map(row => ({ ...row, who: who(row.userId) }));
+    return { ...f, m, rows };
+  }
+
+  it("a Mentor creator's cancellation reaches the meeting's Mentors, students and Parents once each, not urgent, and waits out quiet hours", async () => {
+    vi.setSystemTime(Date.parse("2026-01-14T16:00:00Z")); // Wed 10:00 AM Chicago: quiet hours
+    const f = await mentorFixture();
+    await f.as(f.m.creator.auth).mutation(api.mentorMeetings.cancelMeeting, { eventId: f.m.eventId });
+    const rows = await f.rows();
+    // Not the creator (they made the change), not the declined or outsider Mentor; Parent A once although Parent and invited Mentor.
+    expect(rows.map(row => row.who).sort()).toEqual(["accepted", "invited", "parentA", "s0", "self"]);
+    for (const row of rows) expect(row).toMatchObject({ category: "schedule", urgent: false, pushStatus: "deferred", title: "Canceled: Team build", url: `/events/${f.m.eventId}` });
+  });
+
+  it("Coach changes reach the Mentor creator too: canceled (urgent), back on, and a time change on a Mentors-only meeting", async () => {
+    const f = await mentorFixture();
+    await f.coach.mutation(api.eventCalendar.update, { eventId: f.m.eventId, cancelled: true });
+    await f.coach.mutation(api.eventCalendar.update, { eventId: f.m.eventId, cancelled: false });
+    const rows = await f.rows();
+    const expected = ["accepted", "creator", "invited", "parentA", "s0", "self"];
+    expect(rows.filter(row => row.title.startsWith("Canceled")).map(row => [row.who, row.urgent]).sort()).toEqual(expected.map(who => [who, true]));
+    expect(rows.filter(row => row.title.startsWith("Back on")).map(row => [row.who, row.urgent]).sort()).toEqual(expected.map(who => [who, false]));
+
+    const mentorsOnly = await mentorFixture({ audienceKind: "mentorsOnly", calendarChoice: "create" });
+    await mentorsOnly.t.run(async ctx => { for (const row of await ctx.db.query("participants").withIndex("by_eventId_and_status", q => q.eq("eventId", mentorsOnly.m.eventId)).take(10)) await ctx.db.delete(row._id); });
+    await mentorsOnly.coach.mutation(api.eventCalendar.update, { eventId: mentorsOnly.m.eventId, expectedRevision: 0, startsAt: NOW + 3 * DAY, endsAt: NOW + 3 * DAY + 3_600_000 });
+    const changed = await mentorsOnly.rows();
+    // calendarChoice "create" links the meeting to Team Calendar, so it is no longer a Mentor meeting: its creator isn't notified.
+    expect(changed.map(row => row.who).sort()).toEqual(["accepted", "invited", "parentA", "self"]);
+    for (const row of changed) expect(row).toMatchObject({ category: "schedule", title: "Schedule changed: Team build", url: `/events/${mentorsOnly.m.eventId}` });
   });
 });

@@ -18,7 +18,17 @@ Accepted deferrals are listed in [KNOWN_GAPS.md](KNOWN_GAPS.md); consult them on
 
 - Fee due dates (owner, October 27): let a Coach set a due date on a fee so Highlights can flag a payment as past due before the event starts. Until then "past due" means unpaid after the event start. This is a money change; read DECISIONS.md first.
 - Student Home release prerequisites: before kickoff (January 9, 2027), and with owner approval, run Recalculate attendance on production so the new build-hours totals fill in, and set each season's build-hours target on the Season page.
-- Mentor home page (owner, November 4, 2026; next sprint): a designed Mentor home like the Parent and Student homes, replacing the interim stack.
+- Mentor Home follow-ups (November 7, 2026). The Mentor home page itself is built on `feat/mentor-home` and awaits release ([pre-release receipt](releases/RELEASE_2026-11-07_MENTOR_HOME.md)). Remaining:
+  - M5 "student dropped out" (`studentLeft`) notice to a Mentor meeting's creator: wire it after the owner's withdrawals branch lands.
+  - Edit a one-time meeting to make it repeat (today it must be recreated as a series).
+  - Join list filter and search.
+  - Series row wording on the Join list when the Mentor is already signed up for some meetings.
+  - Use Mentors' "can drive" and "hotel room" answers in Transport and Rooming planning.
+  - A Travel Lead without a subteam sees an empty Who's here now; decide what to show instead.
+  - Greeting and date heading on Mentor Home.
+  - Coach team-wide Mentor overview (who is going to what, across events).
+  - Store the creator's role label at creation time (Created by currently reads the creator's role now).
+  - Theme flash on load.
 - Travel Lead check tightening: change about 20 pre-existing loose checks to `coach || (mentor && travelLead)`; line list in [HANDOFF.md](../HANDOFF.md#next), gap in KNOWN_GAPS.
 - Roster bulk edit and assigning CAD/Leadership from the roster subteam dropdown.
 - Student Home wording: carousel, FIRST registration/Consent & Release jargon, doubled "optional" label on open signups.

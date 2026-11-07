@@ -54,7 +54,12 @@ describe("secondary subteam, leadership and Mentor subteam permissions", () => {
     await expect(f.coach.mutation(api.studentSubteams.setMentorSubteams, { userId: f.ids.build.id, subteams: ["Build"] })).rejects.toThrow("active Mentor");
     await f.coach.mutation(api.studentSubteams.setMentorSubteams, args);
     expect(await f.lead.query(api.studentSubteams.listMentorsForInvite, {})).toContainEqual({ id: f.ids.mentor.id, name: "ab-mentor", subteams: ["Build", "CAD"] });
-    await expect(f.mentor.query(api.studentSubteams.listMentorsForInvite, {})).rejects.toThrow("Coach or Travel Lead");
+    // A plain stored Mentor may read the minimized list (id, name, subteams only); students and parents may not.
+    const asMentor = await f.mentor.query(api.studentSubteams.listMentorsForInvite, {});
+    expect(asMentor).toContainEqual({ id: f.ids.mentor.id, name: "ab-mentor", subteams: ["Build", "CAD"] });
+    for (const row of asMentor) expect(Object.keys(row).sort()).toEqual(["id", "name", "subteams"]);
+    await expect(f.build.query(api.studentSubteams.listMentorsForInvite, {})).rejects.toThrow("Coach or Mentor");
+    await expect(f.parent.query(api.studentSubteams.listMentorsForInvite, {})).rejects.toThrow("Coach or Mentor");
   });
 });
 

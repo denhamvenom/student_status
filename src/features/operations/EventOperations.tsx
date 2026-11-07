@@ -13,6 +13,7 @@ import { WholeTeamLeaveNotices } from "../../Withdrawals";
 import { ConfirmAction } from "../../ConfirmAction";
 import { EventCalendarOperations } from './EventCalendarOperations'
 import { EventAudienceOperations } from './EventAudienceOperations'
+import { EventMentorsSection } from './EventMentorsSection'
 import { SignupQuestionsEditor } from '../event-setup/SignupQuestionsEditor'
 import { ShiftsEditor, type ShiftSettings } from '../event-setup/ShiftsEditor'
 import { SignupResponses } from '../event-setup/SignupResponses'
@@ -111,7 +112,8 @@ export function EventOperations({ eventId, coach=false }: { eventId: Id<"events"
       {withdrawn.length > 0 && <div><h3 className="font-semibold">{operationsCopy.event.withdrawn}</h3><div className={styles.sectionRows}>{withdrawn.map(p => <div className={styles.sectionRow} key={p.participantId}><span className="min-w-40">{p.name}{p.moneyDecision && <span className="muted block">{operationsCopy.event.moneyNotReversed}</span>}</span>{p.inReview ? <span className="muted">{operationsCopy.event.withdrawalInReview}</span> : canPutBack && <ConfirmAction disabled={busy} description={operationsText.event.confirmPutBack(p.name, p.moneyDecision)} onConfirm={async () => { setError(""); setSuccess(""); await putBack({ eventId, studentId: p.studentId }); setSuccess(operationsText.event.putBack(p.name)); }}>{operationsCopy.event.putBackOnEvent}</ConfirmAction>}</div>)}</div></div>}
       {event.assignmentScope==="wholeTeam"&&<WholeTeamLeaveNotices eventId={eventId} coach={coach}/>}
     </CardContent></Card></div></details>
-    <EventAudienceOperations eventId={eventId} event={event}/>
+    <EventMentorsSection eventId={eventId} open={!event.archived && !event.cancelled}/>
+    <EventAudienceOperations event={event}/>
     <EventCalendarOperations eventId={eventId} coach={canEdit} event={event}/>
     {showSettings && <details className={styles.disclosure}><summary><strong>{operationsCopy.event.eventSettings}</strong>{settingsSummary && <span>{settingsSummary}</span>}</summary><div className={styles.disclosureBody}><Card><CardContent><form className="form-grid" onSubmit={submitSettings}>
       {canEdit && event.signupMode !== "assigned" && <><label>{operationsCopy.event.capacityNoLimit} <Input type="number" min="1" max="500" value={capacityValue} onChange={e => setCapacity(e.target.value)} /></label><label>{operationsCopy.event.signupClosesLocal} <Input type="datetime-local" value={signupValue} onChange={e => setSignupDeadline(e.target.value)} /></label></>}
