@@ -32,6 +32,7 @@ Accepted deferrals are listed in [KNOWN_GAPS.md](KNOWN_GAPS.md); consult them on
 - Roster bulk edit and assigning CAD/Leadership from the roster subteam dropdown.
 - Student Home wording: carousel, FIRST registration/Consent & Release jargon, doubled "optional" label on open signups.
 - Owner decision: whether Travel Leads keep adding/removing Mentor invitations on Coach-only required events (current policy allows it).
+- Put back fee (owner, November 7, 2026): decide the rule (Coach confirms a suggested amount vs automatic). Until then Put back on event and Undo leave charges unchanged and the Coach adds the fee by hand; see [DECISIONS.md](DECISIONS.md). This is a money change; read DECISIONS.md first.
 - Remind my parent (owner, October 27): a Student Home button that emails the linked parent about a FIRST registration, permission form or payment waiting on them, through the existing parent email service.
 
 ## Testing
