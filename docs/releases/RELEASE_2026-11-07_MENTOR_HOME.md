@@ -1,8 +1,8 @@
 # Mentor Home, Mentor meetings and sign-up, Mentor notifications — November 7, 2026
 
-> **Not yet released — awaiting owner approval.** This is a pre-release receipt for a release candidate. Nothing below has been pushed, deployed to production or merged. Production facts are marked (VERIFY) and must be filled in from the actual release.
+> **Released November 7, 2026.** PR #75 merged as main `b790a69`; production Convex deployed from main `b790a69` after the merge (owner process: merge, update main, deploy main). Signed-in role walkthroughs remain owner follow-ups (VERIFY).
 
-Release candidate on branch `feat/mentor-home` (commits `627fd29` Mentor Home, meetings, sign-up and notifications; `e112893` round 2; `4739f72` round 3), based on main `851d6ad`. PR, merge commit and Worker versions: (VERIFY). Behavior: [EVENT_AUDIENCES_AND_SERIES.md](../EVENT_AUDIENCES_AND_SERIES.md) (Mentor sections).
+Released through PR #75 (`feat/mentor-home`, commits `627fd29`, `e112893`, `4739f72`, docs `60e3f1e`), merged with a merge commit as main `b790a69` (base `851d6ad`). Behavior: [EVENT_AUDIENCES_AND_SERIES.md](../EVENT_AUDIENCES_AND_SERIES.md) (Mentor sections).
 
 ## Scope
 
@@ -33,30 +33,35 @@ Additive schema only (checked against `convex/schema.ts`, `git diff origin/main.
 - No new crons: the hourly `notification digest` and `notification reminders` crons now also run M2–M5 (comment updated in `convex/crons.ts`). New public modules `mentorHome`, `mentorMeetings` and `mentorClockedIn`.
 - No new environment variables. No Timeclock app change; the Timeclock Worker still rebuilds on merge.
 
-## Release order (project order: backend first)
+## Release record (actual order)
 
-Each step needs explicit owner approval. Use a clean worktree at the exact reviewed source commit.
+1. **Baseline:** Workers `denham-venom-student-status` `5ab34c28-4f60-4a1b-8da4-c490d3cd2fac` and `denham-venom-timeclock` `5d96036e-16db-43bc-aa5a-7cdd130cac72` (both deployed 2026-11-05 00:57 UTC); production Convex last recorded source `d5427af` (PR #71).
+2. **Push and PR #75** opened; the guard hook refused a production deploy from the feature branch, so the owner process was followed: merge, update main, deploy main.
+3. **Merge** of PR #75 (merge commit, head `60e3f1e`) as main `b790a69` at about 20:29:57 UTC.
+4. **Production Convex dry run and deploy from main `b790a69`** in a clean release worktree (`wt-release`), target `prod:amicable-eel-413`: "No indexes are deleted by this push", schema validation complete. Added exactly the five indexes: `eventSeries.by_createdBy_and_status`, `events.by_createdBy_and_endsAt`, `mentorSeriesSignups.by_mentorUserId_and_status`, `mentorSeriesSignups.by_seriesId_and_mentorUserId`, `mentorSeriesSignups.by_seriesId_and_status`. Functions deployed (finished 20:31:31 UTC). The dry run also listed "Change the server's version for Node.js actions" with no detail; it is not part of this change (no `convex.json` or Convex version change in the diff) (VERIFY in the dashboard that Node actions such as push and email still run).
+5. **Window** between the merge and the finished Convex deploy: about 1 minute 34 seconds. The new frontend could call missing Mentor functions only in that window (Student Status build published 20:31:45 UTC, after the deploy started).
+6. **Workers Builds** on `b790a69`: Timeclock succeeded 20:30:55 UTC, Student Status succeeded 20:31:50 UTC.
 
-1. **Record the rollback baseline:** current Worker versions for `student-status` and `timeclock` in Cloudflare, and the current production Convex source (last recorded: `d5427af`, PR #71) (VERIFY).
-2. **Push the branch and open the PR** with the validation evidence below (owner approval).
-3. **Production Convex first, dry run:** `bunx convex deploy --dry-run` against production `amicable-eel-413` from the release source. Confirm the target, five new indexes, **no index deletions** and a valid schema (VERIFY).
-4. **Production Convex deploy:** `bunx convex deploy` against `amicable-eel-413` from the same source. In the dashboard, confirm the new indexes finished backfilling and are ready, and no errors in recent logs (VERIFY).
-5. **Merge to main** (merge commit). Cloudflare Workers Builds publish both Workers (Student Status and Timeclock); confirm both builds succeeded, both sites return 200 and the new bundle is served (VERIFY).
-6. **Post-deploy checks per role** (signed in, read-mostly; synthetic or owner-approved test meetings only):
-   - **Mentor:** Home shows next event, Who's here now and answers needed; Schedule tabs (Going, Join, Created by me); create a one-time optional meeting, edit and cancel it; sign up for an event with drive/hotel questions; series sign-up (every / just this one / next N), skip and leave; Notification settings list "Meetings and events".
-   - **Travel Lead:** My schedule on Home; event page Mentors section with totals and answers; Created by and the Mentor meeting tag.
-   - **Coach:** New Event and `+ Team meeting` create without a crash; Team meeting defaults one-time and optional; Mentors section and Created by on the event page.
-   - **Parent with staff access (Mentor or Travel Lead grant):** sees Mentor Home and can sign up; as Travel Lead sees Mentor answers; Parent pages unchanged.
-   - **Student:** Home and Events unchanged; a Mentor meeting for their subteam appears as an optional event.
-   - **Parent (smoke):** Parent Home loads; no Mentor features shown.
-7. **Record** PR, merge commit, Worker versions, dry-run output and check results here, and remove the "Not yet released" banner.
+## Versions
 
+| Item | Deployed | Rollback |
+| --- | --- | --- |
+| Convex production `amicable-eel-413` | source `b790a69` | forward-fix only (additive) |
+| Worker `denham-venom-student-status` | `0647a74f-c53d-4043-b0b1-bfa9a85e45a4` | `5ab34c28-4f60-4a1b-8da4-c490d3cd2fac` |
+| Worker `denham-venom-timeclock` | `a50c91ea-1521-4bdb-a99b-81b312a85263` | `5d96036e-16db-43bc-aa5a-7cdd130cac72` |
+
+## Post-release checks
+
+- https://students.team8044.org and https://timeclock.team8044.org returned 200.
+- Student Status lazy chunk `LiveApp-CEc-6QLI.js` contains "Meetings and events" and "Competitions & trips" (new strings).
+- Index backfill state and recent production logs were not reviewed in the dashboard (VERIFY).
+- No signed-in production walkthrough for any role: Mentor, Travel Lead, Coach, Parent with staff access, Student, Parent (VERIFY; checklist in the pre-release plan: Mentor Home, Schedule tabs, create/edit/cancel a meeting, sign-up and series scope, Notification settings "Meetings and events", Travel Lead My schedule and Mentors section, Coach New Event and `+ Team meeting`).
 ## Validation (on the branch, development deployment)
 
 - Security reviews of the Mentor meeting, sign-up, Home, Who's here now and notification paths: findings fixed; **no Medium or higher finding open**. Low items are listed under Known gaps.
 - Tests: lint, typecheck and the test suite pass. The only full-suite failure was the known `feeBulk` load timeout, which passes alone (accepted known issue; not a clean full-suite result). Exact counts at the final commit are not recorded here; add them to the PR.
 - Persona passes round 3 (Mentor, Travel Lead, Coach, Parent with staff access, Student, Parent) on the development deployment: **all tasks completed**.
-- Production dry run: not yet run (VERIFY).
+- Production dry run: run from main `b790a69` (see Release record).
 
 ## Known gaps
 
@@ -68,7 +73,7 @@ Each step needs explicit owner approval. Use a clean worktree at the exact revie
 
 ## Limits and rollback
 
-- **Frontend:** restore the rollback Worker versions recorded in step 1, or revert the merge on main. The previous frontend works against the additive backend (it ignores the new fields, table and category).
+- **Frontend:** restore the rollback Worker versions in the Versions table, or revert the merge on main. The previous frontend works against the additive backend (it ignores the new fields, table and category).
 - **Backend:** forward-fix only once new data exists; never delete Mentor meetings, sign-ups or answers to force a rollback. To stop Mentor meeting creation quickly, ship a forward fix that refuses `mentorMeetings.createMeeting` for Mentors.
 - **Not reversible:** notifications already sent, Mentor meetings created and their student sign-ups, Mentor sign-ups and answers.
 - Carried forward: see [KNOWN_GAPS.md](../KNOWN_GAPS.md) and [HANDOFF.md](../../HANDOFF.md) (loose Travel Lead checks, Travel Lead invites on Coach-only events, Student Home wording, flaky full-suite timeouts).
