@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { defaultAudience, defaultMentorInvite } from './audience/audience-rules'
 import type { AudienceValue, MentorInviteValue, MentorOption } from './audience/types'
-import { audienceCreateArgs, capacityApplies, eventAudienceLabel, eventBadges, eventRequiredLabel, seriesProgressNote, whoReviewText, whoSignupMode, type WhoChoice } from './event-audience-wiring'
+import { audienceCreateArgs, capacityApplies, eventAudienceLabel, eventBadges, eventRequiredLabel, mentorMeetingCreateArgs, mentorMeetingEventArgs, seriesProgressNote, whoReviewText, whoSignupMode, type MentorMeetingDraft, type WhoChoice } from './event-audience-wiring'
 
 const mentors: MentorOption[] = [{ id: 'm1', name: 'Mentor One', subteams: ['Programming'] }, { id: 'm2', name: 'Mentor Two', subteams: [] }]
 const who = (audience: Partial<AudienceValue> = {}, invite: Partial<MentorInviteValue> = {}, travelTeam = false): WhoChoice =>
@@ -69,5 +69,24 @@ describe('seriesProgressNote', () => {
     { name: 'not part of a series', series: null, note: null },
   ])('$name', ({ series, note }) => {
     expect(seriesProgressNote(series)).toBe(note)
+  })
+})
+
+describe('Mentor meeting → createMeeting / series arguments', () => {
+  const draft = (overrides: Partial<MentorMeetingDraft> = {}): MentorMeetingDraft => ({ name: ' Build night ', startsAt: 1_000, endsAt: 2_000, where: 'shop', destination: 'ignored', audience: defaultAudience(), inviteSubteamMentors: false, mentorIds: [], ...overrides })
+
+  it.each([
+    { name: 'shop, Everyone', input: draft(), args: { name: 'Build night', startsAt: 1_000, endsAt: 2_000, destination: 'DSHS STEM Center (on site)', audienceKind: 'everyone', locationType: 'inPerson' } },
+    { name: 'virtual, subteams with their Mentors', input: draft({ where: 'virtual', audience: { ...defaultAudience(), kind: 'subteams', subteams: ['CAD'] }, inviteSubteamMentors: true }), args: { name: 'Build night', startsAt: 1_000, endsAt: 2_000, destination: 'Virtual (Discord)', audienceKind: 'subteams', audienceSubteams: ['CAD'], inviteSubteamMentors: true, locationType: 'virtual' } },
+    { name: 'elsewhere, students; subteam Mentors only apply to Subteams', input: draft({ where: 'elsewhere', destination: ' City park ', audience: { ...defaultAudience(), kind: 'students', studentIds: ['s1'], required: true }, inviteSubteamMentors: true }), args: { name: 'Build night', startsAt: 1_000, endsAt: 2_000, destination: 'City park', audienceKind: 'students', audienceStudentIds: ['s1'], locationType: 'inPerson' } },
+    { name: 'Mentors only with picked Mentors', input: draft({ audience: { ...defaultAudience(), kind: 'mentors' }, mentorIds: ['m1', 'm1'] }), args: { name: 'Build night', startsAt: 1_000, endsAt: 2_000, destination: 'DSHS STEM Center (on site)', audienceKind: 'mentorsOnly', mentorInviteUserIds: ['m1'], locationType: 'inPerson' } },
+  ])('$name', ({ input, args }) => {
+    expect(mentorMeetingCreateArgs(input)).toEqual(args)
+  })
+
+  it('never sends a required meeting, fee, travel, form or Team Calendar entry for a repeating meeting', () => {
+    const args = mentorMeetingEventArgs(draft({ audience: { ...defaultAudience(), required: true } }))
+    expect(args).toMatchObject({ type: 'Team', mandatory: false, feeCents: 0, travel: 'None', overnight: false, roomingEnabled: false, permissionRequired: false, firstRequired: false, signupMode: 'open', allowWithdrawal: true, requirements: [], calendarChoice: { kind: 'none' } })
+    expect(args).not.toHaveProperty('onsite')
   })
 })

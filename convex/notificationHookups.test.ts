@@ -7,6 +7,8 @@ import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { createFinancialAccount } from "./lib/financialSources";
+import { chicagoDate } from "./lib/calendarDates";
+import { addDays, weekdayOf } from "./lib/seriesRecurrence";
 
 const modules = import.meta.glob("./**/*.ts");
 // Wed 2026-01-14 16:00 Chicago: outside quiet hours.
@@ -59,7 +61,14 @@ async function fixture() {
   const instant = async () => (await t.run(ctx => ctx.db.query("notifications").take(200))).filter(row => row.pushStatus !== "digest").map(row => name(row.userId)).sort();
   /** "recipient:kind" for each queued digest item, sorted. */
   const digests = async () => (await t.run(ctx => ctx.db.query("notificationDigestItems").take(200))).map(row => `${name(row.userId)}:${row.kind}`).sort();
-  return { t, ids, as, addEvent, instant, digests, coach: as(ids.coach.auth) };
+  /** An optional Team meeting for Everyone created by `createdBy` (as mentorMeetings.createMeeting stores it). */
+  const addMeeting = (createdBy: Id<"appUsers">, fields: Partial<{ signupMode: "open" | "approval" }> = {}) => t.run(ctx => ctx.db.insert("events", {
+    seasonId: ids.season, name: "Synthetic build night", type: "Team", startsAt: NOW + 2 * DAY, endsAt: NOW + 2 * DAY + 7_200_000, destination: "Lab", travel: "None", overnight: false, roomingEnabled: false,
+    feeCents: 0, signupMode: "open", allowWithdrawal: true, permissionRequired: false, firstRequired: false, archived: false, audienceKind: "everyone", mandatory: false, createdBy, ...fields,
+  }));
+  /** "recipient:kind" for queued Mentor meeting digest items (M4/M5) only. */
+  const meetingDigests = async () => (await digests()).filter(row => row.includes(":mentorMeeting"));
+  return { t, ids, as, addEvent, addMeeting, instant, digests, meetingDigests, coach: as(ids.coach.auth) };
 }
 
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(NOW); });
@@ -77,6 +86,63 @@ describe("notification hook-ups", () => {
     expect(await f.digests()).toEqual(["coach:signupPending", "lead:signupPending"]);
     const rows = await f.t.run(ctx => ctx.db.query("notificationDigestItems").take(10));
     expect(rows.every(row => row.url === `/events/${approval}`)).toBe(true);
+  });
+
+  it("M4: a Mentor's new meeting, or new series (once, for its first meeting), is queued for the other Mentors who can join", async () => {
+    const f = await fixture();
+    const asMentor = f.as(f.ids.mentor.auth);
+    await asMentor.mutation(api.mentorMeetings.createMeeting, { name: "Synthetic pit prep", startsAt: NOW + DAY, endsAt: NOW + DAY + 3_600_000, destination: "Lab", audienceKind: "everyone" });
+    // The Travel Lead is a Mentor who can sign up; the creator and the Coach are not told.
+    expect(await f.meetingDigests()).toEqual(["lead:mentorMeetingOpen"]);
+    const startDate = addDays(chicagoDate(NOW), 1);
+    const { firstEventId } = await asMentor.mutation(api.eventSeries.create, {
+      name: "Synthetic weekly build", type: "Team", destination: "Lab", travel: "None", overnight: false, roomingEnabled: false, feeCents: 0, allowWithdrawal: true, permissionRequired: false, firstRequired: false,
+      audienceKind: "everyone", rule: { startDate, weekdays: [weekdayOf(startDate)], intervalWeeks: 1, localStartTime: "18:00", durationMinutes: 120 },
+    });
+    vi.runOnlyPendingTimers();
+    await f.t.finishInProgressScheduledFunctions(); // later meetings in the series are generated quietly
+    expect(await f.meetingDigests()).toEqual(["lead:mentorMeetingOpen", "lead:mentorMeetingOpen"]);
+    const rows = await f.t.run(ctx => ctx.db.query("notificationDigestItems").take(20));
+    expect(rows.filter(row => row.kind === "mentorMeetingOpen").map(row => row.url)).toContain(`/events/${firstEventId}`);
+  });
+
+  it("M5: Mentor sign-ups and drop-outs reach the meeting's Mentor creator only when the Mentor's status actually changes", async () => {
+    const f = await fixture();
+    const eventId = await f.addMeeting(f.ids.mentor.app);
+    const joiner = await f.t.run(async ctx => {
+      const auth = await ctx.db.insert("users", { email: "joiner@synthetic.test", name: "joiner", emailVerificationTime: 1 });
+      await ctx.db.insert("appUsers", { authUserId: auth, email: "joiner@synthetic.test", name: "joiner", role: "mentor", travelLead: false, financialEdit: false, active: true });
+      await ctx.db.insert("eventMentorInvites", { eventId, mentorUserId: f.ids.lead.app, source: "individual", status: "invited", invitedBy: f.ids.mentor.app, createdAt: NOW });
+      return auth;
+    });
+    const asJoiner = f.as(joiner), asLead = f.as(f.ids.lead.auth);
+    const kinds = async () => (await f.meetingDigests()).filter(row => row.startsWith("mentor:")).map(row => row.slice("mentor:".length));
+    await asJoiner.mutation(api.mentorMeetings.signUp, { eventId });
+    await asJoiner.mutation(api.mentorMeetings.signUp, { eventId }); // already signed up: nothing new
+    expect(await kinds()).toEqual(["mentorMeetingMentorJoined"]);
+    await asJoiner.mutation(api.mentorMeetings.withdraw, { eventId });
+    expect(await kinds()).toEqual(["mentorMeetingMentorJoined", "mentorMeetingMentorLeft"]);
+    // An invited Mentor answering: accept counts once; declining after accepting is a drop-out; declining again is not.
+    await asLead.mutation(api.mentorInvites.respond, { eventId, status: "accepted" });
+    await asLead.mutation(api.mentorInvites.respond, { eventId, status: "accepted" });
+    await asLead.mutation(api.mentorInvites.respond, { eventId, status: "declined" });
+    await asLead.mutation(api.mentorInvites.respond, { eventId, status: "declined" });
+    expect(await kinds()).toEqual(["mentorMeetingMentorJoined", "mentorMeetingMentorJoined", "mentorMeetingMentorLeft", "mentorMeetingMentorLeft"]);
+    // Only the creator hears about it.
+    expect((await f.meetingDigests()).every(row => row.startsWith("mentor:"))).toBe(true);
+  });
+
+  it("M5: a student signing up for a Mentor's meeting tells its creator; approval-mode meetings aren't Mentor meetings, so no M5", async () => {
+    const f = await fixture();
+    const open = await f.addMeeting(f.ids.mentor.app);
+    const approval = await f.addMeeting(f.ids.mentor.app, { signupMode: "approval" });
+    const coachMeeting = await f.addMeeting(f.ids.coach.app);
+    expect(await f.as(f.ids.studentUsers[0].auth).mutation(api.participation.signUp, { eventId: open })).toBe("confirmed");
+    expect(await f.as(f.ids.studentUsers[1].auth).mutation(api.participation.signUp, { eventId: approval })).toBe("pending");
+    expect(await f.as(f.ids.studentUsers[2].auth).mutation(api.participation.signUp, { eventId: coachMeeting })).toBe("confirmed");
+    expect(await f.meetingDigests()).toEqual(["mentor:mentorMeetingStudentJoined"]);
+    // The existing staff review digest for the pending signup is unchanged.
+    expect((await f.digests()).filter(row => row.endsWith(":signupPending"))).toEqual(["coach:signupPending", "lead:signupPending"]);
   });
 
   it("a student newly signed up by staff is notified with their Parents once; pending, waitlist and repeat changes notify no one", async () => {

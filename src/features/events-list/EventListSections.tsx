@@ -8,11 +8,17 @@ import { eventLocation } from '@/lib/event-place'
 import { eventTypeLabel } from '@/lib/event-copy'
 import { familyParticipationLabel } from '@/lib/ui-copy'
 import { canceledCount, eventListCopy as copy, eventListItems, eventListSections, seriesPattern, typeFilterOptions, type ListItem, type ListedRow } from '@/lib/event-list'
+import { eventCreatorCopy } from '../mentor-invites/copy'
 import styles from './EventListSections.module.css'
 
 type Row = ListedRow & {
   participation?: string | null
   event: ListedRow['event'] & { type: string; name: string; destination: string; onsite?: boolean; locationType?: string; calendarAllDayStartDate?: string; calendarAllDayEndDate?: string }
+}
+
+/** "Mentor meeting" tag on Coach and Travel Lead event cards for a meeting a Mentor created (`createdBy` is staff-only). */
+export function MentorMeetingTag({ createdBy }: { createdBy?: { mentorMeeting: boolean } | null }) {
+  return createdBy?.mentorMeeting ? <p className={styles.meta}><span className="badge badge-pending">{eventCreatorCopy.mentorMeeting}</span></p> : null
 }
 
 /** Solid "Canceled" pill; also for the page's own event cards. */

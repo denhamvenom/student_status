@@ -67,7 +67,9 @@ export const markAllRead = mutation({
 
 export const getMyPreferences = query({
   args: {},
-  returns: v.array(v.object({ category: notificationCategoryValidator, label: v.string(), description: v.string(), urgentByDefault: v.boolean(), enabled: v.boolean() })),
+  // includesMentorMeetings: kept for compatibility and now always false. Mentor meeting updates (M4/M5) have their own
+  // Mentor-only "mentorEvents" row ("Meetings and events"), listed only for Mentors and Parents with Mentor staff access.
+  returns: v.array(v.object({ category: notificationCategoryValidator, label: v.string(), description: v.string(), urgentByDefault: v.boolean(), enabled: v.boolean(), includesMentorMeetings: v.boolean() })),
   handler: async ctx => {
     const user = await viewerOrNull(ctx);
     if (!user) return [];
@@ -76,7 +78,7 @@ export const getMyPreferences = query({
     if (!stored) return [];
     const prefs = await ctx.db.query("notificationPreferences").withIndex("by_userId", q => q.eq("userId", user._id)).unique();
     const disabled = new Set(prefs?.disabledCategories ?? []);
-    return categoriesForUser(stored).map(category => ({ category, label: NOTIFICATION_CATEGORY_INFO[category].label, description: NOTIFICATION_CATEGORY_INFO[category].description, urgentByDefault: NOTIFICATION_CATEGORY_INFO[category].urgentByDefault, enabled: !disabled.has(category) }));
+    return categoriesForUser(stored).map(category => ({ category, label: NOTIFICATION_CATEGORY_INFO[category].label, description: NOTIFICATION_CATEGORY_INFO[category].description, urgentByDefault: NOTIFICATION_CATEGORY_INFO[category].urgentByDefault, enabled: !disabled.has(category), includesMentorMeetings: false }));
   },
 });
 

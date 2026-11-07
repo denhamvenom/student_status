@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation } from "./_generated/server";
 import { MAX_DIGEST_USERS, queueDigestItem, type DigestCategory } from "./lib/digest";
+import { MENTOR_DIGEST_LABELS, mentorDigestSummary } from "./lib/notificationDigestRules";
 import { parentUserIdsForStudents, studentUserIds } from "./lib/notify";
 import { digestDue } from "./lib/reminderSchedule";
 import { scheduleSummaryPush } from "./push";
@@ -18,19 +19,21 @@ type FlushCarry = { userId: Id<"appUsers">; tallies: Tally[] };
 const flushRef = makeFunctionReference<"mutation", { carry?: FlushCarry }, null>("notificationDigest:flush");
 const purgeRef = makeFunctionReference<"mutation", Record<string, never>, null>("notificationDigest:purgeFlushed");
 
-const DEFAULT_URL: Record<DigestCategory, string> = { money: "/finances", travel: "/events", staff: "/inbox" };
+const DEFAULT_URL: Record<DigestCategory, string> = { money: "/finances", travel: "/events", staff: "/inbox", mentorEvents: "/inbox" };
 const STAFF_LABELS: Record<string, [string, string]> = {
   withdrawalRequest: ["withdrawal request", "withdrawal requests"],
   signupPending: ["signup to review", "signups to review"],
   joinRequest: ["join request", "join requests"],
   profileCorrection: ["profile correction", "profile corrections"],
+  // Mentor meeting items (M4/M5) now use "mentorEvents"; items queued under "staff" before that still read the same.
+  ...MENTOR_DIGEST_LABELS,
 };
 const MONEY_LABELS: Record<string, [string, string]> = { payment: ["payment received", "payments received"], charge: ["new charge", "new charges"] };
 
 const counted = (count: number, [one, many]: [string, string]) => `${count} ${count === 1 ? one : many}`;
 
 type Tally = { category: DigestCategory; total: number; counts: Record<string, number>; urls: string[]; anchor?: Id<"notifications"> };
-const tallyValidator = v.object({ category: v.union(v.literal("money"), v.literal("travel"), v.literal("staff")), total: v.number(), counts: v.record(v.string(), v.number()), urls: v.array(v.string()), anchor: v.optional(v.id("notifications")) });
+const tallyValidator = v.object({ category: v.union(v.literal("money"), v.literal("travel"), v.literal("staff"), v.literal("mentorEvents")), total: v.number(), counts: v.record(v.string(), v.number()), urls: v.array(v.string()), anchor: v.optional(v.id("notifications")) });
 const carryValidator = v.object({ userId: v.id("appUsers"), tallies: v.array(tallyValidator) });
 
 function addItem(tallies: Map<DigestCategory, Tally>, item: Doc<"notificationDigestItems">) {
@@ -56,6 +59,8 @@ function summarize({ category, total, counts, urls }: Tally): { title: string; b
   if (category === "travel") {
     return { title: "Travel: transport details updated", body: urls.length === 1 ? "Transportation for an event changed. Open the event for details." : `Transportation changed for ${urls.length} events. Open Events for details.`, url };
   }
+  const mentor = mentorDigestSummary(kinds);
+  if (mentor) return { ...mentor, url };
   const parts = kinds.map(([kind, count]) => counted(count, STAFF_LABELS[kind] ?? ["item", "items"]));
   return { title: `To-dos: ${parts.join(", ")}`, body: "New staff items are waiting for review.", url };
 }

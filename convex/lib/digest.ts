@@ -8,7 +8,7 @@ import { MAX_BODY, MAX_TITLE, parentUserIdsForStudents } from "./notify";
  * Digest updates: the inbox row is written right away (pushStatus "digest", no push), and one push per category
  * goes out with the daily 5 PM flush (convex/notificationDigest.ts). Same PII rule as notifyUsers: generic text only.
  */
-export type DigestCategory = "money" | "travel" | "staff";
+export type DigestCategory = "money" | "travel" | "staff" | "mentorEvents";
 export type DigestKind = "payment" | "charge" | "transport" | "withdrawalRequest" | "signupPending" | "joinRequest" | "profileCorrection";
 
 export type QueueDigestArgs = {

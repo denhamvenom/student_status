@@ -4,6 +4,7 @@ import { grantedBackgroundActor } from "./access";
 import { chicagoDate, chicagoMidnight } from "./calendarDates";
 import { createEventCore, type MentorInvite, type NewEventFields } from "./createEventCore";
 import { studentInAudience } from "./eventAudienceRules";
+import { applySeriesSignups, isMentorCapable, mentorActor, mentorMeetingLimitError } from "./mentorMeetings";
 import { addDays, occurrenceIndex, occurrencesBetween, SERIES_TIME_ZONE, zonedWallTimeToUtc, type SeriesOccurrence, type SeriesRule } from "./seriesRecurrence";
 import { formatUtcBasic } from "./rrule";
 
@@ -101,34 +102,39 @@ export async function seriesAudienceStudentIds(ctx: QueryCtx | MutationCtx, seri
 }
 
 export function seriesMentorInvites(series: Series): MentorInvite[] {
-  const individual = series.mentorInviteIds ?? [];
-  return [...individual.map(mentorUserId => ({ mentorUserId, source: "individual" as const })), ...(series.subteamMentorInviteIds ?? []).filter(id => !individual.includes(id)).map(mentorUserId => ({ mentorUserId, source: "subteam" as const }))];
+  const individual = (series.mentorInviteIds ?? []).filter(id => id !== series.createdBy); // the creator is never invited to their own series
+  return [...individual.map(mentorUserId => ({ mentorUserId, source: "individual" as const })), ...(series.subteamMentorInviteIds ?? []).filter(id => id !== series.createdBy && !individual.includes(id)).map(mentorUserId => ({ mentorUserId, source: "subteam" as const }))];
 }
 
 export const CREATOR_REVIEW_MESSAGE = "The person who set up this series can no longer manage it, so new meetings stopped. A Coach should review the series.";
 
 /**
- * Meetings are created as the series creator, so the creator must still be allowed to: an active Coach or Travel Lead, and a
- * Coach for a required Whole Team or subteam series. Otherwise the series is marked needsReview and null is returned.
+ * Meetings are created as the series creator, so the creator must still be allowed to: an active Coach or Travel Lead (a
+ * Coach for a required Whole Team or subteam series), or an active plain Mentor (a Mentor account, or a Parent with Mentor
+ * staff access: lib/mentorMeetings isMentorCapable) whose series is still an optional Team meeting within the Mentor limits.
+ * Otherwise (including a Parent whose staff access was removed) the series is marked needsReview and null is returned.
  */
 export async function seriesGenerationActor(ctx: MutationCtx, series: Series): Promise<Doc<"appUsers"> | null> {
   const stored = await ctx.db.get(series.createdBy);
-  // A Parent with a current Travel Lead grant (stored role "parent") acts as a Travel Lead, as lib/access effectiveViewer resolves it.
-  const actor = stored ? grantedBackgroundActor(stored) : null;
+  // A Parent with a current Travel Lead grant (stored role "parent") acts as a Travel Lead, as lib/access effectiveViewer
+  // resolves it; a Parent with a Mentor grant acts as a plain Mentor.
+  const actor = !stored ? null : stored.role === "parent" && stored.parentStaffAccess === "mentor" && isMentorCapable(stored) ? mentorActor(stored) : grantedBackgroundActor(stored);
   const groupMandatory = series.template.mandatory === true && (series.template.audienceKind === "everyone" || series.template.audienceKind === "subteams");
-  const allowed = !!actor && actor.active && actor.archivedAt === undefined && (actor.role === "coach" || (actor.role === "mentor" && actor.travelLead)) && (!groupMandatory || actor.role === "coach");
+  const staff = !!actor && (actor.role === "coach" || (actor.role === "mentor" && actor.travelLead)) && (!groupMandatory || actor.role === "coach");
+  const plainMentor = !!actor && actor.role === "mentor" && !actor.travelLead && mentorMeetingLimitError(series.template) === null && series.template.assignmentScope === undefined;
+  const allowed = !!actor && actor.active && actor.archivedAt === undefined && (staff || plainMentor);
   if (allowed) return actor;
   if (series.status !== "needsReview") await ctx.db.patch(series._id, { status: "needsReview", calendarError: CREATOR_REVIEW_MESSAGE });
   return null;
 }
 
-/** Invited Mentors who are still active Mentors; anyone else is dropped from the series' invite lists. */
+/** Invited Mentors who are still Mentors (isMentorCapable); anyone else is dropped from the series' invite lists. */
 async function activeMentorInvites(ctx: MutationCtx, series: Series): Promise<MentorInvite[]> {
   const invites = seriesMentorInvites(series);
   const kept: MentorInvite[] = [];
   for (const invite of invites) {
     const user = await ctx.db.get(invite.mentorUserId);
-    if (user && user.role === "mentor" && user.active && user.archivedAt === undefined) kept.push(invite);
+    if (isMentorCapable(user)) kept.push(invite);
   }
   if (kept.length !== invites.length) {
     const keep = new Set(kept.map(invite => invite.mentorUserId));
@@ -152,7 +158,10 @@ export async function createOccurrence(ctx: MutationCtx, series: Series, key: st
   const destination = override.destination ?? template.destination;
   const eventFields: NewEventFields = { ...template, name, destination, startsAt: override.startsAt, endsAt: override.endsAt, seriesId: series._id, seriesOccurrenceKey: key, ...(name !== series.name || destination !== template.destination ? { seriesDetached: true } : {}) };
   // Mandatory specific-students occurrences put the listed students on directly; Whole Team and subteam ones enroll by job.
-  return await createEventCore(ctx, actor, season, { eventFields, requirements: [], shifts: [], questions: [], assigned, audienceStudentIds: template.audienceKind === "students" ? series.audienceStudentIds ?? [] : [], mentorInvites: await activeMentorInvites(ctx, series) }, { suppressNotifications: true, silentEnrollment: true });
+  const eventId = await createEventCore(ctx, actor, season, { eventFields, requirements: [], shifts: [], questions: [], assigned, audienceStudentIds: template.audienceKind === "students" ? series.audienceStudentIds ?? [] : [], mentorInvites: await activeMentorInvites(ctx, series) }, { suppressNotifications: true, silentEnrollment: true });
+  // Mentors signed up for every meeting (or the next N not yet reached) go on the new meeting, skipped dates excepted.
+  await applySeriesSignups(ctx, eventId);
+  return eventId;
 }
 
 /**
