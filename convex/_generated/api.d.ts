@@ -135,6 +135,7 @@ import type * as lib_timeclockPin from "../lib/timeclockPin.js";
 import type * as lib_timeclockTransition from "../lib/timeclockTransition.js";
 import type * as lib_transportation from "../lib/transportation.js";
 import type * as lib_wholeTeam from "../lib/wholeTeam.js";
+import type * as lib_withdrawalState from "../lib/withdrawalState.js";
 import type * as lib_zeffy from "../lib/zeffy.js";
 import type * as membershipSync from "../membershipSync.js";
 import type * as mentorInvites from "../mentorInvites.js";
@@ -313,6 +314,7 @@ declare const fullApi: ApiFromModules<{
   "lib/timeclockTransition": typeof lib_timeclockTransition;
   "lib/transportation": typeof lib_transportation;
   "lib/wholeTeam": typeof lib_wholeTeam;
+  "lib/withdrawalState": typeof lib_withdrawalState;
   "lib/zeffy": typeof lib_zeffy;
   membershipSync: typeof membershipSync;
   mentorInvites: typeof mentorInvites;

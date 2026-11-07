@@ -6,6 +6,7 @@ import type { StudentHomeSummary } from "../src/features/student-home/contract";
 import type { ParentHomeSummary } from "../src/features/parent-home/contract";
 import { activeSeason, ownStudent, studentAccess, viewer } from "./lib/access";
 import { enrollmentPending } from "./lib/eventEnrollmentState";
+import { activeApprovedWithdrawal, withdrawalHistory } from "./lib/withdrawalState";
 import { eventVisibleToStudents } from "./lib/eventAudience";
 import { coverageFor } from "./lib/permissionCoverage";
 import { permissionSigningPaused } from "./lib/permissionSigningMode";
@@ -229,8 +230,8 @@ async function buildSummary(ctx: QueryCtx, student: Doc<"students">, asOfDay: st
       const participant = participations.get(event._id);
       if (participant && participant.status !== "withdrawn") continue;
       if (participant) {
-        const withdrawals = await ctx.db.query("withdrawalRequests").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(100);
-        if (withdrawals.some(row => row.status === "approved")) continue;
+        const withdrawals = await withdrawalHistory(ctx, event._id, student._id);
+        if (activeApprovedWithdrawal(withdrawals)) continue;
       }
       openSignups.push({ eventId: event._id, name: event.name, type: event.type, startsAt: event.startsAt, endsAt: event.endsAt, signupClosesAt: event.signupClosesAt ?? null, feeCents: event.feeCents, signupMode: event.signupMode });
     }
