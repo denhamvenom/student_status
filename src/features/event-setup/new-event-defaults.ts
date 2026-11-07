@@ -20,12 +20,12 @@ export const calendarChoiceCopy = {
   /** Next to a chosen existing Calendar entry and on Review: connecting replaces the meeting's name and times with the entry's. */
   linkNote: 'Uses this calendar entry’s name and time.',
   /** In the edit forms, when a Team meeting already on Team Calendar is set to start on a Required weekday (requiredDayEditHint). */
-  requiredDayEditHint: (day: 'Monday' | 'Tuesday') => `Heads up: meetings on Team Calendar on a ${day} are tracked like a regular build meeting.`,
+  requiredDayEditHint: (day: 'Monday' | 'Tuesday') => `This meeting is on Team Calendar. On a ${day}, it will count toward student attendance.`,
   /**
    * Under the Team Calendar choice while a Team meeting is left off it because of its weekday (calendarOffDay). `control`
    * names what adds it: the "Add to Team Calendar" box, or the full wizard's "Create a separate Calendar entry" choice.
    */
-  requiredDayHint: (day: 'Monday' | 'Tuesday', control: 'box' | 'choice' = 'box') => `${day} meetings start off Team Calendar, because anything on Team Calendar on a ${day} is tracked like a regular build meeting. ${control === 'box' ? 'Check the box' : 'Choose “Create a separate Calendar entry”'} to add it anyway.`,
+  requiredDayHint: (day: 'Monday' | 'Tuesday', control: 'box' | 'choice' = 'box') => `${day} is a regular team meeting day. Meetings on Team Calendar that day count toward student attendance, so this one starts off. ${control === 'box' ? 'Check the box' : 'Choose “Create a separate Calendar entry”'} to add it anyway.`,
 } as const
 
 export const newEventWizardCopy = {

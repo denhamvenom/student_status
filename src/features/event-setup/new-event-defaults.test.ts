@@ -48,8 +48,8 @@ describe('New event Team Calendar choice', () => {
 
 describe('Editing a Team meeting on Team Calendar onto a Required day (note only)', () => {
   it.each([
-    ['Team on Calendar, moved to a Tuesday before kickoff', 'Team', true, '2026-11-10T18:00', 'Heads up: meetings on Team Calendar on a Tuesday are tracked like a regular build meeting.'],
-    ['Team on Calendar, moved to a Monday after kickoff', 'Team', true, '2027-01-11T18:00', 'Heads up: meetings on Team Calendar on a Monday are tracked like a regular build meeting.'],
+    ['Team on Calendar, moved to a Tuesday before kickoff', 'Team', true, '2026-11-10T18:00', 'This meeting is on Team Calendar. On a Tuesday, it will count toward student attendance.'],
+    ['Team on Calendar, moved to a Monday after kickoff', 'Team', true, '2027-01-11T18:00', 'This meeting is on Team Calendar. On a Monday, it will count toward student attendance.'],
     ['Team on Calendar, on a Wednesday', 'Team', true, '2026-11-11T18:00', null],
     ['Team on Calendar, Tuesday after kickoff', 'Team', true, '2027-01-12T18:00', null],
     ['Team off Calendar, on a Tuesday', 'Team', false, '2026-11-10T18:00', null],
@@ -60,9 +60,9 @@ describe('Editing a Team meeting on Team Calendar onto a Required day (note only
   })
 
   it('explains a Required-day meeting in plain words, without "required attendance"', () => {
-    expect(calendarChoiceCopy.requiredDayHint('Tuesday')).toBe('Tuesday meetings start off Team Calendar, because anything on Team Calendar on a Tuesday is tracked like a regular build meeting. Check the box to add it anyway.')
-    expect(calendarChoiceCopy.requiredDayHint('Monday')).toBe('Monday meetings start off Team Calendar, because anything on Team Calendar on a Monday is tracked like a regular build meeting. Check the box to add it anyway.')
-    expect(calendarChoiceCopy.requiredDayHint('Tuesday', 'choice')).toBe('Tuesday meetings start off Team Calendar, because anything on Team Calendar on a Tuesday is tracked like a regular build meeting. Choose “Create a separate Calendar entry” to add it anyway.')
+    expect(calendarChoiceCopy.requiredDayHint('Tuesday')).toBe('Tuesday is a regular team meeting day. Meetings on Team Calendar that day count toward student attendance, so this one starts off. Check the box to add it anyway.')
+    expect(calendarChoiceCopy.requiredDayHint('Monday')).toBe('Monday is a regular team meeting day. Meetings on Team Calendar that day count toward student attendance, so this one starts off. Check the box to add it anyway.')
+    expect(calendarChoiceCopy.requiredDayHint('Tuesday', 'choice')).toBe('Tuesday is a regular team meeting day. Meetings on Team Calendar that day count toward student attendance, so this one starts off. Choose “Create a separate Calendar entry” to add it anyway.')
     for (const day of ['Monday', 'Tuesday'] as const) {
       expect(calendarChoiceCopy.requiredDayHint(day)).not.toMatch(/required attendance/i)
       expect(calendarChoiceCopy.requiredDayEditHint(day)).not.toMatch(/required attendance/i)
