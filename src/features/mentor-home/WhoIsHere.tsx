@@ -2,13 +2,15 @@ import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import { useQueries } from 'convex/react'
 import { cn } from 'cn'
 import { api } from '../../../convex/_generated/api'
-import { DashboardTile, TileTitle } from '@/components/dashboard/DashboardTile'
+import { ChevronRight } from 'lucide-react'
+import { DashboardTile } from '@/components/dashboard/DashboardTile'
 import { TileError } from '@/components/dashboard/TileErrorBoundary'
 import { TileSkeleton } from '@/components/dashboard/TileSkeleton'
-import { inset } from '@/components/dashboard/styles'
+import { focusRing } from '@/components/dashboard/styles'
 import { mentorHomeCopy } from '@/copy/mentor-home-copy'
 import type { ClockedInData } from './contract'
-import { hereGroups } from './logic'
+import { hereGroups, type HereGroup } from './logic'
+import { blockHeading } from './rows'
 
 const copy = mentorHomeCopy
 
@@ -27,39 +29,36 @@ export function useClockedIn(now: number) {
   return { data: results.here as ClockedInData | Error | undefined, retry }
 }
 
-const names = (list: string[]) => <ul className="m-0 flex list-none flex-wrap gap-x-3 gap-y-1 p-0 text-[14px] text-vs-text">{list.map((name, i) => <li key={`${name}-${i}`}>{name}</li>)}</ul>
+/** One subteam: "Programming · 3 clocked in". With students in, tapping the line shows or hides their names. */
+function HereLine({ group }: { group: HereGroup }) {
+  const [open, setOpen] = useState(false)
+  const namesId = useId()
+  if (group.count === 0 || group.names.length === 0) return <li className="flex min-h-11 items-center gap-2.5 px-1 text-[15px] text-vs-text-2">
+    <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-vs-border" />{group.label}
+  </li>
+  return <li className="flex flex-col">
+    <button type="button" aria-expanded={open} aria-controls={namesId} onClick={() => setOpen(value => !value)}
+      className={cn('flex min-h-11 w-full cursor-pointer items-center gap-2.5 rounded-lg border-0 bg-transparent px-1 text-left text-[15px] font-semibold text-vs-text! hover:bg-vs-inset', focusRing)}>
+      <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-vs-success-fill" />
+      <span className="min-w-0 flex-1">{group.label}</span>
+      <ChevronRight size={16} aria-hidden="true" className={cn('shrink-0 text-vs-muted transition-transform', open && 'rotate-90')} />
+    </button>
+    <ul id={namesId} hidden={!open} className="m-0 flex list-none flex-col gap-1 py-1 pr-1 pl-[26px] text-[14px] text-vs-text">
+      {group.names.map((name, i) => <li key={`${name}-${i}`}>{name}</li>)}
+    </ul>
+  </li>
+}
 
-/**
- * Who's here now: for each of the Mentor's subteams, "Programming · 3 clocked in" and the names. On a phone each name list is
- * collapsed under its count; from tablet width up the names are listed openly.
- */
+/** Who's here now: one line per Mentor subteam with how many students are clocked in; tap a line for the names. */
 export function WhoIsHere({ data, onRetry }: { data: ClockedInData | Error | undefined; onRetry: () => void }) {
   const id = useId()
   if (data === undefined) return <TileSkeleton label={copy.states.loading(copy.here.title)} />
   if (data instanceof Error) return <TileError title={copy.here.title} message={copy.states.failed(copy.here.title)} retryLabel={copy.states.tryAgain} onRetry={onRetry} />
   const groups = hereGroups(data)
-  return <DashboardTile tone="quiet" aria-labelledby={id} className="gap-3">
-    <TileTitle id={id}>{copy.here.title}</TileTitle>
-    {groups.length === 0 && <p className="m-0 text-[14px] text-vs-muted">{copy.here.noSubteams}</p>}
-    {groups.length > 0 && <ul className={cn(inset, 'm-0 flex list-none flex-col gap-0 px-3 py-1')}>
-      {groups.map(group => <li key={group.subteam} className="flex flex-col gap-1 border-b border-vs-border-subtle py-2 last:border-b-0">
-        {group.count === 0 ? <>
-          <p className="m-0 text-[15px] font-semibold text-vs-text">{group.label}</p>
-          <p className="m-0 text-[13px] text-vs-muted">{group.empty}</p>
-        </> : <>
-          <details className="group md:hidden">
-            <summary aria-label={`${group.label}. ${copy.here.showNames(group.subteam)}`} className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 text-[15px] font-semibold text-vs-text [&::-webkit-details-marker]:hidden">
-              <span>{group.label}</span><span aria-hidden="true" className="text-vs-muted transition-transform group-open:rotate-90">›</span>
-            </summary>
-            {names(group.names)}
-          </details>
-          <div className="hidden flex-col gap-1 md:flex">
-            <p className="m-0 text-[15px] font-semibold text-vs-text">{group.label}</p>
-            {names(group.names)}
-          </div>
-        </>}
-      </li>)}
-    </ul>}
+  return <DashboardTile surface="compact" aria-labelledby={id} className="gap-1">
+    <h2 id={id} className={blockHeading}>{copy.here.title}</h2>
+    {groups.length === 0 ? <p className="m-0 text-[14px] text-vs-muted">{copy.here.noSubteams}</p>
+      : <ul className="m-0 flex list-none flex-col p-0">{groups.map(group => <HereLine key={group.subteam} group={group} />)}</ul>}
     {data.truncated && <p className="m-0 text-[13px] text-vs-muted">{copy.here.truncated}</p>}
   </DashboardTile>
 }

@@ -196,13 +196,12 @@ export function seriesScheduleLabel(series: Pick<Doc<"eventSeries">, "weekdays" 
 export type JoinCategory = "meetings" | "competitionsAndTrips";
 
 /**
- * Which Mentor Home group an event to join belongs to (owner decision, Nov 7 2026): "competitionsAndTrips" for a Competition
- * and for any event with travel (travel isn't None and the event isn't on site or virtual: the drive question applies) or an
- * overnight stay; "meetings" otherwise.
+ * Which Mentor Home group an event to join belongs to (owner decision, Nov 7 2026, revised the same day):
+ * "competitionsAndTrips" only for a Competition and for an overnight trip (the hotel question applies); "meetings" (shown as
+ * "Meetings & events") otherwise, so Fundraisers, Outreach and Team meetings stay there even when travel is set.
  */
 export function joinCategory(event: Pick<Doc<"events">, "type"> & QuestionFields): JoinCategory {
-  const questions = mentorQuestions(event);
-  return event.type === "Competition" || questions.askDrive || questions.askHotel ? "competitionsAndTrips" : "meetings";
+  return event.type === "Competition" || mentorQuestions(event).askHotel ? "competitionsAndTrips" : "meetings";
 }
 
 /**

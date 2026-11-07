@@ -35,7 +35,7 @@ const mySeries = v.object({
  */
 const joinableEntry = v.object({
   kind: v.union(v.literal("series"), v.literal("event")),
-  /** "competitionsAndTrips": a Competition, or any event with travel (not None, on site or virtual) or an overnight stay; else "meetings". */
+  /** "competitionsAndTrips": a Competition or an overnight trip; else "meetings" (Fundraisers, Outreach, Team meetings, even with travel). */
   category: v.union(v.literal("meetings"), v.literal("competitionsAndTrips")),
   /** A meeting whose audience is restricted to subteams that include one of the Mentor's; always false for competitionsAndTrips. */
   forYourSubteam: v.boolean(),

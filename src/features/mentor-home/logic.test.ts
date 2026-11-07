@@ -4,60 +4,128 @@ import { at } from '../student-home/fixtures'
 import { eventEditValues, draftFrom } from '../operations/event-edit'
 import { clockedIn, homeData, joinEntry, meeting, NOW } from './fixtures'
 import type { Id } from '../../../convex/_generated/dataModel'
-import { clockLabel, createdList, editableMeeting, eventTags, hereGroups, JOIN_SECTION_LIMIT, joinEntryLines, joinSections, LIST_LIMIT, meetingPlace, myPartLabel, pendingCount, scheduleView, seriesStatus, showsSubteamTag, startsWhen, subteamsLine, typeLabel } from './logic'
+import { clockLabel, COMING_UP_LIMIT, comingUpTags, createdList, editableMeeting, eventTags, goingList, hereGroups, homeView, joinEntryLines, joinSections, meetingPlace, myPartLabel, needsAnswer, pinKey, seriesStatus, showsSubteamTag, subteamsLine, tabFromHash, typeLabel, unreadPinned } from './logic'
 
 const HOUR = 3_600_000
 const titles = (rows: readonly { title: string }[]) => rows.map(row => row.title)
+const going = { myStatus: 'accepted', mySource: 'individual', canWithdraw: true } as const
+const askDrive = { askDrive: true, askHotel: false }
+const askBoth = { askDrive: true, askHotel: true }
+const skippedSignup = { scope: 'all', count: null, coversThisMeeting: false, skippedThisMeeting: true } as const
+const everyone = { kind: 'everyone' as const, subteams: [], required: false, text: 'Everyone' }
 
-describe('Where you’re scheduled', () => {
-  it('leads with the soonest meeting, merges meetings the Mentor created and drops duplicates, canceled and past meetings', () => {
-    const view = scheduleView(homeData({
-      scheduled: [meeting('later', NOW + 48 * HOUR, { myStatus: 'accepted' }), meeting('in progress', NOW - HOUR, { myStatus: 'accepted' }), meeting('over', NOW - 5 * HOUR, { myStatus: 'accepted' })],
+describe('which Home blocks show', () => {
+  it('shows only Next event (empty) and Who’s here now for a new Mentor: no Needs your answer, Coming up or join tile', () => {
+    expect(homeView(homeData(), NOW)).toEqual({ next: null, needsAnswer: [], comingUp: [], joinCount: 0 })
+  })
+
+  it('leads with the soonest meeting (in progress counts), merges meetings the Mentor created, and drops duplicates, canceled and past ones', () => {
+    const view = homeView(homeData({
+      scheduled: [meeting('later', NOW + 48 * HOUR, going), meeting('in progress', NOW - HOUR, going), meeting('over', NOW - 5 * HOUR, going)],
       created: [meeting('mine', NOW + 24 * HOUR, { isCreator: true }), meeting('later', NOW + 48 * HOUR, { isCreator: true }), meeting('canceled', NOW + 2 * HOUR, { isCreator: true, cancelled: true })],
     }), NOW)
     expect(view.next?.title).toBe('in progress')
-    expect(titles(view.going)).toEqual(['mine', 'later'])
-    expect(view.moreGoing).toBe(0)
+    expect(view.comingUp.map(row => row.meeting.title)).toEqual(['mine', 'later'])
   })
 
-  it('lists every open invitation, soonest first, without canceled ones', () => {
-    const view = scheduleView(homeData({ pendingInvites: [meeting('b', NOW + 3 * HOUR), meeting('a', NOW + 3 * HOUR), meeting('gone', NOW + HOUR, { cancelled: true })] }), NOW)
-    expect(titles(view.invites)).toEqual(['a', 'b'])
-    expect(view.next).toBeNull()
-  })
-
-  it('shows at most LIST_LIMIT meetings after the next one and counts the rest', () => {
-    const scheduled = Array.from({ length: LIST_LIMIT + 3 }, (_, i) => meeting(`m${i}`, NOW + (i + 1) * HOUR, { myStatus: 'accepted' }))
-    const view = scheduleView(homeData({ scheduled }), NOW)
+  it('Coming up is the next three after the Next event, soonest first', () => {
+    const scheduled = Array.from({ length: COMING_UP_LIMIT + 3 }, (_, i) => meeting(`m${i}`, NOW + (i + 1) * HOUR, going))
+    const view = homeView(homeData({ scheduled }), NOW)
     expect(view.next?.title).toBe('m0')
-    expect(view.going).toHaveLength(LIST_LIMIT)
-    expect(view.moreGoing).toBe(2)
+    expect(view.comingUp.map(row => row.meeting.title)).toEqual(['m1', 'm2', 'm3'])
   })
 
-  it('is empty for a new Mentor', () => {
-    expect(scheduleView(homeData(), NOW)).toEqual({ next: null, invites: [], going: [], moreGoing: 0, skipped: [] })
-    expect(pendingCount(homeData(), NOW)).toBe(0)
-  })
-})
-
-describe('skipped series meetings', () => {
-  const skippedSignup = { scope: 'all', count: null, coversThisMeeting: false, skippedThisMeeting: true } as const
-  it('shows a skipped meeting on the schedule as Skipped, not under Events you can join', () => {
-    const rows = [
-      meeting('skipped', NOW + 2 * HOUR, { canSignUp: true, seriesId: 'fixture_series_a' as Id<'eventSeries'>, seriesSignup: skippedSignup }),
-      meeting('open', NOW + 3 * HOUR, { canSignUp: true }),
-      meeting('skipped but canceled', NOW + 4 * HOUR, { canSignUp: true, cancelled: true, seriesSignup: skippedSignup }),
+  it('counts events the Mentor could help with, one per series or one-time event, without their own, skipped or closed ones', () => {
+    const open = [
+      meeting('series', NOW + HOUR, { canSignUp: true, seriesId: 'fixture_series_a' as Id<'eventSeries'> }),
+      meeting('one time', NOW + 2 * HOUR, { canSignUp: true }),
+      meeting('competition', NOW + 3 * HOUR, { canSignUp: true, type: 'Competition' }),
+      meeting('my own', NOW + 2 * HOUR, { canSignUp: true, isCreator: true }),
+      meeting('skipped', NOW + 2 * HOUR, { canSignUp: true, seriesId: 'fixture_series_b' as Id<'eventSeries'>, seriesSignup: skippedSignup }),
+      meeting('closed', NOW + 2 * HOUR, { canSignUp: false }),
     ]
-    expect(titles(scheduleView(homeData({ signUpAvailable: rows }), NOW).skipped)).toEqual(['skipped'])
-    expect(titles(joinSections(rows.map(row => joinEntry(row)), NOW).meetings)).toEqual(['open'])
+    expect(homeView(homeData({ joinable: open.map(row => joinEntry(row)) }), NOW).joinCount).toBe(3)
   })
 })
 
-describe('Events you can join', () => {
+describe('Needs your answer', () => {
+  it.each([
+    { name: 'open invitation', invite: meeting('x', NOW + HOUR, { myStatus: 'invited', canSignUp: true }), row: null, shown: { mode: 'accept', reason: copy.answer.invited } },
+    { name: 'canceled invitation', invite: meeting('x', NOW + HOUR, { myStatus: 'invited', cancelled: true }), row: null, shown: null },
+    { name: 'going, drive not answered', invite: null, row: meeting('x', NOW + HOUR, { ...going, questions: askDrive }), shown: { mode: 'change', reason: copy.answer.missingDrive } },
+    { name: 'going, hotel not answered', invite: null, row: meeting('x', NOW + HOUR, { ...going, questions: askBoth, myAnswers: { canDriveStudents: false, needsHotelRoom: null } }), shown: { mode: 'change', reason: copy.answer.missingHotel } },
+    { name: 'going, everything answered', invite: null, row: meeting('x', NOW + HOUR, { ...going, questions: askBoth, myAnswers: { canDriveStudents: true, needsHotelRoom: false } }), shown: null },
+    { name: 'going, nothing asked', invite: null, row: meeting('x', NOW + HOUR, going), shown: null },
+    { name: 'drive not answered but can no longer change', invite: null, row: meeting('x', NOW + HOUR, { ...going, canWithdraw: false, questions: askDrive }), shown: null },
+    { name: 'drive not answered but canceled', invite: null, row: meeting('x', NOW + HOUR, { ...going, cancelled: true, questions: askDrive }), shown: null },
+    { name: 'drive not answered but over', invite: null, row: meeting('x', NOW - 3 * HOUR, { ...going, questions: askDrive }), shown: null },
+  ])('$name', ({ invite, row, shown }) => {
+    const items = needsAnswer(homeData({ pendingInvites: invite ? [invite] : [], scheduled: row ? [row] : [] }), NOW)
+    expect(items.map(({ mode, reason }) => ({ mode, reason }))).toEqual(shown ? [shown] : [])
+  })
+
+  it('lists invitations and missing answers together, soonest first, each meeting once', () => {
+    const items = needsAnswer(homeData({
+      pendingInvites: [meeting('invite later', NOW + 9 * HOUR, { myStatus: 'invited' }), meeting('both', NOW + 3 * HOUR, { myStatus: 'invited' })],
+      scheduled: [meeting('trip', NOW + 5 * HOUR, { ...going, questions: askDrive }), meeting('both', NOW + 3 * HOUR, { ...going, questions: askDrive })],
+    }), NOW)
+    expect(items.map(item => `${item.meeting.title}:${item.mode}`)).toEqual(['both:accept', 'trip:change', 'invite later:accept'])
+  })
+})
+
+describe('Coming up tags', () => {
+  const subteams = (list: string[]) => ({ kind: 'subteams' as const, subteams: list, required: false, text: 'Subteams' })
+  it.each([
+    { name: 'plain meeting for Everyone', row: { questions: { askDrive: false, askHotel: false }, audience: everyone }, tags: [] },
+    { name: 'trip', row: { questions: askDrive, audience: everyone }, tags: [copy.tags.travel] },
+    { name: 'overnight only', row: { questions: { askDrive: false, askHotel: true }, audience: everyone }, tags: [copy.tags.travel] },
+    { name: 'the Mentor’s subteam (any case)', row: { questions: { askDrive: false, askHotel: false }, audience: subteams(['programming']) }, tags: [copy.join.yourSubteam] },
+    { name: 'another subteam', row: { questions: { askDrive: false, askHotel: false }, audience: subteams(['CAD']) }, tags: [] },
+    { name: 'trip for the Mentor’s subteam: two tags, no more', row: { questions: askBoth, audience: subteams(['Programming']) }, tags: [copy.tags.travel, copy.join.yourSubteam] },
+  ])('$name', ({ row, tags }) => {
+    expect(comingUpTags(row, ['Programming'])).toEqual(tags)
+  })
+})
+
+describe('Schedule', () => {
+  it.each([['', 'going'], ['#join', 'join'], ['#created', 'created'], ['#going', 'going'], ['#nope', 'going']] as const)('hash "%s" opens %s', (hash, tab) => {
+    expect(tabFromHash(hash)).toBe(tab)
+  })
+
+  it('Going lists the Mentor’s schedule and the series meetings they skip (marked), soonest first', () => {
+    const rows = goingList(homeData({
+      scheduled: [meeting('later', NOW + 9 * HOUR, going)],
+      created: [meeting('mine', NOW + HOUR, { isCreator: true })],
+      signUpAvailable: [meeting('skipped', NOW + 3 * HOUR, { canSignUp: true, seriesSignup: skippedSignup }), meeting('open', NOW + 2 * HOUR, { canSignUp: true })],
+    }), NOW)
+    expect(rows.map(row => (row.skipping ? `${row.meeting.title} (skipping)` : row.meeting.title))).toEqual(['mine', 'skipped (skipping)', 'later'])
+  })
+
+  it('Created by me lists upcoming meetings first and canceled ones after them', () => {
+    const rows = [meeting('canceled soon', NOW + HOUR, { cancelled: true }), meeting('later', NOW + 9 * HOUR), meeting('sooner', NOW + 2 * HOUR), meeting('past', NOW - 4 * HOUR)]
+    expect(titles(createdList(rows, NOW))).toEqual(['sooner', 'later', 'canceled soon'])
+  })
+})
+
+describe('pinned announcement banner', () => {
+  const message = (id: string, pinnedAt: number, showUntil: number | null = null) => ({ id, pinnedAt, showUntil })
+  it('shows the newest pinned message still showing that wasn’t dismissed on this device', () => {
+    const messages = [message('old', NOW - 9 * HOUR), message('newest', NOW - HOUR), message('expired', NOW, NOW - 1)]
+    expect(unreadPinned(messages, new Set(), NOW)?.id).toBe('newest')
+    expect(unreadPinned(messages, new Set([pinKey(messages[1])]), NOW)?.id).toBe('old')
+    expect(unreadPinned(messages, new Set(messages.map(pinKey)), NOW)).toBeNull()
+  })
+
+  it('shows a dismissed message again when it is pinned again', () => {
+    expect(unreadPinned([message('a', NOW)], new Set([pinKey(message('a', NOW - HOUR))]), NOW)?.id).toBe('a')
+  })
+})
+
+describe('Schedule › Join', () => {
   const competition = { canSignUp: true, type: 'Competition' } as const
   const trip = { canSignUp: true, questions: { askDrive: true, askHotel: false } }
 
-  it('groups Competitions & trips before Meetings, soonest first, and leaves out the Mentor’s own, canceled, closed and past ones', () => {
+  it('groups Competitions & trips before Meetings & events, soonest first, and leaves out the Mentor’s own, canceled, closed, skipped and past ones', () => {
     const entries = [
       meeting('meeting later', NOW + 5 * HOUR, { canSignUp: true }),
       meeting('meeting soon', NOW + HOUR, { canSignUp: true }),
@@ -66,18 +134,12 @@ describe('Events you can join', () => {
       meeting('my own', NOW + 2 * HOUR, { canSignUp: true, isCreator: true }),
       meeting('canceled', NOW + 2 * HOUR, { canSignUp: true, cancelled: true }),
       meeting('closed', NOW + 2 * HOUR, { canSignUp: false }),
+      meeting('skipped', NOW + 2 * HOUR, { canSignUp: true, seriesSignup: skippedSignup }),
       meeting('over', NOW - 3 * HOUR, { canSignUp: true }),
     ].map(row => joinEntry(row))
     const sections = joinSections(entries, NOW)
     expect(titles(sections.competitions)).toEqual(['outreach with travel', 'regional'])
     expect(titles(sections.meetings)).toEqual(['meeting soon', 'meeting later'])
-  })
-
-  it('cuts each section to the Home limit and counts the rest; the Your schedule page shows all', () => {
-    const entries = Array.from({ length: JOIN_SECTION_LIMIT + 2 }, (_, i) => joinEntry(meeting(`m${i}`, NOW + (i + 1) * HOUR, { canSignUp: true })))
-    expect(joinSections(entries, NOW)).toMatchObject({ moreMeetings: 2, moreCompetitions: 0 })
-    expect(joinSections(entries, NOW).meetings).toHaveLength(JOIN_SECTION_LIMIT)
-    expect(joinSections(entries, NOW, Number.POSITIVE_INFINITY).meetings).toHaveLength(JOIN_SECTION_LIMIT + 2)
   })
 
   it.each([
@@ -103,18 +165,11 @@ describe('Events you can join', () => {
 })
 
 describe('Who’s here now', () => {
-  it('counts and names who is clocked in per subteam, and says so when no one is', () => {
+  it('gives one line per subteam with how many are clocked in, and their names', () => {
     expect(hereGroups(clockedIn({ Programming: ['Avery N.', 'Jordan W.'], CAD: [] }))).toEqual([
-      { subteam: 'Programming', count: 2, names: ['Avery N.', 'Jordan W.'], label: 'Programming · 2 clocked in', empty: 'No one from Programming is clocked in right now.' },
-      { subteam: 'CAD', count: 0, names: [], label: 'CAD · 0 clocked in', empty: 'No one from CAD is clocked in right now.' },
+      { subteam: 'Programming', count: 2, names: ['Avery N.', 'Jordan W.'], label: 'Programming · 2 clocked in' },
+      { subteam: 'CAD', count: 0, names: [], label: 'CAD · 0 clocked in' },
     ])
-  })
-})
-
-describe('Meetings you created', () => {
-  it('lists upcoming meetings first and canceled ones after them', () => {
-    const rows = [meeting('canceled soon', NOW + HOUR, { cancelled: true }), meeting('later', NOW + 9 * HOUR), meeting('sooner', NOW + 2 * HOUR), meeting('past', NOW - 4 * HOUR)]
-    expect(titles(createdList(rows, NOW).shown)).toEqual(['sooner', 'later', 'canceled soon'])
   })
 })
 
@@ -137,16 +192,6 @@ describe('meeting descriptions', () => {
     { name: 'nothing yet', row: { isCreator: false, myStatus: null, mySource: null }, label: null },
   ] as const)('my part: $name', ({ row, label }) => {
     expect(myPartLabel(row)).toBe(label)
-  })
-
-  it.each([
-    { name: 'already started', startsAt: NOW - HOUR, text: 'now' },
-    { name: 'later today', startsAt: at('2026-11-06T18:00'), text: 'today' },
-    { name: 'tomorrow', startsAt: at('2026-11-07T09:00'), text: 'tomorrow' },
-    { name: 'this week', startsAt: at('2026-11-10T18:00'), text: 'on Tue' },
-    { name: 'far off', startsAt: at('2026-11-20T18:00'), text: 'on Friday, Nov 20' },
-  ])('starts: $name', ({ startsAt, text }) => {
-    expect(startsWhen(startsAt, NOW)).toBe(text)
   })
 
   it.each([
@@ -190,13 +235,5 @@ describe('editing a meeting the Mentor created', () => {
     expect(eventEditValues(onsite, { ...draftFrom(onsite), destination: 'Library' })).toEqual({ error: expect.any(String) })
     const elsewhere = editableMeeting(meeting('Park', NOW + HOUR, { place: 'City park' }))
     expect(eventEditValues(elsewhere, { ...draftFrom(elsewhere), destination: 'Library' })).toEqual({ values: { destination: 'Library' } })
-  })
-})
-
-describe('full lists for the Your schedule page', () => {
-  it('shows everything when no limit is given and keeps the Home limit otherwise', () => {
-    const rows = Array.from({ length: LIST_LIMIT + 4 }, (_, i) => meeting(`j${i}`, NOW + (i + 1) * HOUR, { canSignUp: true, isCreator: true }))
-    expect(createdList(rows, NOW, Number.POSITIVE_INFINITY).shown).toHaveLength(LIST_LIMIT + 4)
-    expect(createdList(rows, NOW).more).toBe(4)
   })
 })

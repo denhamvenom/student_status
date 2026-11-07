@@ -66,6 +66,9 @@ const busy = homeData({
   scheduled: [
     meeting('Programming build night', at('2026-11-10T18:00'), { ...going, audience: { kind: 'subteams', subteams: ['Programming'], required: false, text: 'Subteams: Programming' } }),
     meeting('Autonomous review', at('2026-11-12T19:00'), { ...self, virtual: true, place: 'Virtual (Discord)' }),
+    // Travel + Your subteam on Coming up; no drive or hotel answer yet, so it is also under Needs your answer.
+    meeting('Lone Star Qualifier', at('2026-11-20T07:00'), { ...going, type: 'Competition', questions: { askDrive: true, askHotel: true }, endsAt: at('2026-11-21T18:00'), place: 'Houston, TX', audience: programming }),
+    meeting('Saturday shop day', at('2026-11-14T09:00'), { ...self }),
   ],
   pendingInvites: [meeting('River City Regional', at('2026-11-21T07:00'), { ...invited, endsAt: at('2026-11-22T18:00'), place: 'Kansas City Convention Center' })],
   signUpAvailable: busyOpen,
@@ -121,6 +124,9 @@ export const mentorHomeFixtures = {
   invitesOnly: { now: NOW, name: 'Morgan Lee', data: homeData({ subteams: ['Mechanical'], pendingInvites: busy.pendingInvites }), here: clockedIn({ Mechanical: [] }) },
   signups: { now: NOW, name: 'Morgan Lee', data: signups, here: clockedIn({ Programming: ['Jordan W.'] }, true) },
 }
+
+/** A pinned staff message for the preview's banner (fictional). */
+export const pinnedFixture = { id: 'fixture_pin_1', title: 'Robot reveal moved to Sat, Nov 21.', body: 'Robot reveal moved to Sat, Nov 21. Same time and place.', authorName: 'Coach Rivera', pinnedAt: NOW - 3_600_000, showUntil: null }
 
 export const meetingDetailFixture: MentorMeetingDetail = {
   meeting: busy.created[0],

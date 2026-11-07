@@ -129,6 +129,20 @@ function Steps({ meeting, mode, actions, onBusyChange, onClose }: { meeting: Men
       setBusy(false)
     }
   }
+  // Answering an invitation can also be a no, from the first step.
+  const decline = async () => {
+    if (busy) return
+    setBusy(true); setError('')
+    try {
+      await actions.respond(meeting, 'declined')
+      toast.success(mentorHomeCopy.invite.declined(meeting.title))
+      setBusy(false)
+      onClose()
+    } catch (cause) {
+      setError(userFacingError(cause, mentorHomeCopy.invite.failed))
+      setBusy(false)
+    }
+  }
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (busy) return
@@ -175,6 +189,7 @@ function Steps({ meeting, mode, actions, onBusyChange, onClose }: { meeting: Men
         {index > 0 && <button type="button" disabled={busy} onClick={() => { setReturnToReview(false); setCurrent(steps[index - 1]) }} className={cn(big('soft'), 'flex-1')}>{copy.back}</button>}
         <button type="submit" form={formId} disabled={busy} className={cn(big('primary'), 'flex-[2]')}>{last ? (busy ? copy.saving : copy.confirm[mode]) : copy.next}</button>
       </div>
+      {mode === 'accept' && index === 0 && <button type="button" disabled={busy} onClick={() => void decline()} className={cn(big('ghost'), 'w-full')}>{copy.decline}</button>}
     </div>
   </>
 }
@@ -246,7 +261,7 @@ export function LeaveSeriesButton({ meeting, actions, disabled, size = 'sm' }: {
     finally { setBusy(false) }
   }
   return <>
-    <button type="button" disabled={disabled} onClick={() => { setError(''); setOpen(true) }} className={dashboardButtonVariants({ tone: 'ghost', size })}>{seriesCopy.leaveAll}</button>
+    <button type="button" disabled={disabled} onClick={() => { setError(''); setOpen(true) }} className={dashboardButtonVariants({ tone: 'urgent', size })}>{seriesCopy.leaveAll}</button>
     <Dialog open={open} disablePointerDismissal onOpenChange={next => { if (!next && !busy) setOpen(false) }}>
       <DialogContent showCloseButton={false} className="gap-3 border border-vs-border bg-vs-card p-5 text-vs-text sm:max-w-[420px]">
         <DialogTitle className="m-0! text-[20px]! font-bold text-vs-heading">{seriesCopy.leaveTitle}</DialogTitle>

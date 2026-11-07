@@ -1,181 +1,148 @@
 import { useId, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
-import { CalendarPlus } from 'lucide-react'
+import { ArrowRight, Pin, X } from 'lucide-react'
 import { cn } from 'cn'
-import { DashboardTile, TileTitle } from '@/components/dashboard/DashboardTile'
+import { DashboardTile } from '@/components/dashboard/DashboardTile'
 import { StatusBadge } from '@/components/dashboard/StatusBadge'
 import { TileError, TileErrorBoundary } from '@/components/dashboard/TileErrorBoundary'
 import { TileSkeleton } from '@/components/dashboard/TileSkeleton'
-import { dashboardButtonVariants, eyebrow, inset } from '@/components/dashboard/styles'
+import { dashboardButtonVariants, eyebrow, focusRing, inset } from '@/components/dashboard/styles'
 import { mentorHomeCopy } from '@/copy/mentor-home-copy'
-import { formatLongDate } from '../student-home/format'
-import type { ClockedInData, MentorHomeData } from './contract'
-import { MeetingActions, MeetingBadges, MentorMeetingRow, type MentorHomeHandlers, type RowAction } from './MentorMeetingRow'
-import { createdList, joinSections, meetingLine, pendingCount, scheduleView, seriesLine, startsWhen, subteamsLine } from './logic'
-import { JoinSectionsList } from './MentorJoinRow'
+import { formatShortDate } from '../student-home/format'
+import { formatWhen } from '../student-home/agenda'
+import type { ClockedInData, MentorHomeData, MentorMeeting } from './contract'
+import { homeView, meetingPlace, type AnswerItem } from './logic'
+import { MentorSignupWizard, type MentorActions } from './MentorSignupWizard'
+import { blockHeading, EventLinkRow, RowList, Tags } from './rows'
 import { WhoIsHere } from './WhoIsHere'
 
 const copy = mentorHomeCopy
 
-export type MentorHomeViewProps = {
-  name: string
+/** What the Mentor can do from Home and Schedule: their own sign-ups, plus Try again for the Home query. */
+export type MentorHomeHandlers = MentorActions & { retry: () => void }
+
+/** Who's here now (mentorClockedIn.mySubteamClockedIn): its own query, so it loads and fails on its own. */
+export type HereState = { data: ClockedInData | Error | undefined; retry: () => void }
+
+export type PinnedMessage = { id: string; title: string | null; body: string; authorName: string }
+
+/** The small pinned-announcement banner: who wrote it and its first line, a link to the Inbox, and Dismiss. */
+export function PinnedBannerView({ message, onDismiss }: { message: PinnedMessage; onDismiss: () => void }) {
+  return <section aria-label={copy.pinned.region} className={cn(inset, 'flex items-center gap-2 py-1 pr-1 pl-3')}>
+    <Pin size={16} aria-hidden="true" className="shrink-0 text-vs-accent-text" />
+    <Link to="/inbox" className={cn('flex min-h-11 min-w-0 flex-1 items-center rounded-lg text-[14px] text-vs-text! no-underline!', focusRing)}>
+      <span className="line-clamp-2"><b>{message.authorName}:</b> {message.title ?? message.body}<span className="sr-only"> ({copy.pinned.open})</span></span>
+    </Link>
+    <button type="button" aria-label={copy.pinned.dismiss} onClick={onDismiss} className={cn(dashboardButtonVariants({ tone: 'ghost', size: 'md' }), 'size-11 px-0')}><X size={18} aria-hidden="true" /></button>
+  </section>
+}
+
+/** Next event: title, day and time, place and "You're going". The whole card opens the event; no buttons. */
+function NextEvent({ next }: { next: MentorMeeting | null }) {
+  if (!next) return <DashboardTile tone="quiet" className="gap-1.5" aria-label={copy.next.label}>
+    <p className={cn(eyebrow, 'm-0')}>{copy.next.label}</p>
+    <p className="m-0 text-[17px] font-semibold text-vs-heading">{copy.next.none}</p>
+    <p className="m-0 text-[14px] text-vs-text-2">{copy.next.noneDetail}</p>
+  </DashboardTile>
+  return <DashboardTile tone="urgent" className="p-0!" aria-label={copy.next.label}>
+    <Link to={`/events/${next.eventId}`} className={cn('flex min-h-11 flex-col gap-1 rounded-tile p-4 text-vs-text! no-underline! hover:bg-vs-inset/40', focusRing)}>
+      <span className={eyebrow}>{copy.next.label}</span>
+      <span className="flex flex-wrap items-center justify-between gap-2">
+        <span className="font-heading text-[24px] leading-tight text-vs-heading">{next.title}</span>
+        <StatusBadge tone="success">✓ {copy.next.going}</StatusBadge>
+      </span>
+      <span className="text-[15px] text-vs-text">{formatWhen(next.startsAt, next.endsAt)}</span>
+      <span className="text-[14px] text-vs-text-2">{meetingPlace(next)}</span>
+    </Link>
+  </DashboardTile>
+}
+
+/** One Needs your answer row: title, date and why, and one Answer button that opens the sign-up wizard. */
+function AnswerRow({ item, actions }: { item: AnswerItem; actions: MentorActions }) {
+  const [open, setOpen] = useState(false)
+  const { meeting } = item
+  return <li className="flex items-center gap-3 border-b border-vs-border-subtle px-2 py-2 last:border-b-0">
+    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <span className="text-[15px] font-semibold text-vs-text">{meeting.title}</span>
+      <span className="text-[13px] text-vs-text-2">{formatShortDate(meeting.startsAt)} · {item.reason}</span>
+    </span>
+    <button type="button" aria-label={copy.answer.buttonLabel(meeting.title)} onClick={() => setOpen(true)} className={dashboardButtonVariants({ tone: 'primary', size: 'md' })}>{copy.answer.button}</button>
+    <MentorSignupWizard meeting={meeting} mode={open ? item.mode : null} actions={actions} onClose={() => setOpen(false)} />
+  </li>
+}
+
+/** Needs your answer: shown only when an invitation waits or a drive / hotel answer is missing. */
+export function NeedsAnswer({ items, actions }: { items: readonly AnswerItem[]; actions: MentorActions }) {
+  const id = useId()
+  if (!items.length) return null
+  return <DashboardTile tone="quiet" aria-labelledby={id} className="gap-2">
+    <h2 id={id} className={blockHeading}>{copy.answer.title}</h2>
+    <ul className={cn(inset, 'm-0 flex list-none flex-col px-1.5 py-0.5')}>{items.map(item => <AnswerRow key={`${item.mode}:${item.meeting.eventId}`} item={item} actions={actions} />)}</ul>
+  </DashboardTile>
+}
+
+function ComingUp({ rows }: { rows: ReturnType<typeof homeView>['comingUp'] }) {
+  const id = useId()
+  if (!rows.length) return null
+  return <DashboardTile aria-labelledby={id} className="gap-2">
+    <h2 id={id} className={blockHeading}>{copy.comingUp.title}</h2>
+    <RowList>{rows.map(({ meeting, tags }) => <EventLinkRow key={meeting.eventId} to={`/events/${meeting.eventId}`} title={meeting.title} sub={formatShortDate(meeting.startsAt)} tags={<Tags tags={tags} />} />)}</RowList>
+    <Link to="/invited#going" className="inline-flex min-h-11 items-center gap-1 self-start text-[14px] font-semibold">{copy.comingUp.seeAll}<ArrowRight size={15} aria-hidden="true" /></Link>
+  </DashboardTile>
+}
+
+/** One tile: "12 events you could help with →", opening Schedule › Join. Hidden when there is nothing to join. */
+function HelpTile({ count }: { count: number }) {
+  if (count <= 0) return null
+  return <Link to="/invited#join" className={cn('flex min-h-12 items-center justify-between gap-3 rounded-[14px] border border-vs-border-subtle bg-vs-compact px-4 py-3 text-[15px] font-semibold text-vs-text! no-underline! shadow-vs-compact hover:brightness-95 dark:hover:brightness-125', focusRing)}>
+    <span>{copy.helpTile(count)}</span><ArrowRight size={18} aria-hidden="true" className="shrink-0 text-vs-accent-text" />
+  </Link>
+}
+
+export type MentorHomeBlocksProps = {
   now: number
   /** mentorHome.mentorHome: undefined while loading, an Error when it failed. */
   data: MentorHomeData | Error | undefined
   handlers: MentorHomeHandlers
-  /** Pinned staff announcements (StaffHomeAnnouncements); the preview leaves it out. */
-  announcements?: ReactNode
-  /** Who's here now (mentorClockedIn.mySubteamClockedIn): its own query, so it loads and fails on its own. */
-  here: { data: ClockedInData | Error | undefined; retry: () => void }
-}
-
-function List({ rows, action, handlers, label }: { rows: MentorHomeData['scheduled']; action: RowAction; handlers: MentorHomeHandlers; label: string }) {
-  return <ul aria-label={label} className={cn(inset, 'm-0 flex list-none flex-col px-1.5 py-0.5')}>{rows.map(row => <MentorMeetingRow key={row.eventId} meeting={row} action={action} handlers={handlers} />)}</ul>
-}
-
-const more = (count: number, text: (count: number) => string) => count > 0 ? <p className="m-0 text-[13px] text-vs-muted">{text(count)}</p> : null
-const seeAll = (to: string, label: string) => <Link to={to} className="inline-flex min-h-11 items-center self-start text-[14px] font-semibold">{label}</Link>
-
-/**
- * Create a meeting: a secondary button right under Your next event (owner decision, Nov 7 2026). Still full width on a
- * phone and at least 44px tall; its purpose is read with it.
- */
-function CreateMeeting() {
-  const id = useId()
-  return <div className="flex flex-col gap-1">
-    <Link to="/events/new" aria-describedby={id} className={cn(dashboardButtonVariants({ tone: 'soft', size: 'md' }), 'w-full gap-2 text-[14px]! sm:w-auto sm:self-start')}><CalendarPlus size={17} aria-hidden="true" />{copy.create.button}</Link>
-    <p id={id} className="m-0 text-[13px] text-vs-muted">{copy.create.detail}</p>
-  </div>
-}
-
-function NextUp({ data, now, handlers }: { data: MentorHomeData; now: number; handlers: MentorHomeHandlers }) {
-  const { next } = scheduleView(data, now)
-  const [error, setError] = useState('')
-  if (!next) return <DashboardTile tone="quiet" className="gap-2" aria-label={copy.next.region}>
-    <p className={cn(eyebrow, 'm-0')}>{copy.next.label}</p>
-    <h2 className="m-0! font-heading! text-[22px]! font-normal! text-vs-heading">{copy.next.none}</h2>
-    <p className="m-0 text-[14px] text-vs-text-2">{copy.next.noneDetail}</p>
-  </DashboardTile>
-  return <DashboardTile tone="urgent" className="gap-2.5 lg:px-6" aria-label={copy.next.region}>
-    <div className="flex flex-wrap items-center justify-between gap-2"><p className={cn(eyebrow, 'm-0')}>{copy.next.label}</p><StatusBadge tone="warning">{copy.next.startsIn(startsWhen(next.startsAt, now))}</StatusBadge></div>
-    <h2 className="m-0! font-heading! text-[26px]! font-normal! text-vs-heading lg:text-[32px]!">{next.title}</h2>
-    <p className="m-0 text-[15px] text-vs-text">{meetingLine(next)}</p>
-    <MeetingBadges meeting={next} />
-    <div className="flex flex-wrap gap-2" role="group" aria-label={next.title}>
-      <Link to={`/events/${next.eventId}`} className={dashboardButtonVariants({ tone: 'soft' })}>{copy.next.open}</Link>
-      <MeetingActions meeting={next} action="going" actions={handlers} size="md" onError={setError} />
-    </div>
-    {error && <p role="alert" className="m-0 text-[13px] text-vs-urgent">{error}</p>}
-  </DashboardTile>
-}
-
-function Scheduled({ data, now, handlers }: { data: MentorHomeData; now: number; handlers: MentorHomeHandlers }) {
-  const id = useId()
-  const view = scheduleView(data, now)
-  const empty = !view.next && !view.invites.length && !view.skipped.length
-  return <DashboardTile tone={view.invites.length ? 'urgent' : 'quiet'} aria-labelledby={id} className="gap-3">
-    <TileTitle id={id}>{copy.scheduled.title}</TileTitle>
-    {view.invites.length > 0 && <div className="flex flex-col gap-1.5">
-      <p className={cn(eyebrow, 'm-0')}>{copy.scheduled.invitesHeading}</p>
-      <List rows={view.invites} action="invite" handlers={handlers} label={copy.scheduled.invitesHeading} />
-    </div>}
-    {view.going.length > 0 && <div className="flex flex-col gap-1.5">
-      <p className={cn(eyebrow, 'm-0')}>{copy.scheduled.goingHeading}</p>
-      <List rows={view.going} action="going" handlers={handlers} label={copy.scheduled.goingHeading} />
-      {more(view.moreGoing, copy.scheduled.more)}
-    </div>}
-    {view.skipped.length > 0 && <div className="flex flex-col gap-1.5">
-      <p className={cn(eyebrow, 'm-0')}>{copy.series.skippedHeading}</p>
-      <List rows={view.skipped} action="skipped" handlers={handlers} label={copy.series.skippedHeading} />
-    </div>}
-    {empty && <p className="m-0 text-[14px] text-vs-muted">{copy.scheduled.none}</p>}
-    {view.next && !view.going.length && <p className="m-0 text-[13px] text-vs-muted">{copy.scheduled.nothingElse}</p>}
-    <Link to="/invited" className="inline-flex min-h-11 items-center self-start text-[14px] font-semibold">{copy.scheduled.seeAll}</Link>
-  </DashboardTile>
-}
-
-function Joinable({ data, now, handlers }: { data: MentorHomeData; now: number; handlers: MentorHomeHandlers }) {
-  const id = useId()
-  const sections = joinSections(data.joinable, now)
-  const hidden = sections.moreCompetitions + sections.moreMeetings
-  return <DashboardTile tone="quiet" aria-labelledby={id} className="gap-3">
-    <TileTitle id={id}>{copy.join.title}</TileTitle>
-    <JoinSectionsList sections={sections} handlers={handlers} />
-    {hidden > 0 && seeAll('/invited#join', copy.join.seeAll)}
-  </DashboardTile>
-}
-
-function Created({ data, now, handlers }: { data: MentorHomeData; now: number; handlers: MentorHomeHandlers }) {
-  const id = useId()
-  const { shown, more: extra } = createdList(data.created, now)
-  return <DashboardTile tone="quiet" aria-labelledby={id} className="gap-3">
-    <TileTitle id={id}>{copy.created.title}</TileTitle>
-    {shown.length ? <List rows={shown} action="created" handlers={handlers} label={copy.created.title} /> : <p className="m-0 text-[14px] text-vs-muted">{copy.created.none}</p>}
-    {more(extra, copy.created.more)}
-    {extra > 0 && seeAll('/invited#created', copy.created.seeAll)}
-    {data.createdSeries.length > 0 && <div className="flex flex-col gap-1">
-      <p className={cn(eyebrow, 'm-0')}>{copy.created.seriesTitle}</p>
-      <ul className="m-0 flex list-none flex-col gap-1 p-0">{data.createdSeries.map(series => <li key={series.seriesId} className="text-[13px] text-vs-text-2"><span className="font-semibold text-vs-text">{series.name}</span> · {seriesLine(series)}</li>)}</ul>
-    </div>}
-  </DashboardTile>
-}
-
-/** Subteams and the profile stay reachable even while the meetings load or fail. */
-function About({ subteams }: { subteams: readonly string[] | null }) {
-  const id = useId()
-  return <DashboardTile surface="compact" aria-labelledby={id} className="gap-2">
-    <TileTitle id={id}>{copy.about.title}</TileTitle>
-    {subteams && <p className="m-0 text-[14px] text-vs-text">{subteamsLine(subteams)}</p>}
-    <div className="flex flex-wrap gap-2">
-      <Link to="/myprofile" className={dashboardButtonVariants({ tone: 'soft', size: 'sm' })}>{copy.about.profile}</Link>
-      <Link to="/report" className={dashboardButtonVariants({ tone: 'ghost', size: 'sm' })}>{copy.about.report}</Link>
-    </div>
-  </DashboardTile>
+  here: HereState
 }
 
 /**
- * Mentor Home, phone first (390px): greeting, Your next event, Create a meeting (a secondary button right under it), Who's
- * here now, Where you're scheduled (invitations first), Events you can join (Competitions & trips, then Meetings), Meetings
- * you created, About you, then pinned announcements. Tablet: the phone layout, at most 720px wide and centered. Desktop
- * (≥1024px): two 2fr/1fr rows: Your next event and Create on the left with Who's here now on the right; then the schedule and
- * events to join on the left with created / about on the right.
+ * The Mentor Home blocks, in order: Next event, Who's here now, Needs your answer (only when something waits), Coming up (the
+ * next three) and the events-you-could-help-with tile. Shared by Mentor Home and the Travel Lead's My schedule.
  */
-export function MentorHomeView({ name, now, data, handlers, announcements, here }: MentorHomeViewProps) {
-  const failed = data instanceof Error
+export function MentorHomeBlocks({ now, data, handlers, here }: MentorHomeBlocksProps) {
   const loading = data === undefined
+  const failed = data instanceof Error
+  const view = loading || failed ? null : homeView(data, now)
   const guard = (title: string, node: ReactNode) => <TileErrorBoundary title={title} message={copy.states.failed(title)} retryLabel={copy.states.tryAgain} onRetry={handlers.retry}>{node}</TileErrorBoundary>
-  const tile = (title: string, render: (data: MentorHomeData) => ReactNode) => loading ? <TileSkeleton label={copy.states.loading(title)} />
-    : failed ? null : guard(title, render(data))
-  const date = formatLongDate(now)
-  const row = 'flex min-w-0 flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] lg:items-start lg:gap-4'
-  const column = 'flex min-w-0 flex-col gap-3 empty:hidden lg:gap-4'
-  return <div className="flex min-w-0 flex-col gap-3 pb-24 font-sans text-vs-text md:mx-auto md:w-full md:max-w-[720px] lg:mx-0 lg:max-w-none lg:gap-4 lg:pb-6">
-    <header className="flex min-w-0 flex-col gap-1">
-      <h1 className="m-0! font-heading! text-[26px]! font-normal! text-vs-heading lg:text-[34px]!">{copy.greeting(name)}</h1>
-      <p className="m-0 text-[13px] text-vs-muted">{loading || failed ? date : copy.subtitle(date, pendingCount(data, now))}</p>
-    </header>
-    <div className={row}>
-      <div className={column}>
-        {/* One query feeds every list, so a failure is one card instead of four. */}
-        {failed && <TileError title={copy.states.homeTitle} message={copy.states.homeFailed} retryLabel={copy.states.tryAgain} onRetry={handlers.retry} />}
-        {tile(copy.next.region, data => <NextUp data={data} now={now} handlers={handlers} />)}
-        <CreateMeeting />
-      </div>
-      <div className={column}>
-        <TileErrorBoundary title={copy.here.title} message={copy.states.failed(copy.here.title)} retryLabel={copy.states.tryAgain} onRetry={here.retry}><WhoIsHere data={here.data} onRetry={here.retry} /></TileErrorBoundary>
-      </div>
-    </div>
-    <div className={row}>
-      <div className={column}>
-        {tile(copy.scheduled.title, data => <Scheduled data={data} now={now} handlers={handlers} />)}
-        {tile(copy.join.title, data => <Joinable data={data} now={now} handlers={handlers} />)}
-      </div>
-      <div className={column}>
-        {tile(copy.created.title, data => <Created data={data} now={now} handlers={handlers} />)}
-        <About subteams={loading || failed ? null : data.subteams} />
-      </div>
-    </div>
+  return <>
+    {/* One query feeds every block but Who's here now, so a failure is one card. */}
+    {failed && <TileError title={copy.states.homeTitle} message={copy.states.homeFailed} retryLabel={copy.states.tryAgain} onRetry={handlers.retry} />}
+    {loading && <TileSkeleton label={copy.states.loading(copy.next.label)} />}
+    {view && guard(copy.next.label, <NextEvent next={view.next} />)}
+    <TileErrorBoundary title={copy.here.title} message={copy.states.failed(copy.here.title)} retryLabel={copy.states.tryAgain} onRetry={here.retry}><WhoIsHere data={here.data} onRetry={here.retry} /></TileErrorBoundary>
+    {view && guard(copy.answer.title, <NeedsAnswer items={view.needsAnswer} actions={handlers} />)}
+    {view && guard(copy.comingUp.title, <ComingUp rows={view.comingUp} />)}
+    {view && <HelpTile count={view.joinCount} />}
     {!loading && !failed && data.truncated && <p className="m-0 text-[13px] text-vs-muted">{copy.states.truncated}</p>}
-    {announcements}
+  </>
+}
+
+export type MentorHomeViewProps = MentorHomeBlocksProps & {
+  name: string
+  /** The pinned-announcement banner (PinnedBanner); the preview passes PinnedBannerView or nothing. */
+  banner?: ReactNode
+}
+
+/**
+ * Mentor Home, phone first: an optional pinned-announcement banner, the date and greeting, then the Home blocks. Tablet and
+ * desktop keep the same single column, at most 720px wide.
+ */
+export function MentorHomeView({ name, banner, ...blocks }: MentorHomeViewProps) {
+  return <div className="flex min-w-0 flex-col gap-3 pb-24 font-sans text-vs-text md:mx-auto md:w-full md:max-w-[720px] lg:pb-6">
+    {banner}
+    <h1 className="m-0! font-sans! text-[14px]! leading-normal! font-semibold! text-vs-text-2">{copy.greeting(formatShortDate(blocks.now), name)}</h1>
+    <MentorHomeBlocks {...blocks} />
   </div>
 }

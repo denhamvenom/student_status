@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Id } from '../../../convex/_generated/dataModel'
-import { answerLabels, groupMentors, joinedLabels, totalsLine, type EventMentor } from './coach-view'
+import { answerLabels, groupMentors, headerLine, joinedLabels, mentorsOpenByDefault, totalsLine, type EventMentor } from './coach-view'
 import { eventMentorsCopy as copy } from './copy'
 
 const mentor = (name: string, overrides: Partial<EventMentor> = {}): EventMentor => ({
@@ -40,5 +40,17 @@ describe('Coach view of an event’s Mentors', () => {
     expect(totalsLine({ questions: { askDrive: true, askHotel: false }, counts: { ...counts, drivers: 1 } })).toBe('1 Mentor can drive')
     expect(totalsLine({ questions: { askDrive: false, askHotel: true }, counts: { ...counts, hotelRooms: 1 } })).toBe('1 hotel room needed')
     expect(totalsLine({ questions: { askDrive: false, askHotel: false }, counts })).toBeNull()
+  })
+
+  it.each([
+    { name: 'drive and hotel asked', questions: both, change: {}, line: '4 going · 1 waiting · 3 can drive · 2 hotel rooms', open: true },
+    { name: 'nobody waiting, one room', questions: both, change: { invited: 0, hotelRooms: 1 }, line: '4 going · 3 can drive · 1 hotel room', open: true },
+    { name: 'no questions asked', questions: { askDrive: false, askHotel: false }, change: {}, line: '4 going · 1 waiting', open: true },
+    { name: 'only waiting', questions: { askDrive: false, askHotel: false }, change: { accepted: 0 }, line: '0 going · 1 waiting', open: true },
+    { name: 'only can’t go', questions: { askDrive: true, askHotel: false }, change: { accepted: 0, invited: 0, declined: 2, drivers: 0 }, line: '0 going · 0 can drive', open: false },
+  ])('section header: $name', ({ questions, change, line, open }) => {
+    const summary = { questions, counts: { ...counts, ...change } }
+    expect(headerLine(summary)).toBe(line)
+    expect(mentorsOpenByDefault(summary)).toBe(open)
   })
 })

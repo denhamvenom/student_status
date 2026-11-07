@@ -1,3 +1,5 @@
+import type { EventCreator } from '../../../convex/lib/eventCreator'
+import { eventCreatorCopy } from '../mentor-invites/copy'
 import { seriesProgressNote, type SeriesProgress } from '../event-setup/event-audience-wiring'
 import { EventEditActions } from './EventEditActions'
 import { HelpToggle } from './HelpToggle'
@@ -16,15 +18,16 @@ export function EventBadges({ event }: { event: Parameters<typeof displayBadges>
 
 /**
  * Under the event page title: badges, how a repeating series repeats and ends ("Repeats every Tuesday until May 31, 2027")
- * with a "?" for how it keeps adding meetings, and Edit / Cancel / Change end date for staff.
+ * with a "?" for how it keeps adding meetings, and for staff "Created by <name> (Mentor)" and Edit / Cancel / Change end date.
  */
-export function EventPageHeader({ event, series, staff, isCoach }: { event: HeaderEvent; series?: SeriesProgress | null; staff: boolean; isCoach: boolean }) {
+export function EventPageHeader({ event, series, staff, isCoach, creator }: { event: HeaderEvent; series?: SeriesProgress | null; staff: boolean; isCoach: boolean; creator?: EventCreator | null }) {
   const seriesEnd = useSeriesEndDetails(event.seriesOccurrenceKey ? event.seriesId : undefined, staff)
   // A canceled series adds no more meetings, so its "?" about adding them is left out.
   const note = staff && seriesEnd?.status !== 'cancelled' ? seriesProgressNote(series) : null
   const repeats = seriesEnd ? repeatsText(seriesEnd) : null
   return <>
     <EventBadges event={event} />
+    {staff && creator && <p className="muted">{eventCreatorCopy.createdBy(creator.name, creator.roleLabel)}</p>}
     {(note || repeats) && <p className="muted">{repeats ?? 'Repeating meeting'}{note && <HelpToggle label="About this repeating meeting">{note}</HelpToggle>}</p>}
     {staff && <EventEditActions event={event} isCoach={isCoach} seriesEnd={seriesEnd} />}
   </>

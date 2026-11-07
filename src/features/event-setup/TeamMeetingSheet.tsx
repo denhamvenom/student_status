@@ -41,7 +41,7 @@ function TeamMeetingForm({ isCoach, busy, setBusy, onDone }: { isCoach: boolean;
   const createSeries = useCreateSeries()
   const createEvent = useMutation(api.admin.createEvent)
   const [now] = useState(() => Date.now())
-  const [draft, setDraft] = useState<TeamMeetingDraft>(() => teamMeetingDefaults(isCoach, now))
+  const [draft, setDraft] = useState<TeamMeetingDraft>(() => teamMeetingDefaults(now))
   // The first day tapped replaces the preset day (the meeting's own weekday), so picking another day is one tap; later taps add or remove days.
   const [daysTouched, setDaysTouched] = useState(false)
   const [issue, setIssue] = useState<PickerIssue | null>(null)

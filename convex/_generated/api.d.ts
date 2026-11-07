@@ -89,6 +89,7 @@ import type * as lib_developerSignIn from "../lib/developerSignIn.js";
 import type * as lib_digest from "../lib/digest.js";
 import type * as lib_eventAudience from "../lib/eventAudience.js";
 import type * as lib_eventAudienceRules from "../lib/eventAudienceRules.js";
+import type * as lib_eventCreator from "../lib/eventCreator.js";
 import type * as lib_eventEnrollmentState from "../lib/eventEnrollmentState.js";
 import type * as lib_eventProjection from "../lib/eventProjection.js";
 import type * as lib_eventSignupExtras from "../lib/eventSignupExtras.js";
@@ -273,6 +274,7 @@ declare const fullApi: ApiFromModules<{
   "lib/digest": typeof lib_digest;
   "lib/eventAudience": typeof lib_eventAudience;
   "lib/eventAudienceRules": typeof lib_eventAudienceRules;
+  "lib/eventCreator": typeof lib_eventCreator;
   "lib/eventEnrollmentState": typeof lib_eventEnrollmentState;
   "lib/eventProjection": typeof lib_eventProjection;
   "lib/eventSignupExtras": typeof lib_eventSignupExtras;

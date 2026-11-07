@@ -43,3 +43,20 @@ export function totalsLine(summary: Pick<EventMentorSummary, 'questions' | 'coun
   if (summary.questions.askHotel) parts.push(copy.hotelRooms(summary.counts.hotelRooms))
   return parts.length ? parts.join(' · ') : null
 }
+
+/**
+ * The Mentors section's header line (owner decision, Nov 7 2026): "3 going · 1 waiting · 2 can drive · 1 hotel room". Waiting
+ * appears only when someone hasn't answered; drive and hotel totals only when the event asks those questions.
+ */
+export function headerLine(summary: Pick<EventMentorSummary, 'questions' | 'counts'>): string {
+  const parts = [copy.header.going(summary.counts.accepted)]
+  if (summary.counts.invited) parts.push(copy.header.waiting(summary.counts.invited))
+  if (summary.questions.askDrive) parts.push(copy.header.canDrive(summary.counts.drivers))
+  if (summary.questions.askHotel) parts.push(copy.header.hotelRooms(summary.counts.hotelRooms))
+  return parts.join(' · ')
+}
+
+/** The Mentors section starts open when at least one Mentor is going or waiting for an answer. */
+export function mentorsOpenByDefault(summary: Pick<EventMentorSummary, 'counts'>): boolean {
+  return summary.counts.accepted + summary.counts.invited > 0
+}

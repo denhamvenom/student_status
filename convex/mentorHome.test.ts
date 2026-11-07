@@ -265,8 +265,10 @@ describe("mentorHome joinable (grouped, owner decision Nov 7 2026)", () => {
     ["a Team meeting for everyone", {}, "meetings", false],
     ["a Team meeting for the Mentor's subteam", { audienceKind: "subteams", audienceSubteams: ["Mechanical"] }, "meetings", true],
     ["a Competition (even for the Mentor's subteam)", { type: "Competition", audienceKind: "subteams", audienceSubteams: ["Build"] }, "competitionsAndTrips", false],
-    ["an event with travel", { type: "Outreach", travel: "Charter Bus" }, "competitionsAndTrips", false],
-    ["an overnight event", { overnight: true }, "competitionsAndTrips", false],
+    ["an Outreach event with travel", { type: "Outreach", travel: "Charter Bus" }, "meetings", false],
+    ["a Fundraiser with travel", { type: "Fundraiser", travel: "Charter Bus" }, "meetings", false],
+    ["a Team meeting with travel for the Mentor's subteam", { travel: "Charter Bus", audienceKind: "subteams", audienceSubteams: ["Build"] }, "meetings", true],
+    ["an overnight trip", { type: "Outreach", travel: "Charter Bus", overnight: true }, "competitionsAndTrips", false],
     ["an on-site event with a travel value", { travel: "Charter Bus", onsite: true }, "meetings", false],
   ] as const)("puts %s in %s (forYourSubteam %s)", async (_label, extra, category, forYourSubteam) => {
     const f = await fixture();

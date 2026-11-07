@@ -1,69 +1,56 @@
 import { useId, useState } from 'react'
-import { Link } from 'react-router'
-import { ChevronRight } from 'lucide-react'
-import { cn } from 'cn'
-import { StatusBadge } from '@/components/dashboard/StatusBadge'
-import { eyebrow, focusRing, inset } from '@/components/dashboard/styles'
+import { DashboardTile } from '@/components/dashboard/DashboardTile'
 import { mentorHomeCopy } from '@/copy/mentor-home-copy'
 import type { JoinEntry } from './contract'
-import { joinEntryLines, showsSubteamTag, typeLabel, type JoinSections } from './logic'
-import { MeetingActions, type MentorHomeHandlers } from './MentorMeetingRow'
+import { joinEntryLines, MAX_TAGS, showsSubteamTag, type JoinSections } from './logic'
+import { MeetingActions } from './MentorMeetingRow'
+import type { MentorActions } from './MentorSignupWizard'
+import { Tags } from './rows'
 
 const copy = mentorHomeCopy
 
 /**
- * One "Events you can join" entry: a whole repeating series ("Mondays at 6:00 PM · Repeats weekly", N upcoming) or a one-time
- * event. Sign up opens the sign-up wizard on the next meeting; for a series it starts with "Which meetings?".
+ * One Schedule › Join row: a whole repeating series ("Mondays at 6:00 PM · Repeats weekly", N upcoming) or a one-time event,
+ * and Sign up. Sign up opens the sign-up wizard on the next meeting; for a series it starts with "Which meetings?".
  */
-export function MentorJoinRow({ entry, handlers }: { entry: JoinEntry; handlers: MentorHomeHandlers }) {
+export function MentorJoinRow({ entry, actions }: { entry: JoinEntry; actions: MentorActions }) {
   const [error, setError] = useState('')
   const headingId = `mentor-join-${entry.seriesId ?? entry.nextEventId}`
   const { line, detail } = joinEntryLines(entry)
   const meeting = entry.next
-  const subteamTag = showsSubteamTag(entry)
-  return <li className="flex flex-col gap-1.5 border-b border-vs-border-subtle py-2 last:border-b-0">
-    <Link to={`/events/${meeting.eventId}`} className={cn('flex min-h-11 items-center gap-2.5 rounded-lg px-2 py-1 text-vs-text! no-underline! hover:bg-vs-inset-raised', focusRing)}>
+  const tags = [...(showsSubteamTag(entry) ? [copy.join.yourSubteam] : []), ...(meeting.questions.askDrive || meeting.questions.askHotel ? [copy.tags.travel] : [])].slice(0, MAX_TAGS)
+  return <li className="flex flex-col gap-1 border-b border-vs-border-subtle px-2 py-2.5 last:border-b-0">
+    <div className="flex items-center gap-3">
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span id={headingId} className="text-[15px] font-semibold text-vs-text">{entry.title}</span>
         <span className="text-[13px] text-vs-text-2">{line}</span>
         {detail && <span className="text-[13px] text-vs-muted">{detail}</span>}
+        {(tags.length > 0 || entry.hasSeriesSignup) && <span className="flex flex-wrap items-center gap-1.5 pt-0.5">
+          <Tags tags={tags} />
+          {entry.hasSeriesSignup && <span className="text-[12px] font-semibold text-vs-success">{copy.join.onSeries}</span>}
+        </span>}
       </span>
-      <ChevronRight size={16} aria-hidden="true" className="shrink-0 text-vs-muted" />
-    </Link>
-    <div className="flex flex-col gap-2 px-2">
-      <span className="flex flex-wrap items-center gap-1.5">
-        {subteamTag && <StatusBadge tone="success">{copy.join.yourSubteam}</StatusBadge>}
-        <StatusBadge tone="calm">{typeLabel(meeting)}</StatusBadge>
-        {meeting.questions.askDrive && <StatusBadge tone="warning">{copy.tags.travel}</StatusBadge>}
-        {meeting.questions.askHotel && <StatusBadge tone="warning">{copy.tags.overnight}</StatusBadge>}
-        {!subteamTag && <StatusBadge tone={meeting.audience.required ? 'warning' : 'calm'}>{meeting.audience.text}</StatusBadge>}
-        {meeting.virtual && <StatusBadge tone="calm">{copy.meeting.virtual}</StatusBadge>}
-        {entry.hasSeriesSignup && <StatusBadge tone="success">{copy.join.onSeries}</StatusBadge>}
-      </span>
-      <span className="flex flex-wrap gap-2 empty:hidden" role="group" aria-labelledby={headingId}>
-        <MeetingActions meeting={meeting} action="join" actions={handlers} describedBy={headingId} onError={setError} />
-      </span>
+      <MeetingActions meeting={meeting} action="join" actions={actions} size="md" label={copy.join.signUpLabel(entry.title)} onError={setError} />
     </div>
-    {error && <p role="alert" className="m-0 px-2 text-[13px] text-vs-urgent">{error}</p>}
+    {error && <p role="alert" className="m-0 text-[13px] text-vs-urgent">{error}</p>}
   </li>
 }
 
-function Section({ title, none, rows, more, handlers }: { title: string; none: string; rows: JoinEntry[]; more: number; handlers: MentorHomeHandlers }) {
+function Group({ title, none, rows, actions }: { title: string; none: string; rows: JoinEntry[]; actions: MentorActions }) {
   const id = useId()
-  return <section aria-labelledby={id} className="flex flex-col gap-1.5">
-    <h3 id={id} className={cn(eyebrow, 'm-0')}>{title}</h3>
+  return <section aria-labelledby={id} className="flex flex-col gap-2">
+    <h2 id={id} className="m-0! font-sans! text-[16px]! font-bold! text-vs-heading">{title}</h2>
     {rows.length
-      ? <ul aria-labelledby={id} className={cn(inset, 'm-0 flex list-none flex-col px-1.5 py-0.5')}>{rows.map(entry => <MentorJoinRow key={entry.seriesId ?? entry.nextEventId} entry={entry} handlers={handlers} />)}</ul>
+      ? <DashboardTile className="px-1.5! py-1!"><ul aria-labelledby={id} className="m-0 flex list-none flex-col p-0">{rows.map(entry => <MentorJoinRow key={entry.seriesId ?? entry.nextEventId} entry={entry} actions={actions} />)}</ul></DashboardTile>
       : <p className="m-0 text-[14px] text-vs-muted">{none}</p>}
-    {more > 0 && <p className="m-0 text-[13px] text-vs-muted">{copy.join.more(more)}</p>}
   </section>
 }
 
-/** Competitions & trips first, then Meetings (Home shows the first few of each; Your schedule shows all); one line when both are empty. */
-export function JoinSectionsList({ sections, handlers }: { sections: JoinSections; handlers: MentorHomeHandlers }) {
+/** Competitions & trips first, then Meetings & events; one line when both are empty. */
+export function JoinSectionsList({ sections, actions }: { sections: JoinSections; actions: MentorActions }) {
   if (!sections.competitions.length && !sections.meetings.length) return <p className="m-0 text-[14px] text-vs-muted">{copy.join.none}</p>
   return <>
-    <Section title={copy.join.competitions} none={copy.join.noCompetitions} rows={sections.competitions} more={sections.moreCompetitions} handlers={handlers} />
-    <Section title={copy.join.meetings} none={copy.join.noMeetings} rows={sections.meetings} more={sections.moreMeetings} handlers={handlers} />
+    <Group title={copy.join.competitions} none={copy.join.noCompetitions} rows={sections.competitions} actions={actions} />
+    <Group title={copy.join.meetings} none={copy.join.noMeetings} rows={sections.meetings} actions={actions} />
   </>
 }

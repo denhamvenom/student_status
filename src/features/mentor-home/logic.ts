@@ -1,20 +1,15 @@
-// Mentor Home rules: which meetings show where, in what order, and how each one is described.
+// Mentor Home rules: which blocks show, which meetings go in each, and how each one is described.
 // Pure (no Convex or React) so the rules are tested directly; the backend decides what a Mentor may see and do.
 import { onsiteLocation } from '../../../convex/lib/transportation'
 import { mentorHomeCopy } from '@/copy/mentor-home-copy'
 import { subteamDisplay } from '@/lib/subteams'
 import { formatWhen } from '../student-home/agenda'
-import { calendarDaysUntil } from '../student-home/logic'
-import { formatLongDate, formatWeekday } from '../student-home/format'
 import { repeatSummary } from '../event-setup/audience/repeat'
 import type { RepeatValue } from '../event-setup/audience/types'
 import type { EditableEvent } from '../operations/event-edit'
 import type { ClockedInData, JoinEntry, MentorHomeData, MentorMeeting, MentorSeries } from './contract'
 
 const copy = mentorHomeCopy
-
-/** Rows shown before "N more" in Where you're scheduled, Meetings you can join and Meetings you created. */
-export const LIST_LIMIT = 5
 
 type Timed = Pick<MentorMeeting, 'startsAt' | 'endsAt' | 'title'>
 
@@ -45,36 +40,14 @@ export function myPartLabel(meeting: Pick<MentorMeeting, 'isCreator' | 'myStatus
   return null
 }
 
-/** "today", "tomorrow", "on Fri" or "on Mon, Nov 16" (more than a week away), for the Next up card. */
-export function startsWhen(startsAt: number, now: number): string {
-  const days = calendarDaysUntil(startsAt, now)
-  if (days <= 0) return startsAt <= now ? 'now' : 'today'
-  if (days === 1) return 'tomorrow'
-  if (days < 7) return `on ${formatWeekday(startsAt)}`
-  return `on ${formatLongDate(startsAt)}`
-}
-
-export type ScheduleView = {
-  /** The first meeting the Mentor is going to (or creating), shown big. Null when nothing is scheduled. */
-  next: MentorMeeting | null
-  /** Invitations waiting for an answer, soonest first. Always shown in full: each needs an answer. */
-  invites: MentorMeeting[]
-  /** The rest of the Mentor's schedule after `next`, soonest first, at most LIST_LIMIT. */
-  going: MentorMeeting[]
-  moreGoing: number
-  /** Series meetings the Mentor skipped (still in a series they signed up for), soonest first, at most LIST_LIMIT. */
-  skipped: MentorMeeting[]
-}
-
 /** A meeting of a series the Mentor signed up for and then skipped ("Skip this one"); it can be joined again. */
 export const isSkipped = (row: Pick<MentorMeeting, 'seriesSignup' | 'cancelled'>) => !row.cancelled && row.seriesSignup?.skippedThisMeeting === true
 
 /**
- * Where you're scheduled: accepted / self-signed-up meetings plus upcoming meetings the Mentor created (a creator runs
- * their meeting even without an invite row), without duplicates or canceled meetings. Skipped series meetings (the backend
- * lists them as open to sign up again) are shown here as Skipped instead of under Events and meetings you can join.
+ * The Mentor's schedule: accepted / self-signed-up meetings plus upcoming meetings they created (a creator runs their meeting
+ * even without an invite row), soonest first, without duplicates, canceled or past meetings.
  */
-export function scheduleView(data: Pick<MentorHomeData, 'scheduled' | 'pendingInvites' | 'created' | 'signUpAvailable'>, now: number): ScheduleView {
+export function myUpcoming(data: Pick<MentorHomeData, 'scheduled' | 'created'>, now: number): MentorMeeting[] {
   const seen = new Set<string>()
   const mine: MentorMeeting[] = []
   for (const row of [...data.scheduled, ...data.created]) {
@@ -82,37 +55,97 @@ export function scheduleView(data: Pick<MentorHomeData, 'scheduled' | 'pendingIn
     seen.add(row.eventId)
     mine.push(row)
   }
-  const sorted = upcoming(mine, now)
-  const [next = null, ...rest] = sorted
+  return upcoming(mine, now)
+}
+
+/** One Needs your answer row: an invitation (Answer opens the wizard to say yes) or a trip missing a drive / hotel answer. */
+export type AnswerItem = { meeting: MentorMeeting; mode: 'accept' | 'change'; reason: string }
+
+/** Why a meeting the Mentor is going to still needs an answer from them (driving, then hotel room); null when it doesn't. */
+export function missingAnswer(meeting: Pick<MentorMeeting, 'myStatus' | 'canWithdraw' | 'cancelled' | 'questions' | 'myAnswers'>): string | null {
+  if (meeting.cancelled || meeting.myStatus !== 'accepted' || !meeting.canWithdraw) return null
+  if (meeting.questions.askDrive && meeting.myAnswers.canDriveStudents === null) return copy.answer.missingDrive
+  if (meeting.questions.askHotel && meeting.myAnswers.needsHotelRoom === null) return copy.answer.missingHotel
+  return null
+}
+
+/**
+ * Needs your answer: open invitations and meetings the Mentor is going to that still need a drive or hotel answer, upcoming
+ * and not canceled, soonest first. Empty hides the block.
+ */
+export function needsAnswer(data: Pick<MentorHomeData, 'pendingInvites' | 'scheduled'>, now: number): AnswerItem[] {
+  const invites = upcoming(data.pendingInvites.filter(row => !row.cancelled), now).map(meeting => ({ meeting, mode: 'accept' as const, reason: copy.answer.invited }))
+  const seen = new Set(invites.map(item => item.meeting.eventId))
+  const answers = upcoming(data.scheduled, now).flatMap(meeting => {
+    const reason = seen.has(meeting.eventId) ? null : missingAnswer(meeting)
+    return reason ? [{ meeting, mode: 'change' as const, reason }] : []
+  })
+  return [...invites, ...answers].sort((a, b) => bySoonest(a.meeting, b.meeting))
+}
+
+/** Coming up shows this many meetings after the Next event. */
+export const COMING_UP_LIMIT = 3
+/** At most this many tags on a Coming up row. */
+export const MAX_TAGS = 2
+
+const sameSubteam = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+
+/** Coming up tags, at most two: Travel (it asks about driving or a hotel room), then Your subteam (for one of the Mentor's subteams). */
+export function comingUpTags(meeting: Pick<MentorMeeting, 'questions' | 'audience'>, subteams: readonly string[]): string[] {
+  const tags: string[] = []
+  if (meeting.questions.askDrive || meeting.questions.askHotel) tags.push(copy.tags.travel)
+  if (meeting.audience.kind === 'subteams' && meeting.audience.subteams.some(item => subteams.some(mine => sameSubteam(item, mine)))) tags.push(copy.join.yourSubteam)
+  return tags.slice(0, MAX_TAGS)
+}
+
+export type HomeView = {
+  /** The first meeting on the Mentor's schedule (the Next event card); null when nothing is scheduled. */
+  next: MentorMeeting | null
+  /** Empty hides Needs your answer. */
+  needsAnswer: AnswerItem[]
+  /** The next COMING_UP_LIMIT meetings after `next`, each with at most two tags. Empty hides Coming up. */
+  comingUp: { meeting: MentorMeeting; tags: string[] }[]
+  /** Series and one-time events open to join (Schedule › Join); 0 hides the tile. */
+  joinCount: number
+}
+
+/** Mentor Home in one pass: Next event, Needs your answer, Coming up and how many events the Mentor could help with. */
+export function homeView(data: Pick<MentorHomeData, 'scheduled' | 'created' | 'pendingInvites' | 'joinable' | 'subteams'>, now: number): HomeView {
+  const [next = null, ...rest] = myUpcoming(data, now)
+  const join = joinSections(data.joinable, now)
   return {
     next,
-    invites: upcoming(data.pendingInvites.filter(row => !row.cancelled), now),
-    going: rest.slice(0, LIST_LIMIT),
-    moreGoing: Math.max(0, rest.length - LIST_LIMIT),
-    skipped: upcoming(data.signUpAvailable.filter(row => isSkipped(row) && !seen.has(row.eventId)), now).slice(0, LIST_LIMIT),
+    needsAnswer: needsAnswer(data, now),
+    comingUp: rest.slice(0, COMING_UP_LIMIT).map(meeting => ({ meeting, tags: comingUpTags(meeting, data.subteams) })),
+    joinCount: join.competitions.length + join.meetings.length,
   }
 }
 
-/** Entries per section of Events you can join on Home ("See everything" shows the rest). */
-export const JOIN_SECTION_LIMIT = 3
+export type GoingRow = { meeting: MentorMeeting; skipping: boolean }
+
+/** Schedule › Going: everything on the Mentor's schedule plus series meetings they're skipping (marked), soonest first. */
+export function goingList(data: Pick<MentorHomeData, 'scheduled' | 'created' | 'signUpAvailable'>, now: number): GoingRow[] {
+  const mine = myUpcoming(data, now)
+  const seen = new Set(mine.map(row => row.eventId))
+  const skipped = upcoming(data.signUpAvailable.filter(row => isSkipped(row) && !seen.has(row.eventId)), now)
+  return [...mine.map(meeting => ({ meeting, skipping: false })), ...skipped.map(meeting => ({ meeting, skipping: true }))].sort((a, b) => bySoonest(a.meeting, b.meeting))
+}
 
 /** Still open to this Mentor: upcoming, not canceled, not their own meeting and not a series meeting they skipped. */
 const openToJoin = (row: MentorMeeting, now: number) => !row.cancelled && row.canSignUp && !row.isCreator && !isSkipped(row) && row.endsAt > now
 
-export type JoinSections = { competitions: JoinEntry[]; meetings: JoinEntry[]; moreCompetitions: number; moreMeetings: number }
+export type JoinSections = { competitions: JoinEntry[]; meetings: JoinEntry[] }
 
 /**
- * Events you can join, grouped (owner decision, Nov 7 2026): one entry per repeating series or one-time event, Competitions &
- * trips first, then Meetings, each soonest first and cut to `limit`. An entry is dropped when its next meeting is the
- * Mentor's own, canceled, over or skipped (a skipped meeting shows as Skipped on their schedule instead).
+ * Schedule › Join, grouped (owner decision, Nov 7 2026): one entry per repeating series or one-time event, Competitions &
+ * trips first, then Meetings & events, each soonest first. An entry is dropped when its next meeting is the Mentor's own,
+ * canceled, over or skipped (a skipped meeting shows on Going instead).
  */
-export function joinSections(entries: readonly JoinEntry[], now: number, limit = JOIN_SECTION_LIMIT): JoinSections {
+export function joinSections(entries: readonly JoinEntry[], now: number): JoinSections {
   const open = entries.filter(entry => openToJoin(entry.next, now)).sort((a, b) => a.nextStartsAt - b.nextStartsAt || a.title.localeCompare(b.title))
-  const competitions = open.filter(entry => entry.category === 'competitionsAndTrips')
-  const meetings = open.filter(entry => entry.category !== 'competitionsAndTrips')
   return {
-    competitions: competitions.slice(0, limit), meetings: meetings.slice(0, limit),
-    moreCompetitions: Math.max(0, competitions.length - limit), moreMeetings: Math.max(0, meetings.length - limit),
+    competitions: open.filter(entry => entry.category === 'competitionsAndTrips'),
+    meetings: open.filter(entry => entry.category !== 'competitionsAndTrips'),
   }
 }
 
@@ -129,14 +162,33 @@ export function joinEntryLines(entry: Pick<JoinEntry, 'kind' | 'scheduleLabel' |
   return { line: copy.join.seriesLine(schedule, entry.repeatLabel ?? copy.tags.repeats), detail: `${copy.join.upcoming(Math.max(1, entry.upcomingCount))} · ${copy.join.nextMeeting(meetingLine(entry.next))}` }
 }
 
-export type HereGroup = { subteam: string; count: number; names: string[]; label: string; empty: string }
+export type ScheduleTab = 'going' | 'join' | 'created'
+export const SCHEDULE_TABS: readonly ScheduleTab[] = ['going', 'join', 'created']
 
-/** Who's here now, one group per Mentor subteam in the order a Coach set them: "Programming · 3 clocked in" and the names. */
+/** The Schedule tab named in the URL hash (#going, #join, #created); Going otherwise. */
+export function tabFromHash(hash: string): ScheduleTab {
+  const name = hash.replace(/^#/, '')
+  return (SCHEDULE_TABS as readonly string[]).includes(name) ? name as ScheduleTab : 'going'
+}
+
+type Pinned = { id: string; pinnedAt: number; showUntil: number | null }
+
+/** A dismissed pinned message is remembered by id and pin time, so pinning it again shows it again. */
+export const pinKey = (message: Pick<Pinned, 'id' | 'pinnedAt'>) => `${message.id}:${message.pinnedAt}`
+
+/** The newest pinned message still showing that the Mentor hasn't dismissed on this device, or null (no banner). */
+export function unreadPinned<T extends Pinned>(messages: readonly T[], dismissed: ReadonlySet<string>, now: number): T | null {
+  return messages.filter(item => (item.showUntil === null || item.showUntil > now) && !dismissed.has(pinKey(item))).sort((a, b) => b.pinnedAt - a.pinnedAt)[0] ?? null
+}
+
+export type HereGroup = { subteam: string; count: number; names: string[]; label: string }
+
+/** Who's here now, one line per Mentor subteam in the order a Coach set them: "Programming · 3 clocked in" and the names. */
 export function hereGroups(data: Pick<ClockedInData, 'subteams'>): HereGroup[] {
   return data.subteams.map(group => {
     const subteam = subteamDisplay(group.subteam)
     const names = group.students.map(student => student.displayName.trim()).filter(Boolean)
-    return { subteam, count: group.count, names, label: copy.here.count(subteam, group.count), empty: copy.here.none(subteam) }
+    return { subteam, count: group.count, names, label: copy.here.count(subteam, group.count) }
   })
 }
 
@@ -168,11 +220,10 @@ export function seriesStatus(meeting: Pick<MentorMeeting, 'seriesSignup'>): stri
   return copy.series.justOne
 }
 
-/** Meetings you created: upcoming ones first, canceled ones after them, both soonest first. */
-export function createdList(rows: readonly MentorMeeting[], now: number, limit = LIST_LIMIT): { shown: MentorMeeting[]; more: number } {
+/** Created by me: upcoming meetings first, canceled ones after them, both soonest first. */
+export function createdList(rows: readonly MentorMeeting[], now: number): MentorMeeting[] {
   const live = upcoming(rows, now)
-  const ordered = [...live.filter(row => !row.cancelled), ...live.filter(row => row.cancelled)]
-  return { shown: ordered.slice(0, limit), more: Math.max(0, ordered.length - limit) }
+  return [...live.filter(row => !row.cancelled), ...live.filter(row => row.cancelled)]
 }
 
 /** "6:00 PM" from a stored "18:00". */
@@ -194,9 +245,6 @@ export function subteamsLine(subteams: readonly string[]): string {
   const list = subteams.filter(item => item.trim()).map(subteamDisplay)
   return list.length ? copy.about.subteams([...new Set(list)].join(', ')) : copy.about.noSubteams
 }
-
-/** Count of answers still owed, for the greeting line. */
-export const pendingCount = (data: Pick<MentorHomeData, 'pendingInvites'>, now: number) => upcoming(data.pendingInvites.filter(row => !row.cancelled), now).length
 
 /** The edit form's event shape for a meeting row: the place is locked for virtual and on-site meetings. */
 export function editableMeeting(meeting: Pick<MentorMeeting, 'eventId' | 'title' | 'place' | 'startsAt' | 'endsAt' | 'virtual' | 'cancelled' | 'calendarRevision'>): EditableEvent {

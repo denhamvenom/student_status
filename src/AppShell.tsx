@@ -17,10 +17,13 @@ import { StudentShell } from './components/student-shell/StudentShell'
 import { OfflineBanner } from './pwa/OfflineBanner'
 import { NotificationBell, NotificationSync, useSignOut } from './notifications'
 import { mentorHomeCopy } from './copy/mentor-home-copy'
+import { MentorAboutYou } from './features/mentor-home/MentorHome'
 type ShellViewer = { user: { name: string; email: string } | null; season: { name: string } | null }
 export { menu }
 export const primaryPaths:Record<string,string[]>={student:['/','/events','/finances','/profile'],parent:['/','/events','/forms','/finances'],coach:['/','/events','/readiness','/finances'],travelLead:['/readiness','/events','/','/drivers'],mentor:['/','/events/new','/invited']}
-/** A Mentor's pages: Home, Create a meeting and Schedule on the phone bar; Report, Profile and Settings under More. */
+/** A Mentor's pages: Home, Create and Schedule on the phone bar; About you (Edit my profile, Student report) and Settings under More. */
+/** Shown inside About you in the Mentor's More menu instead of as plain links. */
+const aboutPaths = new Set(['/myprofile', '/report'])
 export const mentorMenu:[string,string][]=[[mentorHomeCopy.nav.home,'/'],[mentorHomeCopy.nav.create,'/events/new'],[mentorHomeCopy.nav.schedule,'/invited'],[mentorHomeCopy.nav.report,'/report'],[mentorHomeCopy.nav.profile,'/myprofile'],[mentorHomeCopy.nav.settings,'/settings']]
 
 export function AppShell({ children, viewer, familyContext, role = "coach" }: { children: ReactNode; viewer: ShellViewer; familyContext?: ReactNode; role?: string }) {
@@ -48,12 +51,13 @@ export function AppShell({ children, viewer, familyContext, role = "coach" }: { 
   const nav = navigationCopy.groups
   const groups: Record<string, [string, string][]> = {
     [nav.team]: [[nav.team, '/'], [nav.joinRequests, '/enroll'], [nav.attendance, '/attendance'], [nav.reports, '/reports']],
-    [nav.events]: [[nav.events, '/events'], ['Archived events', '/events/archive'], [nav.readiness, '/readiness'], [nav.permissionForms, '/permissions'], [nav.drivers, '/drivers'], [nav.withdrawals, '/withdrawals'], [navigationCopy.labels.announcements, '/announcements']],
+    [nav.events]: [[nav.events, '/events'], [mentorHomeCopy.nav.schedule, '/invited'], ['Archived events', '/events/archive'], [nav.readiness, '/readiness'], [nav.permissionForms, '/permissions'], [nav.drivers, '/drivers'], [nav.withdrawals, '/withdrawals'], [navigationCopy.labels.announcements, '/announcements']],
     [nav.money]: [[nav.money, '/finances'], [nav.fundraising, '/fundraising']],
     [nav.admin]: [[nav.users, '/adults'], [nav.season, '/season'], [nav.archived, '/retention'], ['Money tools', '/money-tools'], [nav.settings, '/settings']],
   }
   if (role === 'travelLead') { groups[nav.money].push(['Money tools', '/money-tools']); delete groups[nav.admin]; groups[uiCopy.navigation.account] = [[navigationCopy.labels.myProfile, '/myprofile'], [nav.settings, '/settings']] }
-  const allowed = role === 'mentor' ? mentorMenu : menu[role] ?? mentorMenu
+  // A Travel Lead is a Mentor too: their own Schedule (/invited) sits in the Events group, and under More on a phone.
+  const allowed = role === 'mentor' ? mentorMenu : role === 'travelLead' ? [...menu.travelLead, [mentorHomeCopy.nav.schedule, '/invited'] as [string, string]] : menu[role] ?? mentorMenu
   const staff = role === 'coach' || role === 'travelLead'
   const allowedPaths = new Set(allowed.map(([, path]) => path))
   const filteredGroups = Object.fromEntries(Object.entries(groups).map(([label, links]) => [label, links.filter(([, path]) => allowedPaths.has(path))]).filter(([, links]) => links.length)) as Record<string, [string, string][]>
@@ -82,7 +86,7 @@ export function AppShell({ children, viewer, familyContext, role = "coach" }: { 
     <main className={`${styles.main} app-content`}>{children}</main>
     <Sheet open={more} onOpenChange={setMore}>
       <nav className={styles.mobileNav} style={{gridTemplateColumns:`repeat(${primary.length+1},minmax(0,1fr))`}} aria-label={navigationCopy.mobile}>{primary.map((path, index) => { const item = allowed.find(([, to]) => to === path); return item && <Link key={path} to={path} aria-current={path === activePath ? 'page' : undefined}><span aria-hidden="true">{icon(path)}</span>{role === 'mentor' ? item[0] : phoneLabel(role,index,item[0])}</Link> })}<SheetTrigger><Ellipsis size={21} aria-hidden="true"/>{nav.more}</SheetTrigger></nav>
-      <SheetContent side="bottom" className={styles.moreSheet}><SheetHeader><SheetTitle>{nav.more}</SheetTitle></SheetHeader><nav aria-label={navigationCopy.more}>{staff ? moreGroups.map(([heading, links]) => <section key={heading} className={styles.moreGroup} aria-label={heading}><h3>{heading}</h3>{links.map(([label, path]) => <Link key={path} to={path} onClick={() => setMore(false)}>{label}</Link>)}</section>) : additionalLinks.map(([label, path]) => <Link key={path} to={path} onClick={() => setMore(false)}>{label}</Link>)}<button type="button" onClick={() => void exit()}>{nav.signOut}</button></nav></SheetContent>
+      <SheetContent side="bottom" className={styles.moreSheet}><SheetHeader><SheetTitle>{nav.more}</SheetTitle></SheetHeader><nav aria-label={navigationCopy.more}>{staff ? moreGroups.map(([heading, links]) => <section key={heading} className={styles.moreGroup} aria-label={heading}><h3>{heading}</h3>{links.map(([label, path]) => <Link key={path} to={path} onClick={() => setMore(false)}>{label}</Link>)}</section>) : <>{role === 'mentor' && <MentorAboutYou className={styles.moreGroup} onNavigate={() => setMore(false)}/>}{additionalLinks.filter(([, path]) => role !== 'mentor' || !aboutPaths.has(path)).map(([label, path]) => <Link key={path} to={path} onClick={() => setMore(false)}>{label}</Link>)}</>}<button type="button" onClick={() => void exit()}>{nav.signOut}</button></nav></SheetContent>
     </Sheet>
   </div>
 }

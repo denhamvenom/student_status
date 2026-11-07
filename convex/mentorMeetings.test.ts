@@ -708,3 +708,64 @@ describe("Mentor sign-up v2 review fixes", () => {
     expect(recipients.size).toBe(parents.length + 3);
   });
 });
+
+describe("Created by on Coach and Travel Lead screens (owner decision, Nov 7 2026)", () => {
+  it("gives the Coach and Travel Lead list and event page the creator's name and role, tagging only Mentor meetings, and nobody else", async () => {
+    const f = await fixture();
+    const series = await seedSeries(f, f.ids.mentorA.id); // a series meeting has no createdBy of its own: the series creator counts
+    const cases = [
+      ["a Mentor's meeting", await f.seedEvent({ name: "Mentor lab", createdBy: f.ids.mentorA.id }), { name: "mm-mentor-a", roleLabel: "Mentor", mentorMeeting: true }],
+      ["a Mentor's series meeting", series.eventId, { name: "mm-mentor-a", roleLabel: "Mentor", mentorMeeting: true }],
+      ["a Mentor's meeting a Coach later made paid", await f.seedEvent({ name: "Paid lab", feeCents: 500, createdBy: f.ids.mentorA.id }), { name: "mm-mentor-a", roleLabel: "Mentor", mentorMeeting: false }],
+      ["a Coach's event", await f.seedEvent({ name: "Coach lab", createdBy: f.ids.coach.id }), { name: "mm-coach", roleLabel: "Coach", mentorMeeting: false }],
+      ["a Travel Lead's Team meeting", await f.seedEvent({ name: "Lead lab", createdBy: f.ids.lead.id }), { name: "mm-lead", roleLabel: "Travel Lead", mentorMeeting: false }],
+      ["an event with no recorded creator", await f.seedEvent({ name: "Old lab" }), null],
+    ] as const;
+    for (const who of [f.ids.coach, f.ids.lead]) {
+      const rows = await f.as(who).query(api.app.listEvents, {});
+      for (const [label, eventId, createdBy] of cases) {
+        const row = rows.find(row => row.event._id === eventId);
+        expect(row && "createdBy" in row ? row.createdBy : "missing", label).toEqual(createdBy);
+        const detail = await f.as(who).query(api.app.eventDetail, { eventId });
+        expect("createdBy" in detail ? detail.createdBy : "missing", label).toEqual(createdBy);
+      }
+    }
+    // Plain Mentors and Students get no creator details.
+    for (const who of [f.ids.mentorB, f.ids.studentUser]) {
+      const rows = await f.as(who).query(api.app.listEvents, {});
+      expect(rows.length).toBeGreaterThan(0);
+      expect(rows.every(row => !("createdBy" in row))).toBe(true);
+    }
+    expect("createdBy" in await f.as(f.ids.mentorB).query(api.app.eventDetail, { eventId: cases[0][1] })).toBe(false);
+  });
+
+  it("gives creator details to a Parent acting as Travel Lead, but not to a plain Parent or a Parent acting as Mentor", async () => {
+    const f = await fixture();
+    // A legacy event (no audience saved) so a Parent without Family links can see it too.
+    const eventId = await f.seedEvent({ name: "Legacy lab", createdBy: f.ids.coach.id });
+    await f.t.run(ctx => ctx.db.patch(eventId, { audienceKind: undefined }));
+    const callers = await f.t.run(async ctx => {
+      async function parentActingAs(name: string, parentStaffAccess: "mentor" | "travelLead", role: "mentor" | "travelLead") {
+        const auth = await ctx.db.insert("users", { email: `${name}@example.invalid` });
+        const id = await ctx.db.insert("appUsers", { authUserId: auth, name, email: `${name}@example.invalid`, role: "parent", parentStaffAccess, travelLead: false, financialEdit: false, active: true });
+        const session = await ctx.db.insert("authSessions", { userId: auth, expirationTime: Date.now() + DAY });
+        await ctx.db.insert("operatingRoles", { sessionId: session, userId: id, role, accessRevision: 0 });
+        return { auth, session };
+      }
+      return { travelLead: await parentActingAs("mm-parent-tl", "travelLead", "travelLead"), mentor: await parentActingAs("mm-parent-m", "mentor", "mentor") };
+    });
+    const session = (who: { auth: Id<"users">; session: Id<"authSessions"> }) => f.t.withIdentity({ subject: `${who.auth}|${who.session}` });
+    const cases = [
+      ["a Parent acting as Travel Lead", session(callers.travelLead), { name: "mm-coach", roleLabel: "Coach", mentorMeeting: false }],
+      ["a Parent acting as Mentor", session(callers.mentor), "missing"],
+      ["a plain Parent", f.as(f.ids.parent), "missing"],
+    ] as const;
+    for (const [label, caller, createdBy] of cases) {
+      const row = (await caller.query(api.app.listEvents, {})).find(row => row.event._id === eventId);
+      expect(row, label).toBeDefined();
+      expect(row && "createdBy" in row ? row.createdBy : "missing", label).toEqual(createdBy);
+      const detail = await caller.query(api.app.eventDetail, { eventId });
+      expect("createdBy" in detail ? detail.createdBy : "missing", label).toEqual(createdBy);
+    }
+  });
+});

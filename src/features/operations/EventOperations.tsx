@@ -12,6 +12,7 @@ import styles from "./Operations.module.css";
 import { WholeTeamLeaveNotices } from "../../Withdrawals";
 import { EventCalendarOperations } from './EventCalendarOperations'
 import { EventAudienceOperations } from './EventAudienceOperations'
+import { EventMentorsSection } from './EventMentorsSection'
 import { SignupQuestionsEditor } from '../event-setup/SignupQuestionsEditor'
 import { ShiftsEditor, type ShiftSettings } from '../event-setup/ShiftsEditor'
 import { SignupResponses } from '../event-setup/SignupResponses'
@@ -104,7 +105,8 @@ export function EventOperations({ eventId, coach=false }: { eventId: Id<"events"
       {confirmed.length > 0 && <p>{operationsCopy.event.confirmed} {confirmed.map(p => p.name).join(", ")}</p>}
       {event.assignmentScope==="wholeTeam"&&<WholeTeamLeaveNotices eventId={eventId} coach={coach}/>}
     </CardContent></Card></div></details>
-    <EventAudienceOperations eventId={eventId} event={event}/>
+    <EventMentorsSection eventId={eventId} open={!event.archived && !event.cancelled}/>
+    <EventAudienceOperations event={event}/>
     <EventCalendarOperations eventId={eventId} coach={canEdit} event={event}/>
     {showSettings && <details className={styles.disclosure}><summary><strong>{operationsCopy.event.eventSettings}</strong>{settingsSummary && <span>{settingsSummary}</span>}</summary><div className={styles.disclosureBody}><Card><CardContent><form className="form-grid" onSubmit={submitSettings}>
       {canEdit && event.signupMode !== "assigned" && <><label>{operationsCopy.event.capacityNoLimit} <Input type="number" min="1" max="500" value={capacityValue} onChange={e => setCapacity(e.target.value)} /></label><label>{operationsCopy.event.signupClosesLocal} <Input type="datetime-local" value={signupValue} onChange={e => setSignupDeadline(e.target.value)} /></label></>}

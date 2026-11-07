@@ -1,7 +1,7 @@
-import { useId, useState, type FormEvent } from 'react'
-import { Link } from 'react-router'
+import { useId, useMemo, useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router'
 import { ArrowLeft } from 'lucide-react'
-import { useMutation, useQuery } from 'convex/react'
+import { useMutation, useQueries, useQuery } from 'convex/react'
 import { toast } from 'sonner'
 import { cn } from 'cn'
 import { api } from '../../../convex/_generated/api'
@@ -9,7 +9,7 @@ import type { Id } from '../../../convex/_generated/dataModel'
 import { DashboardTile, TileTitle } from '@/components/dashboard/DashboardTile'
 import { TileErrorBoundary } from '@/components/dashboard/TileErrorBoundary'
 import { TileSkeleton } from '@/components/dashboard/TileSkeleton'
-import { dashboardButtonVariants, eyebrow, inset } from '@/components/dashboard/styles'
+import { dashboardButtonVariants, eyebrow, focusRing, inset } from '@/components/dashboard/styles'
 import { mentorHomeCopy } from '@/copy/mentor-home-copy'
 import { userFacingError } from '@/lib/error-message'
 import { eventSchedule } from '@/lib/event-schedule'
@@ -24,6 +24,7 @@ import type { MentorMeeting, MentorMeetingDetail } from './contract'
 import { MeetingActions, MeetingBadges, type RowAction } from './MentorMeetingRow'
 import { useMentorActions } from './MentorHome'
 import { useNow } from '../student-home/useNow'
+import { blockHeading } from './rows'
 import { editableMeeting, meetingPlace, seriesStatus, typeLabel } from './logic'
 
 const copy = mentorHomeCopy
@@ -34,8 +35,11 @@ const copy = mentorHomeCopy
  * too; meetings they created add Edit and Cancel (this meeting only).
  */
 export function MentorMeetingPage({ eventId }: { eventId: string }) {
+  const navigate = useNavigate()
+  // Back returns to where the Mentor came from (Home or Schedule); opened directly, it goes Home.
+  const back = () => { if ((window.history.state as { idx?: number } | null)?.idx) void navigate(-1); else void navigate('/') }
   return <div className="flex min-w-0 flex-col gap-3 pb-24 font-sans text-vs-text md:mx-auto md:w-full md:max-w-[720px] lg:gap-4 lg:pb-6">
-    <Link to="/" className="inline-flex min-h-11 items-center gap-1.5 self-start text-[14px] font-semibold"><ArrowLeft size={16} aria-hidden="true" />{copy.page.back}</Link>
+    <button type="button" onClick={back} className={cn('inline-flex min-h-11 cursor-pointer items-center gap-1.5 self-start border-0 bg-transparent p-0 text-[14px] font-semibold text-vs-accent-text!', focusRing)}><ArrowLeft size={16} aria-hidden="true" />{copy.page.back}</button>
     <TileErrorBoundary title={copy.page.loading} message={copy.page.failed} retryLabel={copy.states.tryAgain}>
       <MeetingContent eventId={eventId as Id<'events'>} />
     </TileErrorBoundary>
@@ -74,9 +78,9 @@ function Meeting({ detail }: { detail: MentorMeetingDetail }) {
         {meeting.myStatus === 'accepted' && meeting.questions.askHotel && <Fact label={copy.signup.review.hotel}>{answerText(meeting.myAnswers.needsHotelRoom ?? null, copy.signup.hotel.yes)}</Fact>}
       </dl>
       {meeting.seriesId && meeting.canManage && <p className="m-0 text-[13px] text-vs-text-2">{copy.page.seriesNote}</p>}
-      <MyActions meeting={meeting} />
       {meeting.canManage && <ManageActions meeting={meeting} />}
     </DashboardTile>
+    <YourPlans meeting={meeting} />
     <div className="grid min-w-0 gap-3 lg:grid-cols-2 lg:gap-4">
       <DashboardTile tone="quiet" aria-labelledby={mentorsId} className="gap-3">
         <TileTitle id={mentorsId}>{copy.page.mentorsComing} · {mentors.length}</TileTitle>
@@ -97,7 +101,7 @@ function Meeting({ detail }: { detail: MentorMeetingDetail }) {
   </>
 }
 
-/** Which of the Mentor's own buttons fit this event (the same ones Home shows). */
+/** Which of the Mentor's own buttons fit this event (the ones Home and Schedule leave to the event page). */
 function pageAction(meeting: MentorMeeting): RowAction {
   if (meeting.cancelled || meeting.isCreator) return 'none'
   if (meeting.myStatus === 'invited') return 'invite'
@@ -106,16 +110,35 @@ function pageAction(meeting: MentorMeeting): RowAction {
   return 'none'
 }
 
-/** The Mentor's own answer: accept or decline an invitation, sign up, change answers, skip or leave. */
-function MyActions({ meeting }: { meeting: MentorMeeting }) {
+/**
+ * Your plans: the Mentor's own buttons, one per line on a phone. Going: Change my answers, then Skip this one and Leave all
+ * meetings in this series (a series) or I can't go anymore (one time). Skipped: Join this one again. Invited: I'll be there /
+ * I can't go. Open to them: Sign up. Hidden for meetings they created and when nothing applies.
+ */
+export function YourPlans({ meeting }: { meeting: MentorMeeting }) {
+  const id = useId()
   const actions = useMentorActions()
   const [error, setError] = useState('')
   const action = pageAction(meeting)
   if (action === 'none') return null
-  return <div className="flex flex-col gap-2">
-    <div className="flex flex-wrap gap-2 empty:hidden" role="group" aria-label={meeting.title}><MeetingActions meeting={meeting} action={action} actions={actions} size="md" onError={setError} /></div>
+  return <DashboardTile aria-labelledby={id} className="gap-2.5">
+    <h2 id={id} className={blockHeading}>{copy.page.plans}</h2>
+    <div className="flex flex-col gap-2 empty:hidden sm:flex-row sm:flex-wrap [&>button]:w-full sm:[&>button]:w-auto" role="group" aria-labelledby={id}><MeetingActions meeting={meeting} action={action} actions={actions} size="md" onError={setError} /></div>
     {error && <p role="alert" className="m-0 text-[13px] text-vs-urgent">{error}</p>}
-  </div>
+  </DashboardTile>
+}
+
+/**
+ * Your plans on the staff event page, for a Travel Lead (a Travel Lead is a Mentor too). Reads mentorMeetings.view and shows
+ * nothing while it loads or when the event isn't open to them as a Mentor.
+ */
+export function MentorPlans({ eventId }: { eventId: string }) {
+  const now = useNow()
+  const asOf = Math.floor(now / 60_000) * 60_000
+  const results = useQueries(useMemo(() => ({ view: { query: api.mentorMeetings.view, args: { eventId: eventId as Id<'events'>, asOf } } }), [eventId, asOf]))
+  const detail = results.view as MentorMeetingDetail | Error | undefined
+  if (detail === undefined || detail instanceof Error) return null
+  return <div className="mb-4 md:max-w-[720px]"><YourPlans meeting={detail.meeting} /></div>
 }
 
 /** Edit (title, time, place) and Cancel for a meeting the Mentor created; both change this meeting only. */

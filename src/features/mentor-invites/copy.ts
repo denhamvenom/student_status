@@ -37,6 +37,15 @@ export const eventMentorsCopy = {
   invited: (count: number) => count === 0 ? 'Those Mentors were already invited.' : count === 1 ? '1 Mentor invited.' : `${count} Mentors invited.`,
   failed: 'Invitations were not sent. Please try again.',
   mentorsTitle: 'Mentors',
+  /** The Mentors section's always-visible line: "3 going · 1 waiting · 2 can drive · 1 hotel room". */
+  header: {
+    going: (count: number) => `${count} going`,
+    waiting: (count: number) => `${count} waiting`,
+    canDrive: (count: number) => `${count} can drive`,
+    hotelRooms: (count: number) => count === 1 ? '1 hotel room' : `${count} hotel rooms`,
+    loading: 'Loading…',
+    unavailable: 'Couldn’t load',
+  },
   loading: 'Loading Mentors…',
   unavailable: 'Mentor sign-ups couldn’t be loaded. Reload the page to try again.',
   none: 'No Mentors invited or signed up yet.',
@@ -55,4 +64,10 @@ export const eventMentorsCopy = {
   drivers: (count: number) => `${mentors(count)} can drive`,
   hotelRooms: (count: number) => count === 1 ? '1 hotel room needed' : `${count} hotel rooms needed`,
   unanswered: (drive: number, hotel: number) => [drive ? `${mentors(drive)} haven’t said if they can drive` : '', hotel ? `${mentors(hotel)} haven’t said if they need a room` : ''].filter(Boolean).join(' · '),
+} as const
+
+/** Who created an event, on Coach and Travel Lead screens. */
+export const eventCreatorCopy = {
+  createdBy: (name: string, role: string) => `Created by ${name} (${role})`,
+  mentorMeeting: 'Mentor meeting',
 } as const

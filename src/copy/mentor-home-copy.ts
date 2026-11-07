@@ -1,48 +1,64 @@
-// Plain words for Mentor Home, the Mentor meeting page and the Mentor version of the New meeting wizard.
+// Plain words for Mentor Home, Schedule, the Mentor event page and the Mentor version of the New meeting wizard.
 export const mentorHomeCopy = {
-  nav: { home: 'Home', create: 'Create', schedule: 'Schedule', report: 'Report', profile: 'Profile', settings: 'Settings' },
-  greeting: (name: string) => name.trim() ? `Hi, ${name.trim().split(/\s+/)[0]}` : 'Hi there',
-  subtitle: (date: string, pending: number) => pending > 0 ? `${date} · ${pending === 1 ? '1 invitation needs your answer' : `${pending} invitations need your answer`}` : `${date} · Here’s your schedule`,
-  create: {
-    button: 'Create a meeting',
-    /** Read with the button (aria-describedby) so its purpose is clear without the old banner. */
-    detail: 'Plan an optional Team meeting: one time by default, or repeating.',
-  },
+  nav: { home: 'Home', create: 'Create', schedule: 'Schedule', report: 'Student report', profile: 'Edit my profile', settings: 'Settings' },
+  /** "Sat, Nov 7 · Hi, Sam". */
+  greeting: (date: string, name: string) => `${date} · ${name.trim() ? `Hi, ${name.trim().split(/\s+/)[0]}` : 'Hi there'}`,
   states: {
     loading: (title: string) => `Loading ${title}…`,
     failed: (title: string) => `${title} could not load. Try again. If it keeps happening, contact a Coach.`,
     tryAgain: 'Try again',
-    homeTitle: 'Your meetings',
-    homeFailed: 'Your meetings could not load. Try again. If it keeps happening, contact a Coach.',
+    homeTitle: 'Your schedule',
+    homeFailed: 'Your schedule could not load. Try again. If it keeps happening, contact a Coach.',
     truncated: 'Some meetings far in the future are not listed yet.',
-    /** Your schedule (/invited): shown when Mentor Home reached a read or list cap. */
+    /** Schedule (/invited): shown when Mentor Home reached a read or list cap. */
     listTruncated: 'Showing the next 100. Ask a Coach if you can’t find a meeting.',
   },
-  next: {
-    region: 'Your next event',
-    label: 'Your next event',
-    none: 'Nothing on your schedule yet',
-    noneDetail: 'Sign up for an event or meeting below, or create a meeting.',
-    open: 'See details',
-    startsIn: (text: string) => `Starts ${text}`,
+  /** Small pinned-announcement banner at the top of Mentor Home; dismissed on this device. */
+  pinned: {
+    region: 'Pinned announcement',
+    open: 'Open in Inbox',
+    dismiss: 'Dismiss announcement',
+    dismissed: 'Announcement dismissed',
   },
-  scheduled: {
-    title: 'Where you’re scheduled',
-    invitesHeading: 'Waiting for your answer',
-    goingHeading: 'You’re going',
-    none: 'You aren’t signed up for anything yet.',
-    nothingElse: 'Nothing else on your schedule after your next event.',
-    more: (count: number) => `${count} more on your schedule`,
-    seeAll: 'See your full schedule',
+  /** The Travel Lead's own schedule, above their staff home. */
+  mySchedule: 'My schedule',
+  next: {
+    label: 'Next event',
+    going: 'You’re going',
+    none: 'Nothing on your schedule yet',
+    noneDetail: 'Find something to help with under Schedule › Join.',
+  },
+  answer: {
+    title: 'Needs your answer',
+    button: 'Answer',
+    buttonLabel: (title: string) => `Answer for ${title}`,
+    invited: 'You’re invited',
+    missingDrive: 'Say if you can drive students',
+    missingHotel: 'Say if you need a hotel room',
+  },
+  comingUp: {
+    title: 'Coming up',
+    seeAll: 'See full schedule',
+  },
+  /** The Home tile that opens Schedule › Join. */
+  helpTile: (count: number) => count === 1 ? '1 event you could help with' : `${count} events you could help with`,
+  schedule: {
+    title: 'Schedule',
+    tabs: { going: 'Going', join: 'Join', created: 'Created by me' } as Record<'going' | 'join' | 'created', string>,
+    tabsLabel: 'Schedule',
+    goingNone: 'You aren’t going to anything yet. Find something under Join.',
+    skipping: 'Skipping this one',
+    joinHint: 'Sign up once for a repeating series and you’re on every upcoming date. You can skip single dates later.',
+    createdNone: 'You haven’t created any upcoming meetings.',
+    createHint: { mentor: 'To make something new, tap Create in the bottom bar.', travelLead: 'To make something new, use New event on the Events page.' },
   },
   join: {
-    title: 'Events you can join',
     none: 'Nothing to join right now. New events and meetings for Everyone or your subteams show up here.',
-    /** Grouped sections (owner decision, Nov 7 2026): competitions and trips first, then meetings. */
+    /** Grouped sections (owner decision, Nov 7 2026): competitions and trips first, then meetings and events. */
     competitions: 'Competitions & trips',
-    meetings: 'Meetings',
+    meetings: 'Meetings & events',
     noCompetitions: 'No competitions or trips to join right now.',
-    noMeetings: 'No meetings to join right now.',
+    noMeetings: 'No meetings or events to join right now.',
     yourSubteam: 'Your subteam',
     /** "Mondays at 6:00 PM · Repeats weekly". */
     seriesLine: (schedule: string, repeat: string) => `${schedule} · ${repeat}`,
@@ -50,47 +66,34 @@ export const mentorHomeCopy = {
     nextMeeting: (when: string) => `Next: ${when}`,
     onSeries: 'You’re on some of these',
     signUp: 'Sign up',
-    signingUp: 'Signing up…',
-    withdraw: 'Leave',
-    withdrawing: 'Leaving…',
-    signedUp: (title: string) => `You’re signed up for ${title}.`,
-    withdrew: (title: string) => `You left ${title}.`,
-    signUpFailed: 'You were not signed up. Please try again.',
+    signUpLabel: (title: string) => `Sign up for ${title}`,
+    withdraw: 'I can’t go anymore',
+    withdrew: (title: string) => `You’re off ${title}.`,
     withdrawFailed: 'You are still signed up. Please try again.',
-    more: (count: number) => `${count} more you can join`,
-    seeAll: 'See everything you can join',
   },
   invite: {
     accept: 'I’ll be there',
-    accepting: 'Opening…',
     decline: 'I can’t go',
-    saving: 'Saving…',
-    accepted: (title: string) => `Thanks! You said you’ll be at ${title}.`,
     declined: (title: string) => `Got it. You said you can’t go to ${title}.`,
     failed: 'Your answer was not saved. Please try again.',
   },
   created: {
-    title: 'Meetings you created',
-    none: 'You haven’t created any upcoming meetings.',
     canceled: 'Canceled',
-    repeating: 'Repeats',
     seriesTitle: 'Repeating meetings',
-    more: (count: number) => `${count} more you created`,
-    seeAll: 'See all meetings you created',
   },
   /** Who's here now: students of the Mentor's subteams clocked in at Timeclock. */
   here: {
     title: 'Who’s here now',
     count: (subteam: string, count: number) => `${subteam} · ${count} clocked in`,
-    none: (subteam: string) => `No one from ${subteam} is clocked in right now.`,
     noSubteams: 'A Coach sets your subteams. Then you’ll see who from them is clocked in.',
-    showNames: (subteam: string) => `Show who from ${subteam} is here`,
     truncated: 'Some clocked-in students may be missing. Check Timeclock for the full list.',
   },
+  /** About you, in the Mentor's More menu. */
   about: {
     title: 'About you',
     subteams: (list: string) => `Your subteams: ${list}`,
     noSubteams: 'No subteams yet. A Coach sets your subteams.',
+    loading: 'Loading your subteams…',
     profile: 'Edit my profile',
     report: 'Student report',
   },
@@ -104,7 +107,6 @@ export const mentorHomeCopy = {
     justOne: 'Just this one',
     next: (count: number) => count === 1 ? 'Next meeting' : `Next ${count} meetings`,
     skipped: 'Skipped',
-    skippedHeading: 'Meetings you’re skipping',
     skip: 'Skip this one',
     skipping: 'Skipping…',
     skippedToast: (title: string) => `You’ll skip this ${title}. You’re still signed up for the others.`,
@@ -115,7 +117,7 @@ export const mentorHomeCopy = {
     joinAgainFailed: 'You were not added back. Please try again.',
     leaveAll: 'Leave all meetings in this series',
     leaveTitle: 'Leave all meetings in this series?',
-    leaveDetail: (title: string) => `You’ll be taken off every upcoming ${title} meeting. You can sign up again later.`,
+    leaveDetail: (title: string) => `You’ll be taken off every upcoming ${title} meeting. You can sign up again from Schedule › Join.`,
     leaveConfirm: 'Yes, leave all',
     leaveKeep: 'Keep my meetings',
     leaving: 'Leaving…',
@@ -126,6 +128,8 @@ export const mentorHomeCopy = {
   /** The Mentor sign-up wizard (also used to accept an invitation and for Change my answers). */
   signup: {
     stepOf: (step: number, total: number) => `Step ${step} of ${total}`,
+    /** Accepting an invitation: say no instead, from the wizard's first step. */
+    decline: 'No, I can’t make it',
     close: 'Close',
     back: 'Back',
     next: 'Next',
@@ -198,7 +202,8 @@ export const mentorHomeCopy = {
     selfSignedUp: 'Signed up',
   },
   page: {
-    back: 'Back to Home',
+    back: 'Back',
+    plans: 'Your plans',
     loading: 'Loading meeting…',
     failed: 'This meeting could not load. It may have been removed or isn’t open to you. Go back to Home and try again.',
     when: 'When',

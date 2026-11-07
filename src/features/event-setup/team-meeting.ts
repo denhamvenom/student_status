@@ -81,12 +81,13 @@ const DEFAULT_START = '18:00'
 
 /**
  * One meeting, 6–8 PM, for Everyone (owner decision, Nov 7 2026: one time by default; "Repeat this meeting" makes it weekly
- * until season end). Required for a Coach, optional for a Travel Lead (who can't require a group). With `nowMs` the date is
- * filled in with the first day still ahead; without it the date stays empty and means the same.
+ * until season end). Optional by default (owner decision, Nov 7 2026); a Coach can still choose Required, a Travel Lead can't
+ * require a group. With `nowMs` the date is filled in with the first day still ahead; without it the date stays empty and
+ * means the same.
  */
-export const teamMeetingDefaults = (isCoach: boolean, nowMs?: number): TeamMeetingDraft => ({
+export const teamMeetingDefaults = (nowMs?: number): TeamMeetingDraft => ({
   name: teamMeetingCopy.defaultName, date: nowMs === undefined ? '' : firstSearchDate(nowMs, DEFAULT_START), repeats: false, weekdays: [], startTime: DEFAULT_START, endTime: '20:00',
-  subteams: [], required: isCoach, ends: 'seasonEnd', endDate: '', count: 10,
+  subteams: [], required: false, ends: 'seasonEnd', endDate: '', count: 10,
 })
 
 /** The competition season wraps up at the end of May (summer starts the next one), so a meeting series ends on the next May 31 on or after `date`. */

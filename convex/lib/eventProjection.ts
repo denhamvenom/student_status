@@ -1,6 +1,7 @@
 import { v, type Infer } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
 import schema from "../schema";
+import { eventCreatorValidator } from "./eventCreator";
 
 /**
  * The event fields Student and Parent screens read (Events list, event page, Home agenda, signup wizard, rooming
@@ -68,7 +69,8 @@ const mentorEventValidator = v.object({
 const viewerEventValidator = v.union(schema.doc("events"), familyEventValidator, mentorEventValidator);
 const participationStatusValidator = v.union(v.literal("pending"), v.literal("confirmed"), v.literal("waitlist"), v.literal("withdrawn"), v.null());
 
-export const listEventsReturns = v.array(v.object({ event: viewerEventValidator, participation: participationStatusValidator }));
+// `createdBy` (creator name and role label): Coach and Travel Lead rows only; absent for everyone else.
+export const listEventsReturns = v.array(v.object({ event: viewerEventValidator, participation: participationStatusValidator, createdBy: v.optional(eventCreatorValidator) }));
 
 export const eventDetailReturns = v.object({
   event: viewerEventValidator,
@@ -82,4 +84,6 @@ export const eventDetailReturns = v.object({
     generatedThrough: v.union(v.number(), v.null()), generatedThroughDate: v.union(v.string(), v.null()), plannedMeetingCount: v.union(v.number(), v.null()),
     moreMeetingsScheduled: v.boolean(), windowDays: v.number(),
   }))),
+  // Staff only: who created the event (name and role label; null when unknown); absent for everyone else.
+  createdBy: v.optional(eventCreatorValidator),
 });

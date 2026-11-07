@@ -6,19 +6,19 @@ import { firstSearchDate, isPlan, seasonEndDate, teamMeetingCopy, teamMeetingDef
 // Tuesday, November 3, 2026 in Central Time.
 const at = (time: string) => parseChicagoInput(`2026-11-03T${time}`)
 /** "Repeat this meeting" turned on, every Tuesday until season end. */
-const weekly = (isCoach = true): TeamMeetingDraft => ({ ...teamMeetingDefaults(isCoach), repeats: true, weekdays: [2] })
+const weekly = (): TeamMeetingDraft => ({ ...teamMeetingDefaults(), repeats: true, weekdays: [2] })
 
 describe('Team meeting is one time by default (owner decision, Nov 7 2026)', () => {
   it('starts as one meeting, 6–8 PM, on the first day still ahead', () => {
-    expect(teamMeetingDefaults(true, at('09:00'))).toMatchObject({ repeats: false, date: '2026-11-03', startTime: '18:00', endTime: '20:00' })
-    expect(teamMeetingDefaults(true, at('19:00')).date).toBe('2026-11-04')
-    const plan = teamMeetingPlan(teamMeetingDefaults(true, at('09:00')), at('09:00'))
+    expect(teamMeetingDefaults(at('09:00'))).toMatchObject({ repeats: false, date: '2026-11-03', startTime: '18:00', endTime: '20:00' })
+    expect(teamMeetingDefaults(at('19:00')).date).toBe('2026-11-04')
+    const plan = teamMeetingPlan(teamMeetingDefaults(at('09:00')), at('09:00'))
     expect(isPlan(plan) && { start: plan.start, end: plan.end, repeats: plan.repeat.repeats }).toEqual({ start: '2026-11-03T18:00', end: '2026-11-03T20:00', repeats: false })
     expect(isPlan(plan) && teamMeetingSummary(plan)).toBe('1 meeting · Nov 3')
   })
 
   it('meets on the chosen date', () => {
-    const plan = teamMeetingPlan({ ...teamMeetingDefaults(true), date: '2026-11-19' }, at('09:00'))
+    const plan = teamMeetingPlan({ ...teamMeetingDefaults(), date: '2026-11-19' }, at('09:00'))
     expect(isPlan(plan) && plan.start).toBe('2026-11-19T18:00')
   })
 
@@ -27,17 +27,17 @@ describe('Team meeting is one time by default (owner decision, Nov 7 2026)', () 
     ['today after the start time', { date: '2026-11-03' }, 'date'],
     ['a date that is not real', { date: '2026-02-30' }, 'date'],
   ] as const)('refuses %s', (_, change, field) => {
-    const plan = teamMeetingPlan({ ...teamMeetingDefaults(true), ...change }, at('19:00'))
+    const plan = teamMeetingPlan({ ...teamMeetingDefaults(), ...change }, at('19:00'))
     expect(isPlan(plan) ? null : plan.field).toBe(field)
   })
 
   it('"Repeat this meeting" starts weekly on the meeting’s own weekday and keeps days already chosen', () => {
-    expect(teamMeetingRepeatOn({ ...teamMeetingDefaults(true), date: '2026-11-05' }, at('09:00'))).toEqual({ repeats: true, weekdays: [4] })
-    expect(teamMeetingRepeatOn({ ...teamMeetingDefaults(true), weekdays: [1, 3] }, at('09:00'))).toEqual({ repeats: true, weekdays: [1, 3] })
+    expect(teamMeetingRepeatOn({ ...teamMeetingDefaults(), date: '2026-11-05' }, at('09:00'))).toEqual({ repeats: true, weekdays: [4] })
+    expect(teamMeetingRepeatOn({ ...teamMeetingDefaults(), weekdays: [1, 3] }, at('09:00'))).toEqual({ repeats: true, weekdays: [1, 3] })
   })
 
   it('"More options" hands the wizard a one-time meeting unless repeating is on', () => {
-    expect(teamMeetingPrefill(teamMeetingDefaults(true), true, at('09:00'))).toMatchObject({ start: '2026-11-03T18:00', repeat: { repeats: false } })
+    expect(teamMeetingPrefill(teamMeetingDefaults(), true, at('09:00'))).toMatchObject({ start: '2026-11-03T18:00', repeat: { repeats: false } })
     expect(teamMeetingPrefill(weekly(), true, at('09:00')).repeat).toMatchObject({ repeats: true, weekdays: [2] })
   })
 })
@@ -147,10 +147,11 @@ describe('Team meeting count before Create', () => {
 
 describe('Team meeting event arguments', () => {
   it.each([
-    ['Coach', true, true, false],
-    ['Travel Lead', false, false, true],
-  ])('%s: at our shop, free, no forms, off Team Calendar; required only for a Coach', (_, isCoach, mandatory, allowWithdrawal) => {
-    const args = teamMeetingEventArgs({ ...teamMeetingDefaults(isCoach), subteams: ['Programming'] }, isCoach, 1, 2)
+    ['Coach, left at the default (optional)', true, false, false, true],
+    ['Coach choosing Required', true, true, true, false],
+    ['Travel Lead (never required)', false, true, false, true],
+  ])('%s: at our shop, free, no forms, off Team Calendar', (_, isCoach, required, mandatory, allowWithdrawal) => {
+    const args = teamMeetingEventArgs({ ...teamMeetingDefaults(), subteams: ['Programming'], ...(required ? { required } : {}) }, isCoach, 1, 2)
     expect(args).toMatchObject({ type: 'Team', onsite: true, feeCents: 0, permissionRequired: false, firstRequired: false, calendarChoice: { kind: 'none' }, audienceKind: 'subteams', audienceSubteams: ['Programming'], mandatory, allowWithdrawal })
   })
 })
