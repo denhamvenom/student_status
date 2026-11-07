@@ -8,6 +8,7 @@ import type { MentorHomeData } from './contract'
 import type { MentorHomeHandlers } from './MentorMeetingRow'
 import type { MentorActions } from './MentorSignupWizard'
 import { MentorHomeView } from './MentorHomeView'
+import { useClockedIn } from './WhoIsHere'
 
 /** The Mentor's own sign-up mutations (Home, Your schedule and the event page share them). The server re-checks every rule. */
 export function useMentorActions(): MentorActions {
@@ -49,9 +50,10 @@ export function useMentorHomeData(now: number) {
   return { data: results.home as MentorHomeData | Error | undefined, handlers }
 }
 
-/** Mentor Home: one query (mentorHome.mentorHome). */
+/** Mentor Home: the Home query (mentorHome.mentorHome) and Who's here now (mentorClockedIn.mySubteamClockedIn). */
 export function MentorHome({ name }: { name: string }) {
   const now = useNow()
   const { data, handlers } = useMentorHomeData(now)
-  return <MentorHomeView name={name} now={now} data={data} handlers={handlers} announcements={<StaffHomeAnnouncements />} />
+  const here = useClockedIn(now)
+  return <MentorHomeView name={name} now={now} data={data} handlers={handlers} here={here} announcements={<StaffHomeAnnouncements />} />
 }

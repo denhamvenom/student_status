@@ -1,6 +1,8 @@
 // New event wizard defaults and choices that depend on the event type, repeating and the server's answer.
 // Pure: no Convex or React, so the rules are tested directly (new-event-defaults.test.ts).
 import type { EventType } from '@/lib/event-copy'
+import { defaultRepeat } from './audience/repeat'
+import type { RepeatValue } from './audience/types'
 
 /** 'create' or 'none', or the id of an existing Team Calendar entry to connect. */
 export type CalendarChoice = string
@@ -20,6 +22,7 @@ export const newEventWizardCopy = {
   calendarError: 'Couldn’t check Team Calendar. You can still create the event.',
   more: 'More',
   moreDetail: 'Repeat, Team Calendar',
+  moreCalendar: 'Team Calendar',
   extras: 'Extras (optional)',
   /** Step counter on a Team meeting's Extras, which is not counted as a step. */
   optionalStep: 'Optional step',
@@ -37,6 +40,15 @@ export const newEventWizardCopy = {
 } as const
 
 export const isLinkedCalendar = (choice: CalendarChoice) => choice !== 'create' && choice !== 'none'
+
+/**
+ * The wizard's starting repeat rule: one time (owner decision, Nov 7 2026, for Coaches, Travel Leads and Mentors alike),
+ * unless "More options" on the Team meeting sheet handed over a repeating meeting.
+ */
+export const initialRepeat = (prefill: RepeatValue | null | undefined): RepeatValue => prefill ?? defaultRepeat('')
+
+/** A Team meeting shows "One time / Repeat this meeting" right on Basics; other events keep Repeat under More. */
+export const repeatOnBasics = (type: EventType) => type === 'Team'
 
 /** Team meetings and repeating meetings stay off Team Calendar unless the Coach asks; other events get their own entry. */
 export const defaultCalendarChoice = (type: EventType, repeats: boolean): 'create' | 'none' => repeats || type === 'Team' ? 'none' : 'create'

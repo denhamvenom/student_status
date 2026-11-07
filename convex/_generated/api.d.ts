@@ -140,6 +140,7 @@ import type * as lib_transportation from "../lib/transportation.js";
 import type * as lib_wholeTeam from "../lib/wholeTeam.js";
 import type * as lib_zeffy from "../lib/zeffy.js";
 import type * as membershipSync from "../membershipSync.js";
+import type * as mentorClockedIn from "../mentorClockedIn.js";
 import type * as mentorHome from "../mentorHome.js";
 import type * as mentorInvites from "../mentorInvites.js";
 import type * as mentorMeetings from "../mentorMeetings.js";
@@ -323,6 +324,7 @@ declare const fullApi: ApiFromModules<{
   "lib/wholeTeam": typeof lib_wholeTeam;
   "lib/zeffy": typeof lib_zeffy;
   membershipSync: typeof membershipSync;
+  mentorClockedIn: typeof mentorClockedIn;
   mentorHome: typeof mentorHome;
   mentorInvites: typeof mentorInvites;
   mentorMeetings: typeof mentorMeetings;

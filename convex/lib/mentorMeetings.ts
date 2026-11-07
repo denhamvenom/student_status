@@ -161,6 +161,60 @@ export function repeatLabel(event: Pick<Doc<"events">, "seriesId">, series: Pick
   return weeks === 1 ? "Repeats weekly" : `Repeats every ${weeks} weeks`;
 }
 
+const WEEKDAY_PLURALS = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"] as const;
+const chicagoWeekdayTime = new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", weekday: "long", hour: "numeric", minute: "2-digit" });
+
+/** "18:00" → "6:00 PM"; null when it isn't a valid HH:MM time. */
+function clockLabel(localTime: string): string | null {
+  const match = /^(\d{2}):(\d{2})$/.exec(localTime);
+  if (!match) return null;
+  const hours = Number(match[1]), minutes = match[2];
+  if (hours > 23 || Number(minutes) > 59) return null;
+  return `${hours % 12 === 0 ? 12 : hours % 12}:${minutes} ${hours < 12 ? "AM" : "PM"}`;
+}
+
+/** "Tuesdays", "Tuesdays and Thursdays", "Mondays, Wednesdays and Fridays". */
+function weekdayList(days: string[]): string {
+  return days.length <= 1 ? days.join("") : `${days.slice(0, -1).join(", ")} and ${days[days.length - 1]}`;
+}
+
+/**
+ * When a repeating series meets, in America/Chicago (the series rule's own time zone): "Tuesdays and Thursdays at 6:00 PM".
+ * Read from the series rule; when the series can't be read (or its rule is malformed), from the given meeting's start in Chicago.
+ */
+export function seriesScheduleLabel(series: Pick<Doc<"eventSeries">, "weekdays" | "localStartTime"> | null, fallbackStartsAt: number): string {
+  if (series) {
+    const days = [...new Set(series.weekdays)].filter(day => Number.isInteger(day) && day >= 0 && day <= 6).sort((a, b) => a - b);
+    const time = clockLabel(series.localStartTime);
+    if (days.length > 0 && time) return `${weekdayList(days.map(day => WEEKDAY_PLURALS[day]))} at ${time}`;
+  }
+  const parts = chicagoWeekdayTime.formatToParts(new Date(fallbackStartsAt));
+  const part = (type: string) => parts.find(p => p.type === type)?.value ?? "";
+  return `${part("weekday")}s at ${part("hour")}:${part("minute")} ${part("dayPeriod")}`;
+}
+
+export type JoinCategory = "meetings" | "competitionsAndTrips";
+
+/**
+ * Which Mentor Home group an event to join belongs to (owner decision, Nov 7 2026): "competitionsAndTrips" for a Competition
+ * and for any event with travel (travel isn't None and the event isn't on site or virtual: the drive question applies) or an
+ * overnight stay; "meetings" otherwise.
+ */
+export function joinCategory(event: Pick<Doc<"events">, "type"> & QuestionFields): JoinCategory {
+  const questions = mentorQuestions(event);
+  return event.type === "Competition" || questions.askDrive || questions.askHotel ? "competitionsAndTrips" : "meetings";
+}
+
+/**
+ * Whether a joinable event is "for your subteam": a meeting (not a Competition or trip, which are for the whole team) whose
+ * audience is restricted to subteams that include one of the Mentor's subteams.
+ */
+export function forMentorSubteam(user: Pick<AppUser, "subteams">, event: Doc<"events">): boolean {
+  if (joinCategory(event) !== "meetings") return false;
+  const audience = resolveAudience(event);
+  return audience.kind === "subteams" && mentorMatchesSubteams(user, audience.subteams);
+}
+
 /** Whether this Mentor's subteams (primary, CAD) include any of the event's audience groups (legacy names canonicalized). */
 export function mentorMatchesSubteams(user: Pick<AppUser, "subteams">, groups: readonly string[]): boolean {
   const mine = new Set((user.subteams ?? []).map(canonicalSubteam));

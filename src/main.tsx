@@ -22,6 +22,10 @@ const convexUrl = import.meta.env.VITE_CONVEX_URL
 const StudentHomePreview = import.meta.env.DEV ? lazy(() => import('./features/student-home/preview/StudentHomePreview')) : null
 const ParentHomePreview = import.meta.env.DEV ? lazy(() => import('./features/parent-home/preview/ParentHomePreview')) : null
 const MentorHomePreview = import.meta.env.DEV ? lazy(() => import('./features/mentor-home/preview/MentorHomePreview')) : null
+// next-themes renders an inline <script> for server-rendered pages; in this client-only app React never runs it and logs
+// "Encountered a script tag while rendering React component". Marking it a data block silences that; the theme is still
+// applied by ThemeProvider itself.
+const themeScriptProps = { type: 'application/json' } as const
 const client = convexUrl ? new ConvexReactClient(convexUrl) : null
 class AppErrorBoundary extends React.Component<{children:React.ReactNode},{error:unknown}> {
   state={error:null as unknown}
@@ -41,5 +45,5 @@ const router = createBrowserRouter([
 captureInstallPrompt()
 registerServiceWorker(to => void router.navigate(to), () => toast('A new version is ready', { id: 'sw-update', duration: Infinity, action: { label: 'Refresh', onClick: () => void applyServiceWorkerUpdate() } }))
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode><ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange><RouterProvider router={router}/><Toaster richColors position="top-right" /></ThemeProvider></React.StrictMode>,
+  <React.StrictMode><ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange scriptProps={themeScriptProps}><RouterProvider router={router}/><Toaster richColors position="top-right" /></ThemeProvider></React.StrictMode>,
 )

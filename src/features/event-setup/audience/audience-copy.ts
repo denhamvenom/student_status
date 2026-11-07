@@ -52,6 +52,8 @@ export const audienceCopy = {
     legend: 'Does it repeat?',
     none: 'Does not repeat',
     weekly: 'Repeats weekly',
+    /** Team meetings (every role): one time by default, with a clear choice to repeat (owner decision, Nov 7 2026). */
+    meeting: { legend: 'One time or repeating?', none: 'One time', noneHelp: 'A single meeting', weekly: 'Repeat this meeting', weeklyHelp: 'Choose the days and when it ends' },
     /** "Repeats every 2 weeks on Tuesday and Thursday" for the New event review. */
     summary: (weeks: number, days: string) => `Repeats ${weeks === 1 ? 'every week' : `every ${weeks} weeks`}${days ? ` on ${days}` : ''}`,
     every: 'Repeats',

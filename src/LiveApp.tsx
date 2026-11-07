@@ -26,14 +26,15 @@ import { QuestionsStep, RequirementsStep, SkipButton, SlotsStep } from './featur
 import { NewEventReview, type ReviewRow } from './features/event-setup/NewEventReview'
 import { TeamMeetingButton } from './features/event-setup/TeamMeetingSheet'
 import { readPrefill } from './features/event-setup/team-meeting'
+import { useMentorModeLists } from './features/event-setup/mentor-mode-lists'
 import { EventsMoreMenu } from './features/event-setup/EventsMoreMenu'
 import setupStyles from './features/event-setup/EventSetup.module.css'
 import { shiftReviewText, reviewDetails, extrasIssue, extrasIssues, withoutInvalid, questionArgs, requirementArgs, shiftArgs, type DraftQuestion, type DraftRequirement, type DraftShift } from './features/event-setup/new-event-extras'
 import { CoachStudentRecord } from './CoachStudentRecord'
-import { AudiencePicker, WherePicker, MentorInvitePicker, RepeatPicker, audienceCopy, audienceIssue, defaultAudience, defaultMentorInvite, defaultRepeat, mentorInviteIssue, needsPermissionForm, repeatIssue, repeatPreview, repeatSummary, whereFields, whereOf, type AudienceValue, type LocationType, type MentorInviteValue, type PickerIssue, type RepeatValue } from './features/event-setup/audience'
+import { AudiencePicker, WherePicker, MentorInvitePicker, RepeatPicker, audienceCopy, audienceIssue, defaultAudience, defaultMentorInvite, mentorInviteIssue, needsPermissionForm, repeatIssue, repeatPreview, repeatSummary, whereFields, whereOf, type AudienceValue, type LocationType, type MentorInviteValue, type PickerIssue, type RepeatValue } from './features/event-setup/audience'
 import { audienceCreateArgs, capacityApplies, mentorMeetingCreateArgs, mentorMeetingEventArgs, mentorReviewText, whoCopy, whoReviewText, whoSignupMode, type WhoChoice } from './features/event-setup/event-audience-wiring'
 import { seriesBlocker, useCreateSeries } from './features/event-setup/series-support'
-import { calendarChoiceArg, calendarChoiceCopy, calendarReviewText, dateTimeBounds, defaultCalendarChoice, eventTypeDefaults, isLinkedCalendar, newEventStepOrder, newEventWizardCopy, serverProblemStep, shownStep, stepChecks, EXTRAS_STEP } from './features/event-setup/new-event-defaults'
+import { calendarChoiceArg, calendarChoiceCopy, calendarReviewText, dateTimeBounds, defaultCalendarChoice, eventTypeDefaults, isLinkedCalendar, newEventStepOrder, newEventWizardCopy, serverProblemStep, shownStep, stepChecks, EXTRAS_STEP, initialRepeat, repeatOnBasics } from './features/event-setup/new-event-defaults'
 import { MentorInvitedEvents } from './features/mentor-invites/MentorInvitedEvents'
 import { MentorHome } from './features/mentor-home/MentorHome'
 import { MentorMeetingPage } from './features/mentor-home/MentorMeetingPage'
@@ -95,7 +96,7 @@ import { announcementsCopy } from './features/announcements/copy'
 import { Inbox, NotificationSettings, useSignOut } from './notifications'
 import { notificationsCopy } from './copy/notifications-copy'
 import { Component, Fragment, createContext, useContext, useEffect, useRef, useState, type FormEvent } from 'react'
-import { useAction, useMutation, useQueries, useQuery, usePaginatedQuery } from 'convex/react'
+import { useAction, useMutation, useQuery, usePaginatedQuery } from 'convex/react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
@@ -391,8 +392,9 @@ const [shifts,setShifts]=useState(false),[maxShifts,setMaxShifts]=useState('1'),
 // Only a Coach may assign the Travel Team or Whole Team automatically; Travel Leads create Open Registration events.
 const isCoach=viewer.user?.role==='coach';
 // Who's going: the Coach's one-tap Travel Team, or the audience picker (Everyone, subteams, specific students or mentors only).
-const [travelTeam,setTravelTeam]=useState(isCoach&&!prefill),[audience,setAudience]=useState<AudienceValue>(()=>prefill?.audience??defaultAudience()),[mentorInvite,setMentorInvite]=useState<MentorInviteValue>(defaultMentorInvite),[locationType,setLocationType]=useState<LocationType>(prefill?whereFields(prefill.where).locationType:'inPerson'),[repeat,setRepeat]=useState<RepeatValue>(()=>prefill?.repeat??defaultRepeat(''));
-// Repeat and Team Calendar sit under "More" on Basics; it opens by itself for a prefilled repeating meeting or a problem inside it.
+const [travelTeam,setTravelTeam]=useState(isCoach&&!prefill),[audience,setAudience]=useState<AudienceValue>(()=>prefill?.audience??defaultAudience()),[mentorInvite,setMentorInvite]=useState<MentorInviteValue>(defaultMentorInvite),[locationType,setLocationType]=useState<LocationType>(prefill?whereFields(prefill.where).locationType:'inPerson'),[repeat,setRepeat]=useState<RepeatValue>(()=>initialRepeat(prefill?.repeat));
+// A Team meeting (every role) asks "One time or repeating?" right on Basics, one time by default; other events keep Repeat
+// under "More" with Team Calendar. More opens by itself for a prefilled repeating meeting or a problem inside it.
 const [moreOpen,setMoreOpen]=useState(!!prefill?.repeat.repeats);
 // A Team meeting skips Extras (questions, things to do, forms, fee) until the Coach asks for it from Review.
 const [extrasAsked,setExtrasAsked]=useState(false),[extrasSections,setExtrasSections]=useState<Record<string,boolean>>({});
@@ -403,7 +405,7 @@ const who:WhoChoice={travelTeam,audience,mentors:mentorInvite},mode=whoSignupMod
 // A Mentor reads students from the Mentor report and can't use the Coach roster or Team Calendar. The Mentor list is
 // read without throwing: while it is unavailable to Mentors, they invite by subteam only (see mentorInvitesAvailable).
 const staffMentorOptions=useQuery(api.studentSubteams.listMentorsForInvite,mentor?'skip':{});
-const mentorModeLists=useQueries(mentor?{mentors:{query:api.studentSubteams.listMentorsForInvite,args:{}},...(audience.kind==='students'?{students:{query:qMentor,args:{}}}:{})}:{});
+const mentorModeLists=useMentorModeLists(mentor,audience.kind==='students');
 const mentorInvitesAvailable=!mentor||Array.isArray(mentorModeLists.mentors);
 const mentorOptions=(mentor?(Array.isArray(mentorModeLists.mentors)?mentorModeLists.mentors as NonNullable<typeof staffMentorOptions>:[]):staffMentorOptions)??[];
 const roster=useQuery(qRoster,mentor?'skip':{}) as Student[]|undefined;
@@ -466,7 +468,7 @@ const allReviewRows:ReviewRow[]=[
   {key:'event',label:eventCopy.review.event,value:linkedCandidate?.title??name,changed:true},
   {key:'type',label:eventCopy.review.type,value:eventTypeLabel(type),changed:true},
   {key:'dates',label:eventCopy.review.dates,value:linkedCandidate?eventWindow(linkedCandidate):Number.isFinite(startMs)&&Number.isFinite(endMs)?eventWindow({startsAt:startMs,endsAt:endMs}):eventCopy.review.notEntered,changed:true},
-  {key:'repeat',label:audienceCopy.repeat.legend,value:repeat.repeats?`${repeatSummary(repeat)} · ${audienceCopy.repeat.total(repeatPreview(startDate,repeat).total,repeatPreview(startDate,repeat).capped)}`:audienceCopy.repeat.none,changed:repeat.repeats},
+  {key:'repeat',label:audienceCopy.repeat.legend,value:repeat.repeats?`${repeatSummary(repeat)} · ${audienceCopy.repeat.total(repeatPreview(startDate,repeat).total,repeatPreview(startDate,repeat).capped)}`:team?audienceCopy.repeat.meeting.none:audienceCopy.repeat.none,changed:repeat.repeats},
   {key:'where',label:audienceCopy.location.legend,value:where==='elsewhere'?(linked?linkedCandidate?.location||'No location listed':destination)||eventCopy.review.notEntered:where==='shop'?`${audienceCopy.location.shop.label} · ${audienceCopy.location.shop.helper}`:virtualPlace,changed:where==='elsewhere'||where!==(typeDefaults.onsite?'shop':'elsewhere')},
   {key:'who',label:eventCopy.review.audience,value:whoReviewText(who),changed:true},
   {key:'mentors',label:'Mentors',value:mentorInviteReview,changed:mentorInviteReview!==whoCopy.noMentors},
@@ -495,10 +497,11 @@ return <>{mentor?<MentorHome name={viewer.user?.name??''}/>:<EventList viewer={v
         <div className={newEventStyles.dateGrid}><label>{eventCopy.fields.starts} (Central Time)<Input id="event-start" aria-invalid={invalidField==='event-start'} aria-describedby={invalidField==='event-start'?'new-event-error':undefined} type="datetime-local" min={dateTimeBounds.min} max={dateTimeBounds.max} value={start} readOnly={linked} onChange={e=>updateEventDate('start',e.target.value)} required/>{invalidField==='event-start'&&error&&<span id="new-event-error" className={newEventStyles.error}>{error}</span>}</label><label>{eventCopy.fields.ends} (Central Time)<Input id="event-end" aria-invalid={invalidField==='event-end'} aria-describedby={invalidField==='event-end'?'new-event-error':undefined} type="datetime-local" min={dateTimeBounds.min} max={dateTimeBounds.max} value={end} readOnly={linked} onChange={e=>updateEventDate('end',e.target.value)} required/>{invalidField==='event-end'&&error&&<span id="new-event-error" className={newEventStyles.error}>{error}</span>}</label></div>
         <WherePicker id="event-onsite" value={where} onChange={next=>{touch('onsite');const fields=whereFields(next);setLocationType(fields.locationType);setOnsite(fields.onsite);if(next!=='elsewhere')clearDestinationIssue()}}/>
         {where==='elsewhere'&&<label>{eventCopy.fields.destination}<Input id="event-destination" aria-invalid={invalidField==='event-destination'} aria-describedby={invalidField==='event-destination'?'new-event-error':undefined} value={destination} readOnly={linked} onChange={e=>setDestination(e.target.value)} placeholder={eventCopy.placeholders.destination} required={!linked}/>{invalidField==='event-destination'&&error&&<span id="new-event-error" className={newEventStyles.error}>{error}</span>}</label>}
-        <details className={setupStyles.disclosure} open={moreOpen||!!invalidField?.startsWith('event-repeat')||invalidField==='event-calendar'||linked} onToggle={e=>setMoreOpen(e.currentTarget.open)}><summary>{newEventWizardCopy.more}<small>{repeat.repeats?repeatSummary(repeat):mentor?mentorHomeCopy.wizard.moreDetail:newEventWizardCopy.moreDetail}</small></summary>
-          <RepeatPicker id="event-repeat" value={repeat} onChange={changeRepeat} startDate={startDate} issue={pickerIssue('event-repeat')}/>
+        {repeatOnBasics(type)&&<RepeatPicker id="event-repeat" meeting value={repeat} onChange={changeRepeat} startDate={startDate} issue={pickerIssue('event-repeat')}/>}
+        {(!repeatOnBasics(type)||(!mentor&&Number.isFinite(startMs)&&Number.isFinite(endMs)&&endMs>=startMs))&&<details className={setupStyles.disclosure} open={moreOpen||(!repeatOnBasics(type)&&!!invalidField?.startsWith('event-repeat'))||invalidField==='event-calendar'||linked} onToggle={e=>setMoreOpen(e.currentTarget.open)}><summary>{newEventWizardCopy.more}<small>{repeatOnBasics(type)?newEventWizardCopy.moreCalendar:repeat.repeats?repeatSummary(repeat):newEventWizardCopy.moreDetail}</small></summary>
+          {!repeatOnBasics(type)&&<RepeatPicker id="event-repeat" value={repeat} onChange={changeRepeat} startDate={startDate} issue={pickerIssue('event-repeat')}/>}
           {!mentor&&Number.isFinite(startMs)&&Number.isFinite(endMs)&&endMs>=startMs&&<fieldset id="event-calendar" tabIndex={-1} className={newEventStyles.calendarChoices} aria-invalid={invalidField==='event-calendar'||undefined}><legend>Team Calendar</legend>{!repeat.repeats&&(calendarLoading||!calendarCandidates.length)&&<p className={newEventStyles.note}>{calendarLoading?calendarChoiceCopy.checking:calendarChoiceCopy.noMatches}</p>}{!repeat.repeats&&calendarError&&<p role="status" className={newEventStyles.note}>{newEventWizardCopy.calendarError}</p>}{linked&&!calendarCandidates.some(item=>item.id===calendarChoice)&&<p role="alert" className={newEventStyles.error}>The selected Calendar entry is no longer in the current matches. Choose a current entry, a separate entry, or leave it off Team Calendar.</p>}{!repeat.repeats&&calendarCandidates.map(item=><label key={item.id}><input type="radio" name="calendar-choice" checked={calendarChoice===item.id} onChange={()=>{touch('calendar');selectCalendarChoice(item.id)}}/><span>{item.title} · {chicagoDisplayTime(item.startsAt)} – {chicagoDisplayTime(item.endsAt)}{item.location?` · ${item.location}`:''}{item.allDay?' · All-day':''}{item.recurring?' · Repeating occurrence':''}</span></label>)}<label><input type="radio" name="calendar-choice" checked={calendarChoice==='create'} onChange={()=>{touch('calendar');selectCalendarChoice('create')}}/><span>{calendarChoiceCopy.create}</span></label><label><input type="radio" name="calendar-choice" checked={calendarChoice==='none'} onChange={()=>{touch('calendar');selectCalendarChoice('none')}}/><span>{calendarChoiceCopy.none}</span></label>{invalidField==='event-calendar'&&error&&<span id="new-event-error" className={newEventStyles.error}>{error}</span>}</fieldset>}
-        </details>
+        </details>}
       </>}
       {step===1&&<div id="event-who" tabIndex={-1} className={newEventStyles.whoStep}>
         <AudiencePicker id="event-audience" value={audience} onChange={next=>{touch('who');setTravelTeam(false);setAudience(next)}} students={audienceStudents} canAutoAssign={isCoach} issue={travelTeam?null:pickerIssue('event-audience')} travelTeam={isCoach?{selected:travelTeam,label:whoCopy.travelTeam,helper:newEventWizardCopy.travelTeamHelper,onSelect:()=>{touch('who');setTravelTeam(true)}}:undefined} optionalOnly={mentor?mentorHomeCopy.wizard.optionalNote:undefined}/>

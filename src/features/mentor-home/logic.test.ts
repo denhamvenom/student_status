@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { mentorHomeCopy as copy } from '@/copy/mentor-home-copy'
 import { at } from '../student-home/fixtures'
 import { eventEditValues, draftFrom } from '../operations/event-edit'
-import { homeData, meeting, NOW } from './fixtures'
+import { clockedIn, homeData, joinEntry, meeting, NOW } from './fixtures'
 import type { Id } from '../../../convex/_generated/dataModel'
-import { clockLabel, createdList, editableMeeting, eventTags, joinable, LIST_LIMIT, meetingPlace, myPartLabel, pendingCount, scheduleView, seriesStatus, startsWhen, subteamsLine, typeLabel } from './logic'
+import { clockLabel, createdList, editableMeeting, eventTags, hereGroups, JOIN_SECTION_LIMIT, joinEntryLines, joinSections, LIST_LIMIT, meetingPlace, myPartLabel, pendingCount, scheduleView, seriesStatus, showsSubteamTag, startsWhen, subteamsLine, typeLabel } from './logic'
 
 const HOUR = 3_600_000
 const titles = (rows: readonly { title: string }[]) => rows.map(row => row.title)
@@ -42,33 +42,72 @@ describe('Where you’re scheduled', () => {
 
 describe('skipped series meetings', () => {
   const skippedSignup = { scope: 'all', count: null, coversThisMeeting: false, skippedThisMeeting: true } as const
-  it('shows a skipped meeting on the schedule as Skipped, not under Events and meetings you can join', () => {
+  it('shows a skipped meeting on the schedule as Skipped, not under Events you can join', () => {
     const rows = [
       meeting('skipped', NOW + 2 * HOUR, { canSignUp: true, seriesId: 'fixture_series_a' as Id<'eventSeries'>, seriesSignup: skippedSignup }),
       meeting('open', NOW + 3 * HOUR, { canSignUp: true }),
       meeting('skipped but canceled', NOW + 4 * HOUR, { canSignUp: true, cancelled: true, seriesSignup: skippedSignup }),
     ]
     expect(titles(scheduleView(homeData({ signUpAvailable: rows }), NOW).skipped)).toEqual(['skipped'])
-    expect(titles(joinable(rows, NOW).shown)).toEqual(['open'])
+    expect(titles(joinSections(rows.map(row => joinEntry(row)), NOW).meetings)).toEqual(['open'])
   })
 })
 
-describe('Events and meetings you can join', () => {
-  it('keeps upcoming meetings open to sign-up and leaves out the Mentor’s own, canceled and closed ones', () => {
-    const rows = [
-      meeting('open later', NOW + 5 * HOUR, { canSignUp: true }),
-      meeting('open soon', NOW + HOUR, { canSignUp: true }),
+describe('Events you can join', () => {
+  const competition = { canSignUp: true, type: 'Competition' } as const
+  const trip = { canSignUp: true, questions: { askDrive: true, askHotel: false } }
+
+  it('groups Competitions & trips before Meetings, soonest first, and leaves out the Mentor’s own, canceled, closed and past ones', () => {
+    const entries = [
+      meeting('meeting later', NOW + 5 * HOUR, { canSignUp: true }),
+      meeting('meeting soon', NOW + HOUR, { canSignUp: true }),
+      meeting('regional', NOW + 9 * HOUR, competition),
+      meeting('outreach with travel', NOW + 2 * HOUR, trip),
       meeting('my own', NOW + 2 * HOUR, { canSignUp: true, isCreator: true }),
       meeting('canceled', NOW + 2 * HOUR, { canSignUp: true, cancelled: true }),
       meeting('closed', NOW + 2 * HOUR, { canSignUp: false }),
       meeting('over', NOW - 3 * HOUR, { canSignUp: true }),
-    ]
-    expect(titles(joinable(rows, NOW).shown)).toEqual(['open soon', 'open later'])
+    ].map(row => joinEntry(row))
+    const sections = joinSections(entries, NOW)
+    expect(titles(sections.competitions)).toEqual(['outreach with travel', 'regional'])
+    expect(titles(sections.meetings)).toEqual(['meeting soon', 'meeting later'])
   })
 
-  it('counts meetings past the list limit', () => {
-    const rows = Array.from({ length: LIST_LIMIT + 1 }, (_, i) => meeting(`j${i}`, NOW + (i + 1) * HOUR, { canSignUp: true }))
-    expect(joinable(rows, NOW).more).toBe(1)
+  it('cuts each section to the Home limit and counts the rest; the Your schedule page shows all', () => {
+    const entries = Array.from({ length: JOIN_SECTION_LIMIT + 2 }, (_, i) => joinEntry(meeting(`m${i}`, NOW + (i + 1) * HOUR, { canSignUp: true })))
+    expect(joinSections(entries, NOW)).toMatchObject({ moreMeetings: 2, moreCompetitions: 0 })
+    expect(joinSections(entries, NOW).meetings).toHaveLength(JOIN_SECTION_LIMIT)
+    expect(joinSections(entries, NOW, Number.POSITIVE_INFINITY).meetings).toHaveLength(JOIN_SECTION_LIMIT + 2)
+  })
+
+  it.each([
+    ['a meeting for the Mentor’s subteam', 'meetings', true, true],
+    ['a meeting for Everyone', 'meetings', false, false],
+    // Never on a Competition or trip, even if the server marked it.
+    ['a competition', 'competitionsAndTrips', true, false],
+  ] as const)('shows the Your subteam tag on %s: %s', (_, category, forYourSubteam, shown) => {
+    expect(showsSubteamTag({ category, forYourSubteam })).toBe(shown)
+  })
+
+  it('describes a repeating series once, with its schedule, how often and how many are coming up', () => {
+    const next = meeting('Build night', at('2026-11-09T18:00'), { canSignUp: true, seriesId: 'fixture_series_b' as Id<'eventSeries'>, repeatLabel: 'Repeats weekly' })
+    expect(joinEntryLines(joinEntry(next, { scheduleLabel: 'Mondays at 6:00 PM', upcomingCount: 8 }))).toEqual({
+      line: 'Mondays at 6:00 PM · Repeats weekly',
+      detail: '8 upcoming · Next: Mon Nov 9, 6–8 PM · DSHS STEM Center (on site)',
+    })
+  })
+
+  it('describes a one-time event by its time and place', () => {
+    expect(joinEntryLines(joinEntry(meeting('Showcase', at('2026-11-20T08:00'), { canSignUp: true, place: 'Baton Rouge River Center' })))).toEqual({ line: 'Fri Nov 20, 8–10 AM · Baton Rouge River Center', detail: null })
+  })
+})
+
+describe('Who’s here now', () => {
+  it('counts and names who is clocked in per subteam, and says so when no one is', () => {
+    expect(hereGroups(clockedIn({ Programming: ['Avery N.', 'Jordan W.'], CAD: [] }))).toEqual([
+      { subteam: 'Programming', count: 2, names: ['Avery N.', 'Jordan W.'], label: 'Programming · 2 clocked in', empty: 'No one from Programming is clocked in right now.' },
+      { subteam: 'CAD', count: 0, names: [], label: 'CAD · 0 clocked in', empty: 'No one from CAD is clocked in right now.' },
+    ])
   })
 })
 
@@ -156,9 +195,8 @@ describe('editing a meeting the Mentor created', () => {
 
 describe('full lists for the Your schedule page', () => {
   it('shows everything when no limit is given and keeps the Home limit otherwise', () => {
-    const rows = Array.from({ length: LIST_LIMIT + 4 }, (_, i) => meeting(`j${i}`, NOW + (i + 1) * HOUR, { canSignUp: true }))
-    expect(joinable(rows, NOW, Number.POSITIVE_INFINITY).shown).toHaveLength(LIST_LIMIT + 4)
+    const rows = Array.from({ length: LIST_LIMIT + 4 }, (_, i) => meeting(`j${i}`, NOW + (i + 1) * HOUR, { canSignUp: true, isCreator: true }))
     expect(createdList(rows, NOW, Number.POSITIVE_INFINITY).shown).toHaveLength(LIST_LIMIT + 4)
-    expect(joinable(rows, NOW).more).toBe(4)
+    expect(createdList(rows, NOW).more).toBe(4)
   })
 })

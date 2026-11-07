@@ -9,7 +9,7 @@ import { formatLongDate, formatWeekday } from '../student-home/format'
 import { repeatSummary } from '../event-setup/audience/repeat'
 import type { RepeatValue } from '../event-setup/audience/types'
 import type { EditableEvent } from '../operations/event-edit'
-import type { MentorHomeData, MentorMeeting, MentorSeries } from './contract'
+import type { ClockedInData, JoinEntry, MentorHomeData, MentorMeeting, MentorSeries } from './contract'
 
 const copy = mentorHomeCopy
 
@@ -93,14 +93,51 @@ export function scheduleView(data: Pick<MentorHomeData, 'scheduled' | 'pendingIn
   }
 }
 
+/** Entries per section of Events you can join on Home ("See everything" shows the rest). */
+export const JOIN_SECTION_LIMIT = 3
+
+/** Still open to this Mentor: upcoming, not canceled, not their own meeting and not a series meeting they skipped. */
+const openToJoin = (row: MentorMeeting, now: number) => !row.cancelled && row.canSignUp && !row.isCreator && !isSkipped(row) && row.endsAt > now
+
+export type JoinSections = { competitions: JoinEntry[]; meetings: JoinEntry[]; moreCompetitions: number; moreMeetings: number }
+
 /**
- * Events and meetings you can join: still open to sign-up, soonest first. The Mentor's own meetings are left out (the
- * backend also lists a creator's Everyone meeting as open to them; they are already on their schedule), and so are series
- * meetings they skipped (shown as Skipped on their schedule).
+ * Events you can join, grouped (owner decision, Nov 7 2026): one entry per repeating series or one-time event, Competitions &
+ * trips first, then Meetings, each soonest first and cut to `limit`. An entry is dropped when its next meeting is the
+ * Mentor's own, canceled, over or skipped (a skipped meeting shows as Skipped on their schedule instead).
  */
-export function joinable(rows: readonly MentorMeeting[], now: number, limit = LIST_LIMIT): { shown: MentorMeeting[]; more: number } {
-  const open = upcoming(rows.filter(row => !row.cancelled && row.canSignUp && !row.isCreator && !isSkipped(row)), now)
-  return { shown: open.slice(0, limit), more: Math.max(0, open.length - limit) }
+export function joinSections(entries: readonly JoinEntry[], now: number, limit = JOIN_SECTION_LIMIT): JoinSections {
+  const open = entries.filter(entry => openToJoin(entry.next, now)).sort((a, b) => a.nextStartsAt - b.nextStartsAt || a.title.localeCompare(b.title))
+  const competitions = open.filter(entry => entry.category === 'competitionsAndTrips')
+  const meetings = open.filter(entry => entry.category !== 'competitionsAndTrips')
+  return {
+    competitions: competitions.slice(0, limit), meetings: meetings.slice(0, limit),
+    moreCompetitions: Math.max(0, competitions.length - limit), moreMeetings: Math.max(0, meetings.length - limit),
+  }
+}
+
+/** "Your subteam" is only for meetings, never for a Competition or trip (those are for the whole team). */
+export const showsSubteamTag = (entry: Pick<JoinEntry, 'category' | 'forYourSubteam'>) => entry.category === 'meetings' && entry.forYourSubteam
+
+/**
+ * How a join entry is described. A series: "Mondays at 6:00 PM · Repeats weekly", then "4 upcoming · Next: Mon Nov 9,
+ * 6–8 PM · DSHS STEM Center (on site)". A one-time event: its time and place.
+ */
+export function joinEntryLines(entry: Pick<JoinEntry, 'kind' | 'scheduleLabel' | 'repeatLabel' | 'upcomingCount' | 'next'>): { line: string; detail: string | null } {
+  if (entry.kind !== 'series') return { line: meetingLine(entry.next), detail: null }
+  const schedule = entry.scheduleLabel ?? formatWhen(entry.next.startsAt, entry.next.endsAt)
+  return { line: copy.join.seriesLine(schedule, entry.repeatLabel ?? copy.tags.repeats), detail: `${copy.join.upcoming(Math.max(1, entry.upcomingCount))} · ${copy.join.nextMeeting(meetingLine(entry.next))}` }
+}
+
+export type HereGroup = { subteam: string; count: number; names: string[]; label: string; empty: string }
+
+/** Who's here now, one group per Mentor subteam in the order a Coach set them: "Programming · 3 clocked in" and the names. */
+export function hereGroups(data: Pick<ClockedInData, 'subteams'>): HereGroup[] {
+  return data.subteams.map(group => {
+    const subteam = subteamDisplay(group.subteam)
+    const names = group.students.map(student => student.displayName.trim()).filter(Boolean)
+    return { subteam, count: group.count, names, label: copy.here.count(subteam, group.count), empty: copy.here.none(subteam) }
+  })
 }
 
 /** "Team meeting", "Competition", "Outreach", "Fundraiser". */

@@ -4,9 +4,9 @@ export const mentorHomeCopy = {
   greeting: (name: string) => name.trim() ? `Hi, ${name.trim().split(/\s+/)[0]}` : 'Hi there',
   subtitle: (date: string, pending: number) => pending > 0 ? `${date} · ${pending === 1 ? '1 invitation needs your answer' : `${pending} invitations need your answer`}` : `${date} · Here’s your schedule`,
   create: {
-    title: 'Plan a meeting',
     button: 'Create a meeting',
-    detail: 'Plan an optional Team meeting. Pick who it’s for, one time or repeating, and invite other Mentors.',
+    /** Read with the button (aria-describedby) so its purpose is clear without the old banner. */
+    detail: 'Plan an optional Team meeting: one time by default, or repeating.',
   },
   states: {
     loading: (title: string) => `Loading ${title}…`,
@@ -19,11 +19,11 @@ export const mentorHomeCopy = {
     listTruncated: 'Showing the next 100. Ask a Coach if you can’t find a meeting.',
   },
   next: {
-    region: 'Next up',
-    label: 'Your next meeting',
+    region: 'Your next event',
+    label: 'Your next event',
     none: 'Nothing on your schedule yet',
     noneDetail: 'Sign up for an event or meeting below, or create a meeting.',
-    open: 'Open meeting',
+    open: 'See details',
     startsIn: (text: string) => `Starts ${text}`,
   },
   scheduled: {
@@ -31,13 +31,24 @@ export const mentorHomeCopy = {
     invitesHeading: 'Waiting for your answer',
     goingHeading: 'You’re going',
     none: 'You aren’t signed up for anything yet.',
-    nothingElse: 'Nothing else on your schedule after your next meeting.',
+    nothingElse: 'Nothing else on your schedule after your next event.',
     more: (count: number) => `${count} more on your schedule`,
     seeAll: 'See your full schedule',
   },
   join: {
-    title: 'Events and meetings you can join',
+    title: 'Events you can join',
     none: 'Nothing to join right now. New events and meetings for Everyone or your subteams show up here.',
+    /** Grouped sections (owner decision, Nov 7 2026): competitions and trips first, then meetings. */
+    competitions: 'Competitions & trips',
+    meetings: 'Meetings',
+    noCompetitions: 'No competitions or trips to join right now.',
+    noMeetings: 'No meetings to join right now.',
+    yourSubteam: 'Your subteam',
+    /** "Mondays at 6:00 PM · Repeats weekly". */
+    seriesLine: (schedule: string, repeat: string) => `${schedule} · ${repeat}`,
+    upcoming: (count: number) => count === 1 ? '1 upcoming' : `${count} upcoming`,
+    nextMeeting: (when: string) => `Next: ${when}`,
+    onSeries: 'You’re on some of these',
     signUp: 'Sign up',
     signingUp: 'Signing up…',
     withdraw: 'Leave',
@@ -66,6 +77,15 @@ export const mentorHomeCopy = {
     seriesTitle: 'Repeating meetings',
     more: (count: number) => `${count} more you created`,
     seeAll: 'See all meetings you created',
+  },
+  /** Who's here now: students of the Mentor's subteams clocked in at Timeclock. */
+  here: {
+    title: 'Who’s here now',
+    count: (subteam: string, count: number) => `${subteam} · ${count} clocked in`,
+    none: (subteam: string) => `No one from ${subteam} is clocked in right now.`,
+    noSubteams: 'A Coach sets your subteams. Then you’ll see who from them is clocked in.',
+    showNames: (subteam: string) => `Show who from ${subteam} is here`,
+    truncated: 'Some clocked-in students may be missing. Check Timeclock for the full list.',
   },
   about: {
     title: 'About you',
@@ -222,7 +242,6 @@ export const mentorHomeCopy = {
   wizard: {
     title: 'Create a meeting',
     typeNote: 'Team meeting · optional for students',
-    moreDetail: 'Repeat',
     optionalNote: 'Students choose whether to sign up. Only a Coach can make a meeting required.',
     inviteBySubteam: 'Also invite Mentors of the chosen subteams',
     inviteNote: 'Inviting Mentors one by one isn’t available to Mentors yet. You can invite the Mentors of the subteams you chose.',

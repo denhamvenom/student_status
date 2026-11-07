@@ -196,3 +196,82 @@ describe("mentorHome review fixes (round 4)", () => {
     expect(home.truncated).toBe(false);
   });
 });
+
+describe("mentorHome joinable (grouped, owner decision Nov 7 2026)", () => {
+  const template = { type: "Team" as const, destination: "Lab", travel: "None", overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "open" as const, allowWithdrawal: true, permissionRequired: false, firstRequired: false, audienceKind: "everyone" as const, mandatory: false };
+
+  it("shows one entry per repeating series, with its schedule, counts and the next meeting to sign up for", async () => {
+    const f = await fixture();
+    const seriesId = await f.t.run(ctx => ctx.db.insert("eventSeries", {
+      seasonId: f.ids.season, createdBy: f.ids.coach.id, createdAt: 1, name: "Build nights", status: "active", origin: "created", template,
+      localStartTime: "18:00", durationMinutes: 120, weekdays: [4, 2], intervalWeeks: 1, startDate: "2030-01-01", timeZone: "America/Chicago", templateRevision: 1,
+    }));
+    const week = (days: number, key: string) => f.seed("Build night", days, { seriesId, seriesOccurrenceKey: key });
+    const first = await week(1, "2030-01-01"), second = await week(8, "2030-01-08");
+    await week(15, "2030-01-15");
+    const oneTime = await f.seed("Open house", 3);
+    const home = await f.as(f.ids.mentor).query(api.mentorHome.mentorHome, { asOf: Date.now() });
+    expect(home.signUpAvailable).toHaveLength(4); // the per-meeting list is unchanged
+    expect(home.joinable).toEqual([
+      expect.objectContaining({
+        kind: "series", seriesId, title: "Build nights", repeatLabel: "Repeats weekly", scheduleLabel: "Tuesdays and Thursdays at 6:00 PM",
+        nextEventId: first, upcomingCount: 3, joinableCount: 3, hasSeriesSignup: false, category: "meetings", forYourSubteam: false,
+        next: expect.objectContaining({ eventId: first, canSignUp: true }),
+      }),
+      expect.objectContaining({ kind: "event", seriesId: null, title: "Open house", repeatLabel: null, scheduleLabel: null, nextEventId: oneTime, upcomingCount: 1, joinableCount: 1, hasSeriesSignup: false }),
+    ]);
+
+    // "Just this one" on the first meeting: the series entry moves to the next meeting and says the Mentor has a sign-up.
+    await f.t.run(async ctx => {
+      const signupId = await ctx.db.insert("mentorSeriesSignups", { seriesId, mentorUserId: f.ids.mentor.id, status: "active", scope: "one", coveredKeys: ["2030-01-01"], skippedKeys: [], createdAt: 1, updatedAt: 1 });
+      await ctx.db.insert("eventMentorInvites", { eventId: first, mentorUserId: f.ids.mentor.id, source: "self", status: "accepted", invitedBy: f.ids.mentor.id, createdAt: 1, seriesSignupId: signupId });
+    });
+    const after = await f.as(f.ids.mentor).query(api.mentorHome.mentorHome, { asOf: Date.now() });
+    expect(after.joinable.find(entry => entry.seriesId === seriesId)).toMatchObject({ nextEventId: second, upcomingCount: 3, joinableCount: 2, hasSeriesSignup: true });
+  });
+
+  it("counts only meetings this Mentor may join: not ones a Coach restricted to other subteams, nor ones they can't sign up for", async () => {
+    const f = await fixture();
+    const seriesId = await f.t.run(ctx => ctx.db.insert("eventSeries", {
+      seasonId: f.ids.season, createdBy: f.ids.coach.id, createdAt: 1, name: "Mixed nights", status: "active", origin: "created", template,
+      localStartTime: "18:00", durationMinutes: 60, weekdays: [2], intervalWeeks: 1, startDate: "2030-01-01", timeZone: "America/Chicago", templateRevision: 1,
+    }));
+    const week = (days: number, key: string, extra: Partial<Doc<"events">> = {}) => f.seed("Mixed night", days, { seriesId, seriesOccurrenceKey: key, ...extra });
+    const first = await week(1, "2030-01-01");
+    await week(8, "2030-01-08", { audienceKind: "subteams", audienceSubteams: ["Electrical"] }); // the Mentor is Build and CAD
+    await week(15, "2030-01-15", { audienceKind: "subteams", audienceSubteams: ["Build"] });
+    await week(22, "2030-01-22", { cancelled: true });
+    const home = await f.as(f.ids.mentor).query(api.mentorHome.mentorHome, { asOf: Date.now() });
+    expect(home.joinable).toEqual([expect.objectContaining({ seriesId, nextEventId: first, upcomingCount: 2, joinableCount: 2 })]);
+    // The other Mentor (Electrical) sees the other restricted meeting instead.
+    const other = await f.as(f.ids.other).query(api.mentorHome.mentorHome, { asOf: Date.now() });
+    expect(other.joinable).toEqual([expect.objectContaining({ seriesId, upcomingCount: 2, joinableCount: 2 })]);
+  });
+
+  it("joinableCount leaves out meetings the Mentor is already on", async () => {
+    const f = await fixture();
+    const seriesId = await f.t.run(ctx => ctx.db.insert("eventSeries", {
+      seasonId: f.ids.season, createdBy: f.ids.coach.id, createdAt: 1, name: "Nights", status: "active", origin: "created", template,
+      localStartTime: "18:00", durationMinutes: 60, weekdays: [2], intervalWeeks: 1, startDate: "2030-01-01", timeZone: "America/Chicago", templateRevision: 1,
+    }));
+    const a = await f.seed("Night", 1, { seriesId, seriesOccurrenceKey: "2030-01-01" });
+    await f.seed("Night", 8, { seriesId, seriesOccurrenceKey: "2030-01-08" });
+    await f.t.run(ctx => ctx.db.insert("eventMentorInvites", { eventId: a, mentorUserId: f.ids.mentor.id, source: "self", status: "accepted", invitedBy: f.ids.mentor.id, createdAt: 1 }));
+    const home = await f.as(f.ids.mentor).query(api.mentorHome.mentorHome, { asOf: Date.now() });
+    expect(home.joinable).toEqual([expect.objectContaining({ seriesId, upcomingCount: 2, joinableCount: 1 })]);
+  });
+
+  it.each([
+    ["a Team meeting for everyone", {}, "meetings", false],
+    ["a Team meeting for the Mentor's subteam", { audienceKind: "subteams", audienceSubteams: ["Mechanical"] }, "meetings", true],
+    ["a Competition (even for the Mentor's subteam)", { type: "Competition", audienceKind: "subteams", audienceSubteams: ["Build"] }, "competitionsAndTrips", false],
+    ["an event with travel", { type: "Outreach", travel: "Charter Bus" }, "competitionsAndTrips", false],
+    ["an overnight event", { overnight: true }, "competitionsAndTrips", false],
+    ["an on-site event with a travel value", { travel: "Charter Bus", onsite: true }, "meetings", false],
+  ] as const)("puts %s in %s (forYourSubteam %s)", async (_label, extra, category, forYourSubteam) => {
+    const f = await fixture();
+    const eventId = await f.seed("Event", 2, extra as Partial<Doc<"events">>);
+    const home = await f.as(f.ids.mentor).query(api.mentorHome.mentorHome, { asOf: Date.now() });
+    expect(home.joinable).toEqual([expect.objectContaining({ nextEventId: eventId, category, forYourSubteam })]);
+  });
+});

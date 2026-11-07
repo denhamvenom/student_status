@@ -9,9 +9,11 @@ import { TileSkeleton } from '@/components/dashboard/TileSkeleton'
 import { dashboardButtonVariants, eyebrow, inset } from '@/components/dashboard/styles'
 import { mentorHomeCopy } from '@/copy/mentor-home-copy'
 import { formatLongDate } from '../student-home/format'
-import type { MentorHomeData } from './contract'
+import type { ClockedInData, MentorHomeData } from './contract'
 import { MeetingActions, MeetingBadges, MentorMeetingRow, type MentorHomeHandlers, type RowAction } from './MentorMeetingRow'
-import { createdList, joinable, meetingLine, pendingCount, scheduleView, seriesLine, startsWhen, subteamsLine } from './logic'
+import { createdList, joinSections, meetingLine, pendingCount, scheduleView, seriesLine, startsWhen, subteamsLine } from './logic'
+import { JoinSectionsList } from './MentorJoinRow'
+import { WhoIsHere } from './WhoIsHere'
 
 const copy = mentorHomeCopy
 
@@ -23,6 +25,8 @@ export type MentorHomeViewProps = {
   handlers: MentorHomeHandlers
   /** Pinned staff announcements (StaffHomeAnnouncements); the preview leaves it out. */
   announcements?: ReactNode
+  /** Who's here now (mentorClockedIn.mySubteamClockedIn): its own query, so it loads and fails on its own. */
+  here: { data: ClockedInData | Error | undefined; retry: () => void }
 }
 
 function List({ rows, action, handlers, label }: { rows: MentorHomeData['scheduled']; action: RowAction; handlers: MentorHomeHandlers; label: string }) {
@@ -32,15 +36,16 @@ function List({ rows, action, handlers, label }: { rows: MentorHomeData['schedul
 const more = (count: number, text: (count: number) => string) => count > 0 ? <p className="m-0 text-[13px] text-vs-muted">{text(count)}</p> : null
 const seeAll = (to: string, label: string) => <Link to={to} className="inline-flex min-h-11 items-center self-start text-[14px] font-semibold">{label}</Link>
 
-/** The one big action every Mentor has: open the New meeting wizard in Mentor mode. */
+/**
+ * Create a meeting: a secondary button right under Your next event (owner decision, Nov 7 2026). Still full width on a
+ * phone and at least 44px tall; its purpose is read with it.
+ */
 function CreateMeeting() {
-  return <DashboardTile surface="hero" tone="hero" className="gap-3 lg:flex-row lg:items-center lg:justify-between">
-    <div className="flex min-w-0 flex-col gap-1">
-      <h2 className="m-0! font-heading! text-[24px]! font-normal! text-vs-heading lg:text-[28px]!">{copy.create.title}</h2>
-      <p className="m-0 max-w-[52ch] text-[14px] text-vs-text-2">{copy.create.detail}</p>
-    </div>
-    <Link to="/events/new" className={cn(dashboardButtonVariants({ tone: 'primary', size: 'lg' }), 'w-full gap-2 lg:w-auto')}><CalendarPlus size={18} aria-hidden="true" />{copy.create.button}</Link>
-  </DashboardTile>
+  const id = useId()
+  return <div className="flex flex-col gap-1">
+    <Link to="/events/new" aria-describedby={id} className={cn(dashboardButtonVariants({ tone: 'soft', size: 'md' }), 'w-full gap-2 text-[14px]! sm:w-auto sm:self-start')}><CalendarPlus size={17} aria-hidden="true" />{copy.create.button}</Link>
+    <p id={id} className="m-0 text-[13px] text-vs-muted">{copy.create.detail}</p>
+  </div>
 }
 
 function NextUp({ data, now, handlers }: { data: MentorHomeData; now: number; handlers: MentorHomeHandlers }) {
@@ -91,12 +96,12 @@ function Scheduled({ data, now, handlers }: { data: MentorHomeData; now: number;
 
 function Joinable({ data, now, handlers }: { data: MentorHomeData; now: number; handlers: MentorHomeHandlers }) {
   const id = useId()
-  const { shown, more: extra } = joinable(data.signUpAvailable, now)
+  const sections = joinSections(data.joinable, now)
+  const hidden = sections.moreCompetitions + sections.moreMeetings
   return <DashboardTile tone="quiet" aria-labelledby={id} className="gap-3">
     <TileTitle id={id}>{copy.join.title}</TileTitle>
-    {shown.length ? <List rows={shown} action="join" handlers={handlers} label={copy.join.title} /> : <p className="m-0 text-[14px] text-vs-muted">{copy.join.none}</p>}
-    {more(extra, copy.join.more)}
-    {extra > 0 && seeAll('/invited#join', copy.join.seeAll)}
+    <JoinSectionsList sections={sections} handlers={handlers} />
+    {hidden > 0 && seeAll('/invited#join', copy.join.seeAll)}
   </DashboardTile>
 }
 
@@ -129,33 +134,43 @@ function About({ subteams }: { subteams: readonly string[] | null }) {
 }
 
 /**
- * Mentor Home, phone first (390px): greeting, Create a meeting, Next up, Where you're scheduled (invitations first),
- * Events and meetings you can join, Meetings you created, About you, then pinned announcements. Tablet: the phone layout, at most
- * 720px wide and centered. Desktop (≥1024px): Create a meeting full width, then a 2fr/1fr grid with the schedule on the
- * left and joining / created / about on the right.
+ * Mentor Home, phone first (390px): greeting, Your next event, Create a meeting (a secondary button right under it), Who's
+ * here now, Where you're scheduled (invitations first), Events you can join (Competitions & trips, then Meetings), Meetings
+ * you created, About you, then pinned announcements. Tablet: the phone layout, at most 720px wide and centered. Desktop
+ * (≥1024px): two 2fr/1fr rows: Your next event and Create on the left with Who's here now on the right; then the schedule and
+ * events to join on the left with created / about on the right.
  */
-export function MentorHomeView({ name, now, data, handlers, announcements }: MentorHomeViewProps) {
+export function MentorHomeView({ name, now, data, handlers, announcements, here }: MentorHomeViewProps) {
   const failed = data instanceof Error
   const loading = data === undefined
   const guard = (title: string, node: ReactNode) => <TileErrorBoundary title={title} message={copy.states.failed(title)} retryLabel={copy.states.tryAgain} onRetry={handlers.retry}>{node}</TileErrorBoundary>
   const tile = (title: string, render: (data: MentorHomeData) => ReactNode) => loading ? <TileSkeleton label={copy.states.loading(title)} />
     : failed ? null : guard(title, render(data))
   const date = formatLongDate(now)
+  const row = 'flex min-w-0 flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] lg:items-start lg:gap-4'
+  const column = 'flex min-w-0 flex-col gap-3 empty:hidden lg:gap-4'
   return <div className="flex min-w-0 flex-col gap-3 pb-24 font-sans text-vs-text md:mx-auto md:w-full md:max-w-[720px] lg:mx-0 lg:max-w-none lg:gap-4 lg:pb-6">
     <header className="flex min-w-0 flex-col gap-1">
       <h1 className="m-0! font-heading! text-[26px]! font-normal! text-vs-heading lg:text-[34px]!">{copy.greeting(name)}</h1>
       <p className="m-0 text-[13px] text-vs-muted">{loading || failed ? date : copy.subtitle(date, pendingCount(data, now))}</p>
     </header>
-    <CreateMeeting />
-    {/* One query feeds every list, so a failure is one card instead of four. */}
-    {failed && <TileError title={copy.states.homeTitle} message={copy.states.homeFailed} retryLabel={copy.states.tryAgain} onRetry={handlers.retry} />}
-    <div className="flex min-w-0 flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] lg:gap-4">
-      <div className="flex min-w-0 flex-col gap-3 empty:hidden lg:gap-4">
+    <div className={row}>
+      <div className={column}>
+        {/* One query feeds every list, so a failure is one card instead of four. */}
+        {failed && <TileError title={copy.states.homeTitle} message={copy.states.homeFailed} retryLabel={copy.states.tryAgain} onRetry={handlers.retry} />}
         {tile(copy.next.region, data => <NextUp data={data} now={now} handlers={handlers} />)}
-        {tile(copy.scheduled.title, data => <Scheduled data={data} now={now} handlers={handlers} />)}
+        <CreateMeeting />
       </div>
-      <div className="flex min-w-0 flex-col gap-3 lg:gap-4">
+      <div className={column}>
+        <TileErrorBoundary title={copy.here.title} message={copy.states.failed(copy.here.title)} retryLabel={copy.states.tryAgain} onRetry={here.retry}><WhoIsHere data={here.data} onRetry={here.retry} /></TileErrorBoundary>
+      </div>
+    </div>
+    <div className={row}>
+      <div className={column}>
+        {tile(copy.scheduled.title, data => <Scheduled data={data} now={now} handlers={handlers} />)}
         {tile(copy.join.title, data => <Joinable data={data} now={now} handlers={handlers} />)}
+      </div>
+      <div className={column}>
         {tile(copy.created.title, data => <Created data={data} now={now} handlers={handlers} />)}
         <About subteams={loading || failed ? null : data.subteams} />
       </div>

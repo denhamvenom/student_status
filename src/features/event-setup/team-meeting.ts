@@ -1,11 +1,11 @@
-// "+ Team meeting": the one-sheet fast path for a weekly team meeting at our shop, and the prefill it hands to the full
-// New event wizard ("More options"). Pure: no Convex or React, so the rules are tested directly (team-meeting.test.ts).
+// "+ Team meeting": the one-sheet fast path for a team meeting at our shop (one time by default, or repeating when the Coach
+// turns on "Repeat this meeting"), and the prefill it hands to the full New event wizard ("More options"). Pure: no Convex or React, so the rules are tested directly (team-meeting.test.ts).
 import type { FunctionArgs } from 'convex/server'
 import type { api } from '../../../convex/_generated/api'
 import { onsiteLocation } from '../../../convex/lib/transportation'
 import { chicagoInputTime } from '@/lib/chicago-time'
 import { defaultMentorInvite } from './audience/audience-rules'
-import { formatDay, MAX_SERIES_DAYS, parseDay, previewDateLabel, repeatIssue, seriesDates } from './audience/repeat'
+import { defaultRepeat, formatDay, MAX_SERIES_DAYS, parseDay, previewDateLabel, repeatIssue, seriesDates, weekdayOf } from './audience/repeat'
 import type { AudienceValue, PickerIssue, RepeatValue, Weekday, Where } from './audience/types'
 import { audienceCreateArgs, whoSignupMode, type WhoChoice } from './event-audience-wiring'
 
@@ -16,6 +16,10 @@ export const teamMeetingCopy = {
   title: 'New team meeting',
   name: 'Name',
   defaultName: 'Team meeting',
+  date: 'Date',
+  startDate: 'Starting on',
+  repeat: 'Repeat this meeting',
+  repeatHelp: 'Off: one meeting. On: choose the days and when it ends.',
   days: 'Every week on',
   starts: 'Starts',
   ends: 'Ends',
@@ -45,7 +49,10 @@ export const teamMeetingCopy = {
   create: 'Create',
   creating: 'Creating…',
   created: 'Team meeting created.',
+  seriesCreated: 'Repeating team meeting created.',
   needName: 'Enter a name.',
+  needDate: 'Choose the date of the meeting.',
+  past: 'That time has already passed. Choose a later date or time.',
   needDay: 'Choose at least one day.',
   needTimes: 'Enter a start and end time.',
   endAfterStart: 'The end must be after the start.',
@@ -53,6 +60,10 @@ export const teamMeetingCopy = {
 
 export type TeamMeetingDraft = {
   name: string
+  /** YYYY-MM-DD: the meeting's date, or the first day of a repeating one. Empty means the first day still ahead (today or tomorrow). */
+  date: string
+  /** Off by default: one meeting. On: weekly on `weekdays` until `ends`. */
+  repeats: boolean
   weekdays: Weekday[]
   /** HH:MM, Central Time. */
   startTime: string
@@ -66,11 +77,16 @@ export type TeamMeetingDraft = {
   count: number
 }
 
-const TUESDAY: Weekday = 2
+const DEFAULT_START = '18:00'
 
-/** Tuesdays 6–8 PM for Everyone until season end; required for a Coach, optional for a Travel Lead (who can't require a group). */
-export const teamMeetingDefaults = (isCoach: boolean): TeamMeetingDraft => ({
-  name: teamMeetingCopy.defaultName, weekdays: [TUESDAY], startTime: '18:00', endTime: '20:00', subteams: [], required: isCoach, ends: 'seasonEnd', endDate: '', count: 10,
+/**
+ * One meeting, 6–8 PM, for Everyone (owner decision, Nov 7 2026: one time by default; "Repeat this meeting" makes it weekly
+ * until season end). Required for a Coach, optional for a Travel Lead (who can't require a group). With `nowMs` the date is
+ * filled in with the first day still ahead; without it the date stays empty and means the same.
+ */
+export const teamMeetingDefaults = (isCoach: boolean, nowMs?: number): TeamMeetingDraft => ({
+  name: teamMeetingCopy.defaultName, date: nowMs === undefined ? '' : firstSearchDate(nowMs, DEFAULT_START), repeats: false, weekdays: [], startTime: DEFAULT_START, endTime: '20:00',
+  subteams: [], required: isCoach, ends: 'seasonEnd', endDate: '', count: 10,
 })
 
 /** The competition season wraps up at the end of May (summer starts the next one), so a meeting series ends on the next May 31 on or after `date`. */
@@ -88,19 +104,38 @@ export function firstSearchDate(nowMs: number, startTime: string): string {
   return validTime(startTime) && now.slice(11) < startTime ? today : addDay(today)
 }
 
-/** The weekly repeat rule the sheet stands for, starting from `startDate`. Season end and a chosen date both end 'onDate'. */
-export function teamMeetingRepeat(draft: Pick<TeamMeetingDraft, 'weekdays' | 'ends' | 'endDate' | 'count'>, startDate: string): RepeatValue {
+/** The meeting's date, or the first day a repeating meeting may start: the chosen date, else today (tomorrow once the start time has passed). */
+export function teamMeetingStartDate(draft: Pick<TeamMeetingDraft, 'date' | 'startTime'>, nowMs: number): string {
+  return parseDay(draft.date) !== null ? draft.date : firstSearchDate(nowMs, draft.startTime)
+}
+
+/** Turning on "Repeat this meeting": weekly on the meeting's own weekday, unless days were already chosen. */
+export function teamMeetingRepeatOn(draft: Pick<TeamMeetingDraft, 'date' | 'startTime' | 'weekdays'>, nowMs: number): Pick<TeamMeetingDraft, 'repeats' | 'weekdays'> {
+  const day = weekdayOf(teamMeetingStartDate(draft, nowMs))
+  return { repeats: true, weekdays: draft.weekdays.length ? [...draft.weekdays] : day === null ? [] : [day] }
+}
+
+/**
+ * The repeat rule the sheet stands for, starting from `startDate`: none for one meeting; otherwise weekly, where season end
+ * and a chosen date both end 'onDate'.
+ */
+export function teamMeetingRepeat(draft: Pick<TeamMeetingDraft, 'repeats' | 'weekdays' | 'ends' | 'endDate' | 'count'>, startDate: string): RepeatValue {
+  if (!draft.repeats) return defaultRepeat(startDate)
   return {
     repeats: true, intervalWeeks: 1, weekdays: [...draft.weekdays].sort((a, b) => a - b), ends: draft.ends === 'afterCount' ? 'afterCount' : 'onDate',
     endDate: draft.ends === 'onDate' ? draft.endDate : seasonEndDate(startDate), count: draft.count,
   }
 }
 
-/** The first meeting date (the next chosen weekday from today, or tomorrow once today's start time has passed), or null with no days. */
-export function teamMeetingFirstDate(draft: Pick<TeamMeetingDraft, 'weekdays' | 'startTime'>, nowMs: number): string | null {
+/**
+ * The (first) meeting date: the start date for one meeting; for a repeating one, the first chosen weekday on or after it, or
+ * null with no days chosen.
+ */
+export function teamMeetingFirstDate(draft: Pick<TeamMeetingDraft, 'date' | 'repeats' | 'weekdays' | 'startTime'>, nowMs: number): string | null {
+  const from = teamMeetingStartDate(draft, nowMs)
+  if (!draft.repeats) return from
   if (!draft.weekdays.length) return null
-  const from = firstSearchDate(nowMs, draft.startTime)
-  return seriesDates(from, teamMeetingRepeat({ weekdays: draft.weekdays, ends: 'afterCount', endDate: '', count: 1 }, from))[0] ?? null
+  return seriesDates(from, teamMeetingRepeat({ repeats: true, weekdays: draft.weekdays, ends: 'afterCount', endDate: '', count: 1 }, from))[0] ?? null
 }
 
 /** The range a chosen last date may take: from the first meeting through MAX_SERIES_DAYS later (the same limit as the full wizard). */
@@ -110,8 +145,8 @@ export function teamMeetingEndDateLimits(firstDate: string): { min: string; max:
 }
 
 /** What is wrong with a chosen last date ('end-date'), or null. Season end and "after N meetings" have no date to check. */
-export function teamMeetingEndIssue(draft: Pick<TeamMeetingDraft, 'ends' | 'endDate'>, firstDate: string): PickerIssue | null {
-  if (draft.ends !== 'onDate') return null
+export function teamMeetingEndIssue(draft: Pick<TeamMeetingDraft, 'repeats' | 'ends' | 'endDate'>, firstDate: string): PickerIssue | null {
+  if (!draft.repeats || draft.ends !== 'onDate') return null
   if (parseDay(draft.endDate) === null) return { field: 'end-date', message: teamMeetingCopy.needEndDate }
   const { min, max } = teamMeetingEndDateLimits(firstDate)
   if (draft.endDate < min) return { field: 'end-date', message: teamMeetingCopy.endBeforeFirst(previewDateLabel(min)) }
@@ -127,11 +162,15 @@ export type TeamMeetingPlan = { start: string; end: string; repeat: RepeatValue;
 /** The first meeting's Central Time inputs ("YYYY-MM-DDTHH:MM") and the repeat rule, or the first thing to fix. */
 export function teamMeetingPlan(draft: TeamMeetingDraft, nowMs: number): TeamMeetingPlan | PickerIssue {
   if (!draft.name.trim()) return { field: 'name', message: teamMeetingCopy.needName }
-  if (!draft.weekdays.length) return { field: 'days', message: teamMeetingCopy.needDay }
+  if (draft.date && parseDay(draft.date) === null) return { field: 'date', message: teamMeetingCopy.needDate }
+  if (draft.repeats && !draft.weekdays.length) return { field: 'days', message: teamMeetingCopy.needDay }
   if (!validTime(draft.startTime) || !validTime(draft.endTime)) return { field: 'starts', message: teamMeetingCopy.needTimes }
   if (draft.endTime <= draft.startTime) return { field: 'ends', message: teamMeetingCopy.endAfterStart }
   const firstDate = teamMeetingFirstDate(draft, nowMs)
   if (!firstDate) return { field: 'days', message: teamMeetingCopy.needDay }
+  // The server refuses meetings that already started; Central Time inputs compare as text.
+  if (`${firstDate}T${draft.startTime}` <= chicagoInputTime(nowMs)) return { field: 'date', message: teamMeetingCopy.past }
+  if (!draft.repeats) return { start: `${firstDate}T${draft.startTime}`, end: `${firstDate}T${draft.endTime}`, repeat: defaultRepeat(firstDate), firstDate }
   const endIssue = teamMeetingEndIssue(draft, firstDate)
   if (endIssue) return endIssue
   const repeat = teamMeetingRepeat(draft, firstDate)
@@ -158,7 +197,7 @@ export function teamMeetingAudience(draft: Pick<TeamMeetingDraft, 'subteams' | '
   return { kind: draft.subteams.length ? 'subteams' : 'everyone', subteams: [...draft.subteams], studentIds: [], required: isCoach && draft.required }
 }
 
-/** createEvent arguments for the first meeting (the series copies them): at our shop, free, no forms, off Team Calendar. */
+/** createEvent arguments for the meeting (a repeating one's series copies them): at our shop, free, no forms, off Team Calendar. */
 export function teamMeetingEventArgs(draft: TeamMeetingDraft, isCoach: boolean, startsAt: number, endsAt: number): CreateEventArgs {
   const who: WhoChoice = { travelTeam: false, audience: teamMeetingAudience(draft, isCoach), mentors: defaultMentorInvite() }
   return {
@@ -175,7 +214,7 @@ export function teamMeetingPrefill(draft: TeamMeetingDraft, isCoach: boolean, no
   const plan = teamMeetingPlan(draft, nowMs)
   const audience = teamMeetingAudience(draft, isCoach)
   if (isPlan(plan)) return { name: draft.name, type: 'Team', start: plan.start, end: plan.end, where: 'shop', audience, repeat: plan.repeat }
-  const from = teamMeetingFirstDate(draft, nowMs) ?? firstSearchDate(nowMs, draft.startTime)
+  const from = teamMeetingFirstDate(draft, nowMs) ?? teamMeetingStartDate(draft, nowMs)
   return { name: draft.name, type: 'Team', start: validTime(draft.startTime) ? `${from}T${draft.startTime}` : '', end: validTime(draft.endTime) ? `${from}T${draft.endTime}` : '', where: 'shop', audience, repeat: teamMeetingRepeat(draft, from) }
 }
 
