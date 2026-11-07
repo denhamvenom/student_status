@@ -128,11 +128,23 @@ export async function seriesOf(ctx: Ctx, seriesId: Id<"eventSeries">, cache: Ser
 }
 
 /**
+ * Whether the event's Team Calendar link still leaves it a Mentor meeting: it isn't on Team Calendar at all, or it is a
+ * one-time meeting whose own new entry the Mentor added when creating it (calendarChoice "create" AND
+ * calendarCreatedByMentor, set only by mentorMeetings.createMeeting; owner decision, Nov 7 2026). A meeting a Coach or
+ * Travel Lead later put on Team Calendar (eventCalendar.connect, "create" or "link") stays Coach/Travel Lead-managed.
+ */
+export function mentorKeepsCalendarLink(event: Pick<Doc<"events">, "calendarChoice" | "calendarEventId" | "calendarCreatedByMentor" | "seriesId">): boolean {
+  if (event.calendarChoice === undefined) return event.calendarEventId === undefined;
+  return event.calendarChoice === "create" && event.calendarCreatedByMentor === true && !event.seriesId;
+}
+
+/**
  * Whether the event is a Mentor meeting right now: it passes mentorMeetingLimitError (optional Team meeting, no fee, travel,
- * overnight, rooms or permission form) and isn't linked to Team Calendar (own Calendar event or a Calendar series).
+ * overnight, rooms or permission form), its Team Calendar link allows it (mentorKeepsCalendarLink) and it isn't in a
+ * Calendar series. Edits from the app to a Mentor-added entry are pushed to it (mentorUpdateEvent).
  */
 export async function isMentorMeetingNow(ctx: Ctx, event: Doc<"events">, seriesCache: SeriesCache = new Map()): Promise<boolean> {
-  if (mentorMeetingLimitError(event) !== null || event.calendarChoice !== undefined || event.calendarEventId !== undefined) return false;
+  if (mentorMeetingLimitError(event) !== null || !mentorKeepsCalendarLink(event)) return false;
   if (!event.seriesId) return true;
   return !(await seriesOf(ctx, event.seriesId, seriesCache))?.calendarMasterId;
 }
@@ -344,8 +356,11 @@ export type MentorEventEdit = { eventId: Id<"events">; expectedRevision?: number
 
 /**
  * A Mentor edits or cancels one meeting they created (this meeting only). Same field rules as the Coach path
- * (calendarDetails update); the meeting becomes a detached override when it belongs to a series. Meetings on Team Calendar
- * are Coach/Travel Lead-managed, so a Mentor is sent to a Coach for those.
+ * (calendarDetails update); the meeting becomes a detached override when it belongs to a series. A one-time meeting whose own
+ * Team Calendar entry the Mentor added at creation (mentorKeepsCalendarLink) is pushed to that entry like eventCalendar.update does: the opened
+ * revision is required, the revision is bumped, sync goes back to pending and eventCalendar.push is scheduled. Meetings
+ * connected to an existing entry, put on Team Calendar later by a Coach or Travel Lead, or in a Calendar series are
+ * Coach/Travel Lead-managed, so a Mentor is sent to a Coach.
  */
 export async function mentorUpdateEvent(ctx: MutationCtx, sessionUser: AppUser, args: MentorEventEdit): Promise<null> {
   const user = await requireMeetingMentor(ctx, sessionUser);
@@ -359,7 +374,11 @@ export async function mentorUpdateEvent(ctx: MutationCtx, sessionUser: AppUser, 
   if (event.cancelled) throw new ConvexError("This meeting is canceled, so it can't be changed.");
   const now = Date.now();
   if (event.endsAt <= now) throw new ConvexError("This meeting is over, so it can't be changed.");
-  if (args.expectedRevision !== undefined && args.expectedRevision !== (event.calendarRevision ?? 0)) throw new ConvexError(MEETING_CHANGED_MESSAGE);
+  // A Team Calendar meeting always needs the revision the Mentor opened (same rule as eventCalendar.update).
+  const onCalendar = event.calendarChoice !== undefined;
+  if ((onCalendar || args.expectedRevision !== undefined) && args.expectedRevision !== (event.calendarRevision ?? 0)) throw new ConvexError(MEETING_CHANGED_MESSAGE);
+  // Same "wait for the connection" rule as eventCalendar.update (only connected entries need it; canMentorManageEvent already refuses those).
+  if (event.calendarChoice === "link" && !event.calendarEtag && (args.name !== undefined || args.destination !== undefined || args.startsAt !== undefined || args.endsAt !== undefined)) throw new ConvexError("Wait for the Team Calendar connection to finish before changing the title, place or schedule.");
   const name = args.name?.trim() ?? event.name, destination = args.destination?.trim() ?? event.destination;
   const startsAt = args.startsAt ?? event.startsAt, endsAt = args.endsAt ?? event.endsAt;
   if (!name || name.length > 250 || destination.length > 500 || !Number.isFinite(startsAt) || !Number.isFinite(endsAt) || endsAt <= startsAt) throw new ConvexError("Enter a title up to 250 characters, a place up to 500, and an end time after the start.");
@@ -372,10 +391,14 @@ export async function mentorUpdateEvent(ctx: MutationCtx, sessionUser: AppUser, 
     if (await sessionsExistOn(ctx, [event])) throw new ConvexError("Attendance has already been taken for this meeting, so its time can't be changed.");
   }
   const material = name !== event.name || destination !== event.destination || startsAt !== event.startsAt || endsAt !== event.endsAt || cancelling;
+  const revision = (event.calendarRevision ?? 0) + 1;
   await ctx.db.patch(event._id, {
     name, destination, startsAt, endsAt, cancelled: cancelling ? true : event.cancelled ?? false,
-    ...(event.seriesId && material ? { seriesDetached: true } : {}), calendarRevision: (event.calendarRevision ?? 0) + 1,
+    ...(event.seriesId && material ? { seriesDetached: true } : {}), calendarRevision: revision,
+    ...(onCalendar ? { calendarSyncState: "pending" as const, calendarSyncError: undefined, calendarActorId: user._id } : {}),
   });
+  // Write gates (STUDENT_STATUS_CALENDAR_WRITE_ENABLED + production URL) are checked by push itself, as for every Calendar write.
+  if (onCalendar) await ctx.scheduler.runAfter(0, internal.eventCalendar.push, { eventId: event._id, revision });
   if (endsAt !== event.endsAt) await scheduleEventArchive(ctx, event._id);
   if (cancelling) await ctx.runMutation(internal.eventEnrollment.stopCancelledEnrollment, { eventId: event._id });
   if (material) await notifyEventScheduleChange(ctx, event);

@@ -131,7 +131,9 @@ describe("Venom Status Calendar link", () => {
     process.env.CONVEX_CLOUD_URL = "https://amicable-eel-413.convex.cloud";
     const f = await fixture();
     await bindSyntheticCalendar(f.t);
-    await f.t.run(ctx => ctx.db.patch(f.ids.event, { calendarChoice: "create", calendarSyncState: "pending", calendarRevision: 1, calendarActorId: f.ids.coach }));
+    // Still ahead, so the end-time archive job never archives it mid-push.
+    const soon = Date.now() + 2 * 86_400_000, nextStart = soon + 86_400_000, nextEnd = nextStart + 3_600_000;
+    await f.t.run(ctx => ctx.db.patch(f.ids.event, { startsAt: soon, endsAt: soon + 3_600_000, calendarChoice: "create", calendarSyncState: "pending", calendarRevision: 1, calendarActorId: f.ids.coach }));
 
     let remoteId = "";
     const posts: Array<{ id: string; summary: string }> = [];
@@ -157,7 +159,6 @@ describe("Venom Status Calendar link", () => {
 
     await f.t.action(internal.eventCalendar.push, { eventId: f.ids.event, revision: 1 });
     expect((await f.t.run(ctx => ctx.db.get(f.ids.event)))?.calendarSyncState).toBe("failed");
-    const nextStart = chicagoMidnight("2026-11-02"), nextEnd = chicagoMidnight("2026-11-03");
     await f.coach.mutation(api.eventCalendar.update, { eventId: f.ids.event, expectedRevision: 1, name: "Updated practice", destination: "New arena", startsAt: nextStart, endsAt: nextEnd });
     await f.t.action(internal.eventCalendar.push, { eventId: f.ids.event, revision: 2 });
     expect(posts).toHaveLength(2);
@@ -165,5 +166,121 @@ describe("Venom Status Calendar link", () => {
     expect(posts[0].id).toBe(remoteId);
     expect(patches).toEqual([{ url: `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${remoteId}`, ifMatch: '"v1"', summary: "Updated practice", location: "New arena", start: new Date(nextStart).toISOString() }]);
     expect((await f.t.run(ctx => ctx.db.get(f.ids.event)))?.calendarSyncState).toBe("synced");
+  });
+  it("never lets an older revision's push overwrite a newer one that inserted the entry first (409 race)", async () => {
+    process.env.TIMECLOCK_CALENDAR_ID = calendarId;
+    process.env.TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_EMAIL = accountEmail;
+    process.env.TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_PRIVATE_KEY = await syntheticPrivateKey();
+    process.env.STUDENT_STATUS_CALENDAR_WRITE_ENABLED = "true";
+    process.env.CONVEX_CLOUD_URL = "https://amicable-eel-413.convex.cloud";
+    const f = await fixture();
+    await bindSyntheticCalendar(f.t);
+    // Still ahead, so the end-time archive job never archives it mid-push.
+    const soon = Date.now() + 2 * 86_400_000, nextStart = soon + 86_400_000, nextEnd = nextStart + 3_600_000;
+    await f.t.run(ctx => ctx.db.patch(f.ids.event, { startsAt: soon, endsAt: soon + 3_600_000, calendarChoice: "create", calendarSyncState: "pending", calendarRevision: 1, calendarActorId: f.ids.coach }));
+
+    // The one remote entry, as Google Calendar holds it.
+    let remote: { id: string; etag: string; summary: string; location: string; start: { dateTime: string }; end: { dateTime: string } } | null = null;
+    const posts: string[] = [], patches: string[] = [];
+    let interleaved = false;
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input));
+      if (url.origin === "https://oauth2.googleapis.com") return new Response(JSON.stringify({ access_token: "synthetic-token" }), { status: 200 });
+      if (url.origin !== "https://www.googleapis.com") throw new Error(`Unexpected URL ${url.origin}`);
+      if (init?.method === "POST") {
+        const body = JSON.parse(String(init.body)) as { id: string; summary: string; location: string; start: { dateTime: string }; end: { dateTime: string } };
+        posts.push(body.summary);
+        if (!interleaved) {
+          // Revision 1's insert is slow: meanwhile a Coach saves revision 2, and its push inserts the entry first.
+          interleaved = true;
+          await f.coach.mutation(api.eventCalendar.update, { eventId: f.ids.event, expectedRevision: 1, name: "Updated practice", destination: "New arena", startsAt: nextStart, endsAt: nextEnd });
+          await f.t.action(internal.eventCalendar.push, { eventId: f.ids.event, revision: 2 });
+          return new Response("{}", { status: 409 });
+        }
+        if (remote) return new Response("{}", { status: 409 });
+        remote = { id: body.id, etag: '"v1"', summary: body.summary, location: body.location, start: body.start, end: body.end };
+        return new Response(JSON.stringify({ ...remote, updated: "2026-11-01T12:00:00Z" }), { status: 200 });
+      }
+      if (init?.method === "PATCH") {
+        const body = JSON.parse(String(init.body)) as { summary: string };
+        patches.push(body.summary);
+        if (remote) remote = { ...remote, ...body, etag: '"v2"' };
+        return new Response(JSON.stringify({ ...remote, updated: "2026-11-01T13:00:00Z" }), { status: 200 });
+      }
+      if (remote && url.pathname.endsWith(`/${remote.id}`)) return new Response(JSON.stringify({ ...remote, updated: "2026-11-01T12:00:00Z", extendedProperties: { private: { studentStatusEventId: f.ids.event } } }), { status: 200 });
+      throw new Error(`Unexpected Calendar request ${url}`);
+    });
+
+    await f.t.action(internal.eventCalendar.push, { eventId: f.ids.event, revision: 1 });
+    expect(posts).toEqual(["Practice", "Updated practice"]);
+    // Revision 1 found the entry (409) but stopped before writing: Team Calendar keeps revision 2's details.
+    expect(patches).toEqual([]);
+    expect(remote).toMatchObject({ summary: "Updated practice", location: "New arena", start: { dateTime: new Date(nextStart).toISOString() } });
+    expect(await f.t.run(ctx => ctx.db.get(f.ids.event))).toMatchObject({ name: "Updated practice", calendarRevision: 2, calendarSyncState: "synced", calendarEtag: '"v1"' });
+  });
+  it("lists upcoming failed and conflicting Calendar updates for Coaches and Travel Leads only", async () => {
+    process.env.TIMECLOCK_CALENDAR_ID = calendarId;
+    process.env.TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_EMAIL = accountEmail;
+    process.env.TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_PRIVATE_KEY = "synthetic-key-not-used";
+    process.env.STUDENT_STATUS_CALENDAR_WRITE_ENABLED = "true";
+    process.env.CONVEX_CLOUD_URL = "https://amicable-eel-413.convex.cloud";
+    const f = await fixture();
+    const asOf = Date.now(), soon = asOf + 86_400_000;
+    const ids = await f.t.run(async ctx => {
+      const person = async (name: string, role: "mentor" | "student" | "parent", travelLead = false) => {
+        const auth = await ctx.db.insert("users", { email: `${name}@synthetic.test`, name });
+        await ctx.db.insert("appUsers", { authUserId: auth, email: `${name}@synthetic.test`, name, role, travelLead, financialEdit: false, active: true });
+        return auth;
+      };
+      const seed = (name: string, startsAt: number, extra: Record<string, unknown>) => ctx.db.insert("events", { seasonId: f.ids.season, name, type: "Team", startsAt, endsAt: startsAt + 3_600_000, destination: "Gym", travel: "None", overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "open", allowWithdrawal: true, permissionRequired: false, firstRequired: false, archived: false, calendarChoice: "create", calendarRevision: 1, ...extra });
+      const conflict = await seed("Scrimmage", soon, { calendarChoice: "link", calendarEventId: "cal_conflict", calendarSyncState: "conflict", calendarSyncError: "This entry changed in Team Calendar. Reload Calendar details, then try again." });
+      const failed = await seed("Build night", soon + 86_400_000, { calendarSyncState: "failed", calendarSyncError: "Team Calendar could not be updated (error 500). Try again in a few minutes." });
+      await seed("Synced", soon, { calendarSyncState: "synced" });
+      await seed("Pending", soon, { calendarSyncState: "pending" });
+      await seed("Already over", asOf - 2 * 3_600_000, { calendarSyncState: "failed", calendarSyncError: "old" });
+      await seed("Archived", soon, { calendarSyncState: "failed", calendarSyncError: "old", archived: true });
+      return { conflict, failed, travelLead: await person("lead", "mentor", true), student: await person("student", "student"), parent: await person("parent", "parent") };
+    });
+    const as = (auth: string) => f.t.withIdentity({ subject: `${auth}|one` });
+    const expected = { items: [
+      { eventId: ids.conflict, name: "Scrimmage", startsAt: soon, state: "conflict", reason: "This entry changed in Team Calendar. Reload Calendar details, then try again." },
+      { eventId: ids.failed, name: "Build night", startsAt: soon + 86_400_000, state: "failed", reason: "Team Calendar could not be updated (error 500). Try again in a few minutes." },
+    ], more: false };
+    expect(await f.coach.query(api.eventCalendar.syncProblems, { asOf })).toEqual(expected);
+    expect(await as(ids.travelLead).query(api.eventCalendar.syncProblems, { asOf })).toEqual(expected);
+    for (const who of [f.mentor, as(ids.student), as(ids.parent)]) await expect(who.query(api.eventCalendar.syncProblems, { asOf })).rejects.toThrow("Only a Coach or Travel Lead");
+    // While Calendar writes are off, every entry reads "disabled" (as in status), so nothing is listed.
+    process.env.STUDENT_STATUS_CALENDAR_WRITE_ENABLED = "false";
+    expect(await f.coach.query(api.eventCalendar.syncProblems, { asOf })).toEqual({ items: [], more: false });
+  });
+  it("shows the 10 soonest-starting Calendar problems across both states, whatever their length, and says when there are more", async () => {
+    process.env.TIMECLOCK_CALENDAR_ID = calendarId;
+    process.env.TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_EMAIL = accountEmail;
+    process.env.TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_PRIVATE_KEY = "synthetic-key-not-used";
+    process.env.STUDENT_STATUS_CALENDAR_WRITE_ENABLED = "true";
+    process.env.CONVEX_CLOUD_URL = "https://amicable-eel-413.convex.cloud";
+    const f = await fixture();
+    const asOf = Date.now(), HOUR = 3_600_000, DAY = 24 * HOUR;
+    const shorts = await f.t.run(async ctx => {
+      const seed = (name: string, startsAt: number, endsAt: number, extra: Record<string, unknown> = {}) => ctx.db.insert("events", { seasonId: f.ids.season, name, type: "Team", startsAt, endsAt, destination: "Gym", travel: "None", overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "open", allowWithdrawal: true, permissionRequired: false, firstRequired: false, archived: false, calendarChoice: "create", calendarRevision: 1, calendarSyncState: "failed", calendarSyncError: "Synthetic failure", ...extra });
+      // Ends last but started first (a trip under way): it must still lead the list.
+      await seed("Trip under way", asOf - 2 * DAY, asOf + 5 * DAY);
+      await seed("Long conflict", asOf + 30 * 60_000, asOf + 10 * DAY, { calendarSyncState: "conflict" });
+      await seed("Late conflict", asOf + 20 * HOUR, asOf + 21 * HOUR, { calendarSyncState: "conflict" });
+      // Not listed: no longer on Team Calendar, and already over (but not yet archived).
+      await seed("Unlinked", asOf + 10 * 60_000, asOf + 70 * 60_000, { calendarChoice: undefined });
+      await seed("Over", asOf - 3 * HOUR, asOf - HOUR);
+      const ids = [];
+      for (let hour = 1; hour <= 11; hour++) ids.push(await seed(`Short ${hour}`, asOf + hour * HOUR, asOf + hour * HOUR + HOUR));
+      return ids;
+    });
+    const first = await f.coach.query(api.eventCalendar.syncProblems, { asOf });
+    expect(first.items.map(item => item.name)).toEqual(["Trip under way", "Long conflict", ...Array.from({ length: 8 }, (_, i) => `Short ${i + 1}`)]);
+    expect(first.more).toBe(true);
+    // 14 listed problems; archiving four leaves exactly 10, so nothing more.
+    await f.t.run(async ctx => { for (const id of shorts.slice(7)) await ctx.db.patch(id, { archived: true }); });
+    const exact = await f.coach.query(api.eventCalendar.syncProblems, { asOf });
+    expect(exact.items.map(item => item.name)).toEqual(["Trip under way", "Long conflict", ...Array.from({ length: 7 }, (_, i) => `Short ${i + 1}`), "Late conflict"]);
+    expect(exact.more).toBe(false);
   });
 });

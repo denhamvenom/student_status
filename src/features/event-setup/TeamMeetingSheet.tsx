@@ -16,26 +16,28 @@ import { RadioChoice } from './audience/RadioChoice'
 import { previewDateLabel, MAX_SERIES_MEETINGS, weekdays } from './audience/repeat'
 import type { PickerIssue, Weekday } from './audience/types'
 import setupStyles from './EventSetup.module.css'
+import { calendarChoiceCopy, calendarOffDay } from './new-event-defaults'
 import { useCreateSeries } from './series-support'
-import { isPlan, seasonEndDate, teamMeetingDefaults, teamMeetingEndDateLimits, teamMeetingEndIssue, teamMeetingEventArgs, teamMeetingFirstDate, teamMeetingPlan, teamMeetingPrefill, teamMeetingRepeatOn, teamMeetingStartDate, teamMeetingSummary, type TeamMeetingDraft, teamMeetingCopy as copy } from './team-meeting'
+import { isPlan, seasonEndDate, teamMeetingDefaults, teamMeetingEndDateLimits, teamMeetingEndIssue, teamMeetingEventArgs, teamMeetingFirstDate, teamMeetingOnCalendar, teamMeetingPlan, teamMeetingPrefill, teamMeetingRepeatOn, teamMeetingStartDate, teamMeetingSummary, type TeamMeetingDraft, teamMeetingCopy as copy } from './team-meeting'
 
 /**
  * "+ Team meeting" on Events (Coach and Travel Lead): one sheet for a meeting at our shop. It is one meeting by default;
  * "Repeat this meeting" makes it weekly (days and end). Everything but the date, time, subteams and repeat is preset;
- * "More options" opens the full New event wizard with these answers filled in.
+ * "More options" opens the full New event wizard with these answers filled in. `seasonYear` (the current season's
+ * competition year) decides whether the meeting's date is a Required weekday, which starts it off Team Calendar.
  */
-export function TeamMeetingButton({ isCoach }: { isCoach: boolean }) {
+export function TeamMeetingButton({ isCoach, seasonYear }: { isCoach: boolean; seasonYear: number | null }) {
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   return <>
     <button type="button" className="button button-outline" onClick={() => setOpen(true)}>{copy.open}</button>
     <Dialog open={open} disablePointerDismissal onOpenChange={next => { if (!next && !busy) setOpen(false) }}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain sm:max-w-lg">{open && <TeamMeetingForm isCoach={isCoach} busy={busy} setBusy={setBusy} onDone={() => setOpen(false)} />}</DialogContent>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain sm:max-w-lg">{open && <TeamMeetingForm isCoach={isCoach} seasonYear={seasonYear} busy={busy} setBusy={setBusy} onDone={() => setOpen(false)} />}</DialogContent>
     </Dialog>
   </>
 }
 
-function TeamMeetingForm({ isCoach, busy, setBusy, onDone }: { isCoach: boolean; busy: boolean; setBusy: (busy: boolean) => void; onDone: () => void }) {
+function TeamMeetingForm({ isCoach, seasonYear, busy, setBusy, onDone }: { isCoach: boolean; seasonYear: number | null; busy: boolean; setBusy: (busy: boolean) => void; onDone: () => void }) {
   const id = useId()
   const navigate = useNavigate()
   const createSeries = useCreateSeries()
@@ -60,6 +62,10 @@ function TeamMeetingForm({ isCoach, busy, setBusy, onDone }: { isCoach: boolean;
   // How many meetings Create makes and their range, once the sheet is complete.
   const preview = teamMeetingPlan(draft, now)
   const summary = isPlan(preview) ? teamMeetingSummary(preview) : null
+  // A one-time meeting on a Required weekday starts off Team Calendar; the box follows the date until it is changed by hand.
+  const firstStart = parseChicagoInput(`${firstDate}T${draft.startTime}`)
+  const onCalendar = teamMeetingOnCalendar(draft, firstStart, seasonYear)
+  const offDay = draft.repeats || onCalendar ? null : calendarOffDay('Team', firstStart, seasonYear)
   const pickDay = (day: Weekday) => { set({ weekdays: daysTouched ? toggleItem(draft.weekdays, day).sort((a, b) => a - b) : [day] }); setDaysTouched(true) }
 
   const submit = async () => {
@@ -68,7 +74,7 @@ function TeamMeetingForm({ isCoach, busy, setBusy, onDone }: { isCoach: boolean;
     if (!isPlan(current)) { setIssue(current); requestAnimationFrame(() => document.getElementById(fieldId(current.field))?.focus()); return }
     setBusy(true); setError('')
     try {
-      const args = teamMeetingEventArgs(draft, isCoach, parseChicagoInput(current.start), parseChicagoInput(current.end))
+      const args = teamMeetingEventArgs(draft, isCoach, parseChicagoInput(current.start), parseChicagoInput(current.end), seasonYear)
       const eventId = current.repeat.repeats ? await createSeries(args, current.repeat, current.start) : await createEvent(args)
       toast.success(current.repeat.repeats ? copy.seriesCreated : copy.created)
       onDone()
@@ -103,6 +109,13 @@ function TeamMeetingForm({ isCoach, busy, setBusy, onDone }: { isCoach: boolean;
         <RadioChoice name={`${id}-required`} value="no" checked={!draft.required} label={copy.requiredNo} helper={audienceCopy.audience.requiredNo.helper} onSelect={() => set({ required: false })} />
       </div>
     </fieldset> : <><p className={styles.hint}>{copy.optionalOnly}</p><p className={styles.hint}>{copy.coachOnlyRequired}</p></>}
+    {draft.repeats ? <p className={styles.hint}>{copy.repeatingOffCalendar}</p> : <>
+      <label className={styles.check} htmlFor={fieldId('calendar')}>
+        <Checkbox id={fieldId('calendar')} checked={onCalendar} disabled={busy} aria-describedby={offDay ? fieldId('calendar-help') : undefined} onCheckedChange={checked => set({ addToCalendar: checked })} />
+        <span>{copy.addToCalendar}</span>
+      </label>
+      {offDay && <p id={fieldId('calendar-help')} className={styles.hint}>{calendarChoiceCopy.requiredDayHint(offDay)}</p>}
+    </>}
     <p className={styles.hint}>{copy.summary}</p>
     <label className={styles.check} htmlFor={fieldId('repeat')}>
       <Checkbox id={fieldId('repeat')} checked={draft.repeats} disabled={busy} aria-describedby={fieldId('repeat-help')} onCheckedChange={checked => { set(checked ? teamMeetingRepeatOn(draft, now) : { repeats: false }); setDaysTouched(false) }} />

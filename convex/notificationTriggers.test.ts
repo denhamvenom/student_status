@@ -310,12 +310,15 @@ describe("M1 Mentor schedule notices", () => {
     expect(rows.filter(row => row.title.startsWith("Canceled")).map(row => [row.who, row.urgent]).sort()).toEqual(expected.map(who => [who, true]));
     expect(rows.filter(row => row.title.startsWith("Back on")).map(row => [row.who, row.urgent]).sort()).toEqual(expected.map(who => [who, false]));
 
-    const mentorsOnly = await mentorFixture({ audienceKind: "mentorsOnly", calendarChoice: "create" });
-    await mentorsOnly.t.run(async ctx => { for (const row of await ctx.db.query("participants").withIndex("by_eventId_and_status", q => q.eq("eventId", mentorsOnly.m.eventId)).take(10)) await ctx.db.delete(row._id); });
-    await mentorsOnly.coach.mutation(api.eventCalendar.update, { eventId: mentorsOnly.m.eventId, expectedRevision: 0, startsAt: NOW + 3 * DAY, endsAt: NOW + 3 * DAY + 3_600_000 });
-    const changed = await mentorsOnly.rows();
-    // calendarChoice "create" links the meeting to Team Calendar, so it is no longer a Mentor meeting: its creator isn't notified.
-    expect(changed.map(row => row.who).sort()).toEqual(["accepted", "invited", "parentA", "self"]);
-    for (const row of changed) expect(row).toMatchObject({ category: "schedule", title: "Schedule changed: Team build", url: `/events/${mentorsOnly.m.eventId}` });
+    // On Team Calendar, a Mentors-only meeting stays a Mentor meeting only when its Mentor added the entry at creation
+    // (calendarCreatedByMentor, Nov 7 2026): then the creator hears a Coach's change; when a Coach put it there, they don't.
+    for (const [addedByMentor, expectedWho] of [[true, ["accepted", "creator", "invited", "parentA", "self"]], [false, ["accepted", "invited", "parentA", "self"]]] as const) {
+      const mentorsOnly = await mentorFixture({ audienceKind: "mentorsOnly", calendarChoice: "create", ...(addedByMentor ? { calendarCreatedByMentor: true } : {}) });
+      await mentorsOnly.t.run(async ctx => { for (const row of await ctx.db.query("participants").withIndex("by_eventId_and_status", q => q.eq("eventId", mentorsOnly.m.eventId)).take(10)) await ctx.db.delete(row._id); });
+      await mentorsOnly.coach.mutation(api.eventCalendar.update, { eventId: mentorsOnly.m.eventId, expectedRevision: 0, startsAt: NOW + 3 * DAY, endsAt: NOW + 3 * DAY + 3_600_000 });
+      const changed = await mentorsOnly.rows();
+      expect(changed.map(row => row.who).sort()).toEqual(expectedWho);
+      for (const row of changed) expect(row).toMatchObject({ category: "schedule", title: "Schedule changed: Team build", url: `/events/${mentorsOnly.m.eventId}` });
+    }
   });
 });

@@ -57,6 +57,9 @@ export const calendarChipCopy = {
   retrying: 'Retry requested.',
 } as const
 
+/** Id of the event page's Team Calendar section (EventCalendarOperations); Home's Team Calendar alert links to it as a hash. */
+export const TEAM_CALENDAR_ANCHOR = 'team-calendar'
+
 export type CalendarChip = { label: string; tone: 'ready' | 'neutral' | 'attention'; reason: string | null; canRetry: boolean }
 
 /** One chip for the Team Calendar section instead of sync-state sentences. */

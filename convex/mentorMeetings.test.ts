@@ -769,3 +769,72 @@ describe("Created by on Coach and Travel Lead screens (owner decision, Nov 7 202
     }
   });
 });
+
+describe("Mentor meetings on Team Calendar (owner decision, Nov 7 2026)", () => {
+  /** eventCalendar.push runs scheduled here (convex-test doesn't run it): the revisions queued for one event. */
+  const queuedPushes = (f: Fixture, eventId: Id<"events">) => f.t.run(async ctx => (await ctx.db.system.query("_scheduled_functions").take(50))
+    .filter(job => job.name.includes("eventCalendar") && job.name.includes("push") && (job.args[0] as { eventId?: string }).eventId === eventId)
+    .map(job => (job.args[0] as { revision: number }).revision));
+
+  it.each([
+    ["Add to Team Calendar", { calendarChoice: { kind: "create" as const } }, true],
+    ["left off Team Calendar", { calendarChoice: { kind: "none" as const } }, false],
+    ["no choice sent", {}, false],
+  ])("one-time meeting, %s", async (_, extra, onCalendar) => {
+    const f = await fixture();
+    const eventId = await f.as(f.ids.mentorA).mutation(api.mentorMeetings.createMeeting, meeting(extra));
+    const stored = await f.event(eventId);
+    if (onCalendar) expect(stored).toMatchObject({ calendarChoice: "create", calendarCreatedByMentor: true, calendarSyncState: "pending", calendarRevision: 1, calendarActorId: f.ids.mentorA.id, createdBy: f.ids.mentorA.id });
+    else expect([stored?.calendarChoice, stored?.calendarCreatedByMentor]).toEqual([undefined, undefined]);
+    expect(await queuedPushes(f, eventId)).toEqual(onCalendar ? [1] : []);
+    // Still the Mentor's own meeting: they count as going and may manage it.
+    const view = await f.as(f.ids.mentorA).query(api.mentorMeetings.view, { eventId, asOf: Date.now() });
+    expect(view.meeting).toMatchObject({ isCreator: true, canManage: true });
+    expect(view.mentors.map(m => m.isCreator)).toEqual([true]);
+  });
+
+  it("refuses a Mentor's request to connect an existing Calendar entry", async () => {
+    const f = await fixture();
+    await expect(f.as(f.ids.mentorA).mutation(api.mentorMeetings.createMeeting, meeting({ calendarChoice: { kind: "link", eventId: "existing1" } }) as never)).rejects.toThrow();
+    expect(await f.t.run(ctx => ctx.db.query("eventCalendarClaims").take(5))).toEqual([]);
+  });
+
+  it("lets the creator edit and cancel it with the opened revision, pushing each change; nobody else may", async () => {
+    const f = await fixture();
+    const mine = f.as(f.ids.mentorA), other = f.as(f.ids.mentorB);
+    const eventId = await mine.mutation(api.mentorMeetings.createMeeting, meeting({ calendarChoice: { kind: "create" } }));
+    await expect(other.mutation(api.mentorMeetings.editMeeting, { eventId, expectedRevision: 1, name: "Hijacked" })).rejects.toThrow("only Team meetings you created");
+    await expect(other.mutation(api.mentorMeetings.cancelMeeting, { eventId, expectedRevision: 1 })).rejects.toThrow("only Team meetings you created");
+    // A Team Calendar meeting always needs the revision the Mentor opened, as on the Coach path.
+    await expect(mine.mutation(api.mentorMeetings.editMeeting, { eventId, name: "No revision" })).rejects.toThrow("changed since you opened it");
+    await f.t.run(ctx => ctx.db.patch(eventId, { calendarSyncState: "synced", calendarEtag: "etag-1", calendarEventId: "ssabc" }));
+    await mine.mutation(api.mentorMeetings.editMeeting, { eventId, expectedRevision: 1, name: "Pit prep 2" });
+    expect(await f.event(eventId)).toMatchObject({ name: "Pit prep 2", calendarRevision: 2, calendarSyncState: "pending", calendarActorId: f.ids.mentorA.id });
+    await expect(mine.mutation(api.mentorMeetings.cancelMeeting, { eventId, expectedRevision: 1 })).rejects.toThrow("changed since you opened it");
+    await mine.mutation(api.mentorMeetings.cancelMeeting, { eventId, expectedRevision: 2 });
+    expect(await f.event(eventId)).toMatchObject({ cancelled: true, calendarRevision: 3, calendarSyncState: "pending" });
+    expect(await queuedPushes(f, eventId)).toEqual([1, 2, 3]);
+  });
+
+  it("keeps a meeting a Coach later put on Team Calendar Coach-managed, even for its Mentor creator", async () => {
+    const f = await fixture();
+    const mine = f.as(f.ids.mentorA);
+    const eventId = await mine.mutation(api.mentorMeetings.createMeeting, meeting({ calendarChoice: { kind: "none" } }));
+    expect((await mine.query(api.mentorMeetings.view, { eventId, asOf: Date.now() })).meeting).toMatchObject({ isCreator: true, canManage: true });
+    // A separate new entry, added by a Coach after creation: same calendarChoice "create" as the Mentor's own, but not the Mentor's.
+    await f.as(f.ids.coach).mutation(api.eventCalendar.connect, { eventId, calendarChoice: { kind: "create" } });
+    const connected = await f.event(eventId);
+    expect([connected?.calendarChoice, connected?.calendarCreatedByMentor]).toEqual(["create", undefined]);
+    expect((await mine.query(api.mentorMeetings.view, { eventId, asOf: Date.now() })).meeting).toMatchObject({ isCreator: false, canManage: false });
+    await expect(mine.mutation(api.mentorMeetings.editMeeting, { eventId, expectedRevision: 1, name: "Changed" })).rejects.toThrow("only Team meetings you created");
+    await expect(mine.mutation(api.mentorMeetings.cancelMeeting, { eventId, expectedRevision: 1 })).rejects.toThrow("only Team meetings you created");
+  });
+
+  it("keeps a meeting connected to an existing Calendar entry Coach-managed, even for its Mentor creator", async () => {
+    const f = await fixture();
+    const eventId = await f.seedEvent({ createdBy: f.ids.mentorA.id, calendarChoice: "link", calendarEventId: "existing1", calendarSyncState: "synced", calendarEtag: "etag-1", calendarRevision: 1 });
+    await expect(f.as(f.ids.mentorA).mutation(api.mentorMeetings.editMeeting, { eventId, expectedRevision: 1, name: "Changed" })).rejects.toThrow("only Team meetings you created");
+    const view = await f.as(f.ids.mentorA).query(api.mentorMeetings.view, { eventId, asOf: Date.now() });
+    expect(view.meeting).toMatchObject({ isCreator: false, canManage: false });
+  });
+});

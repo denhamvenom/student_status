@@ -18,7 +18,8 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../com
 import { Input } from '../../components/ui/input'
 import { Button } from '../../components/ui/button'
 import { ConfirmAction } from '../../ConfirmAction'
-import { dateTimeBounds } from '../event-setup/new-event-defaults'
+import { dateTimeBounds, requiredDayEditHint } from '../event-setup/new-event-defaults'
+import { useSeasonYear } from '../event-setup/use-season-year'
 import { draftFrom, eventEditValues, placeEditable, type EventDraft } from '../operations/event-edit'
 import type { MentorMeeting, MentorMeetingDetail } from './contract'
 import { MeetingActions, MeetingBadges, type RowAction } from './MentorMeetingRow'
@@ -150,6 +151,10 @@ function ManageActions({ meeting }: { meeting: MentorMeeting }) {
   const [openedRevision, setOpenedRevision] = useState(0)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const noteId = useId()
+  const seasonYear = useSeasonYear()
+  // Note only (no refusal): their Team Calendar meeting set to start on a Required weekday counts as required attendance.
+  const requiredDayNote = draft ? requiredDayEditHint(meeting, draft.start, seasonYear) : null
   const open = () => { setError(''); setDraft(draftFrom(event)); setOpenedRevision(meeting.calendarRevision) }
   async function save(e: FormEvent) {
     e.preventDefault()
@@ -173,7 +178,8 @@ function ManageActions({ meeting }: { meeting: MentorMeeting }) {
           <DialogTitle>{copy.edit.title}</DialogTitle>
           <DialogDescription>{copy.edit.description}</DialogDescription>
           <label>{copy.edit.name}<Input value={draft.name} maxLength={250} onChange={e => setDraft({ ...draft, name: e.target.value })} required /></label>
-          <label>{copy.edit.starts}<Input type="datetime-local" min={dateTimeBounds.min} max={dateTimeBounds.max} value={draft.start} onChange={e => setDraft({ ...draft, start: e.target.value })} required /></label>
+          <label>{copy.edit.starts}<Input type="datetime-local" min={dateTimeBounds.min} max={dateTimeBounds.max} value={draft.start} aria-describedby={requiredDayNote ? noteId : undefined} onChange={e => setDraft({ ...draft, start: e.target.value })} required /></label>
+          {requiredDayNote && <p id={noteId} className="muted">{requiredDayNote}</p>}
           <label>{copy.edit.ends}<Input type="datetime-local" min={dateTimeBounds.min} max={dateTimeBounds.max} value={draft.end} onChange={e => setDraft({ ...draft, end: e.target.value })} required /></label>
           {placeEditable(event)
             ? <label>{copy.edit.place}<Input value={draft.destination} maxLength={500} onChange={e => setDraft({ ...draft, destination: e.target.value })} required /></label>

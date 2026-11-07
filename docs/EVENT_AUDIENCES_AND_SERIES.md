@@ -47,7 +47,7 @@ Their stored fields are not rewritten.
 
 ## Team Calendar choice
 
-New events offer **Create a separate Calendar entry**, **Connect an existing Calendar event**, or **Don't add to Team Calendar** (`src/features/event-setup/new-event-defaults.ts`). Team meetings and repeating meetings default to **Don't add to Team Calendar**, and other types default to Create. A repeating meeting can get its own Team Calendar series (`addToCalendar`) or stay off it. It cannot connect to a single existing entry. To manage an existing Google series, a Coach adopts it (see below).
+New events offer **Create a separate Calendar entry**, **Connect an existing Calendar event**, or **Don't add to Team Calendar** (`src/features/event-setup/new-event-defaults.ts`). Since November 7, 2026, every one-time event defaults to Create, Team meetings included. The exception is a one-time Team meeting on a Required weekday (Tuesday before kickoff, Monday from kickoff), which starts off Team Calendar so attendance doesn't count it as Required. Repeating meetings default to **Don't add to Team Calendar**. Mentors get a simpler **Add to Team Calendar** checkbox for one-time meetings only (see [EVENT_CALENDAR_SYNC.md](EVENT_CALENDAR_SYNC.md)). A repeating meeting can get its own Team Calendar series (`addToCalendar`) or stay off it. It cannot connect to a single existing entry. To manage an existing Google series, a Coach adopts it (see below).
 
 **+ Team meeting** (Coach and Travel Lead, `TeamMeetingSheet`): optional by default (owner decision, Nov 7 2026); a Coach can still choose Required, a Travel Lead can't require a group.
 

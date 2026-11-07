@@ -15,7 +15,7 @@ export const meetingId = (key: string) => `fixture_meeting_${key}` as Id<'events
 export function meeting(key: string, startsAt: number, overrides: Partial<MentorMeeting> = {}): MentorMeeting {
   return {
     eventId: meetingId(key), title: key, type: 'Team', startsAt, endsAt: startsAt + 2 * HOUR, place: 'DSHS STEM Center (on site)', virtual: false, cancelled: false,
-    audience: { kind: 'everyone', subteams: [], required: false, text: 'Everyone' }, seriesId: null, repeatLabel: null, calendarRevision: 0,
+    audience: { kind: 'everyone', subteams: [], required: false, text: 'Everyone' }, seriesId: null, repeatLabel: null, calendarRevision: 0, onTeamCalendar: false,
     myStatus: null, mySource: null, questions: { askDrive: false, askHotel: false }, myAnswers: { canDriveStudents: null, needsHotelRoom: null }, seriesSignup: null,
     isCreator: false, canSignUp: false, canWithdraw: false, canManage: false,
     ...overrides,

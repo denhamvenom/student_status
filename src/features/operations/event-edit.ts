@@ -9,6 +9,8 @@ export type EditableEvent = {
   onsite?: boolean; locationType?: string; cancelled?: boolean; calendarAllDayStartDate?: string
   seriesId?: string; seriesOccurrenceKey?: string; calendarRevision?: number; mediaSupportRequested?: boolean
   assignmentScope?: string; audienceKind?: string; mandatory?: boolean
+  /** Event type and Team Calendar link, for the Required-day note (requiredDayEditHint). */
+  type?: string; calendarChoice?: string
 }
 
 export type EventDraft = { name: string; start: string; end: string; destination: string; media: boolean }

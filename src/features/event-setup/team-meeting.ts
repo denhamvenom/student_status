@@ -8,6 +8,7 @@ import { defaultMentorInvite } from './audience/audience-rules'
 import { defaultRepeat, formatDay, MAX_SERIES_DAYS, parseDay, previewDateLabel, repeatIssue, seriesDates, weekdayOf } from './audience/repeat'
 import type { AudienceValue, PickerIssue, RepeatValue, Weekday, Where } from './audience/types'
 import { audienceCreateArgs, whoSignupMode, type WhoChoice } from './event-audience-wiring'
+import { defaultCalendarChoice } from './new-event-defaults'
 
 type CreateEventArgs = FunctionArgs<typeof api.admin.createEvent>
 
@@ -31,7 +32,9 @@ export const teamMeetingCopy = {
   requiredNo: 'No',
   optionalOnly: 'Optional — students choose to sign up.',
   coachOnlyRequired: 'Only a Coach can make meetings required.',
-  summary: 'Free · No permission form · Not added to Team Calendar',
+  summary: 'Free · No permission form',
+  addToCalendar: 'Add to Team Calendar',
+  repeatingOffCalendar: 'Repeating meetings aren’t added to Team Calendar.',
   repeatEnds: 'Last meeting',
   seasonEnd: (date: string) => `At season end (${date})`,
   onDate: 'On a date',
@@ -75,6 +78,11 @@ export type TeamMeetingDraft = {
   /** YYYY-MM-DD, used when `ends` is 'onDate'. Filled with the season end when that choice is picked. */
   endDate: string
   count: number
+  /**
+   * One-time meetings only: "Add to Team Calendar" as chosen by hand, or null to follow the default for the meeting's date
+   * (teamMeetingOnCalendar), which changes with the date until the box is changed.
+   */
+  addToCalendar: boolean | null
 }
 
 const DEFAULT_START = '18:00'
@@ -87,7 +95,7 @@ const DEFAULT_START = '18:00'
  */
 export const teamMeetingDefaults = (nowMs?: number): TeamMeetingDraft => ({
   name: teamMeetingCopy.defaultName, date: nowMs === undefined ? '' : firstSearchDate(nowMs, DEFAULT_START), repeats: false, weekdays: [], startTime: DEFAULT_START, endTime: '20:00',
-  subteams: [], required: false, ends: 'seasonEnd', endDate: '', count: 10,
+  subteams: [], required: false, ends: 'seasonEnd', endDate: '', count: 10, addToCalendar: null,
 })
 
 /** The competition season wraps up at the end of May (summer starts the next one), so a meeting series ends on the next May 31 on or after `date`. */
@@ -198,25 +206,41 @@ export function teamMeetingAudience(draft: Pick<TeamMeetingDraft, 'subteams' | '
   return { kind: draft.subteams.length ? 'subteams' : 'everyone', subteams: [...draft.subteams], studentIds: [], required: isCoach && draft.required }
 }
 
-/** createEvent arguments for the meeting (a repeating one's series copies them): at our shop, free, no forms, off Team Calendar. */
-export function teamMeetingEventArgs(draft: TeamMeetingDraft, isCoach: boolean, startsAt: number, endsAt: number): CreateEventArgs {
+/**
+ * Whether the meeting goes on Team Calendar: never when repeating; otherwise the hand-made choice, else the default for its
+ * start (defaultCalendarChoice: on, except Tuesday before kickoff and Monday from kickoff, which attendance counts as Required).
+ */
+export function teamMeetingOnCalendar(draft: Pick<TeamMeetingDraft, 'repeats' | 'addToCalendar'>, startsAt: number, competitionYear: number | null): boolean {
+  if (draft.repeats) return false
+  return draft.addToCalendar ?? defaultCalendarChoice('Team', false, startsAt, competitionYear) === 'create'
+}
+
+/**
+ * createEvent arguments for the meeting (a repeating one's series copies them): at our shop, free, no forms, and on Team
+ * Calendar as teamMeetingOnCalendar says (a repeating one stays off it).
+ */
+export function teamMeetingEventArgs(draft: TeamMeetingDraft, isCoach: boolean, startsAt: number, endsAt: number, competitionYear: number | null = null): CreateEventArgs {
   const who: WhoChoice = { travelTeam: false, audience: teamMeetingAudience(draft, isCoach), mentors: defaultMentorInvite() }
   return {
     name: draft.name.trim(), type: 'Team', startsAt, endsAt, destination: onsiteLocation, travel: onsiteLocation, overnight: false, roomingEnabled: false, onsite: true,
     feeCents: 0, ...audienceCreateArgs(who, [], 'inPerson'), allowWithdrawal: whoSignupMode(who) !== 'assigned', permissionRequired: false, firstRequired: false,
-    requirements: [], mediaSupportRequested: false, calendarChoice: { kind: 'none' },
+    requirements: [], mediaSupportRequested: false, calendarChoice: { kind: teamMeetingOnCalendar(draft, startsAt, competitionYear) ? 'create' : 'none' },
   }
 }
 
-/** What "More options" hands the full New event wizard (sent as router state to /events/new). */
-export type NewEventPrefill = { name: string; type: 'Team'; start: string; end: string; where: Where; audience: AudienceValue; repeat: RepeatValue }
+/**
+ * What "More options" hands the full New event wizard (sent as router state to /events/new). `addToCalendar` is present only
+ * when "Add to Team Calendar" was changed by hand; otherwise the wizard applies its own date-based default.
+ */
+export type NewEventPrefill = { name: string; type: 'Team'; start: string; end: string; where: Where; audience: AudienceValue; repeat: RepeatValue; addToCalendar?: boolean }
 
 export function teamMeetingPrefill(draft: TeamMeetingDraft, isCoach: boolean, nowMs: number): NewEventPrefill {
   const plan = teamMeetingPlan(draft, nowMs)
   const audience = teamMeetingAudience(draft, isCoach)
-  if (isPlan(plan)) return { name: draft.name, type: 'Team', start: plan.start, end: plan.end, where: 'shop', audience, repeat: plan.repeat }
+  const calendar = !draft.repeats && draft.addToCalendar !== null ? { addToCalendar: draft.addToCalendar } : {}
+  if (isPlan(plan)) return { name: draft.name, type: 'Team', start: plan.start, end: plan.end, where: 'shop', audience, repeat: plan.repeat, ...calendar }
   const from = teamMeetingFirstDate(draft, nowMs) ?? teamMeetingStartDate(draft, nowMs)
-  return { name: draft.name, type: 'Team', start: validTime(draft.startTime) ? `${from}T${draft.startTime}` : '', end: validTime(draft.endTime) ? `${from}T${draft.endTime}` : '', where: 'shop', audience, repeat: teamMeetingRepeat(draft, from) }
+  return { name: draft.name, type: 'Team', start: validTime(draft.startTime) ? `${from}T${draft.startTime}` : '', end: validTime(draft.endTime) ? `${from}T${draft.endTime}` : '', where: 'shop', audience, repeat: teamMeetingRepeat(draft, from), ...calendar }
 }
 
 /** Reads router state defensively: anything but a prefill from the Team meeting sheet is ignored. */

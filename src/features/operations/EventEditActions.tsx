@@ -10,7 +10,8 @@ import { Checkbox } from '../../components/ui/checkbox'
 import { Input } from '../../components/ui/input'
 import { ConfirmAction } from '../../ConfirmAction'
 import { SeriesScopeDialog } from '../event-setup/audience/SeriesScopeDialog'
-import { dateTimeBounds } from '../event-setup/new-event-defaults'
+import { dateTimeBounds, requiredDayEditHint } from '../event-setup/new-event-defaults'
+import { useSeasonYear } from '../event-setup/use-season-year'
 import { useChangeOccurrence, type OccurrenceChange } from '../event-setup/series-support'
 import { cancelToastText, draftFrom, eventEditBlocker, eventEditCopy as copy, eventEditValues, placeEditable, type EditableEvent, type EventDraft } from './event-edit'
 import { ChangeSeriesEndDate } from './SeriesEndDate'
@@ -31,6 +32,7 @@ export function EventEditActions({ event, isCoach, seriesEnd }: { event: Editabl
   const [seriesChange, setSeriesChange] = useState<OccurrenceChange | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const seasonYear = useSeasonYear()
   const blocker = eventEditBlocker(isCoach, event)
   const eventId = event._id as Id<'events'>
   const expectedRevision = event.calendarRevision ?? 0
@@ -55,6 +57,8 @@ export function EventEditActions({ event, isCoach, seriesEnd }: { event: Editabl
     finally { setBusy(false) }
   }
   const allDay = !!event.calendarAllDayStartDate
+  // Note only (no refusal): a Team meeting on Team Calendar set to start on a Required weekday counts as required attendance.
+  const requiredDayNote = draft ? requiredDayEditHint({ type: event.type, onTeamCalendar: !!event.calendarChoice }, draft.start, seasonYear) : null
   return <div className="event-actions">
     <div className="action-row" role="group" aria-label="Change this event">
       <Button type="button" disabled={!!blocker} aria-describedby={blocker ? `${id}-blocked` : undefined} onClick={openEdit}>{copy.edit}</Button>
@@ -71,7 +75,8 @@ export function EventEditActions({ event, isCoach, seriesEnd }: { event: Editabl
           <DialogDescription>{copy.description}</DialogDescription>
           <label>{copy.name}<Input value={draft.name} maxLength={250} onChange={e => setDraft({ ...draft, name: e.target.value })} required /></label>
           {allDay && <p className="muted">{copy.allDay}</p>}
-          <label>{copy.starts}<Input type="datetime-local" min={dateTimeBounds.min} max={dateTimeBounds.max} value={draft.start} disabled={allDay} onChange={e => setDraft({ ...draft, start: e.target.value })} required /></label>
+          <label>{copy.starts}<Input type="datetime-local" min={dateTimeBounds.min} max={dateTimeBounds.max} value={draft.start} disabled={allDay} aria-describedby={requiredDayNote ? `${id}-required-day` : undefined} onChange={e => setDraft({ ...draft, start: e.target.value })} required /></label>
+          {requiredDayNote && <p id={`${id}-required-day`} className="muted">{requiredDayNote}</p>}
           <label>{copy.ends}<Input type="datetime-local" min={dateTimeBounds.min} max={dateTimeBounds.max} value={draft.end} disabled={allDay} onChange={e => setDraft({ ...draft, end: e.target.value })} required /></label>
           {placeEditable(event)
             ? <label>{copy.location}<Input value={draft.destination} maxLength={500} onChange={e => setDraft({ ...draft, destination: e.target.value })} /></label>

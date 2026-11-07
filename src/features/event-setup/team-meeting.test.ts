@@ -150,8 +150,25 @@ describe('Team meeting event arguments', () => {
     ['Coach, left at the default (optional)', true, false, false, true],
     ['Coach choosing Required', true, true, true, false],
     ['Travel Lead (never required)', false, true, false, true],
-  ])('%s: at our shop, free, no forms, off Team Calendar', (_, isCoach, required, mandatory, allowWithdrawal) => {
+  ])('%s: at our shop, free, no forms, on Team Calendar', (_, isCoach, required, mandatory, allowWithdrawal) => {
     const args = teamMeetingEventArgs({ ...teamMeetingDefaults(), subteams: ['Programming'], ...(required ? { required } : {}) }, isCoach, 1, 2)
-    expect(args).toMatchObject({ type: 'Team', onsite: true, feeCents: 0, permissionRequired: false, firstRequired: false, calendarChoice: { kind: 'none' }, audienceKind: 'subteams', audienceSubteams: ['Programming'], mandatory, allowWithdrawal })
+    expect(args).toMatchObject({ type: 'Team', onsite: true, feeCents: 0, permissionRequired: false, firstRequired: false, calendarChoice: { kind: 'create' }, audienceKind: 'subteams', audienceSubteams: ['Programming'], mandatory, allowWithdrawal })
+  })
+
+  // Tue Nov 3, 2026 and Wed Nov 4, 2026, before the 2027 kickoff: Tuesday is the Required day (owner decision, Nov 7 2026).
+  const tuesday = parseChicagoInput('2026-11-03T18:00'), wednesday = parseChicagoInput('2026-11-04T18:00')
+  it.each([
+    ['Wednesday, left at the default', false, null, wednesday, 'create'],
+    ['Tuesday, left at the default', false, null, tuesday, 'none'],
+    ['Tuesday, added by hand', false, true, tuesday, 'create'],
+    ['Wednesday, left off by hand', false, false, wednesday, 'none'],
+    ['repeating, even when added by hand', true, true, wednesday, 'none'],
+  ] as const)('%s: Team Calendar %s', (_, repeats, addToCalendar, startsAt, kind) => {
+    expect(teamMeetingEventArgs({ ...teamMeetingDefaults(), repeats, addToCalendar }, true, startsAt, startsAt + 7_200_000, 2027).calendarChoice).toEqual({ kind })
+  })
+
+  it('hands a hand-made Team Calendar choice to the full wizard, and nothing when left at the default', () => {
+    expect(teamMeetingPrefill({ ...teamMeetingDefaults(), addToCalendar: true }, true, at('09:00')).addToCalendar).toBe(true)
+    expect(teamMeetingPrefill(teamMeetingDefaults(), true, at('09:00'))).not.toHaveProperty('addToCalendar')
   })
 })

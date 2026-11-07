@@ -7,7 +7,7 @@ import { activeSeason, audit, viewer, type AppUser } from "./lib/access";
 import { createEventCore, prepareEventAudience } from "./lib/createEventCore";
 import {
   MAX_MEETING_MENTORS, acceptMeeting, answersFor, audienceSummary, leaveMeetingRows, leaveSeries as leaveSeriesSignup, listMeetingMentors,
-  mentorInviteRows, mentorMeetingCreatorId, mentorMeetingLimitError, mentorQuestions, mentorUpdateEvent, recordSeriesSkip, removeLostMentorSignups,
+  mentorInviteRows, mentorKeepsCalendarLink, mentorMeetingCreatorId, mentorMeetingLimitError, mentorQuestions, mentorUpdateEvent, recordSeriesSkip, removeLostMentorSignups,
   plausibleAsOf, repeatLabel, requireAnswers, requireInvitableMeetingMentors, requireMeetingLength, requireMeetingMentor, requireMentorMeetingFields, selfSignupEligible, seriesOf,
   seriesSignupFor, seriesSignupView, signUpForSeries, signupChoice, upcomingSeriesMeetings,
 } from "./lib/mentorMeetings";
@@ -51,6 +51,8 @@ export const mentorMeetingSummary = v.object({
   audience: audienceSummaryValidator, seriesId: v.union(v.id("eventSeries"), v.null()),
   /** How often a series meeting repeats ("Repeats weekly", "Repeats every 2 weeks"; lib/mentorMeetings repeatLabel); null when it doesn't. */
   repeatLabel: v.union(v.string(), v.null()), calendarRevision: v.number(),
+  /** Whether the meeting is on Team Calendar (for the edit form's Required-day note). Never its sync state, which stays staff-only. */
+  onTeamCalendar: v.boolean(),
   /** The Mentor's own invite row: status and how it started (individual/subteam invite, or self sign-up). Null when none. */
   myStatus: v.union(inviteStatus, v.null()), mySource: v.union(inviteSource, v.null()),
   /** Which sign-up questions this event asks, and the Mentor's OWN answers (never anyone else's). */
@@ -69,10 +71,11 @@ export type MentorMeetingSummary = typeof mentorMeetingSummary.type;
 export function meetingSummary(event: Doc<"events">, user: AppUser, invite: Doc<"eventMentorInvites"> | null, creatorId: Id<"appUsers"> | null, now: number, signup: Doc<"mentorSeriesSignups"> | null = null, series: Doc<"eventSeries"> | null = null): MentorMeetingSummary {
   const current = !event.archived && !event.cancelled && event.endsAt > now;
   const isCreator = creatorId === user._id;
-  const canManage = isCreator && current && mentorMeetingLimitError(event) === null && !event.calendarChoice && event.assignmentScope === undefined;
+  // A Team Calendar entry the Mentor added at creation keeps it theirs to manage; one a Coach connected or added later doesn't.
+  const canManage = isCreator && current && mentorMeetingLimitError(event) === null && mentorKeepsCalendarLink(event) && event.assignmentScope === undefined;
   return {
     eventId: event._id, title: event.name, type: event.type, startsAt: event.startsAt, endsAt: event.endsAt, place: event.destination, virtual: event.locationType === "virtual", cancelled: event.cancelled ?? false,
-    audience: audienceSummary(event), seriesId: event.seriesId ?? null, repeatLabel: repeatLabel(event, series), calendarRevision: event.calendarRevision ?? 0,
+    audience: audienceSummary(event), seriesId: event.seriesId ?? null, repeatLabel: repeatLabel(event, series), calendarRevision: event.calendarRevision ?? 0, onTeamCalendar: event.calendarChoice !== undefined,
     myStatus: invite?.status ?? null, mySource: invite?.source ?? null,
     questions: mentorQuestions(event), myAnswers: { canDriveStudents: invite?.canDriveStudents ?? null, needsHotelRoom: invite?.needsHotelRoom ?? null },
     seriesSignup: seriesSignupView(signup, event), isCreator,
@@ -89,12 +92,25 @@ export async function requireMentor(ctx: Parameters<typeof viewer>[0]) {
 const UNAVAILABLE = "This meeting is no longer available. Reload to see current meetings.";
 const NOT_CURRENT = "This event is canceled, over or no longer available. Reload to see current events.";
 
-/** Create a one-time Team meeting. Optional for students; audience is Everyone, Subteams, specific students or Mentors only. */
+/**
+ * A Mentor's Team Calendar choice for a new one-time meeting: its own new entry, or none. Connecting to an existing entry
+ * (and the candidate lookup behind it) stays with Coaches and Travel Leads, so "link" is not accepted here.
+ */
+const mentorCalendarChoice = v.union(v.object({ kind: v.literal("create") }), v.object({ kind: v.literal("none") }));
+
+/**
+ * Create a one-time Team meeting. Optional for students; audience is Everyone, Subteams, specific students or Mentors only.
+ * calendarChoice { kind: "create" } also gives it its own Team Calendar entry (pushed by eventCalendar.push under the
+ * usual write gates) and sets calendarCreatedByMentor, so the meeting stays the Mentor's to manage; omitted or "none" keeps it
+ * off Team Calendar. Repeating meetings are created through eventSeries.create,
+ * which refuses Team Calendar for Mentors.
+ */
 export const createMeeting = mutation({
   args: {
     name: v.string(), startsAt: v.number(), endsAt: v.number(), destination: v.string(), locationType: v.optional(v.union(v.literal("inPerson"), v.literal("virtual"))),
     audienceKind, audienceSubteams: v.optional(v.array(v.string())), audienceStudentIds: v.optional(v.array(v.id("students"))),
     mentorInviteUserIds: v.optional(v.array(v.id("appUsers"))), inviteSubteamMentors: v.optional(v.boolean()),
+    calendarChoice: v.optional(mentorCalendarChoice),
   },
   returns: v.id("events"),
   handler: async (ctx, args) => {
@@ -123,7 +139,9 @@ export const createMeeting = mutation({
       signupMode: a.signupMode, assignmentScope: (a as { assignmentScope?: "selected" | "travelTeam" | "wholeTeam" }).assignmentScope, allowWithdrawal: true, permissionRequired: a.permissionRequired, firstRequired: false,
       audienceKind: a.audienceKind, audienceSubteams: a.audienceSubteams, mandatory: a.mandatory, locationType: a.locationType, createdBy: user._id,
     };
-    return await createEventCore(ctx, user, season, { eventFields, requirements: [], shifts: [], questions: [], assigned: [], audienceStudentIds: prepared.audienceStudentIds, mentorInvites: prepared.mentorInvites.filter(invite => invite.mentorUserId !== user._id) });
+    const calendarChoice = args.calendarChoice?.kind === "create" ? { kind: "create" as const } : undefined;
+    // calendarCreatedByMentor marks the entry as the Mentor's own, so the meeting stays theirs to manage (mentorKeepsCalendarLink).
+    return await createEventCore(ctx, user, season, { eventFields: { ...eventFields, ...(calendarChoice ? { calendarCreatedByMentor: true } : {}) }, requirements: [], shifts: [], questions: [], assigned: [], calendarChoice, audienceStudentIds: prepared.audienceStudentIds, mentorInvites: prepared.mentorInvites.filter(invite => invite.mentorUserId !== user._id) });
   },
 });
 
