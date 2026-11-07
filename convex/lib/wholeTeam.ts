@@ -1,6 +1,7 @@
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { audit } from "./access";
+import { activeApprovedWithdrawal, withdrawalHistory } from "./withdrawalState";
 import { addCharge, addCharges, type ChargeDraft } from "./money";
 import { makeFunctionReference } from "convex/server";
 
@@ -11,9 +12,8 @@ async function enrollWholeTeamMember(ctx: MutationCtx, actor: Doc<"appUsers">, e
   if (!student.active || student.seasonId !== event.seasonId || event.archived || event.cancelled || event.signupMode !== "assigned" || event.assignmentScope !== "wholeTeam") return false;
   const prior = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
   if (prior) return false;
-  const withdrawals = await ctx.db.query("withdrawalRequests").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(101);
-  if (withdrawals.length > 100) throw new Error("Withdrawal history limit reached; automatic assignment stopped safely.");
-  if (withdrawals.some(request => request.status === "approved")) return false;
+  const withdrawals = await withdrawalHistory(ctx, event._id, student._id);
+  if (activeApprovedWithdrawal(withdrawals)) return false;
   const count = event.wholeTeamParticipantCount;
   if (count === undefined || !Number.isSafeInteger(count) || count < 0) throw new Error("Whole Team enrollment count needs reconciliation before adding members.");
   if (count >= 500) throw new Error("Whole Team event roster limit reached; membership update stopped safely.");

@@ -9,6 +9,7 @@ import { addCharge } from "./lib/money";
 import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
 import { activeQuestions, activeShifts, clearShifts } from "./lib/eventSignupExtras";
 import { notifySignupDecision } from "./lib/notificationTriggers";
+import { activeApprovedWithdrawal, recentWithdrawals } from "./lib/withdrawalState";
 
 function requireOperations(user: Doc<"appUsers">) {
   if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Only a Coach or Travel Lead can manage events.");
@@ -41,8 +42,17 @@ export const workspace = query({
     if (requirements.length > 100) throw new ConvexError("This event has too many requirements to show here. Contact a Coach.");
     const reserved = participants.filter(p => p.status === "pending" || p.status === "confirmed").length;
     const waitlist = students.filter(p => p.status === "waitlist").sort((a, b) => a.signedUpAt - b.signedUpAt || a.participantId.localeCompare(b.participantId));
+    // Withdrawn students for "Put back on event": whether a reviewed withdrawal moved money, and whether one is still in review.
+    // Display hints only, from each student's newest rows (putBackOnEvent re-checks the full history).
+    const withdrawn = [];
+    for (const row of students.filter(p => p.status === "withdrawn" && p.active)) {
+      const requests = await recentWithdrawals(ctx, event._id, row.studentId);
+      const approved = activeApprovedWithdrawal(requests);
+      withdrawn.push({ ...row, moneyDecision: !!approved?.jobId, inReview: requests.some(r => r.status === "pending" || r.status === "processing") });
+    }
+    withdrawn.sort((a, b) => a.name.localeCompare(b.name));
     const shiftSettings = { shiftsEnabled: event.shiftsEnabled ?? false, maxShiftsPerStudent: event.maxShiftsPerStudent ?? null, minShiftsPerStudent: event.minShiftsPerStudent ?? 1, shiftCount: (await activeShifts(ctx, event._id)).length };
-    return { event, canEdit: user.role === "coach", shiftSettings, questionCount: (await activeQuestions(ctx, event._id)).length, reserved, available: event.capacity === undefined ? null : Math.max(0, event.capacity - reserved), participants: students.filter(p => p.status !== "waitlist").sort((a, b) => a.name.localeCompare(b.name)), waitlist, requirements };
+    return { event, canEdit: user.role === "coach", shiftSettings, questionCount: (await activeQuestions(ctx, event._id)).length, reserved, available: event.capacity === undefined ? null : Math.max(0, event.capacity - reserved), participants: students.filter(p => p.status !== "waitlist").sort((a, b) => a.name.localeCompare(b.name)), waitlist, withdrawn, requirements };
   },
 });
 

@@ -13,6 +13,7 @@ import { NativeSelect, NativeSelectOption } from './components/ui/native-select'
 import styles from './features/operations/Operations.module.css'
 import { chargeCurrency } from './lib/charge-money'
 import { dueAtFromInput, dueDateCopy } from './copy/due-date-copy'
+import { chicagoDisplayTime } from './lib/chicago-time'
 
 const usd = chargeCurrency
 const message = (error:unknown) => userFacingError(error)
@@ -39,16 +40,20 @@ export function StudentWithdrawal({eventId,studentId}:{eventId:Id<'events'>;stud
   const data = useQuery(api.withdrawals.withdrawalPreview,{eventId,studentId})
   const request = useMutation(api.withdrawals.requestWithdrawal)
   const leaveWholeTeam = useMutation(api.withdrawals.leaveWholeTeam)
+  const undo = useMutation(api.withdrawals.undoWithdrawal)
   const [busy,setBusy] = useState(false)
   const [error,setError] = useState('')
   const submit = async () => {setBusy(true);setError('');try{await request({eventId,idempotencyKey:key()})}catch(e){setError(message(e))}finally{setBusy(false)}}
   if (!data) return <p>{operationsCopy.withdrawals.loadingWithdrawalStatus}</p>
   if (data.wholeTeamLeft) return <section className={`${styles.root} card`}><p role="status">You have left this event. Your Coach has been told.</p>{data.requestStatus==='pending'&&<p>The fee decision is waiting for Coach review.</p>}{data.requestStatus==='processing'&&<ProcessingStatus progress={data.progress} alreadyLeft/>}</section>
-  if (data.status === 'withdrawn') return <p role="status">{operationsCopy.withdrawals.withdrawalApprovedYourPlaceHasBeenReleased}</p>
+  const undoNow = async () => {setBusy(true);setError('');try{await undo({eventId})}catch(e){setError(message(e))}finally{setBusy(false)}}
+  if (data.status === 'withdrawn' && data.withdrawnImmediately && data.canUndo) return <section className={`${styles.root} card`}><p role="status">{operationsText.withdrawals.withdrawnNow(data.eventName)}</p><p>{operationsText.withdrawals.undoHint(chicagoDisplayTime(data.undoUntil))}</p><Button className="button button-outline" disabled={busy} onClick={()=>void undoNow()}>{busy?operationsCopy.withdrawals.undoing:operationsCopy.withdrawals.undoWithdrawal}</Button>{error && <p role="alert" className="open-text">{error}</p>}</section>
+  if (data.status === 'withdrawn' && data.withdrawnImmediately && data.undoBlocked) return <section className={`${styles.root} card`}><p role="status">{operationsText.withdrawals.withdrawnNow(data.eventName)}</p><p>{data.undoBlocked}</p></section>
+  if (data.status === 'withdrawn') return <p role="status">{data.withdrawnImmediately?operationsText.withdrawals.withdrawnNow(data.eventName):operationsCopy.withdrawals.withdrawalApprovedYourPlaceHasBeenReleased}</p>
   if (data.wholeTeam && data.status === 'confirmed') return <section className={`${styles.root} card`} aria-labelledby="withdraw-title"><h2 id="withdraw-title">Leave this event</h2><p>You can leave this Whole Team event now. Your Coach will be told.</p><ConfirmAction description={`Leave ${data.eventName}? Your Coach will be told.`} onConfirm={()=>leaveWholeTeam({eventId})}>Leave this event</ConfirmAction></section>
   if (!data.allowWithdrawal) return null
   return <section className={`${styles.root} card`} aria-labelledby="withdraw-title"><h2 id="withdraw-title">{operationsCopy.withdrawals.withdrawal}</h2>
-    {data.requestStatus === 'processing' ? <ProcessingStatus progress={data.progress} /> : data.requestStatus === 'pending' ? <p role="status">{operationsCopy.withdrawals.yourWithdrawalRequestIsAwaitingCoachOrTravelLeadReviewYourParticipationStatusAnd}</p> : <><p>{operationsText.withdrawals.requestToLeave(data.eventName)}</p>{data.requestStatus === 'denied' && <p role="status">{operationsCopy.withdrawals.aPreviousRequestWasDeniedYouMaySubmitAnotherRequest}</p>}<Button className="button button-outline" disabled={busy} onClick={()=>void submit()}>{busy?operationsCopy.withdrawals.submitting:operationsCopy.withdrawals.requestWithdrawal}</Button></>}
+    {data.requestStatus === 'processing' ? <ProcessingStatus progress={data.progress} /> : data.requestStatus === 'pending' ? <p role="status">{operationsCopy.withdrawals.yourWithdrawalRequestIsAwaitingCoachOrTravelLeadReviewYourParticipationStatusAnd}</p> : data.reviewRequired === false ? <><p>{operationsText.withdrawals.leaveNow(data.eventName)}</p><ConfirmAction description={operationsText.withdrawals.confirmLeaveNow(data.eventName,chicagoDisplayTime(data.undoUntil))} onConfirm={()=>request({eventId,idempotencyKey:key()})}>{operationsCopy.withdrawals.withdrawNow}</ConfirmAction></> : <><p>{operationsText.withdrawals.requestToLeave(data.eventName)}</p>{data.coachAssigned && <p>{operationsText.withdrawals.coachAssignedReview}</p>}{data.requestStatus === 'denied' && <p role="status">{operationsCopy.withdrawals.aPreviousRequestWasDeniedYouMaySubmitAnotherRequest}</p>}<Button className="button button-outline" disabled={busy} onClick={()=>void submit()}>{busy?operationsCopy.withdrawals.submitting:operationsCopy.withdrawals.requestWithdrawal}</Button></>}
     {error && <p role="alert" className="open-text">{error}</p>}
   </section>
 }

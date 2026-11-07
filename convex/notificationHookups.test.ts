@@ -145,6 +145,58 @@ describe("notification hook-ups", () => {
     expect((await f.digests()).filter(row => row.endsWith(":signupPending"))).toEqual(["coach:signupPending", "lead:signupPending"]);
   });
 
+  it("M5: a student's automatic withdrawal from a Mentor's meeting and their Undo tell its creator once a day; Waitlisted and Coach meetings don't", async () => {
+    const f = await fixture();
+    const meeting = await f.addMeeting(f.ids.mentor.app);
+    const coachMeeting = await f.addMeeting(f.ids.coach.app);
+    await f.t.run(async ctx => {
+      for (const [eventId, studentId, status] of [[meeting, f.ids.students[0], "confirmed"], [meeting, f.ids.students[1], "waitlist"], [coachMeeting, f.ids.students[2], "confirmed"]] as const) {
+        await ctx.db.insert("participants", { eventId, studentId, status, createdAt: NOW, updatedAt: NOW });
+      }
+    });
+    const [s0, s1, s2] = f.ids.studentUsers.map(user => f.as(user.auth));
+    // The Waitlisted student leaves first (so nobody waits ahead of an Undo); they were never on the meeting, so no M5.
+    await s1.mutation(api.withdrawals.requestWithdrawal, { eventId: meeting, idempotencyKey: "m5-waitlist-leaves" });
+    await s2.mutation(api.withdrawals.requestWithdrawal, { eventId: coachMeeting, idempotencyKey: "m5-coach-meeting-leaves" });
+    expect(await f.meetingDigests()).toEqual([]);
+    await s0.mutation(api.withdrawals.requestWithdrawal, { eventId: meeting, idempotencyKey: "m5-leaves-once" });
+    expect((await f.t.run(ctx => ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", meeting).eq("studentId", f.ids.students[0])).unique()))?.status).toBe("withdrawn");
+    expect(await f.meetingDigests()).toEqual(["mentor:mentorMeetingStudentLeft"]);
+    expect(await s0.mutation(api.withdrawals.undoWithdrawal, { eventId: meeting })).toBe("confirmed");
+    expect(await f.meetingDigests()).toEqual(["mentor:mentorMeetingStudentJoined", "mentor:mentorMeetingStudentLeft"]);
+    // Leaving and undoing again the same day doesn't repeat either item.
+    await s0.mutation(api.withdrawals.requestWithdrawal, { eventId: meeting, idempotencyKey: "m5-leaves-twice" });
+    expect(await s0.mutation(api.withdrawals.undoWithdrawal, { eventId: meeting })).toBe("confirmed");
+    expect(await f.meetingDigests()).toEqual(["mentor:mentorMeetingStudentJoined", "mentor:mentorMeetingStudentLeft"]);
+    const rows = await f.t.run(ctx => ctx.db.query("notificationDigestItems").take(10));
+    expect(rows.every(row => row.url === `/events/${meeting}`)).toBe(true);
+  });
+
+  it("M5: a Coach-approved withdrawal from a Mentor's meeting and Put back on event tell its creator", async () => {
+    const f = await fixture();
+    const meeting = await f.addMeeting(f.ids.mentor.app);
+    const studentId = f.ids.students[0];
+    await f.t.run(async ctx => {
+      await ctx.db.insert("participants", { eventId: meeting, studentId, status: "confirmed", createdAt: NOW, updatedAt: NOW });
+      // A room request is a logistics commitment, so this withdrawal needs Coach review.
+      await ctx.db.insert("roomRequests", { eventId: meeting, studentId, requestedAt: NOW });
+    });
+    const requestId = await f.as(f.ids.studentUsers[0].auth).mutation(api.withdrawals.requestWithdrawal, { eventId: meeting, idempotencyKey: "m5-reviewed-leave" });
+    expect((await f.t.run(ctx => ctx.db.get(requestId)))?.status).toBe("pending");
+    expect(await f.meetingDigests()).toEqual([]);
+    const { revision } = await f.coach.query(api.withdrawals.withdrawalPreview, { eventId: meeting, studentId });
+    await f.coach.mutation(api.withdrawals.reviewWithdrawal, { requestId, decision: "retain", cancelUnpaidMain: false, reason: "Approved schedule change", expectedRevision: revision });
+    for (let i = 0; i < 20 && (await f.t.run(ctx => ctx.db.get(requestId)))?.status === "processing"; i++) {
+      const jobId = (await f.t.run(ctx => ctx.db.get(requestId)))!.jobId!;
+      const job = (await f.t.run(ctx => ctx.db.get(jobId)))!;
+      await f.t.mutation(makeFunctionReference<"mutation">("financialOperationsWorker:processPage"), { jobId, step: job.step });
+    }
+    expect((await f.t.run(ctx => ctx.db.get(requestId)))?.status).toBe("approved");
+    expect(await f.meetingDigests()).toEqual(["mentor:mentorMeetingStudentLeft"]);
+    await f.coach.mutation(api.withdrawals.putBackOnEvent, { eventId: meeting, studentId });
+    expect(await f.meetingDigests()).toEqual(["mentor:mentorMeetingStudentJoined", "mentor:mentorMeetingStudentLeft"]);
+  });
+
   it("a student newly signed up by staff is notified with their Parents once; pending, waitlist and repeat changes notify no one", async () => {
     const f = await fixture();
     const eventId = await f.addEvent({ signupMode: "approval" });

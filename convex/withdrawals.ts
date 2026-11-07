@@ -1,15 +1,19 @@
 import { requireFamilyEventAccess } from "./lib/archivedEventAccess";
 import { publicErrorResult } from './lib/publicErrors';
 import { requireSeasonFinanceReady } from "./lib/seasonFinance";
-import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
+import { enrollmentPending, requireEnrollmentComplete } from "./lib/eventEnrollmentState";
+import { activeApprovedWithdrawal, STUDENT_UNDO_LIMIT, studentUndoCount, withdrawalHistory } from "./lib/withdrawalState";
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { activeSeason, audit, ownStudent, studentAccess, viewer } from "./lib/access";
 import { effectiveChargeCents } from "./lib/money";
-import { clearShifts } from "./lib/eventSignupExtras";
-import { notifyWithdrawalDecision, queueWithdrawalRequestDigest } from "./lib/notificationTriggers";
+import { activeQuestions, checkAnswers, checkShifts, clearShifts, MAX_QUESTION_ROWS } from "./lib/eventSignupExtras";
+import { teamTransportEnabled } from "./lib/transportation";
+import { studentCanAccessEvent } from "./lib/eventAudience";
+import { resolveAudience } from "./lib/eventAudienceRules";
+import { notifyEventAssigned, notifyWithdrawalDecision, queueMentorMeetingActivityDigest, queueSignupPendingDigest, queueWithdrawalRequestDigest } from "./lib/notificationTriggers";
 
 import { ensureFinancialAccount, saveFinancialAccount } from "./lib/financialSources";
 import { makeFunctionReference } from "convex/server";
@@ -17,7 +21,7 @@ import { makeFunctionReference } from "convex/server";
 type Context = MutationCtx | QueryCtx;
 const decision = v.union(v.literal("full"), v.literal("retain"), v.literal("partial"), v.literal("deny"));
 const progressValidator = v.object({ jobId: v.id("financialOperationJobs"), state: v.union(v.literal("running"), v.literal("failed"), v.literal("complete")), committedCents: v.number(), totalCents: v.number(), lastError: v.union(v.string(), v.null()) });
-const previewResult = v.object({ progress: v.union(progressValidator, v.null()), canRetry: v.boolean(), eventName: v.string(), studentName: v.string(), allowWithdrawal: v.boolean(), wholeTeam: v.boolean(), wholeTeamLeft: v.boolean(), revision: v.string(), status: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("waitlist"), v.literal("withdrawn")), requestId: v.union(v.id("withdrawalRequests"), v.null()), requestStatus: v.union(v.literal("pending"), v.literal("processing"), v.literal("approved"), v.literal("denied"), v.null()), charges: v.array(v.object({ id: v.id("charges"), label: v.string(), category: v.union(v.literal("main"), v.literal("extra")), chargedCents: v.number(), originalChargedCents: v.number(), adjustedCents: v.number(), paidCents: v.number(), unpaidCents: v.number(), cancelledCents: v.number() })), paidMainCents: v.number(), paidExtraCents: v.number(), unpaidMainCents: v.number(), unpaidExtraCents: v.number() });
+const previewResult = v.object({ progress: v.union(progressValidator, v.null()), canRetry: v.boolean(), eventName: v.string(), studentName: v.string(), allowWithdrawal: v.boolean(), wholeTeam: v.boolean(), coachAssigned: v.boolean(), wholeTeamLeft: v.boolean(), revision: v.string(), status: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("waitlist"), v.literal("withdrawn")), reviewRequired: v.boolean(), withdrawnImmediately: v.boolean(), canUndo: v.boolean(), undoBlocked: v.union(v.string(), v.null()), undoUntil: v.number(), requestId: v.union(v.id("withdrawalRequests"), v.null()), requestStatus: v.union(v.literal("pending"), v.literal("processing"), v.literal("approved"), v.literal("denied"), v.null()), charges: v.array(v.object({ id: v.id("charges"), label: v.string(), category: v.union(v.literal("main"), v.literal("extra")), chargedCents: v.number(), originalChargedCents: v.number(), adjustedCents: v.number(), paidCents: v.number(), unpaidCents: v.number(), cancelledCents: v.number() })), paidMainCents: v.number(), paidExtraCents: v.number(), unpaidMainCents: v.number(), unpaidExtraCents: v.number() });
 
 async function details(ctx: Context, eventId: Id<"events">, studentId: Id<"students">) {
   const event = await ctx.db.get(eventId), student = await ctx.db.get(studentId), season = await activeSeason(ctx);
@@ -26,18 +30,114 @@ async function details(ctx: Context, eventId: Id<"events">, studentId: Id<"stude
   if (!participant) throw new ConvexError("There's no signup for this event. Reload to see the latest.");
   const charges = await ctx.db.query("charges").withIndex("by_eventId_and_studentId", q => q.eq("eventId", eventId).eq("studentId", studentId)).take(101);
   if (charges.length > 100) throw new ConvexError("This event has too many fees to review here. Ask a Coach for help.");
-  const requests = await ctx.db.query("withdrawalRequests").withIndex("by_eventId_and_studentId", q => q.eq("eventId", eventId).eq("studentId", studentId)).take(101);
-  if (requests.length > 100) throw new ConvexError("There are too many withdrawal requests for this event to review here. Ask a Coach for help.");
+  const requests = await withdrawalHistory(ctx, eventId, studentId);
   return { event, student, participant, charges, requests };
 }
 
 async function summary(ctx: Context, user: Doc<"appUsers">, data: Awaited<ReturnType<typeof details>>) {
   const charges = data.charges.map(c => ({ id: c._id, label: c.label, category: c.category ?? "main" as const, chargedCents: effectiveChargeCents(c), originalChargedCents: c.amountCents, adjustedCents: c.adjustedCents ?? 0, paidCents: c.appliedCents, unpaidCents: effectiveChargeCents(c) - c.appliedCents, cancelledCents: c.cancelledCents ?? 0 }));
-  const pending = data.requests.find(r => (r.status === "pending" || r.status === "processing")) ?? data.requests.at(-1);
+  // A reinstated row is history only: it is not shown as the current request.
+  const pending = data.requests.find(r => (r.status === "pending" || r.status === "processing")) ?? data.requests.filter(r => r.reinstatedAt === undefined).at(-1);
+  const active = activeApprovedWithdrawal(data.requests);
+  const undo = user.role === "student" && data.student.userId === user._id ? await undoCheck(ctx, data, Date.now()) : null;
+  const ownUndo = !!undo && typeof undo !== "string";
+  // Only the signup-rule refusals are shown next to the withdrawal; any other refusal just hides Undo.
+  const undoBlocked = undo === UNDO_NEEDS_SHIFTS || undo === UNDO_NEEDS_ANSWERS ? undo : null;
   const job = pending?.jobId ? await ctx.db.get(pending.jobId) : null;
   const wholeTeamLeft = data.participant.status === "withdrawn" && data.event.assignmentScope === "wholeTeam" && !!await ctx.db.query("wholeTeamLeaveNotices").withIndex("by_participantId", q => q.eq("participantId", data.participant._id)).first();
   const progress = job ? { jobId: job._id, state: job.state, committedCents: job.committedCents, totalCents: job.amountCents, lastError: job.lastError ?? null } : null;
-  return { progress, canRetry: user.role === "coach" && job?.state === "failed", eventName: data.event.name, studentName: data.student.legalName || data.student.preferredName, allowWithdrawal: data.event.allowWithdrawal && !data.event.archived, wholeTeam: data.event.assignmentScope === "wholeTeam" && data.event.signupMode === "assigned", wholeTeamLeft, revision: revision(data), status: data.participant.status, requestId: pending?._id ?? null, requestStatus: pending?.status ?? null, charges, paidMainCents: charges.filter(c => c.category === "main").reduce((n, c) => n + c.paidCents, 0), paidExtraCents: charges.filter(c => c.category === "extra").reduce((n, c) => n + c.paidCents, 0), unpaidMainCents: charges.filter(c => c.category === "main").reduce((n, c) => n + c.unpaidCents, 0), unpaidExtraCents: charges.filter(c => c.category === "extra").reduce((n, c) => n + c.unpaidCents, 0) };
+  return { progress, canRetry: user.role === "coach" && job?.state === "failed", eventName: data.event.name, studentName: data.student.legalName || data.student.preferredName, allowWithdrawal: data.event.allowWithdrawal && !data.event.archived, wholeTeam: data.event.assignmentScope === "wholeTeam" && data.event.signupMode === "assigned", coachAssigned: data.event.signupMode === "assigned", wholeTeamLeft, revision: revision(data), status: data.participant.status, reviewRequired: data.participant.status === "withdrawn" || await withdrawalNeedsReview(ctx, data), withdrawnImmediately: data.participant.status === "withdrawn" && !!active && isAutomaticWithdrawal(active), canUndo: ownUndo, undoBlocked, undoUntil: undoDeadline(data.event), requestId: pending?._id ?? null, requestStatus: pending?.status ?? null, charges, paidMainCents: charges.filter(c => c.category === "main").reduce((n, c) => n + c.paidCents, 0), paidExtraCents: charges.filter(c => c.category === "extra").reduce((n, c) => n + c.paidCents, 0), unpaidMainCents: charges.filter(c => c.category === "main").reduce((n, c) => n + c.unpaidCents, 0), unpaidExtraCents: charges.filter(c => c.category === "extra").reduce((n, c) => n + c.unpaidCents, 0) };
+}
+
+type WithdrawalData = Awaited<ReturnType<typeof details>>;
+/** Stored on automatic withdrawals (no Coach decision); with no jobId it marks the row as automatic. */
+const AUTO_WITHDRAW_REASON = "Automatic withdrawal: no fee, payment, room or team transport for this event.";
+const isAutomaticWithdrawal = (request: Doc<"withdrawalRequests">) => request.status === "approved" && !request.jobId && request.reason === AUTO_WITHDRAW_REASON;
+
+/** Money still tied to this signup, or a request already in review. Shared by requestWithdrawal and leaveWholeTeam. */
+function withdrawalMoneyReview(data: WithdrawalData) {
+  return data.requests.some(r => r.status === "pending" || r.status === "processing")
+    || data.event.feeCents > 0
+    || data.charges.some(charge => effectiveChargeCents(charge) > 0 || charge.appliedCents > 0);
+}
+
+/**
+ * Owner decision 2026-11-06: a withdrawal skips Coach/Travel Lead review only when no money and no logistics
+ * commitment is involved. Commitments: a room membership or room request for the event, or a confirmed seat in
+ * team transport (team transport on and the student not travelling independently). Shift signups are not
+ * commitments; they are cleared on withdrawal. Coach-assigned events (signupMode "assigned", including Whole Team, whose
+ * leave path is leaveWholeTeam with its durable Coach notice) always keep Coach/Travel Lead review.
+ */
+async function withdrawalNeedsReview(ctx: Context, data: WithdrawalData) {
+  if (data.event.signupMode === "assigned") return true;
+  if (withdrawalMoneyReview(data)) return true;
+  const eventId = data.event._id, studentId = data.student._id;
+  if (await ctx.db.query("roomMemberships").withIndex("by_eventId_and_studentId", q => q.eq("eventId", eventId).eq("studentId", studentId)).first()) return true;
+  if (await ctx.db.query("roomRequests").withIndex("by_eventId_and_studentId", q => q.eq("eventId", eventId).eq("studentId", studentId)).first()) return true;
+  return data.participant.status === "confirmed" && !data.participant.independentTravel && teamTransportEnabled(data.event);
+}
+
+type Restorable = "pending" | "confirmed" | "waitlist";
+
+/** Open places for a returning signup; mirrors setParticipation (capacity, and no jumping ahead of a waitlist on optional events). */
+async function placeBlocker(ctx: Context, event: Doc<"events">, status: Restorable) {
+  if (status === "waitlist") return null;
+  const rows = await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(501);
+  if (rows.length > 500) return "This event has too many signups to update here. Contact a Coach.";
+  if (event.signupMode !== "assigned" && rows.some(p => p.status === "waitlist")) return "Students are Waitlisted for this event. Promote them before adding another student.";
+  if (event.capacity !== undefined && rows.filter(p => p.status === "confirmed" || p.status === "pending").length >= event.capacity) return "This event is full. A Coach can raise its capacity in event settings.";
+  return null;
+}
+
+/** Last moment a student can undo: the earlier of the event start and the signup close time (when one is set). */
+function undoDeadline(event: Doc<"events">) {
+  return event.signupClosesAt === undefined ? event.startsAt : Math.min(event.startsAt, event.signupClosesAt);
+}
+
+/**
+ * Owner decision 2026-11-06: a student may undo their own automatic withdrawal (never a Coach-reviewed one) before the event
+ * starts and before signup closes, whichever is first, while the event still takes signups from them (current, not archived
+ * or canceled, not Coach-assigned, enrollment finished, still in the event's audience, an open place) and at most
+ * STUDENT_UNDO_LIMIT times per event, and only when signUp's rules would still let them back (signupRuleBlocker).
+ * Returns the status to restore, or why not. Rooms, shifts and charges are not restored.
+ * A student who was Waitlisted rejoins at the end of the waitlist; nobody is ever moved up a status by an undo.
+ */
+async function undoCheck(ctx: Context, data: WithdrawalData, now: number): Promise<{ restore: Restorable; request: Doc<"withdrawalRequests"> } | string> {
+  const closed = "You can't undo this withdrawal now. Ask a Coach if you still need to go.";
+  const request = activeApprovedWithdrawal(data.requests);
+  if (data.participant.status !== "withdrawn" || !request || !isAutomaticWithdrawal(request) || request.participantId !== data.participant._id || !request.priorParticipation) return closed;
+  if (data.requests.some(r => r.status === "pending" || r.status === "processing")) return closed;
+  if (studentUndoCount(data.requests) >= STUDENT_UNDO_LIMIT) return "You've already undone a withdrawal from this event several times. Ask a Coach if you still need to go.";
+  const event = data.event;
+  if (event.archived || event.cancelled || event.signupMode === "assigned" || enrollmentPending(event) || now >= undoDeadline(event)) return closed;
+  if (!await studentCanAccessEvent(ctx, event, data.student)) return closed;
+  // Security review 2026-11-07: an undo follows signUp's rules. An approval event takes the student back as Waiting for approval at most.
+  const restore = request.priorParticipation === "confirmed" && event.signupMode === "approval" ? "pending" : request.priorParticipation;
+  const blocker = await placeBlocker(ctx, event, restore) ?? await signupRuleBlocker(ctx, event, data.student._id, restore);
+  return blocker ?? { restore, request };
+}
+
+const UNDO_NEEDS_SHIFTS = "This event needs you to pick shifts, so Undo can't put you back. Ask a Coach to put you back on it.";
+const UNDO_NEEDS_ANSWERS = "This event has questions you haven't answered, so Undo can't put you back. Ask a Coach to put you back on it.";
+
+/**
+ * The shift and question checks signUp makes, run against what the student already has: shifts were cleared on withdrawal,
+ * so an event that requires shifts (outside the waitlist) can't be rejoined by Undo; stored answers must still satisfy the
+ * event's current active questions (new required questions, or changed options). Reads only.
+ */
+async function signupRuleBlocker(ctx: Context, event: Doc<"events">, studentId: Id<"students">, restore: Restorable) {
+  if (restore !== "waitlist" && await refused(() => checkShifts(ctx, event, studentId, []))) return UNDO_NEEDS_SHIFTS;
+  const questions = new Set((await activeQuestions(ctx, event._id)).map(q => q._id));
+  const stored = await ctx.db.query("eventQuestionAnswers").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", studentId)).take(MAX_QUESTION_ROWS + 1);
+  if (stored.length > MAX_QUESTION_ROWS) return UNDO_NEEDS_ANSWERS;
+  const answers = stored.filter(a => questions.has(a.questionId)).map(a => ({ questionId: a.questionId, value: a.value }));
+  if (await refused(() => checkAnswers(ctx, event._id, answers))) return UNDO_NEEDS_ANSWERS;
+  return null;
+}
+
+/** True when a signUp check refuses (a ConvexError); any other error still throws. */
+async function refused(check: () => Promise<unknown>) {
+  try { await check(); return false; } catch (error) { if (error instanceof ConvexError) return true; throw error; }
 }
 
 function revision(data: Awaited<ReturnType<typeof details>>) {
@@ -118,14 +218,29 @@ export const requestWithdrawal = mutation({
     const user = await viewer(ctx), student = await ownStudent(ctx, user);
     const data = await details(ctx, args.eventId, student._id);
     requireEnrollmentComplete(data.event);
-    if (data.event.archived || !data.event.allowWithdrawal || data.participant.status === "withdrawn") throw new ConvexError("You can't withdraw from this event. Ask a Coach or Travel Lead if you need to leave.");
+    const blocked = "You can't withdraw from this event. Ask a Coach or Travel Lead if you need to leave.";
+    if (data.event.archived || !data.event.allowWithdrawal) throw new ConvexError(blocked);
     if (args.idempotencyKey.length < 8 || args.idempotencyKey.length > 120) throw new ConvexError("Something went wrong sending your request. Reload, then try again.");
     const duplicate = await ctx.db.query("withdrawalRequests").withIndex("by_idempotencyKey", q => q.eq("idempotencyKey", args.idempotencyKey)).unique();
     if (duplicate) { if (duplicate.eventId !== args.eventId || duplicate.studentId !== student._id) throw new ConvexError("This was already submitted with different details. Reload to see the latest, then try again."); return duplicate._id; }
+    if (data.participant.status === "withdrawn") throw new ConvexError(blocked);
     const pending = data.requests.find(r => r.status === "pending" || r.status === "processing");
     if (pending) return pending._id;
-    if (data.requests.some(r => r.status === "approved")) throw new ConvexError("Your withdrawal from this event was already approved.");
-    const id = await ctx.db.insert("withdrawalRequests", { eventId: args.eventId, studentId: student._id, participantId: data.participant._id, status: "pending", requestedBy: user._id, requestedAt: Date.now(), idempotencyKey: args.idempotencyKey });
+    if (activeApprovedWithdrawal(data.requests)) throw new ConvexError("Your withdrawal from this event was already approved.");
+    const priorParticipation = data.participant.status;
+    const now = Date.now();
+    if (!await withdrawalNeedsReview(ctx, data)) {
+      // No money or logistics commitment: withdraw now and keep an approved row so history, retries and re-enrollment rules still apply.
+      const id = await ctx.db.insert("withdrawalRequests", { eventId: args.eventId, studentId: student._id, participantId: data.participant._id, status: "approved", requestedBy: user._id, requestedAt: now, decidedBy: user._id, decidedAt: now, decision: "full", returnCents: 0, retainedCents: 0, cancelUnpaidMain: false, reason: AUTO_WITHDRAW_REASON, idempotencyKey: args.idempotencyKey, priorParticipation });
+      await removeRoomState(ctx, data.event._id, student._id, user);
+      const shiftSignupsCleared = await clearShifts(ctx, data.event._id, student._id);
+      await ctx.db.patch(data.participant._id, { status: "withdrawn", updatedAt: now });
+      await audit(ctx, user, "withdrawalRequests", id, "autoWithdraw", { participation: data.participant.status }, { status: "approved", participation: "withdrawn", eventId: args.eventId, studentId: student._id, shiftSignupsCleared }, AUTO_WITHDRAW_REASON);
+      // M5 to the Mentor who created the meeting (no-op for other events). Like signUp, only a Signed up student counts.
+      if (priorParticipation === "confirmed") await queueMentorMeetingActivityDigest(ctx, { eventId: args.eventId, activity: "studentLeft" });
+      return id;
+    }
+    const id = await ctx.db.insert("withdrawalRequests", { eventId: args.eventId, studentId: student._id, participantId: data.participant._id, status: "pending", requestedBy: user._id, requestedAt: now, idempotencyKey: args.idempotencyKey });
     await audit(ctx, user, "withdrawalRequests", id, "request", null, { eventId: args.eventId, studentId: student._id, participation: data.participant.status });
     await queueWithdrawalRequestDigest(ctx);
     return id;
@@ -146,8 +261,8 @@ export const leaveWholeTeam = mutation({
     }
     if (data.participant.status !== "confirmed") throw new ConvexError("You can leave this event only once you're signed up for it.");
     const pending = data.requests.find(request => request.status === "pending" || request.status === "processing");
-    const needsMoneyReview = !!pending || data.event.feeCents > 0 || data.charges.some(charge => effectiveChargeCents(charge) > 0 || charge.appliedCents > 0);
-    if (data.requests.some(request => request.status === "approved")) throw new ConvexError("An earlier withdrawal from this event needs a Coach to review it. Ask a Coach for help.");
+    const needsMoneyReview = withdrawalMoneyReview(data);
+    if (activeApprovedWithdrawal(data.requests)) throw new ConvexError("An earlier withdrawal from this event needs a Coach to review it. Ask a Coach for help.");
     const now = Date.now();
     const noticeId = await ctx.db.insert("wholeTeamLeaveNotices", { seasonId: data.event.seasonId, eventId: data.event._id, studentId: student._id, participantId: data.participant._id, leftAt: now });
     if (needsMoneyReview) {
@@ -162,6 +277,77 @@ export const leaveWholeTeam = mutation({
     await ctx.db.patch(data.participant._id, { status: "withdrawn", updatedAt: now });
     await audit(ctx, user, "participants", data.participant._id, "leaveWholeTeam", { status: "confirmed" }, { status: "withdrawn", noticeId, moneyReviewPending: needsMoneyReview });
     return { moneyReviewPending: needsMoneyReview };
+  },
+});
+
+/** Student undo of their own automatic withdrawal (see undoCheck). Identity comes from the session; Parents cannot undo. */
+export const undoWithdrawal = mutation({
+  args: { eventId: v.id("events") }, returns: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("waitlist")),
+  handler: async (ctx, args) => {
+    await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
+    const user = await viewer(ctx), student = await ownStudent(ctx, user);
+    const data = await details(ctx, args.eventId, student._id);
+    requireEnrollmentComplete(data.event);
+    const latest = data.requests.at(-1);
+    if (data.participant.status !== "withdrawn" && latest?.reinstatedByStudent && latest.reinstatedBy === user._id) return data.participant.status;
+    const now = Date.now();
+    const check = await undoCheck(ctx, data, now);
+    if (typeof check === "string") throw new ConvexError(check);
+    await ctx.db.patch(check.request._id, { reinstatedAt: now, reinstatedBy: user._id, reinstatedByStudent: true });
+    await ctx.db.patch(data.participant._id, { status: check.restore, createdAt: check.restore === "waitlist" ? now : data.participant.createdAt, updatedAt: now });
+    // Owner decision 2026-11-07: Undo never adds, restores or changes a charge (the fee rule is deferred).
+    await audit(ctx, user, "withdrawalRequests", check.request._id, "undoWithdrawal", { participation: "withdrawn" }, { participation: check.restore, reinstatedAt: now, chargesChanged: false });
+    if (check.restore === "pending") await queueSignupPendingDigest(ctx, { eventId: data.event._id });
+    // M5, as for a new signup: back on as Signed up, or waiting for approval. A Waitlisted return is not reported.
+    if (check.restore === "confirmed") await queueMentorMeetingActivityDigest(ctx, { eventId: data.event._id, activity: "studentJoined" });
+    else if (check.restore === "pending") await queueMentorMeetingActivityDigest(ctx, { eventId: data.event._id, activity: "signupPending" });
+    return check.restore;
+  },
+});
+
+/**
+ * Coach "Put back on event" for a withdrawn student (owner decision 2026-11-06). Permissions mirror setParticipation: a Coach for
+ * any event, a Travel Lead only for events that are not Coach-assigned. The approved withdrawal is marked reinstated, never
+ * deleted, and money stays exactly as the withdrawal decision left it: owner decision 2026-11-07 defers the Put back fee rule, so
+ * no charge is added, restored, reversed or re-allocated here. The Coach or Travel Lead adjusts charges by hand if the student
+ * should pay. The student goes back to Signed up.
+ */
+export const putBackOnEvent = mutation({
+  args: { eventId: v.id("events"), studentId: v.id("students"), reason: v.optional(v.string()) }, returns: v.null(),
+  handler: async (ctx, args) => {
+    await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
+    const user = await viewer(ctx);
+    if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can put a student back on an event.");
+    if (args.reason !== undefined && args.reason.length > 1000) throw new ConvexError("Keep the note under 1,000 characters.");
+    const data = await details(ctx, args.eventId, args.studentId);
+    const event = data.event;
+    if (event.archived || event.cancelled) throw new ConvexError("This event is canceled or in Past events, so students can't be put back on it.");
+    requireEnrollmentComplete(event);
+    if (resolveAudience(event).kind === "mentorsOnly") throw new ConvexError("This event is for Mentors only, so students can't be added to it.");
+    if (event.signupMode === "assigned" && user.role !== "coach") throw new ConvexError("Only a Coach can change signups for a required event.");
+    if (data.participant.status !== "withdrawn") throw new ConvexError("This student is already on this event. Reload to see the latest.");
+    if (data.requests.some(r => r.status === "pending" || r.status === "processing")) throw new ConvexError("A withdrawal for this student is still being reviewed. Finish it under Withdrawal requests first.");
+    const blocker = await placeBlocker(ctx, event, "confirmed");
+    if (blocker) throw new ConvexError(blocker);
+    const now = Date.now();
+    const request = activeApprovedWithdrawal(data.requests);
+    if (request) await ctx.db.patch(request._id, { reinstatedAt: now, reinstatedBy: user._id });
+    await ctx.db.patch(data.participant._id, { status: "confirmed", createdAt: now, updatedAt: now });
+    // Owner decision 2026-11-07: Put back never touches charges; the audit row records that no fee was changed.
+    await audit(ctx, user, "participants", data.participant._id, "putBackOnEvent", { status: "withdrawn", withdrawalRequestId: request?._id ?? null, moneyDecision: !!request?.jobId }, { status: "confirmed", chargesChanged: false }, args.reason?.trim() || undefined);
+    // The student is back, so their Whole Team leave notice is no longer news for Coaches.
+    if (event.assignmentScope === "wholeTeam") {
+      const notices = await ctx.db.query("wholeTeamLeaveNotices").withIndex("by_participantId", q => q.eq("participantId", data.participant._id)).take(101);
+      if (notices.length > 100) throw new ConvexError("This student has too many leave notices to update here. Ask a Coach for help.");
+      for (const notice of notices) {
+        if (notice.dismissedAt !== undefined || notice.eventId !== event._id) continue;
+        await ctx.db.patch(notice._id, { dismissedAt: now, dismissedBy: user._id });
+        await audit(ctx, user, "wholeTeamLeaveNotices", notice._id, "dismiss", { dismissedAt: null }, { dismissedAt: now }, "Put back on event");
+      }
+    }
+    await notifyEventAssigned(ctx, { eventId: event._id, studentIds: [data.student._id] });
+    await queueMentorMeetingActivityDigest(ctx, { eventId: event._id, activity: "studentJoined" }); // M5
+    return null;
   },
 });
 
@@ -239,6 +425,7 @@ export async function finalizeWithdrawal(ctx: MutationCtx, job: Doc<"financialOp
   if (!request || request.status !== "processing" || request.jobId !== job._id) throw new ConvexError("This changed since you opened it. Reload to see the latest, then try again.");
   const participant = await ctx.db.get(request.participantId);
   if (!participant || participant.studentId !== job.studentId || participant.eventId !== job.eventId || (request.wholeTeamLeave ? participant.status !== "withdrawn" : participant.status === "withdrawn")) throw new ConvexError("The signup changed. Review the request again.");
+  const leftSignedUp = participant.status === "confirmed";
   if (participant.status !== "withdrawn") {
     await removeRoomState(ctx, job.eventId, job.studentId, user);
     await clearShifts(ctx, job.eventId, job.studentId);
@@ -246,5 +433,7 @@ export async function finalizeWithdrawal(ctx: MutationCtx, job: Doc<"financialOp
   }
   await ctx.db.patch(request._id, { status: "approved", decidedBy: user._id, decidedAt: Date.now() });
   await notifyWithdrawalDecision(ctx, { requestId: request._id, approved: true });
+  // M5 to the Mentor who created the meeting; a Whole Team leave (already withdrawn) was not a drop-out here.
+  if (leftSignedUp) await queueMentorMeetingActivityDigest(ctx, { eventId: job.eventId, activity: "studentLeft" });
   await audit(ctx, user, "withdrawalRequests", request._id, "approve", { status: "processing", participation: participant.status }, { status: "approved", participation: "withdrawn", returnedCents: job.committedCents, retainedCents: request.retainedCents }, job.reason);
 }

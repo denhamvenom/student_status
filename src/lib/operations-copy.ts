@@ -87,6 +87,9 @@ export const operationsCopy = {
     "chargeRecorded": "Charge recorded.",
     "submitting": "Submitting…",
     "requestWithdrawal": "Request withdrawal",
+    "withdrawNow": "Withdraw now",
+    "undoWithdrawal": "Undo",
+    "undoing": "Undoing…",
     "enterAValidAmount": "Enter a valid amount",
     "willBeCanceled": "will be canceled",
     "willRemainOwed": "will remain owed",
@@ -188,6 +191,12 @@ export const operationsCopy = {
     "decline": "Decline",
     "waitlist": "Waitlist",
     "promote": "Promote",
+    "withdrawn": "Withdrawn",
+    "putBackOnEvent": "Put back on event",
+    "withdrawalInReview": "Withdrawal still in review",
+    "moneyNotReversed": "Money moved by the withdrawal decision is not reversed.",
+    // Owner decision 2026-11-07: Put back never changes charges; the fee rule is deferred.
+    "putBackNoCharges": "Putting a student back doesn't add charges. Check their charges for this event and add the fee if they should pay.",
     "eventSettings": "Event settings",
     "saveSettings": "Save settings",
     "outreachEvent": "Outreach event",
@@ -331,6 +340,14 @@ export const operationsText = {
   },
   withdrawals: {
     requestToLeave: (eventName: string) => `Request to leave ${eventName}. Your participation status and any reserved room place remain unchanged until a decision.`,
+    // Owner decision 2026-11-06: no fee, payment, room or team transport means no Coach review.
+    leaveNow: (eventName: string) => `You can leave ${eventName} now. There is no fee, room or ride to sort out, so it takes effect right away.`,
+    confirmLeaveNow: (eventName: string, undoUntil: string) => `Withdraw from ${eventName}? This happens right away. If there's still a place, you can undo it until ${undoUntil}.`,
+    withdrawnNow: (eventName: string) => `You're withdrawn from ${eventName}.`,
+    // Owner decision 2026-11-06: a student may undo their own immediate withdrawal until signup closes or the event starts, whichever is first.
+    undoHint: (undoUntil: string) => `Changed your mind? You can undo this until ${undoUntil}. Your room and shift choices are not restored.`,
+    // Coach-assigned events always go to a Coach or Travel Lead (owner decision 2026-11-06).
+    coachAssignedReview: 'A Coach assigned you to this event, so a Coach or Travel Lead reviews your request.',
     disposition: (returned: string, retained: string, unpaidExtras: string) => `Back to student account: ${returned}. Team keeps (not refunded): ${retained}. Unpaid extras (${unpaidExtras}) will be canceled. Money put back pays the student's other charges first, in fee order. Anything left stays on the account as the same kind of money (personal payment or fundraising credit). This is not a cash or check refund.`,
     unpaidMain: (outcome: string) => `Unpaid main balance ${outcome}.`,
     pendingReview: (count: number) => `Pending review · ${count}`,
@@ -345,6 +362,8 @@ export const operationsText = {
     declined: (name: string) => `${name} declined.`,
     promoted: (name: string) => `${name} promoted and confirmed.`,
     removedFromWaitlist: (name: string) => `${name} removed from waitlist.`,
+    putBack: (name: string) => `${name} is back on this event. No charges were added. Check their charges for this event and add the fee if they should pay.`,
+    confirmPutBack: (name: string, moneyDecision: boolean) => `Put ${name} back on this event as Signed up?${moneyDecision ? ' Money moved by their withdrawal decision is not reversed.' : ''} Rooms and shifts are not restored, and no charges are added.`,
     removedRequirement: (label: string) => `${label} removed.`,
     due: (date: string) => ` · due ${date}`,
   },

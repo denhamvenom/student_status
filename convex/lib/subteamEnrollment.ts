@@ -1,6 +1,7 @@
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { audit } from "./access";
+import { activeApprovedWithdrawal, withdrawalHistory } from "./withdrawalState";
 import { addCharge } from "./money";
 import { resolveAudience, studentInAudience } from "./eventAudienceRules";
 import { finishMembershipPage, membershipPage, type MembershipSyncOptions } from "./wholeTeam";
@@ -16,9 +17,8 @@ async function enrollSubteamMember(ctx: MutationCtx, actor: Doc<"appUsers">, eve
   if (!student.active || student.seasonId !== event.seasonId || event.archived || event.cancelled || !isSubteamMandatory(event) || !studentInAudience(event, student, false)) return false;
   const prior = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
   if (prior) return false;
-  const withdrawals = await ctx.db.query("withdrawalRequests").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(101);
-  if (withdrawals.length > 100) throw new Error("Withdrawal history limit reached; automatic assignment stopped safely.");
-  if (withdrawals.some(request => request.status === "approved")) return false;
+  const withdrawals = await withdrawalHistory(ctx, event._id, student._id);
+  if (activeApprovedWithdrawal(withdrawals)) return false;
   const now = Date.now();
   await ctx.db.insert("participants", { eventId: event._id, studentId: student._id, status: "confirmed", createdAt: now, updatedAt: now });
   await audit(ctx, actor, "participants", `${event._id}:${student._id}`, "subteamAssignment", null, "confirmed");

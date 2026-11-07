@@ -10,6 +10,7 @@ import { Checkbox } from "../../components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import styles from "./Operations.module.css";
 import { WholeTeamLeaveNotices } from "../../Withdrawals";
+import { ConfirmAction } from "../../ConfirmAction";
 import { EventCalendarOperations } from './EventCalendarOperations'
 import { EventAudienceOperations } from './EventAudienceOperations'
 import { EventMentorsSection } from './EventMentorsSection'
@@ -20,6 +21,7 @@ import { chicagoInputTime, parseChicagoInput } from '../../lib/chicago-time'
 import { HelpToggle } from './HelpToggle'
 
 type Row = { participantId: string; studentId: Id<"students">; name: string; status: string; signedUpAt: number; active: boolean };
+type WithdrawnRow = Row & { moneyDecision: boolean; inReview: boolean };
 type Requirement = { key: string; label: string; instructions?: string; url?: string; dueAt?: number };
 
 function when(value?: number | null) { return value ? new Date(value).toLocaleString("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }) : operationsCopy.event.notSet; }
@@ -30,6 +32,7 @@ function parseCentral(value: string) { return value ? parseChicagoInput(value) :
 export function EventOperations({ eventId, coach=false }: { eventId: Id<"events">; coach?:boolean }) {
   const data = useQuery(api.eventOperations.workspace, { eventId });
   const review = useMutation(api.eventOperations.reviewSignup);
+  const putBack = useMutation(api.withdrawals.putBackOnEvent);
   const settings = useMutation(api.eventOperations.updateSettings);
   const saveRequirement = useMutation(api.eventOperations.saveRequirement);
   const removeRequirement = useMutation(api.eventOperations.removeRequirement);
@@ -63,6 +66,7 @@ export function EventOperations({ eventId, coach=false }: { eventId: Id<"events"
   const roomValue = roomDeadline ?? centralInput(event.roomDeadline);
   const participants = data.participants as Row[];
   const waitlist = data.waitlist as Row[];
+  const withdrawn = (data.withdrawn ?? []) as WithdrawnRow[];
   const requirements = data.requirements as Requirement[];
   const shiftSettings = data.shiftSettings as ShiftSettings;
   const pending = participants.filter(p => p.status === "pending");
@@ -73,6 +77,8 @@ export function EventOperations({ eventId, coach=false }: { eventId: Id<"events"
   const showQuestions = hasQuestions || adding.questions;
   const showShifts = usesShifts || adding.shifts;
   const required = event.signupMode === "assigned";
+  // Mirrors putBackOnEvent: a Travel Lead can put students back only on events a Coach did not assign.
+  const canPutBack = canEdit || !required;
   // Required events list who was assigned automatically; optional ones count who chose to sign up.
   const countLine = required ? operationsText.event.assigned(data.reserved) : operationsText.event.signedUp(data.reserved, event.capacity, data.available);
   // A Travel Lead can only mark an optional event as Outreach (required group events stay with the Coach), so the
@@ -103,6 +109,7 @@ export function EventOperations({ eventId, coach=false }: { eventId: Id<"events"
       {waitlist.length > 0 && <div><h3 className="font-semibold">{operationsCopy.event.waitlist}</h3><ol className={styles.sectionRows}>{waitlist.map((p, i) => <li className={styles.sectionRow} key={p.participantId}><span className="min-w-40">{i + 1}. {p.name} · {when(p.signedUpAt)}</span><Button disabled={busy || i !== 0 || data.available === 0} onClick={() => void act(() => review({ eventId, studentId: p.studentId, decision: "promote" }), operationsText.event.promoted(p.name))}>{operationsCopy.event.promote}</Button><Button variant="outline" disabled={busy || !reason.trim()} onClick={() => void act(() => review({ eventId, studentId: p.studentId, decision: "decline", reason: reason.trim() }), operationsText.event.removedFromWaitlist(p.name))}>{operationsCopy.event.decline}</Button></li>)}</ol></div>}
       {(pending.length > 0 || waitlist.length > 0) && <label className="block">{operationsCopy.event.reasonForDeclining} <Input value={reason} onChange={e => setReason(e.target.value)} maxLength={500} /></label>}
       {confirmed.length > 0 && <p>{operationsCopy.event.confirmed} {confirmed.map(p => p.name).join(", ")}</p>}
+      {withdrawn.length > 0 && <div><h3 className="font-semibold">{operationsCopy.event.withdrawn}</h3>{canPutBack && withdrawn.some(p => !p.inReview) && <p className="muted">{operationsCopy.event.putBackNoCharges}</p>}<div className={styles.sectionRows}>{withdrawn.map(p => <div className={styles.sectionRow} key={p.participantId}><span className="min-w-40">{p.name}{p.moneyDecision && <span className="muted block">{operationsCopy.event.moneyNotReversed}</span>}</span>{p.inReview ? <span className="muted">{operationsCopy.event.withdrawalInReview}</span> : canPutBack && <ConfirmAction disabled={busy} description={operationsText.event.confirmPutBack(p.name, p.moneyDecision)} onConfirm={async () => { setError(""); setSuccess(""); await putBack({ eventId, studentId: p.studentId }); setSuccess(operationsText.event.putBack(p.name)); }}>{operationsCopy.event.putBackOnEvent}</ConfirmAction>}</div>)}</div></div>}
       {event.assignmentScope==="wholeTeam"&&<WholeTeamLeaveNotices eventId={eventId} coach={coach}/>}
     </CardContent></Card></div></details>
     <EventMentorsSection eventId={eventId} open={!event.archived && !event.cancelled}/>

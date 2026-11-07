@@ -228,6 +228,8 @@ describe("Student Home summary", () => {
     await make("Starts first", { signupMode: "approval", startsAt: START - 48 * HOUR, endsAt: START - 40 * HOUR });
     const rejoin = await make("Withdrawn, may rejoin", { startsAt: START + 1 * HOUR }, "withdrawn");
     const withdrew = await make("Withdrawal approved", {}, "withdrawn");
+    // A Coach put the student back (or they undid it), then they left again with nothing blocking: they may rejoin.
+    const reinstated = await make("Withdrawal reinstated", { startsAt: START + 2 * HOUR }, "withdrawn");
     await make("Assigned", { signupMode: "assigned" });
     await make("Canceled", { cancelled: true });
     await make("Archived", { archived: true });
@@ -236,13 +238,13 @@ describe("Student Home summary", () => {
     await make("Waitlisted", {}, "waitlist");
     await make("Whole Team enrollment running", { enrollmentState: "running" });
     await f.t.run(async ctx => {
-      for (const [eventId, status] of [[rejoin, "denied"], [withdrew, "approved"]] as const) {
+      for (const [eventId, status, reinstatedAt] of [[rejoin, "denied", undefined], [withdrew, "approved", undefined], [reinstated, "approved", 2]] as const) {
         const participant = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", eventId).eq("studentId", f.ids.riley)).unique();
-        await ctx.db.insert("withdrawalRequests", { eventId, studentId: f.ids.riley, participantId: participant!._id, status, requestedBy: f.ids.coach, requestedAt: 1, idempotencyKey: `withdraw-${eventId}` });
+        await ctx.db.insert("withdrawalRequests", { eventId, studentId: f.ids.riley, participantId: participant!._id, status, requestedBy: f.ids.coach, requestedAt: 1, idempotencyKey: `withdraw-${eventId}`, ...(reinstatedAt ? { reinstatedAt, reinstatedBy: f.ids.coach } : {}) });
       }
     });
     const home = await summary(f.riley);
-    expect(home.openSignups.map(row => row.name)).toEqual(["Starts first", "Withdrawn, may rejoin", "Closes later"]);
+    expect(home.openSignups.map(row => row.name)).toEqual(["Starts first", "Withdrawn, may rejoin", "Withdrawal reinstated", "Closes later"]);
     expect(home.openSignups[0]).toMatchObject({ signupMode: "approval", signupClosesAt: null, feeCents: 0, type: "Team" });
   });
 

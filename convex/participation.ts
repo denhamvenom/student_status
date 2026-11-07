@@ -5,6 +5,7 @@ import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import type { SignupAvailability } from "../src/features/student-home/contract";
 import { activeSeason, audit, ownStudent, viewer } from "./lib/access";
+import { activeApprovedWithdrawal, withdrawalHistory } from "./lib/withdrawalState";
 import { addCharge } from "./lib/money";
 import { enrollmentPending, requireEnrollmentComplete } from "./lib/eventEnrollmentState";
 import { activeQuestions, answerInput, checkAnswers, checkListSizes, checkShifts, clearShifts, replaceShifts, saveAnswers } from "./lib/eventSignupExtras";
@@ -35,8 +36,8 @@ export const signUp = mutation({
     if (event.signupClosesAt !== undefined && Date.now() > event.signupClosesAt) throw new ConvexError("Signup for this event has closed. Ask a Coach or Travel Lead if you still need to go.");
     const prior = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
     if (prior && prior.status !== "withdrawn") return prior.status;
-    const withdrawal = await ctx.db.query("withdrawalRequests").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(100);
-    if (withdrawal.some(x => x.status === "approved")) throw new ConvexError("You withdrew from this event. Ask a Coach to sign you up again.");
+    const withdrawal = await withdrawalHistory(ctx, event._id, student._id);
+    if (activeApprovedWithdrawal(withdrawal)) throw new ConvexError("You withdrew from this event. Ask a Coach to sign you up again.");
     const waiting = await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(501);
     if (waiting.length > 500) throw new ConvexError("This event has too many signups to update here. Contact a Coach.");
     const full = waiting.some(p => p.status === "waitlist") || event.capacity !== undefined && waiting.filter(p => p.status === "confirmed" || p.status === "pending").length >= event.capacity;
@@ -85,7 +86,7 @@ export const signupAvailability = query({
     if (!event || event.seasonId !== student.seasonId || !await studentCanAccessEvent(ctx, event, student)) throw new ConvexError("This event is no longer available. Reload to see current events.");
     const prior = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
     const signedUp = !!prior && prior.status !== "withdrawn";
-    const withdrew = !signedUp && (await ctx.db.query("withdrawalRequests").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(100)).some(x => x.status === "approved");
+    const withdrew = !signedUp && !!activeApprovedWithdrawal(await withdrawalHistory(ctx, event._id, student._id));
     const rows = await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(501);
     const counted = rows.length <= 500;
     const reserved = rows.filter(p => p.status === "confirmed" || p.status === "pending").length;
@@ -119,8 +120,8 @@ export const setParticipation = mutation({
     if (args.status === "withdrawn") throw new ConvexError("To take a student off this event, use Withdrawal requests.");
     if (prior?.status === args.status) return null;
     if (args.status === "confirmed" || args.status === "pending" || args.status === "waitlist") {
-      const withdrawals = await ctx.db.query("withdrawalRequests").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(100);
-      if (withdrawals.some(x => x.status === "approved")) throw new ConvexError("This student withdrew from this event. Only a Coach can sign them up again.");
+      const withdrawals = await withdrawalHistory(ctx, event._id, student._id);
+      if (activeApprovedWithdrawal(withdrawals)) throw new ConvexError("This student withdrew from this event. Use Put back on event on the event's signups.");
     }
     if (prior?.status === "confirmed" && (args.status === "pending" || args.status === "waitlist")) throw new ConvexError("A student who is Signed up can't be moved back to Waiting for approval or Waitlisted.");
     if (prior?.status === "waitlist" && args.status !== "waitlist") throw new ConvexError("This student is Waitlisted. Use Promote on the event's signups to move them up.");
