@@ -17,10 +17,15 @@ export const calendarChoiceCopy = {
   reviewCreate: 'Create a separate entry',
   reviewNone: 'Not added to Team Calendar',
   reviewLink: 'Connect to existing entry',
-  /** Under the Team Calendar choice while a Team meeting is left off it because of its weekday (calendarOffDay). */
+  /** Next to a chosen existing Calendar entry and on Review: connecting replaces the meeting's name and times with the entry's. */
+  linkNote: 'Uses this calendar entry’s name and time.',
   /** In the edit forms, when a Team meeting already on Team Calendar is set to start on a Required weekday (requiredDayEditHint). */
-  requiredDayEditHint: 'This day counts as required attendance. It will still be on Team Calendar.',
-  requiredDayHint: (day: 'Monday' | 'Tuesday') => `${day} meetings aren’t added to Team Calendar by default, so they aren’t counted as required attendance. You can still add this one.`,
+  requiredDayEditHint: (day: 'Monday' | 'Tuesday') => `Heads up: meetings on Team Calendar on a ${day} are tracked like a regular build meeting.`,
+  /**
+   * Under the Team Calendar choice while a Team meeting is left off it because of its weekday (calendarOffDay). `control`
+   * names what adds it: the "Add to Team Calendar" box, or the full wizard's "Create a separate Calendar entry" choice.
+   */
+  requiredDayHint: (day: 'Monday' | 'Tuesday', control: 'box' | 'choice' = 'box') => `${day} meetings start off Team Calendar, because anything on Team Calendar on a ${day} is tracked like a regular build meeting. ${control === 'box' ? 'Check the box' : 'Choose “Create a separate Calendar entry”'} to add it anyway.`,
 } as const
 
 export const newEventWizardCopy = {
@@ -73,7 +78,8 @@ export function calendarOffDay(type: EventType, startsAt: number, competitionYea
  */
 export function requiredDayEditHint(event: { type?: string; onTeamCalendar: boolean }, startInput: string, competitionYear: number | null): string | null {
   if (event.type !== 'Team' || !event.onTeamCalendar) return null
-  return requiredMeetingDay(parseChicagoInput(startInput), competitionYear) ? calendarChoiceCopy.requiredDayEditHint : null
+  const day = requiredMeetingDay(parseChicagoInput(startInput), competitionYear)
+  return day ? calendarChoiceCopy.requiredDayEditHint(day) : null
 }
 
 /**
