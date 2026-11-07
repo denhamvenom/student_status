@@ -1,10 +1,12 @@
 # Handoff
 
-November 7, 2026 | main `851d6ad`
+November 7, 2026 | main `b790a69`
 
-## Mentor Home release candidate (not released)
+## Mentor Home, Mentor meetings and sign-up, Mentor notifications (released)
 
-Branch `feat/mentor-home` (commits `627fd29`, `e112893`, `4739f72`; docs commit on top), based on main `851d6ad`. Status: **awaiting owner approval** for push/PR, the production Convex deploy (amicable-eel-413, first) and the merge to main. Simplified Mentor Home and Schedule tabs, Mentor meetings (optional, 12h cap, creator-only edit/cancel), Mentor self sign-up with drive/hotel answers and series scope, Parents with staff grants as Mentors first, Mentor notifications M1–M5 ("Meetings and events"), Who's here now, Travel Lead My schedule, event-page Mentors section, Created by, one-time optional Team meetings, and the create-a-meeting crash fix. Additive schema (five new indexes, new table `mentorSeriesSignups`). Security reviews: no Medium+ open; tests pass (known `feeBulk` timeout passes alone); persona round 3: all tasks completed. Open: M5 "student dropped out" waits on the owner's withdrawals branch; no real-phone notification test; theme flash. [Pre-release receipt](docs/releases/RELEASE_2026-11-07_MENTOR_HOME.md)
+PR #75 merged as main `b790a69` (head `60e3f1e`). Production Convex amicable-eel-413 deployed from main `b790a69` after the merge (five new indexes, no deletions; about 1.5 minutes between merge and deploy). Workers: student-status `0647a74f-c53d-4043-b0b1-bfa9a85e45a4`, timeclock `a50c91ea-1521-4bdb-a99b-81b312a85263` (rollback `5ab34c28-4f60-4a1b-8da4-c490d3cd2fac` / `5d96036e-16db-43bc-aa5a-7cdd130cac72`). Both sites returned 200 and served the new bundle. Simplified Mentor Home and Schedule tabs, Mentor meetings (optional, 12h cap, creator-only edit/cancel), Mentor self sign-up with drive/hotel answers and series scope, Parents with staff grants as Mentors first, Mentor notifications M1–M5 ("Meetings and events"), Who's here now, Travel Lead My schedule, event-page Mentors section, Created by, one-time optional Team meetings, and the create-a-meeting crash fix. Additive schema (five new indexes, new table `mentorSeriesSignups`). Security reviews: no Medium+ open; tests pass (known `feeBulk` timeout passes alone); persona round 3: all tasks completed. Open: M5 "student dropped out" waits on the owner's withdrawals branch; no real-phone notification test; theme flash. [Release receipt](docs/releases/RELEASE_2026-11-07_MENTOR_HOME.md)
+
+Owner follow-ups (not yet verified): signed-in role walkthroughs (Mentor, Travel Lead, Coach, Parent with staff access, Student, Parent); in the Convex dashboard confirm the five new indexes finished backfilling and that Node actions (push, email) still run, since the deploy also reported an unexplained Node.js action version change (VERIFY); real-phone Mentor notification test.
 
 ## Coach email change fix and stable profile edit dialog (released)
 
