@@ -1,6 +1,10 @@
 # Handoff
 
-November 4, 2026 | main `08a5d71`
+November 7, 2026 | main `851d6ad`
+
+## Mentor Home release candidate (not released)
+
+Branch `feat/mentor-home` (commits `627fd29`, `e112893`, `4739f72`; docs commit on top), based on main `851d6ad`. Status: **awaiting owner approval** for push/PR, the production Convex deploy (amicable-eel-413, first) and the merge to main. Simplified Mentor Home and Schedule tabs, Mentor meetings (optional, 12h cap, creator-only edit/cancel), Mentor self sign-up with drive/hotel answers and series scope, Parents with staff grants as Mentors first, Mentor notifications M1–M5 ("Meetings and events"), Who's here now, Travel Lead My schedule, event-page Mentors section, Created by, one-time optional Team meetings, and the create-a-meeting crash fix. Additive schema (five new indexes, new table `mentorSeriesSignups`). Security reviews: no Medium+ open; tests pass (known `feeBulk` timeout passes alone); persona round 3: all tasks completed. Open: M5 "student dropped out" waits on the owner's withdrawals branch; no real-phone notification test; theme flash. [Pre-release receipt](docs/releases/RELEASE_2026-11-07_MENTOR_HOME.md)
 
 ## Coach email change fix and stable profile edit dialog (released)
 
@@ -77,7 +81,6 @@ Clocking, PIN controls, automatic closing, fixed event roster and historical imp
 
 ## Next
 
-- **Next sprint: Mentor home page**, designed like the Parent and Student homes (replaces the interim Mentor Home stack).
 - Tighten about 20 pre-existing loose Travel Lead checks (`role === "coach" || travelLead`, which trusts a stored flag on any role) to the canonical rule `coach || (mentor && travelLead)` used by `mentorInvites.requireInviter` (`viewer()` resolves a Parent's selected Travel Lead role to that shape). Lines as of main `99515ed`, in `convex/`:
   - Coach-or-Travel-Lead gates: `app.ts:52,196`; `eventEnrollment.ts:18`; `eventOperations.ts:14`; `lib/eventSignupExtras.ts:22`; `participation.ts:107,167`; `permissionVersions.ts:12`; `rooms.ts:78,219,260,276,306`; `studentHome.ts:289`; `workflowSummaries.ts:9`.
   - Mentor-blocking checks (`mentor && !travelLead`): `app.ts:51,101,126,252`; `announcements.ts:141`; `dashboardReports.ts:39`; `financeDetails.ts:39`.
