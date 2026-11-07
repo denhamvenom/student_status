@@ -1,16 +1,38 @@
 import { describe, expect, it } from 'vitest'
-import { calendarChoiceArg, calendarReviewText, defaultCalendarChoice, eventTypeDefaults, initialRepeat, isLinkedCalendar, newEventStepOrder, repeatOnBasics, serverProblemStep, shownStep, stepChecks } from './new-event-defaults'
+import { parseChicagoInput } from '@/lib/chicago-time'
+import { calendarChoiceArg, calendarChoiceCopy, calendarOffDay, requiredDayEditHint, calendarReviewText, defaultCalendarChoice, eventTypeDefaults, initialRepeat, isLinkedCalendar, newEventStepOrder, repeatOnBasics, serverProblemStep, shownStep, stepChecks } from './new-event-defaults'
 
 describe('New event Team Calendar choice', () => {
   it.each([
     ['Competition', false, 'create'],
     ['Outreach', false, 'create'],
     ['Fundraiser', false, 'create'],
-    ['Team', false, 'none'],
+    ['Team', false, 'create'],
     ['Competition', true, 'none'],
     ['Team', true, 'none'],
   ] as const)('%s (repeats %s) defaults to %s', (type, repeats, expected) => {
     expect(defaultCalendarChoice(type, repeats)).toBe(expected)
+  })
+
+  // Attendance reports count a Team Calendar meeting on Tuesday before kickoff, or Monday from kickoff, as Required, so a
+  // one-time Team meeting on that day starts off Team Calendar (owner decision, Nov 7 2026). 2027 kickoff: Sat Jan 9, 2027.
+  it.each([
+    ['Tuesday before kickoff', 'Team', '2026-11-10T18:00', 2027, false, 'none', 'Tuesday'],
+    ['Monday before kickoff', 'Team', '2026-11-09T18:00', 2027, false, 'create', null],
+    ['Monday after kickoff', 'Team', '2027-01-11T18:00', 2027, false, 'none', 'Monday'],
+    ['Tuesday after kickoff', 'Team', '2027-01-12T18:00', 2027, false, 'create', null],
+    ['Wednesday', 'Team', '2026-11-11T18:00', 2027, false, 'create', null],
+    ['Thursday after kickoff', 'Team', '2027-01-14T18:00', 2027, false, 'create', null],
+    ['Saturday', 'Team', '2026-11-14T10:00', 2027, false, 'create', null],
+    ['Tuesday, season unknown (only Tuesday counts)', 'Team', '2026-11-10T18:00', null, false, 'none', 'Tuesday'],
+    ['Monday, kickoff not verified for the season', 'Team', '2031-01-13T18:00', 2031, false, 'create', null],
+    ['no start yet', 'Team', '', 2027, false, 'create', null],
+    ['repeating Wednesday', 'Team', '2026-11-11T18:00', 2027, true, 'none', null],
+    ['Competition on a Tuesday', 'Competition', '2026-11-10T18:00', 2027, false, 'create', null],
+  ] as const)('%s: %s defaults to %s', (_, type, start, year, repeats, expected, offDay) => {
+    const startsAt = start ? parseChicagoInput(start) : Number.NaN
+    expect(defaultCalendarChoice(type, repeats, startsAt, year)).toBe(expected)
+    expect(calendarOffDay(type, startsAt, year)).toBe(offDay)
   })
 
   it.each([
@@ -21,6 +43,30 @@ describe('New event Team Calendar choice', () => {
     expect(calendarChoiceArg(choice)).toEqual(arg)
     expect(calendarReviewText(choice)).toBe(review)
     expect(isLinkedCalendar(choice)).toBe(linked)
+  })
+})
+
+describe('Editing a Team meeting on Team Calendar onto a Required day (note only)', () => {
+  it.each([
+    ['Team on Calendar, moved to a Tuesday before kickoff', 'Team', true, '2026-11-10T18:00', 'This meeting is on Team Calendar. On a Tuesday, it will count toward student attendance.'],
+    ['Team on Calendar, moved to a Monday after kickoff', 'Team', true, '2027-01-11T18:00', 'This meeting is on Team Calendar. On a Monday, it will count toward student attendance.'],
+    ['Team on Calendar, on a Wednesday', 'Team', true, '2026-11-11T18:00', null],
+    ['Team on Calendar, Tuesday after kickoff', 'Team', true, '2027-01-12T18:00', null],
+    ['Team off Calendar, on a Tuesday', 'Team', false, '2026-11-10T18:00', null],
+    ['Competition on Calendar, on a Tuesday', 'Competition', true, '2026-11-10T18:00', null],
+    ['start cleared', 'Team', true, '', null],
+  ] as const)('%s', (_, type, onTeamCalendar, start, note) => {
+    expect(requiredDayEditHint({ type, onTeamCalendar }, start, 2027)).toBe(note)
+  })
+
+  it('explains a Required-day meeting in plain words, without "required attendance"', () => {
+    expect(calendarChoiceCopy.requiredDayHint('Tuesday')).toBe('Tuesday is a regular team meeting day. Meetings on Team Calendar that day count toward student attendance, so this one starts off. Check the box to add it anyway.')
+    expect(calendarChoiceCopy.requiredDayHint('Monday')).toBe('Monday is a regular team meeting day. Meetings on Team Calendar that day count toward student attendance, so this one starts off. Check the box to add it anyway.')
+    expect(calendarChoiceCopy.requiredDayHint('Tuesday', 'choice')).toBe('Tuesday is a regular team meeting day. Meetings on Team Calendar that day count toward student attendance, so this one starts off. Choose “Create a separate Calendar entry” to add it anyway.')
+    for (const day of ['Monday', 'Tuesday'] as const) {
+      expect(calendarChoiceCopy.requiredDayHint(day)).not.toMatch(/required attendance/i)
+      expect(calendarChoiceCopy.requiredDayEditHint(day)).not.toMatch(/required attendance/i)
+    }
   })
 })
 

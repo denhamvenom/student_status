@@ -1,6 +1,8 @@
 // New event wizard defaults and choices that depend on the event type, repeating and the server's answer.
 // Pure: no Convex or React, so the rules are tested directly (new-event-defaults.test.ts).
 import type { EventType } from '@/lib/event-copy'
+import { parseChicagoInput } from '@/lib/chicago-time'
+import { requiredMeetingDay } from '../../../convex/lib/requiredMeetingDay'
 import { defaultRepeat } from './audience/repeat'
 import type { RepeatValue } from './audience/types'
 
@@ -15,6 +17,15 @@ export const calendarChoiceCopy = {
   reviewCreate: 'Create a separate entry',
   reviewNone: 'Not added to Team Calendar',
   reviewLink: 'Connect to existing entry',
+  /** Next to a chosen existing Calendar entry and on Review: connecting replaces the meeting's name and times with the entry's. */
+  linkNote: 'Uses this calendar entry’s name and time.',
+  /** In the edit forms, when a Team meeting already on Team Calendar is set to start on a Required weekday (requiredDayEditHint). */
+  requiredDayEditHint: (day: 'Monday' | 'Tuesday') => `This meeting is on Team Calendar. On a ${day}, it will count toward student attendance.`,
+  /**
+   * Under the Team Calendar choice while a Team meeting is left off it because of its weekday (calendarOffDay). `control`
+   * names what adds it: the "Add to Team Calendar" box, or the full wizard's "Create a separate Calendar entry" choice.
+   */
+  requiredDayHint: (day: 'Monday' | 'Tuesday', control: 'box' | 'choice' = 'box') => `${day} is a regular team meeting day. Meetings on Team Calendar that day count toward student attendance, so this one starts off. ${control === 'box' ? 'Check the box' : 'Choose “Create a separate Calendar entry”'} to add it anyway.`,
 } as const
 
 export const newEventWizardCopy = {
@@ -50,8 +61,35 @@ export const initialRepeat = (prefill: RepeatValue | null | undefined): RepeatVa
 /** A Team meeting shows "One time / Repeat this meeting" right on Basics; other events keep Repeat under More. */
 export const repeatOnBasics = (type: EventType) => type === 'Team'
 
-/** Team meetings and repeating meetings stay off Team Calendar unless the Coach asks; other events get their own entry. */
-export const defaultCalendarChoice = (type: EventType, repeats: boolean): 'create' | 'none' => repeats || type === 'Team' ? 'none' : 'create'
+/**
+ * The weekday that keeps a one-time Team meeting off Team Calendar by default, or null. Attendance reports count a Team
+ * Calendar meeting on that day as Required (Tuesday before Build Season kickoff, Monday from kickoff; the same
+ * requiredMeetingDay rule), so it is only added when someone asks (owner decision, Nov 7 2026). `startsAt` is the start
+ * (NaN while unset) and `competitionYear` the current season's year (null when unknown: then only Tuesday counts).
+ */
+export function calendarOffDay(type: EventType, startsAt: number, competitionYear: number | null): 'Monday' | 'Tuesday' | null {
+  return type === 'Team' ? requiredMeetingDay(startsAt, competitionYear) : null
+}
+
+/**
+ * The edit forms' note for a Team meeting already on Team Calendar whose start (the form's "YYYY-MM-DDTHH:MM", Chicago) is
+ * a Required weekday (requiredMeetingDay): attendance will count it as Required, and the edit keeps it on Team Calendar.
+ * Only a note (owner decision, Nov 7 2026: Required days are off by default for new meetings, not refused); null otherwise.
+ */
+export function requiredDayEditHint(event: { type?: string; onTeamCalendar: boolean }, startInput: string, competitionYear: number | null): string | null {
+  if (event.type !== 'Team' || !event.onTeamCalendar) return null
+  const day = requiredMeetingDay(parseChicagoInput(startInput), competitionYear)
+  return day ? calendarChoiceCopy.requiredDayEditHint(day) : null
+}
+
+/**
+ * Every one-time event, Team meetings included (owner decision, Nov 7 2026), gets its own Team Calendar entry by default,
+ * except a Team meeting on a Required weekday (calendarOffDay). Repeating meetings stay off Team Calendar unless the Coach
+ * asks, so the existing Google Tuesday series is never duplicated. Callers re-apply it when the type, repeat or start date
+ * changes, until the choice is changed by hand.
+ */
+export const defaultCalendarChoice = (type: EventType, repeats: boolean, startsAt: number = Number.NaN, competitionYear: number | null = null): 'create' | 'none' =>
+  repeats || calendarOffDay(type, startsAt, competitionYear) ? 'none' : 'create'
 
 export const calendarChoiceArg = (choice: CalendarChoice): { kind: 'create' } | { kind: 'none' } | { kind: 'link'; eventId: string } =>
   choice === 'create' ? { kind: 'create' } : choice === 'none' ? { kind: 'none' } : { kind: 'link', eventId: choice }

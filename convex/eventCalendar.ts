@@ -198,6 +198,44 @@ export const status = query({
   },
 });
 
+const SYNC_PROBLEMS_SHOWN = 10;
+const SYNC_REASON_LENGTH = 200;
+const syncProblem = v.object({ eventId: v.id("events"), name: v.string(), startsAt: v.number(), state: v.union(v.literal("failed"), v.literal("conflict")), reason: v.union(v.string(), v.null()) });
+
+/**
+ * Coach and Travel Lead Home alert: upcoming (not ended, not archived) current-season events whose Team Calendar update
+ * failed or conflicts, soonest start first, so someone opens the event's Team Calendar controls to retry or reload. Event
+ * name, start and the stored plain-language reason only. Same staff-only rule as `status`, so Mentors never see sync state.
+ * Mirrors `status`: while Calendar writes are turned off every entry reads "disabled", not failed, so nothing is listed.
+ * `asOf` is the browser's clock (queries can't read it).
+ *
+ * Each state is read in start order (by_seasonId_and_calendarSyncState_and_archived_and_startsAt) with the "still linked and
+ * not over" filter applied before take, so each state's first SYNC_PROBLEMS_SHOWN + 1 rows are its soonest qualifying ones:
+ * the overall soonest SYNC_PROBLEMS_SHOWN are among them, and `more` is exact. The scan covers only that season's
+ * non-archived failed/conflict rows (an event is archived once it ends), and the result is bounded by take.
+ */
+export const syncProblems = query({
+  args: { asOf: v.number() },
+  returns: v.object({ items: v.array(syncProblem), more: v.boolean() }),
+  handler: async (ctx, args) => {
+    requireStaff(await viewer(ctx));
+    if (!Number.isFinite(args.asOf)) throw new ConvexError("Reload the page, then try again.");
+    if (!writeEnabled()) return { items: [], more: false };
+    const season = await activeSeason(ctx);
+    const rows: Doc<"events">[] = [];
+    for (const state of ["failed", "conflict"] as const) {
+      rows.push(...await ctx.db.query("events").withIndex("by_seasonId_and_calendarSyncState_and_archived_and_startsAt", q => q.eq("seasonId", season._id).eq("calendarSyncState", state).eq("archived", false))
+        .filter(q => q.and(q.gt(q.field("endsAt"), args.asOf), q.neq(q.field("calendarChoice"), undefined)))
+        .take(SYNC_PROBLEMS_SHOWN + 1));
+    }
+    rows.sort((a, b) => a.startsAt - b.startsAt);
+    return {
+      items: rows.slice(0, SYNC_PROBLEMS_SHOWN).map(event => ({ eventId: event._id, name: event.name, startsAt: event.startsAt, state: event.calendarSyncState === "conflict" ? "conflict" as const : "failed" as const, reason: event.calendarSyncError?.slice(0, SYNC_REASON_LENGTH) ?? null })),
+      more: rows.length > SYNC_PROBLEMS_SHOWN,
+    };
+  },
+});
+
 export const connect = mutation({
   args: { eventId: v.id("events"), calendarChoice: choice }, returns: v.null(),
   handler: async (ctx, args) => {
@@ -360,6 +398,10 @@ export const push = internalAction({ args: { eventId: v.id("events"), revision: 
         if (!existing.etag) { await fail("Team Calendar didn't return the latest copy of this entry. Try again.", true); return null; }
         if (existing.cancelled && !snapshot.cancelled) { await fail("This entry was canceled in Team Calendar. Reload Calendar details before editing.", true); return null; }
         if (existing.cancelled && snapshot.cancelled) { await ctx.runMutation(internal.eventCalendar.finishPush, { ...args, calendarEventId: id, etag: existing.etag, providerUpdatedAt: existing.updatedAt }); return null; }
+        // The entry may have been inserted by a newer revision's push that ran while this one waited. Writing this snapshot now
+        // would put older details over newer ones, so stop unless this revision is still the one to push (the newer push, or
+        // its retry, owns the entry). The If-Match etag below still guards writes that land after this check.
+        if (!await ctx.runQuery(internal.eventCalendar.pushSnapshot, args)) return null;
         const patched = await fetch(eventUrl(id), { method: "PATCH", headers: { authorization: auth, "content-type": "application/json", "if-match": existing.etag }, body: JSON.stringify(snapshot.cancelled ? { status: "cancelled" } : { summary: snapshot.name, location: snapshot.destination, start: { dateTime: new Date(snapshot.startsAt).toISOString() }, end: { dateTime: new Date(snapshot.endsAt).toISOString() }, description: withMediaMarker(existing.description, snapshot.media) }) });
         if (!patched.ok) { await fail(calendarError(patched.status), patched.status === 412); return null; }
         const latest = googleDetails(await patched.json());

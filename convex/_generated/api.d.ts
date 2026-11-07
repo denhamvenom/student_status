@@ -123,6 +123,7 @@ import type * as lib_quietHours from "../lib/quietHours.js";
 import type * as lib_readModels from "../lib/readModels.js";
 import type * as lib_reminderSchedule from "../lib/reminderSchedule.js";
 import type * as lib_reportAggregates from "../lib/reportAggregates.js";
+import type * as lib_requiredMeetingDay from "../lib/requiredMeetingDay.js";
 import type * as lib_retention from "../lib/retention.js";
 import type * as lib_rrule from "../lib/rrule.js";
 import type * as lib_seasonCalendar from "../lib/seasonCalendar.js";
@@ -309,6 +310,7 @@ declare const fullApi: ApiFromModules<{
   "lib/readModels": typeof lib_readModels;
   "lib/reminderSchedule": typeof lib_reminderSchedule;
   "lib/reportAggregates": typeof lib_reportAggregates;
+  "lib/requiredMeetingDay": typeof lib_requiredMeetingDay;
   "lib/retention": typeof lib_retention;
   "lib/rrule": typeof lib_rrule;
   "lib/seasonCalendar": typeof lib_seasonCalendar;

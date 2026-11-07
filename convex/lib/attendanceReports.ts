@@ -2,25 +2,20 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { assertNoOverlap, classifiedTime } from "./timeclock";
-import { kickoffBoundaryForCompetitionYear } from "./seasonCalendar";
+import { requiredFromSchedule, verifiedKickoffAt } from "./requiredMeetingDay";
 import { updateSessionAggregate, updateStudentAttendanceAggregate, type AttendanceWeekday } from "./reportAggregates";
 
 export const outreachFromTitle = (title: string) => /outreach/i.test(title);
 export const outreachForSession = (session: Doc<"timeclockSessions">, title: string) => session.outreachOverride ?? outreachFromTitle(title);
 
-/** Required meetings: non-Outreach sessions on Tuesdays before Build Season kickoff and Mondays from kickoff (Chicago weekday). */
-export function requiredFromSchedule(scheduledStart: number, outreach: boolean, kickoffAt: number | null): boolean {
-  if (outreach) return false;
-  const day = new Intl.DateTimeFormat("en-US", {timeZone:"America/Chicago",weekday:"long"}).format(scheduledStart);
-  return day === (kickoffAt !== null && scheduledStart >= kickoffAt ? "Monday" : "Tuesday");
-}
+/** The Required weekday rule lives in requiredMeetingDay.ts, shared with the app's Team Calendar defaults. */
+export { requiredFromSchedule };
 /** A Coach's requiredOverride wins; Outreach is never Required. */
 export async function requiredForSession(ctx: QueryCtx | MutationCtx, session: Doc<"timeclockSessions">, outreach: boolean): Promise<boolean> {
   if (outreach) return false;
   if (session.requiredOverride !== undefined) return session.requiredOverride;
   const season = await ctx.db.get(session.seasonId);
-  const kickoff = season ? kickoffBoundaryForCompetitionYear(season.year) : null;
-  return requiredFromSchedule(session.scheduledStart, outreach, kickoff?.state === "verified" ? kickoff.kickoffAt : null);
+  return requiredFromSchedule(session.scheduledStart, outreach, verifiedKickoffAt(season ? season.year : null));
 }
 
 export function buildDayFromTitle(title: string, scheduledStart: number): "weekday" | "saturday" | "sunday" | null {

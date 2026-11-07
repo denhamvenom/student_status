@@ -256,5 +256,10 @@ export const mentorHomeCopy = {
     mentorsOnlyUnavailable: 'A Mentors-only meeting needs at least one invited Mentor, and inviting Mentors one by one isn’t available yet. Choose Everyone, Subteams or specific students.',
     created: 'Meeting created.',
     seriesCreated: 'Repeating meeting created.',
+    addToCalendar: 'Add to Team Calendar',
+    addToCalendarNote: 'Everyone on the team can see it on the shared Team Calendar.',
+    repeatingOffCalendar: 'Repeating meetings aren’t added to Team Calendar.',
+    onCalendar: 'Added to Team Calendar',
+    offCalendar: 'Not added to Team Calendar',
   },
 } as const

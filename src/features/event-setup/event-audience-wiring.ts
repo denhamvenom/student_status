@@ -163,6 +163,8 @@ export type MentorMeetingDraft = {
   inviteSubteamMentors: boolean
   /** Mentors picked one by one (only when the Mentor list could be read). */
   mentorIds: readonly string[]
+  /** One-time meetings only: also give the meeting its own Team Calendar entry. A repeating meeting never sends it. */
+  addToCalendar?: boolean
 }
 
 /** Where a Mentor meeting happens, as stored. Mentor meetings have no on-site flag, so the shop is written out. */
@@ -184,13 +186,13 @@ function mentorAudienceArgs(draft: MentorMeetingDraft): MentorAudienceArgs {
 
 /** mentorMeetings.createMeeting arguments for a one-time meeting. Required is never sent: Mentor meetings are optional. */
 export function mentorMeetingCreateArgs(draft: MentorMeetingDraft): FunctionArgs<typeof api.mentorMeetings.createMeeting> {
-  return { name: draft.name.trim(), startsAt: draft.startsAt, endsAt: draft.endsAt, destination: mentorMeetingPlace(draft.where, draft.destination), ...mentorAudienceArgs(draft) }
+  return { name: draft.name.trim(), startsAt: draft.startsAt, endsAt: draft.endsAt, destination: mentorMeetingPlace(draft.where, draft.destination), ...mentorAudienceArgs(draft), ...(draft.addToCalendar ? { calendarChoice: { kind: 'create' as const } } : {}) }
 }
 
 /** admin.createEvent-shaped arguments for a repeating Mentor meeting; seriesCreateArgs turns them into eventSeries.create. */
 export function mentorMeetingEventArgs(draft: MentorMeetingDraft): FunctionArgs<typeof api.admin.createEvent> {
   return {
-    ...mentorMeetingCreateArgs(draft), type: 'Team', travel: 'None', overnight: false, roomingEnabled: false, feeCents: 0, signupMode: 'open', mandatory: false,
+    ...mentorMeetingCreateArgs({ ...draft, addToCalendar: false }), type: 'Team', travel: 'None', overnight: false, roomingEnabled: false, feeCents: 0, signupMode: 'open', mandatory: false,
     allowWithdrawal: true, permissionRequired: false, firstRequired: false, requirements: [], calendarChoice: { kind: 'none' },
   }
 }
