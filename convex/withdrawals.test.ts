@@ -5,6 +5,7 @@ import { makeFunctionReference } from "convex/server";
 import type { Id } from "./_generated/dataModel";
 import { startFinancialRebuild } from "./financialSources";
 import { financialAccount } from "./lib/financialSources";
+import { chargeFeeDefinition } from "./lib/feeDefinitions";
 import { assignWholeTeamMember } from "./lib/wholeTeam";
 import { assignSubteamMember } from "./lib/subteamEnrollment";
 import { api } from "./_generated/api";
@@ -357,8 +358,9 @@ describe("putting a withdrawn student back on an event", () => {
     expect(state.request).toMatchObject({ status: "approved", reinstatedBy: f.coachUser });
     expect(state.request?.reinstatedAt).toBeTypeOf("number");
     expect(await auditsFor(f.t, f.participantId)).toContainEqual({ action: "putBackOnEvent", before: { status: "withdrawn", withdrawalRequestId: f.requestId, moneyDecision }, after: { status: "confirmed" } });
-    // Money moved by the reviewed withdrawal stays where it is.
-    if (main && before) expect(await f.t.run(ctx => ctx.db.get(main))).toMatchObject({ appliedCents: before.appliedCents, cancelledCents: before.cancelledCents });
+    // 
+    // The put back never reverses the withdrawal's cancellation (a fee added back may take returned money, so applied can change).
+    if (main && before) expect(await f.t.run(ctx => ctx.db.get(main))).toMatchObject({ cancelledCents: before.cancelledCents });
     await expect(f.coach.mutation(api.withdrawals.putBackOnEvent, { eventId: f.eventId, studentId: f.studentId })).rejects.toThrow("already on this event");
     const second = await f.student.mutation(api.withdrawals.requestWithdrawal, { eventId: f.eventId, idempotencyKey: "withdraw-again" });
     expect((await f.t.run(ctx => ctx.db.get(second)))?.status).toBe(again);
@@ -538,25 +540,54 @@ describe("the event fee when a student comes back", () => {
   const mainCharges = (f: { t: FreeFixture["t"] }, eventId: Id<"events">, studentId: Id<"students">) => f.t.run(async ctx => (await ctx.db.query("charges").withIndex("by_eventId_and_studentId", q => q.eq("eventId", eventId).eq("studentId", studentId)).take(20)).filter(c => (c.category ?? "main") === "main"));
   const active = (c: { amountCents: number; adjustedCents?: number; cancelledCents?: number }) => c.amountCents + (c.adjustedCents ?? 0) - (c.cancelledCents ?? 0) > 0;
 
-  it.each([
-    { name: "keeps the unpaid fee and adds none", cancelUnpaidMain: false, decision: "retain" as const, added: false },
-    { name: "adds the current fee after the old one was returned and cancelled", cancelUnpaidMain: true, decision: "full" as const, added: true },
-  ])("Put back on event $name", async ({ cancelUnpaidMain, decision, added }) => {
+  // Security review 2026-11-07 (M-1): a returning student gets back only the main fee that withdrawal cancelled. The fixture's fee is
+  // $100.00 with $80.00 paid; the $20.00 extra never counts.
+  const dispositions = [
+    { name: "retained money and cancelled the unpaid balance", decision: "retain" as const, cancelUnpaidMain: true, returnCents: undefined, added: 2000 },
+    { name: "refunded the paid money without cancelling the unpaid balance", decision: "full" as const, cancelUnpaidMain: false, returnCents: undefined, added: 8000 },
+    { name: "refunded part of the money", decision: "partial" as const, cancelUnpaidMain: false, returnCents: 3000, added: 3000 },
+    { name: "refunded everything and cancelled the unpaid balance", decision: "full" as const, cancelUnpaidMain: true, returnCents: undefined, added: 10000 },
+    { name: "kept the unpaid fee and retained the money", decision: "retain" as const, cancelUnpaidMain: false, returnCents: undefined, added: 0 },
+  ];
+  async function reviewedWithdrawal(d: { decision: "full" | "retain" | "partial"; cancelUnpaidMain: boolean; returnCents: number | undefined }) {
     const f = await fixture();
-    const requestId = await f.student.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.event, idempotencyKey: `fee-${decision}` });
+    const requestId = await f.student.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.event, idempotencyKey: `fee-${d.decision}-${d.cancelUnpaidMain}` });
     const expectedRevision = (await f.coach.query(api.withdrawals.withdrawalPreview, { eventId: f.ids.event, studentId: f.ids.student })).revision;
-    await f.coach.mutation(api.withdrawals.reviewWithdrawal, { requestId, decision, cancelUnpaidMain, reason: "Synthetic decision", expectedRevision });
+    await f.coach.mutation(api.withdrawals.reviewWithdrawal, { requestId, decision: d.decision, returnCents: d.returnCents, cancelUnpaidMain: d.cancelUnpaidMain, reason: "Synthetic decision", expectedRevision });
     await finish(f);
+    return { f, requestId };
+  }
+
+  it.each(dispositions)("Put back on event after a withdrawal that $name adds back $added cents", async d => {
+    const { f } = await reviewedWithdrawal(d);
     const before = await mainCharges(f, f.ids.event, f.ids.student);
-    expect(before.some(active)).toBe(!added);
     await f.coach.mutation(api.withdrawals.putBackOnEvent, { eventId: f.ids.event, studentId: f.ids.student });
     const after = await mainCharges(f, f.ids.event, f.ids.student);
-    expect(after.length).toBe(before.length + (added ? 1 : 0));
-    expect(after.filter(active)).toHaveLength(1);
-    if (added) expect(after.find(c => !before.some(b => b._id === c._id))).toMatchObject({ amountCents: 10000 });
+    const added = after.filter(c => !before.some(b => b._id === c._id));
+    expect(added.map(c => c.amountCents)).toEqual(d.added ? [d.added] : []);
   });
 
-  it("adds the current fee on Undo when the earlier fee was cancelled, linked to the event's fee, and only once", async () => {
+  it("does not add the fee again when the same withdrawal is put back twice", async () => {
+    const { f, requestId } = await reviewedWithdrawal(dispositions[1]);
+    // Production events already have their main fee definition from the first signup.
+    await f.t.run(async ctx => { const student = await ctx.db.get(f.ids.student); await chargeFeeDefinition(ctx, f.ids.coach.user, student!, { eventId: f.ids.event, category: "main", idempotencyKey: `eventFee:${f.ids.event}:${f.ids.student}`, label: "Travel", amountCents: 10000, priority: 1 }); });
+    await f.coach.mutation(api.withdrawals.putBackOnEvent, { eventId: f.ids.event, studentId: f.ids.student });
+    await f.t.run(async ctx => { await ctx.db.patch(f.ids.participant, { status: "withdrawn" }); await ctx.db.patch(requestId, { reinstatedAt: undefined, reinstatedBy: undefined }); });
+    const first = await mainCharges(f, f.ids.event, f.ids.student);
+    expect(first.some(c => c.amountCents === 8000)).toBe(true);
+    await f.coach.mutation(api.withdrawals.putBackOnEvent, { eventId: f.ids.event, studentId: f.ids.student });
+    expect(await mainCharges(f, f.ids.event, f.ids.student)).toHaveLength(first.length);
+  });
+
+  it("keeps a waived fee waived", async () => {
+    const { f } = await reviewedWithdrawal(dispositions[4]);
+    await f.t.run(ctx => ctx.db.patch(f.ids.main, { adjustedCents: -10000, appliedCents: 0, outstanding: false }));
+    const before = await mainCharges(f, f.ids.event, f.ids.student);
+    await f.coach.mutation(api.withdrawals.putBackOnEvent, { eventId: f.ids.event, studentId: f.ids.student });
+    expect(await mainCharges(f, f.ids.event, f.ids.student)).toHaveLength(before.length);
+  });
+
+  it("adds nothing on Undo for a fee a Coach cancelled, and never adds a second fee", async () => {
     const f = await autoWithdrawn();
     await f.t.run(ctx => ctx.db.patch(f.ids.event, { feeCents: 5000 }));
     await f.coach.mutation(api.withdrawals.putBackOnEvent, { eventId: f.ids.event, studentId: f.ids.student });
@@ -570,8 +601,24 @@ describe("the event fee when a student comes back", () => {
     expect(await f.student.mutation(api.withdrawals.undoWithdrawal, { eventId: f.ids.event })).toBe("confirmed");
     expect(await f.student.mutation(api.withdrawals.undoWithdrawal, { eventId: f.ids.event })).toBe("confirmed");
     const charges = await mainCharges(f, f.ids.event, f.ids.student);
-    expect(charges).toHaveLength(2);
-    expect(charges.filter(active)).toEqual([expect.objectContaining({ amountCents: 6000, feeDefinitionId: first.feeDefinitionId })]);
+    expect(charges).toHaveLength(1);
+    expect(charges.filter(active)).toEqual([]);
+  });
+
+  it("adds nothing, and does not fail, when the event's main fee was canceled", async () => {
+    const f = await autoWithdrawn();
+    await f.t.run(ctx => ctx.db.patch(f.ids.event, { feeCents: 5000 }));
+    await f.coach.mutation(api.withdrawals.putBackOnEvent, { eventId: f.ids.event, studentId: f.ids.student });
+    const [first] = await mainCharges(f, f.ids.event, f.ids.student);
+    await f.t.run(async ctx => {
+      await ctx.db.patch(first._id, { cancelledCents: 5000, outstanding: false });
+      await ctx.db.patch(f.ids.event, { feeCents: 0 });
+    });
+    await f.student.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.event, idempotencyKey: "leave-before-definition-cancel" });
+    await f.t.run(async ctx => { await ctx.db.patch(first.feeDefinitionId!, { state: "cancelled" }); await ctx.db.patch(f.ids.event, { feeCents: 6000 }); });
+    await f.coach.mutation(api.withdrawals.putBackOnEvent, { eventId: f.ids.event, studentId: f.ids.student });
+    expect((await f.t.run(ctx => ctx.db.get(f.ids.participant)))?.status).toBe("confirmed");
+    expect(await mainCharges(f, f.ids.event, f.ids.student)).toHaveLength(1);
   });
 });
 
