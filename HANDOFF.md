@@ -1,6 +1,6 @@
 # Handoff
 
-November 7, 2026 | main `b790a69`; branch `feat/auto-withdrawal-undo`, PR #73 (withdrawal work, below; main merged in on branch `feat/withdrawals-update`)
+November 7, 2026 | main `377b2d9` (withdrawals `3d27afd`, parallel-work guard merged)
 
 ## Mentor Home, Mentor meetings and sign-up, Mentor notifications (released)
 
@@ -8,9 +8,9 @@ PR #75 merged as main `b790a69` (head `60e3f1e`). Production Convex amicable-eel
 
 Owner follow-ups (not yet verified): signed-in role walkthroughs (Mentor, Travel Lead, Coach, Parent with staff access, Student, Parent); in the Convex dashboard confirm the five new indexes finished backfilling and that Node actions (push, email) still run, since the deploy also reported an unexplained Node.js action version change (VERIFY); real-phone Mentor notification test.
 
-## Automatic withdrawal, Put back on event, Undo (on development, not in production)
+## Automatic withdrawal, Put back on event, Undo, M5 notices (released)
 
-Branch `feat/auto-withdrawal-undo`, commit `c2c571f`, [PR #73](https://github.com/denhamvenom/student_status/pull/73) open against main, not merged. Development Convex synced 2026-11-06 (`bunx convex dev --once` to `third-bandicoot-18`). Production deploy not done (needs owner approval). [Release receipt](docs/releases/RELEASE_2026-11-06_AUTOMATIC_WITHDRAWAL.md)
+[PR #73](https://github.com/denhamvenom/student_status/pull/73) merged as main `3d27afd` (head `65add32`, main merged in). Production Convex amicable-eel-413 deployed from `3d27afd` (no new index, no deletions; about 1 min 37 s from merge to deploy). Workers: student-status `ef0afe46-008e-458c-89ec-4cc1e4a6f7f4` (before `b41cd589-fb15-42b4-a981-cdabbde96913`), timeclock `26b44c33-e715-4a4f-b68a-24eb1bda3fb7` (before `c1f2358a-9d56-4989-ae04-5112e4e850bb`). Parallel-work guard merged as PR #77 (main `377b2d9`, docs/tooling only, no Convex deploy). **Next: the owner cleans the shared checkout `student-status-app`.** Put back and Undo leave charges unchanged (fee rule deferred, Coach note). Still open: signed-in production walkthrough of withdraw/Put back/Undo; Convex dashboard check that Node actions still run. [Release receipt](docs/releases/RELEASE_2026-11-07_WITHDRAWALS.md)
 
 - A student's withdrawal takes effect immediately (approved $0 `full` row, `autoWithdraw` audit, no Coach digest) only when the event has no fee, no charge with amount owed/applied, no pending request, no room membership/request, no team-transport seat, and is not Whole Team or Coach-assigned. Otherwise it stays pending review.
 - Coach/Travel Lead can "Put back on event" (`withdrawals.putBackOnEvent`, Event operations > Signups and capacity > Withdrawn). It does not reverse money (warning shown).
