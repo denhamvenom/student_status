@@ -1,6 +1,10 @@
 # Handoff
 
-November 7, 2026 | main `377b2d9` (withdrawals `3d27afd`, parallel-work guard merged)
+November 7, 2026 | main `1e9768b` (Team Calendar meetings PR #80; withdrawals `3d27afd`, parallel-work guard merged)
+
+## Team Calendar meetings (merged)
+
+PR #80 merged as main `1e9768b` (head `5e7aea6`): one-time Team meetings, Mentor meetings included, go on Team Calendar by default except on a Required weekday; Mentors get an Add to Team Calendar checkbox; Coach/Travel Lead Home shows "Team Calendar needs attention" for failed or conflicting syncs. Additive schema (optional `events.calendarCreatedByMentor`, one new `events` index). Production Convex deploy and Worker status are not recorded in docs/releases (VERIFY). Behavior: [EVENT_CALENDAR_SYNC.md](docs/EVENT_CALENDAR_SYNC.md).
 
 ## Mentor Home, Mentor meetings and sign-up, Mentor notifications (released)
 
