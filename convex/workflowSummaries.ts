@@ -1,12 +1,12 @@
 import { v } from 'convex/values';
 import { query } from './_generated/server';
-import { activeSeason, viewer, requireRole } from './lib/access';
+import { activeSeason, viewer, requireRole, isCoachOrTravelLead } from "./lib/access";
 
 export const waitingSignups = query({
   args: { eventId: v.id('events') }, returns: v.object({ count: v.number(), more: v.boolean() }),
   handler: async (ctx, { eventId }) => {
     const actor = await viewer(ctx); const season = await activeSeason(ctx);
-    if (actor.role !== 'coach' && !actor.travelLead) throw new ConvexError('Only a Coach or Travel Lead can see this summary.');
+    if (!isCoachOrTravelLead(actor)) throw new ConvexError('Only a Coach or Travel Lead can see this summary.');
     const event = await ctx.db.get(eventId);
     if (!event || event.archived || event.seasonId !== season._id) throw new ConvexError('This event is no longer active. Reload to see current events.');
     const rows = await ctx.db.query('participants').withIndex('by_eventId_and_status', q => q.eq('eventId', eventId).eq('status', 'pending')).take(101);

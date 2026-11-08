@@ -3,7 +3,7 @@ import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
-import { activeSeason, audit, ownStudent, viewer } from "./lib/access";
+import { activeSeason, audit, ownStudent, viewer, isCoachOrTravelLead } from "./lib/access";
 import { notifyRoomUpdate } from "./lib/notificationTriggers";
 
 const INVITE_PUSHES_PER_HOUR = 10;
@@ -75,7 +75,7 @@ export const workspace = query({
   args: { eventId: v.id("events") }, returns: v.any(),
   handler: async (ctx, args) => {
     const user = await viewer(ctx);
-    if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Only a Coach or Travel Lead can manage rooms.");
+    if (!isCoachOrTravelLead(user)) throw new ConvexError("Only a Coach or Travel Lead can manage rooms.");
     const season = await activeSeason(ctx); const event = await ctx.db.get(args.eventId);
     if (!event || event.archived || event.seasonId !== season._id || !event.overnight || !event.roomingEnabled) throw new ConvexError("This event doesn't use rooms. Rooms apply only to current overnight events set up with room choice.");
     const groups = await ctx.db.query("roomGroups").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(101);
@@ -216,7 +216,7 @@ export const finalize = mutation({
   args: { groupId: v.id("roomGroups"), allowFifth: v.boolean(), reason: v.optional(v.string()), expectedMembers: v.optional(v.array(v.id("students"))) }, returns: v.null(),
   handler: async (ctx, args) => {
     const user = await viewer(ctx);
-    if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Only a Coach or Travel Lead can finalize rooms.");
+    if (!isCoachOrTravelLead(user)) throw new ConvexError("Only a Coach or Travel Lead can finalize rooms.");
     const group = await ctx.db.get(args.groupId); if (!group) throw new ConvexError("This room group was removed. Reload to see the latest.");
     const season = await activeSeason(ctx); const event = await ctx.db.get(group.eventId);
     if (!event || event.archived || event.seasonId !== season._id || !event.overnight || !event.roomingEnabled) throw new ConvexError("This event doesn't use rooms. Rooms apply only to current overnight events set up with room choice.");
@@ -257,7 +257,7 @@ export const leave = mutation({
 export const adultCreateGroup = mutation({
   args: { eventId: v.id("events"), category: v.union(v.literal("Boys"), v.literal("Girls")), name: v.string(), reason: v.optional(v.string()) }, returns: v.id("roomGroups"),
   handler: async (ctx, args) => {
-    const user = await viewer(ctx); if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Only a Coach or Travel Lead can manage rooms.");
+    const user = await viewer(ctx); if (!isCoachOrTravelLead(user)) throw new ConvexError("Only a Coach or Travel Lead can manage rooms.");
     const season = await activeSeason(ctx); const event = await ctx.db.get(args.eventId);
     if (!event || event.archived || event.seasonId !== season._id || !event.roomingEnabled || !event.overnight || !args.name.trim() || args.name.length > 80) throw new ConvexError("Enter a room group name of up to 80 characters. Rooms apply only to current overnight events set up with room choice.");
     requireEnrollmentComplete(event);
@@ -273,7 +273,7 @@ export const adultCreateGroup = mutation({
 export const adultAssign = mutation({
   args: { groupId: v.id("roomGroups"), studentId: v.id("students"), allowFifth: v.boolean(), reason: v.optional(v.string()) }, returns: v.null(),
   handler: async (ctx, args) => {
-    const user = await viewer(ctx); if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Only a Coach or Travel Lead can manage rooms.");
+    const user = await viewer(ctx); if (!isCoachOrTravelLead(user)) throw new ConvexError("Only a Coach or Travel Lead can manage rooms.");
     const group = await ctx.db.get(args.groupId); const season = await activeSeason(ctx);
     const event = group ? await ctx.db.get(group.eventId) : null; const student = await ctx.db.get(args.studentId);
     if (!group || !event || event.archived || !event.overnight || !event.roomingEnabled || !student || event.seasonId !== season._id || student.seasonId !== season._id || !student.active || student.roomCategory !== group.category) throw new ConvexError("This student can't go in this room. The room must match the student's Room type on a current overnight event. Reload and try again.");
@@ -303,7 +303,7 @@ export const adultAssign = mutation({
 export const adultUnassign = mutation({
   args: { eventId: v.id("events"), studentId: v.id("students"), reason: v.string() }, returns: v.null(),
   handler: async (ctx, args) => {
-    const user = await viewer(ctx); if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Only a Coach or Travel Lead can manage rooms.");
+    const user = await viewer(ctx); if (!isCoachOrTravelLead(user)) throw new ConvexError("Only a Coach or Travel Lead can manage rooms.");
     const season = await activeSeason(ctx); const event = await ctx.db.get(args.eventId);
     if (!event || event.archived || event.seasonId !== season._id || !event.overnight || !event.roomingEnabled) throw new ConvexError("This event doesn't use rooms. Rooms apply only to current overnight events set up with room choice.");
     requireEnrollmentComplete(event);

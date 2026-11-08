@@ -4,7 +4,7 @@ import type { QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { StudentHomeSummary } from "../src/features/student-home/contract";
 import type { ParentHomeSummary } from "../src/features/parent-home/contract";
-import { activeSeason, ownStudent, studentAccess, viewer } from "./lib/access";
+import { activeSeason, ownStudent, studentAccess, viewer, isCoachOrTravelLead } from "./lib/access";
 import { enrollmentPending } from "./lib/eventEnrollmentState";
 import { activeApprovedWithdrawal, withdrawalHistory } from "./lib/withdrawalState";
 import { eventVisibleToStudents } from "./lib/eventAudience";
@@ -288,7 +288,7 @@ export const parentSummary = query({
   returns: parentSummaryResult,
   handler: async (ctx, args) => {
     const user = await viewer(ctx);
-    if (user.role !== "parent" && user.role !== "coach" && !user.travelLead) throw new ConvexError("Parent Home requires a linked parent or staff account.");
+    if (user.role !== "parent" && !isCoachOrTravelLead(user)) throw new ConvexError("Parent Home requires a linked parent or staff account.");
     const student = await studentAccess(ctx, user, args.studentId);
     const home = await buildSummary(ctx, student, args.asOfDay);
     // Walk future events in start order. A fixed slice of old participations can

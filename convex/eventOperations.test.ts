@@ -34,6 +34,14 @@ async function fixture() {
 
 describe("event operations", () => {
 
+  it("refuses staff-only room and signup changes to a non-staff account with a stale Travel Lead flag", async () => {
+    const f = await fixture();
+    const studentUserId = (await f.t.run(ctx => ctx.db.get(f.ids.students[0])))!.userId!;
+    await f.t.run(ctx => ctx.db.patch(studentUserId, { travelLead: true }));
+    await expect(f.student[0].query(api.rooms.workspace, { eventId: f.ids.event })).rejects.toThrow("Only a Coach or Travel Lead");
+    await expect(f.student[0].mutation(api.participation.setParticipation, { eventId: f.ids.event, studentId: f.ids.students[1], status: "confirmed" })).rejects.toThrow("Only a Coach or Travel Lead");
+  });
+
   it("keeps canceled events visible while blocking new signup, approval and roster charges", async () => {
     const f = await fixture();
     await f.student[0].mutation(api.participation.signUp, { eventId: f.ids.event });

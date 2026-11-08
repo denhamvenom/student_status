@@ -1,6 +1,7 @@
 import { ConvexError, v, type Infer } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
+import { isCoachOrTravelLead } from "./staffRule";
 
 type Ctx = QueryCtx | MutationCtx;
 
@@ -19,7 +20,7 @@ export const choiceKind = (kind: QuestionKind) => kind === "singleChoice" || kin
 
 /** Same rule as eventOperations' requireOperations: Coaches and Travel Leads manage event setup. */
 export function requireEventStaff(user: Doc<"appUsers">) {
-  if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Only a Coach or Travel Lead can manage events.");
+  if (!isCoachOrTravelLead(user)) throw new ConvexError("Only a Coach or Travel Lead can manage events.");
 }
 
 /** An event in the active season that has not moved to Past events. The schema imports this module, so it stays free of access.ts. */
