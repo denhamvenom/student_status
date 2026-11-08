@@ -1,11 +1,9 @@
 import { onsiteLocation, teamTransportEnabled } from "./lib/transportation";
-import { normalizeEmail, normalizePhone } from "./lib/contactValidation";
 import { requireSeasonFinanceReady } from "./lib/seasonFinance";
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { activeSeason, audit, requireRole, requireSeasonProfileWritable, viewer } from "./lib/access";
+import { activeSeason, audit, requireRole, viewer } from "./lib/access";
 import { refreshStudentFinance } from "./lib/financeSummaries";
-import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
 import { markRoomCategoryReview } from "./lib/profileCorrections";
 import { syncWholeTeamMembership } from "./lib/wholeTeam";
 import { subteamOptions } from "../src/lib/subteams";
@@ -184,40 +182,4 @@ export const updateRoster = mutation({
     await audit(ctx, user, "students", student._id, "updateRoster", { profileRevision: student.profileRevision ?? 0, active: student.active, roomCategory: student.roomCategory, legalName: student.legalName, archivedAt: student.archivedAt ?? null }, { ...changes, archivedAt: changes.archivedAt ?? student.archivedAt ?? null }, reason?.trim());
     return null;
   },
-});
-
-export const recordAttendance = mutation({
-  args: { meetingId: v.id("attendanceMeetings"), studentId: v.id("students"), present: v.boolean() }, returns: v.null(),
-  handler: async (ctx, args) => {
-    const user = await viewer(ctx);
-    if (user.role !== "coach") throw new ConvexError("Only a Coach can record attendance.");
-    const meeting = await ctx.db.get(args.meetingId); const student = await ctx.db.get(args.studentId);
-    const season = await activeSeason(ctx); await requireSeasonProfileWritable(ctx, season._id);
-    if (!meeting || !student || !student.active || meeting.seasonId !== season._id || meeting.seasonId !== student.seasonId || meeting.cancelled) throw new ConvexError("Attendance can't be recorded for this meeting. It may be canceled or from an earlier season, or the student is no longer active. Reload to see the latest.");
-    const old = await ctx.db.query("attendanceRecords").withIndex("by_meetingId_and_studentId", q => q.eq("meetingId", meeting._id).eq("studentId", student._id)).unique();
-    if (old) await ctx.db.patch(old._id, { present: args.present, recordedBy: user._id });
-    else await ctx.db.insert("attendanceRecords", { meetingId: meeting._id, studentId: student._id, present: args.present, recordedBy: user._id });
-    await audit(ctx, user, "attendanceRecords", `${meeting._id}:${student._id}`, "record", old?.present ?? null, args.present);
-    return null;
-  },
-});
-
-export const createMeeting = mutation({
-  args: { kind: v.union(v.literal("Tuesday"), v.literal("Thursday"), v.literal("Outreach")), startsAt: v.number(), eventId: v.optional(v.id("events")) }, returns: v.id("attendanceMeetings"),
-  handler: async (ctx, args) => { const user = await viewer(ctx); requireRole(user, "coach"); const season = await activeSeason(ctx); await requireSeasonProfileWritable(ctx, season._id); return await ctx.db.insert("attendanceMeetings", { ...args, seasonId: season._id, cancelled: false }); },
-});
-
-export const setMeetingCancelled = mutation({
-  args: { meetingId: v.id("attendanceMeetings"), cancelled: v.boolean() }, returns: v.null(),
-  handler: async (ctx, args) => { const user = await viewer(ctx); requireRole(user, "coach"); const meeting = await ctx.db.get(args.meetingId); const season = await activeSeason(ctx); await requireSeasonProfileWritable(ctx, season._id); if (!meeting || meeting.seasonId !== season._id) throw new ConvexError("This meeting is not in the current season. Reload to see current meetings."); await ctx.db.patch(meeting._id, { cancelled: args.cancelled }); await audit(ctx, user, "attendanceMeetings", meeting._id, "setCancelled", meeting.cancelled, args.cancelled); return null; },
-});
-
-export const createDriver = mutation({
-  args: { name: v.string(), phone: v.string(), email: v.string(), seats: v.number(), approved: v.boolean() }, returns: v.id("drivers"),
-  handler: async (ctx, args) => { const user = await viewer(ctx); if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can manage drivers."); if (!Number.isSafeInteger(args.seats) || args.seats < 0) throw new ConvexError("Enter passenger seats as a whole number, not counting the driver."); const season = await activeSeason(ctx); return await ctx.db.insert("drivers", { ...args, email: normalizeEmail(args.email, "Driver email"), phone: normalizePhone(args.phone, "Driver phone"), seasonId: season._id }); },
-});
-
-export const assignDriver = mutation({
-  args: { eventId: v.id("events"), driverId: v.id("drivers"), seats: v.number(), notes: v.optional(v.string()) }, returns: v.null(),
-  handler: async (ctx, args) => { const user = await viewer(ctx); if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can manage transport."); const event = await ctx.db.get(args.eventId); const driver = await ctx.db.get(args.driverId); const season = await activeSeason(ctx); if (!event || !driver || event.seasonId !== season._id || event.seasonId !== driver.seasonId || !driver.approved || !Number.isSafeInteger(args.seats) || args.seats < 0 || args.seats > driver.seats) throw new ConvexError("Choose an approved driver from this season, with passenger seats from 0 up to the vehicle's seats."); requireEnrollmentComplete(event); if (!teamTransportEnabled(event)) throw new ConvexError("Drivers and rides aren't managed for this event. Choose team transport in the event's Transport settings to manage them."); const prior = await ctx.db.query("eventVehicles").withIndex("by_eventId_and_driverId", q => q.eq("eventId", event._id).eq("driverId", driver._id)).unique(); if (prior) await ctx.db.patch(prior._id, { seats: args.seats, notes: args.notes }); else await ctx.db.insert("eventVehicles", args); return null; },
 });

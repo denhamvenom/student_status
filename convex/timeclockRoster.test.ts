@@ -29,8 +29,7 @@ async function fixture() {
     const unreviewed = await studentRow("Legacy", "Uncertain", "", false);
     await studentRow("Past", "Person", "", true, archived);
     await studentRow("Inactive", "Person", "", true, season, false);
-    const meeting = await ctx.db.insert("attendanceMeetings", { seasonId: season, kind: "Tuesday", startsAt: 0, cancelled: false });
-    return { coach, mentor, student, parent, inactive, unreviewed, z, meeting, season, archived };
+    return { coach, mentor, student, parent, inactive, unreviewed, z, season, archived };
   });
   const as = (id: typeof ids.coach) => t.withIdentity({ subject: `${id.auth}|test` });
   return { t, ids, coach: as(ids.coach), mentor: as(ids.mentor), student: as(ids.student), parent: as(ids.parent), inactive: as(ids.inactive) };
@@ -72,15 +71,6 @@ describe("Timeclock roster and attendance boundary", () => {
     expect(auditRows).toHaveLength(1);
     expect(auditRows[0].action).toBe("reviewStructuredName");
   });
-  it("removes the legacy Travel Lead attendance-write bypass", async () => {
-    const f = await fixture();
-    const args = { meetingId: f.ids.meeting, studentId: f.ids.z, present: true };
-    await expect(f.mentor.mutation(api.admin.recordAttendance, args)).rejects.toThrow("Only a Coach can record attendance");
-    await f.coach.mutation(api.admin.recordAttendance, args);
-    expect((await f.t.run(ctx => ctx.db.query("attendanceRecords").take(2)))).toHaveLength(1);
-    expect((await f.t.run(ctx => ctx.db.query("timeclockIntervals").take(1)))).toHaveLength(0);
-  });
-
   it("exposes minimized reviewed-student status only to active operators in the active season", async () => {
     const f = await fixture();
     const sessions = await sessionFixture(f);

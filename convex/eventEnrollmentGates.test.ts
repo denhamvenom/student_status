@@ -23,11 +23,10 @@ async function fixture(state: "running" | "failed") {
 }
 
 describe.each(["running", "failed"] as const)("%s Whole Team provisioning gates", state => {
-  it("blocks finance, both driver paths, travel, rooms and withdrawal without writes", async () => {
+  it("blocks finance, driver assignment, travel, rooms and withdrawal without writes", async () => {
     const f = await fixture(state);
     const eventId = f.ids.event;
     await expect(f.coach.mutation(api.finance.createCharge, { eventId, studentId: f.ids.student, label: "Extra", amountCents: 100, priority: 1, idempotencyKey: "pending-charge" })).rejects.toThrow("must finish");
-    await expect(f.coach.mutation(api.admin.assignDriver, { eventId, driverId: f.ids.driver, seats: 3 })).rejects.toThrow("must finish");
     await expect(f.coach.mutation(api.travel.assignVehicle, { eventId, driverId: f.ids.driver, seats: 3 })).rejects.toThrow("must finish");
     await expect(f.coach.mutation(api.travel.setEventTransport, { eventId, transportEnabled: true, busSeats: 5, additionalAdults: 0, trailerRequired: false })).rejects.toThrow("must finish");
     await expect(f.coach.mutation(api.travel.setIndependentTravel, { eventId, studentId: f.ids.student, independentTravel: true })).rejects.toThrow("must finish");
