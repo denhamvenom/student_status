@@ -35,14 +35,18 @@ describe("duplicate Mentor invite rows", () => {
     await f.t.run(async ctx => {
       for (let i = 0; i < 2; i++) await ctx.db.insert("eventMentorInvites", { eventId: f.ids.event, mentorUserId: f.ids.mentor.id, source: "individual", status: "invited", invitedBy: f.ids.coach.id, createdAt: i });
     });
+    expect((await f.mentor.query(api.mentorHome.mentorHome, { asOf: Date.now() })).pendingInvites.map(row => row.eventId)).toEqual([f.ids.event]);
     expect((await f.coach.query(api.mentorInvites.forEventSummary, { eventId: f.ids.event })).mentors).toMatchObject([{ mentorUserId: f.ids.mentor.id, status: "invited" }]);
     await f.mentor.mutation(api.mentorInvites.respond, { eventId: f.ids.event, status: "accepted" });
     const rows = await f.t.run(ctx => ctx.db.query("eventMentorInvites").withIndex("by_eventId", q => q.eq("eventId", f.ids.event)).take(10));
     expect(rows.map(row => row.status)).toEqual(["accepted", "accepted"]);
+    expect((await f.mentor.query(api.mentorHome.mentorHome, { asOf: Date.now() })).scheduled.map(row => row.eventId)).toEqual([f.ids.event]);
     // Adding the same Mentor again doesn't add a row.
     expect(await f.coach.mutation(api.mentorInvites.addMentorInvites, { eventId: f.ids.event, mentorUserIds: [f.ids.mentor.id, f.ids.mentor.id] })).toBe(0);
     await f.coach.mutation(api.mentorInvites.removeMentorInvite, { eventId: f.ids.event, mentorUserId: f.ids.mentor.id });
-    expect(await f.t.run(ctx => ctx.db.query("eventMentorInvites").withIndex("by_eventId", q => q.eq("eventId", f.ids.event)).take(10))).toEqual([]);
+    const home = await f.mentor.query(api.mentorHome.mentorHome, { asOf: Date.now() });
+    expect([...home.scheduled, ...home.pendingInvites].map(row => row.eventId)).not.toContain(f.ids.event);
+    expect((await f.coach.query(api.mentorInvites.forEventSummary, { eventId: f.ids.event })).mentors).toEqual([]);
   });
 });
 

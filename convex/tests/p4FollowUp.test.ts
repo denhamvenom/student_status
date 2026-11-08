@@ -243,6 +243,37 @@ describe("Coach roster directory", () => {
   });
 });
 
+describe("Mentor invitations", () => {
+  it("lists upcoming invitations on the Mentor's schedule even behind more than 100 newer accepted ones for archived events", async () => {
+    const f = await fixture();
+    const upcomingAccepted = await insertEvent(f, "Upcoming accepted");
+    const upcomingInvited = await insertEvent(f, "Upcoming invited", { startsAt: Date.now() + DAY, endsAt: Date.now() + DAY + 3_600_000 });
+    const declined = await insertEvent(f, "Declined", { startsAt: Date.now() + 3 * DAY, endsAt: Date.now() + 3 * DAY + 3_600_000 });
+    await f.t.run(async ctx => {
+      await ctx.db.insert("eventMentorInvites", { eventId: upcomingAccepted, mentorUserId: f.ids.mentor.id, source: "individual", status: "accepted", invitedBy: f.ids.coach.id, createdAt: 1 });
+      await ctx.db.insert("eventMentorInvites", { eventId: upcomingInvited, mentorUserId: f.ids.mentor.id, source: "subteam", status: "invited", invitedBy: f.ids.coach.id, createdAt: 2 });
+      await ctx.db.insert("eventMentorInvites", { eventId: declined, mentorUserId: f.ids.mentor.id, source: "individual", status: "declined", invitedBy: f.ids.coach.id, createdAt: 3 });
+      // Inserted after the current invitations, so a newest-first read meets these first.
+      for (let i = 0; i < 120; i++) {
+        const old = await ctx.db.insert("events", { seasonId: f.ids.season, name: `Old ${i}`, type: "Team", startsAt: 1, endsAt: 2, destination: "Lab", travel: "None", overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "open", allowWithdrawal: true, permissionRequired: false, firstRequired: false, archived: true });
+        await ctx.db.insert("eventMentorInvites", { eventId: old, mentorUserId: f.ids.mentor.id, source: "individual", status: "accepted", invitedBy: f.ids.coach.id, createdAt: 100 + i });
+      }
+    });
+    const schedule = () => f.mentor.query(api.mentorHome.mentorHome, { asOf: Date.now() });
+    const before = await schedule();
+    expect(before.pendingInvites.map(row => row.eventId)).toEqual([upcomingInvited]);
+    expect(before.scheduled.map(row => row.eventId)).toEqual([upcomingAccepted]);
+    // A declined invitation for a current event stays answerable: it is offered to join again.
+    expect(before.signUpAvailable.map(row => row.eventId)).toContain(declined);
+    expect(before.truncated).toBe(false);
+    await f.mentor.mutation(api.mentorInvites.respond, { eventId: declined, status: "accepted" });
+    const after = await schedule();
+    expect(after.scheduled.map(row => row.eventId)).toEqual([upcomingAccepted, declined]);
+    expect(after.signUpAvailable.map(row => row.eventId)).not.toContain(declined);
+    expect(after.pendingInvites.map(row => row.eventId)).toEqual([upcomingInvited]);
+  });
+});
+
 describe("series progress for staff", () => {
   it("reports the created window and the planned total so the UI can say more meetings are added automatically", async () => {
     vi.useFakeTimers();
