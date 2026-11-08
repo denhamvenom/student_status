@@ -4,7 +4,10 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { getAuthUserId, getAuthSessionId } from "@convex-dev/auth/server";
 import { timeclockTransitionLocked } from "./timeclockTransition";
 import { requireMaintenanceAccess } from "./maintenanceAccess";
+import { isCoachOrTravelLead } from "./staffRule";
 import { isDeveloperEmail, requireDeveloperAccountAllowed, developerSignInEnabled } from "./developerSignIn";
+
+export { isCoachOrTravelLead };
 
 type Ctx = QueryCtx | MutationCtx;
 export type AppUser = Doc<"appUsers">;
@@ -80,6 +83,10 @@ export function requireRole(user: AppUser, ...roles: AppUser["role"][]) {
   if (!roles.includes(user.role)) throw new ConvexError("You do not have permission for this action. Ask a Coach if you need access.");
 }
 
+export function requireCoachOrTravelLead(user: Pick<AppUser, "role" | "travelLead">) {
+  if (!isCoachOrTravelLead(user)) throw new ConvexError("You do not have permission for this action. Ask a Coach if you need access.");
+}
+
 export async function activeSeason(ctx: Ctx) {
   const season = await ctx.db.query("seasons").withIndex("by_status", q => q.eq("status", "active")).unique();
   if (!season) throw new ConvexError("No season is active yet. Ask a Coach to set up the season.");
@@ -96,7 +103,7 @@ export async function studentAccess(ctx: Ctx, user: AppUser, studentId: Id<"stud
   const season = await activeSeason(ctx);
   if (!student.active || student.seasonId !== season._id) throw new ConvexError("This student is unavailable in the active season. Reload to see the current roster.");
   if ("scheduler" in ctx) await requireSeasonProfileWritable(ctx, season._id);
-  if (user.role === "coach" || (user.role === "mentor" && user.travelLead)) return student;
+  if (isCoachOrTravelLead(user)) return student;
   if (user.role === "student" && student.userId === user._id) return student;
   if (user.role === "parent") {
     const link = await ctx.db.query("familyLinks").withIndex("by_parentUserId_and_studentId", q => q.eq("parentUserId", user._id).eq("studentId", studentId)).unique();
