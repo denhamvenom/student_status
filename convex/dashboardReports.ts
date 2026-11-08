@@ -6,7 +6,7 @@ import { paginationOptsValidator, paginationResultValidator } from "convex/serve
 import { query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
-import { activeSeason, requireRole, studentAccess, viewer, type AppUser } from "./lib/access";
+import { activeSeason, requireRole, studentAccess, viewer, type AppUser, isCoachOrTravelLead } from "./lib/access";
 import { calculateStudentFinance, FINANCE_SUMMARY_VERSION } from "./lib/financeSummaries";
 import { financialAccount } from "./lib/financialSources";
 import { attendanceEvidence, outreachForSession, buildDayFromTitle } from "./lib/attendanceReports";
@@ -258,7 +258,7 @@ export const team = query({
   ),
   handler: async ctx => {
     const user = await viewer(ctx);
-    if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can see team Money totals.");
+    if (!isCoachOrTravelLead(user)) throw new ConvexError("Only a Coach or Travel Lead can see team Money totals.");
     const season = await activeSeason(ctx);
     const students = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(501);
     if (students.length > 500) throw new ConvexError("Too many students this season to show team totals. Each student's account is still available.");

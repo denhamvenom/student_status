@@ -3,7 +3,7 @@ import { makeFunctionReference, paginationOptsValidator, paginationResultValidat
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import schema from "./schema";
-import { activeSeason, audit, requireRole, viewer } from "./lib/access";
+import { activeSeason, audit, requireRole, viewer, isCoachOrTravelLead } from "./lib/access";
 import { requireSeasonFinanceReady, seasonFinanceControl } from "./lib/seasonFinance";
 import { tokenHash } from "./lib/invitationIdentity";
 import { financialAccount } from "./lib/financialSources";
@@ -98,7 +98,7 @@ export const cancelPrepared = mutation({
 export const bulkStatus = query({
   args: { jobId: v.id("feeBulkJobs") }, returns: v.object({ job: schema.doc("feeBulkJobs"), originalActorName: v.string(), processingActorName: v.string(), canCommit: v.boolean(), canRetry: v.boolean(), canCancel: v.boolean() }),
   handler: async (ctx, args) => {
-    const actor = await viewer(ctx); if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can see team money.");
+    const actor = await viewer(ctx); if (!isCoachOrTravelLead(actor)) throw new ConvexError("Only a Coach or Travel Lead can see team money.");
     const season = await activeSeason(ctx); const job = await ctx.db.get(args.jobId); if (!job || job.seasonId !== season._id) throw new ConvexError("This fee change no longer exists. Reload to see the latest.");
     const original = await ctx.db.get(job.originalActorId); const processor = await ctx.db.get(job.actorId); const coach = actor.role === "coach";
     const control = await seasonFinanceControl(ctx, season._id); const definition = await ctx.db.get(job.feeDefinitionId);
@@ -143,7 +143,7 @@ export const bulkRows = query({
 export const bulkJobs = query({
   args: { feeDefinitionId: v.id("feeDefinitions"), paginationOpts: paginationOptsValidator }, returns: paginationResultValidator(schema.doc("feeBulkJobs")),
   handler: async (ctx, args) => {
-    const actor = await viewer(ctx); if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can see team money.");
+    const actor = await viewer(ctx); if (!isCoachOrTravelLead(actor)) throw new ConvexError("Only a Coach or Travel Lead can see team money.");
     const season = await activeSeason(ctx); const fee = await ctx.db.get(args.feeDefinitionId);
     if (!fee || fee.seasonId !== season._id) throw new ConvexError("This fee isn't in the current season. Reload to see the latest.");
     const opts = args.paginationOpts;

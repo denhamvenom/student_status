@@ -5,7 +5,7 @@ import { internal } from "./_generated/api";
 import schema from "./schema";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
-import { viewer } from "./lib/access";
+import { viewer, isCoachOrTravelLead } from "./lib/access";
 
 /** Mutate only event visibility. Participation, requirements and money remain intact. */
 export const sweep = internalMutation({
@@ -35,7 +35,7 @@ export async function scheduleEventArchive(ctx: MutationCtx, eventId: Id<"events
 }
 
 function staff(user: Awaited<ReturnType<typeof viewer>>) {
-  if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can open Past events.");
+  if (!isCoachOrTravelLead(user)) throw new ConvexError("Only a Coach or Travel Lead can open Past events.");
 }
 
 export const page = query({

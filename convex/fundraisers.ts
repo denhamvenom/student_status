@@ -6,7 +6,7 @@ import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
-import { activeSeason, audit, viewer } from "./lib/access";
+import { activeSeason, audit, viewer, isCoachOrTravelLead } from "./lib/access";
 import { fundraisingCapabilities, fundraisingSplit } from "./lib/fundraisingMath";
 import { tokenHash } from "./lib/invitationIdentity";
 import { financialAccount } from "./lib/financialSources";
@@ -20,7 +20,7 @@ const previewRow = v.object({ studentId: v.id("students"), grossCents: v.number(
 
 async function authorized(ctx: QueryCtx | MutationCtx) {
   const actor = await viewer(ctx);
-  if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can see fundraisers.");
+  if (!isCoachOrTravelLead(actor)) throw new ConvexError("Only a Coach or Travel Lead can see fundraisers.");
   return actor;
 }
 

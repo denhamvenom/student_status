@@ -3,7 +3,7 @@ import { ConvexError, v } from "convex/values";
 import { query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
-import { activeSeason, viewer } from "./lib/access";
+import { activeSeason, viewer, isCoachOrTravelLead } from "./lib/access";
 import { financeRow } from "./lib/financeRow";
 import { teamReportAttendanceGate, teamReportAttendanceRow } from "./lib/teamReportAttendance";
 import { studentReadiness } from "./lib/readModels";
@@ -18,7 +18,7 @@ const rowValidator = v.object({studentId:v.id("students"),name:v.string(),subtea
 
 async function requireViewer(ctx: QueryCtx) {
   const actor = await viewer(ctx);
-  if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can open team reports.");
+  if (!isCoachOrTravelLead(actor)) throw new ConvexError("Only a Coach or Travel Lead can open team reports.");
   return actor;
 }
 

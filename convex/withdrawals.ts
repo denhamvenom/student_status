@@ -7,7 +7,7 @@ import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { activeSeason, audit, ownStudent, studentAccess, viewer } from "./lib/access";
+import { activeSeason, audit, ownStudent, studentAccess, viewer, isCoachOrTravelLead } from "./lib/access";
 import { effectiveChargeCents } from "./lib/money";
 import { activeQuestions, checkAnswers, checkShifts, clearShifts, MAX_QUESTION_ROWS } from "./lib/eventSignupExtras";
 import { teamTransportEnabled } from "./lib/transportation";
@@ -153,7 +153,7 @@ export const pendingWithdrawals = query({
   args: {}, returns: v.array(v.object({ requestId: v.id("withdrawalRequests"), eventId: v.id("events"), studentId: v.id("students"), eventName: v.string(), studentName: v.string(), requestedAt: v.number(), status: v.union(v.literal("pending"), v.literal("processing")), progress: v.union(progressValidator, v.null()) })),
   handler: async ctx => {
     const user = await viewer(ctx);
-    if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can review withdrawal requests.");
+    if (!isCoachOrTravelLead(user)) throw new ConvexError("Only a Coach or Travel Lead can review withdrawal requests.");
     const season = await activeSeason(ctx);
     const pending = await ctx.db.query("withdrawalRequests").withIndex("by_status", q => q.eq("status", "pending")).take(101);
     const processing = await ctx.db.query("withdrawalRequests").withIndex("by_status", q => q.eq("status", "processing")).take(101);
@@ -175,7 +175,7 @@ export const wholeTeamLeaveNotices = query({
   returns: v.array(v.object({ noticeId: v.id("wholeTeamLeaveNotices"), eventId: v.id("events"), eventName: v.string(), studentName: v.string(), leftAt: v.number() })),
   handler: async (ctx, args) => {
     const user = await viewer(ctx);
-    if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can see Whole Team leave notices.");
+    if (!isCoachOrTravelLead(user)) throw new ConvexError("Only a Coach or Travel Lead can see Whole Team leave notices.");
     const season = await activeSeason(ctx);
     const event = args.eventId ? await ctx.db.get(args.eventId) : null;
     if (args.eventId && (!event || event.seasonId !== season._id)) throw new ConvexError("This event isn't in the current season. Reload to see the latest.");
@@ -317,7 +317,7 @@ export const putBackOnEvent = mutation({
   handler: async (ctx, args) => {
     await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const user = await viewer(ctx);
-    if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can put a student back on an event.");
+    if (!isCoachOrTravelLead(user)) throw new ConvexError("Only a Coach or Travel Lead can put a student back on an event.");
     if (args.reason !== undefined && args.reason.length > 1000) throw new ConvexError("Keep the note under 1,000 characters.");
     const data = await details(ctx, args.eventId, args.studentId);
     const event = data.event;
@@ -377,7 +377,7 @@ export const reviewWithdrawal = mutation({
   handler: async (ctx, args) => {
     await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const user = await viewer(ctx);
-    if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can review withdrawal requests.");
+    if (!isCoachOrTravelLead(user)) throw new ConvexError("Only a Coach or Travel Lead can review withdrawal requests.");
     if (args.reason.trim().length < 8 || args.reason.length > 1000) throw new ConvexError("Provide an explanation of at least eight characters.");
     const request = await ctx.db.get(args.requestId);
     if (!request) throw new ConvexError("This withdrawal request no longer exists. Reload to see the latest.");

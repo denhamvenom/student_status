@@ -133,6 +133,7 @@ import type * as lib_seasonIdentity from "../lib/seasonIdentity.js";
 import type * as lib_seasonTransitionFinance from "../lib/seasonTransitionFinance.js";
 import type * as lib_seriesGenerate from "../lib/seriesGenerate.js";
 import type * as lib_seriesRecurrence from "../lib/seriesRecurrence.js";
+import type * as lib_staffRule from "../lib/staffRule.js";
 import type * as lib_subteamEnrollment from "../lib/subteamEnrollment.js";
 import type * as lib_teamReportAttendance from "../lib/teamReportAttendance.js";
 import type * as lib_timeclock from "../lib/timeclock.js";
@@ -320,6 +321,7 @@ declare const fullApi: ApiFromModules<{
   "lib/seasonTransitionFinance": typeof lib_seasonTransitionFinance;
   "lib/seriesGenerate": typeof lib_seriesGenerate;
   "lib/seriesRecurrence": typeof lib_seriesRecurrence;
+  "lib/staffRule": typeof lib_staffRule;
   "lib/subteamEnrollment": typeof lib_subteamEnrollment;
   "lib/teamReportAttendance": typeof lib_teamReportAttendance;
   "lib/timeclock": typeof lib_timeclock;

@@ -3,7 +3,7 @@ import { ConvexError, v } from "convex/values";
 import { query } from "./_generated/server";
 import type { QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { activeSeason, studentAccess, viewer } from "./lib/access";
+import { activeSeason, studentAccess, viewer, isCoachOrTravelLead } from "./lib/access";
 import schema from "./schema";
 import { effectiveChargeDueAt } from "./lib/feeDefinitions";
 
@@ -52,7 +52,7 @@ export const charges = query({
     if (result.page.length > 25) throw new ConvexError("This list couldn't load. Reload the page to try again.");
     // dueAt is the effective due date: the charge's own, else its fee definition's.
     const page = await Promise.all(result.page.map(async charge => ({charge, dueAt: await effectiveChargeDueAt(ctx, charge)})));
-    if (actor.role === "coach" || actor.role === "mentor" && actor.travelLead) return {...result, page: page.map(({charge, dueAt}) => ({...charge, dueAt}))};
+    if (isCoachOrTravelLead(actor)) return {...result, page: page.map(({charge, dueAt}) => ({...charge, dueAt}))};
     return {...result, page: page.map(({charge, dueAt}) => ({_id: charge._id, eventId: charge.eventId, label: charge.label, category: charge.category, cancelledCents: charge.cancelledCents, outstanding: charge.outstanding, adjustedCents: charge.adjustedCents, amountCents: charge.amountCents, appliedCents: charge.appliedCents, priority: charge.priority, createdAt: charge.createdAt, dueAt}))};
   },
 });
@@ -68,7 +68,7 @@ export const history = query({
     const page = await Promise.all(result.page.map(async entry => {
       const charge = entry.chargeId ? await ctx.db.get(entry.chargeId) : null;
       const safeDescription = familyDescription(entry.kind, charge?.label ?? null, entry.destination, entry.sourceKind);
-      if (actor.role === "coach" || actor.role === "mentor" && actor.travelLead) return {...entry, safeDescription};
+      if (isCoachOrTravelLead(actor)) return {...entry, safeDescription};
       return {_id: entry._id, kind: entry.kind, amountCents: entry.amountCents, recordedAt: entry.recordedAt, method: entry.method, sourceKind: entry.sourceKind, destination: entry.destination, safeDescription};
     }));
     return {...result, page};

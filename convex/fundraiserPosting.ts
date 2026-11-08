@@ -6,7 +6,7 @@ import { makeFunctionReference, paginationOptsValidator } from "convex/server";
 import { ConvexError, v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import schema from "./schema";
-import { activeSeason, audit, viewer } from "./lib/access";
+import { activeSeason, audit, viewer, isCoachOrTravelLead } from "./lib/access";
 import { fundraisingCapabilities, fundraisingSplit } from "./lib/fundraisingMath";
 import { financialAccount, recordProjectedEntry, requireNoFinancialJob, saveFinancialAccount } from "./lib/financialSources";
 import { availableOriginalFundraiserCredit, updateFundraiserAggregate } from "./lib/reportAggregates";
@@ -130,7 +130,7 @@ export const rows = query({
   args: { jobId: v.id("fundraiserPostingJobs"), paginationOpts: paginationOptsValidator }, returns: v.object({ page: v.array(schema.doc("fundraiserPostingRows").extend({ name: v.string() })), isDone: v.boolean(), continueCursor: v.string() }),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); const season = await activeSeason(ctx); const job = await ctx.db.get(args.jobId); const fundraiser = job ? await ctx.db.get(job.fundraiserId) : null;
-    if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead) || !fundraiser || fundraiser.seasonId !== season._id) throw new ConvexError("Fundraiser history isn't available. Only a Coach or Travel Lead can see it, for current-season fundraisers.");
+    if (!isCoachOrTravelLead(actor) || !fundraiser || fundraiser.seasonId !== season._id) throw new ConvexError("Fundraiser history isn't available. Only a Coach or Travel Lead can see it, for current-season fundraisers.");
     if (!Number.isSafeInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 30) throw new ConvexError("Request at most 30 rows per page.");
     const page = await ctx.db.query("fundraiserPostingRows").withIndex("by_jobId", q => q.eq("jobId", args.jobId)).paginate({ ...args.paginationOpts, maximumRowsRead: 31 });
     if (page.page.length > 30) throw new ConvexError("This list couldn't load. Reload the page to try again.");
