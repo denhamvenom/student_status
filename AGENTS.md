@@ -93,6 +93,8 @@ Optional vendor guidance can be installed with `npx convex ai-files install`; re
 - Development Convex sync (`convex dev`, `bun run dev:backend`, `start.ps1 -Mode Dev`) runs only from a worktree with a clean tree whose branch includes current origin/main. Announce the deployment first, run one sync at a time, and expect each sync to replace whatever was synced last.
 - Production (`convex deploy`, merging to main) needs my explicit approval each time and goes one feature at a time from an up-to-date main after the PR is merged: merge PR -> pull main -> deploy main -> notify. Never deploy a feature branch to production.
 - After a production deploy, other sessions rebase or merge origin/main before their next development sync.
+- Retarget stacked PRs to main before deleting their base branch; otherwise GitHub closes them and refuses to reopen them.
+- `convex codegen` prints "Uploading functions to Convex" but deploys nothing; check what a deployment runs with `bunx convex function-spec`, and never treat codegen as a sync.
 - Stage explicit paths only; never commit another session's files.
 - In Claude Code, `.claude/hooks/parallel-work-guard.mjs` enforces the worktree and Convex sync/deploy rules; see `docs/REPOSITORY.md` (Parallel sessions).
 - Review staged content for private data and secrets; preserve published history and verify pushes before claiming remote backup.

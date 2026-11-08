@@ -28,12 +28,37 @@ Accepted deferrals are listed in [KNOWN_GAPS.md](KNOWN_GAPS.md); consult them on
   - Coach team-wide Mentor overview (who is going to what, across events).
   - Store the creator's role label at creation time (Created by currently reads the creator's role now).
   - Theme flash on load.
-- Travel Lead check tightening: change about 20 pre-existing loose checks to `coach || (mentor && travelLead)`; line list in [HANDOFF.md](../HANDOFF.md#next), gap in KNOWN_GAPS.
 - Roster bulk edit and assigning CAD/Leadership from the roster subteam dropdown.
 - Student Home wording: carousel, FIRST registration/Consent & Release jargon, doubled "optional" label on open signups.
 - Owner decision: whether Travel Leads keep adding/removing Mentor invitations on Coach-only required events (current policy allows it).
 - Put back fee (owner, November 7, 2026): decide the rule (Coach confirms a suggested amount vs automatic). Until then Put back on event and Undo leave charges unchanged and the Coach adds the fee by hand; see [DECISIONS.md](DECISIONS.md). This is a money change; read DECISIONS.md first.
 - Remind my parent (owner, October 27): a Student Home button that emails the linked parent about a FIRST registration, permission form or payment waiting on them, through the existing parent email service.
+- Carried over from earlier HANDOFF entries (November 8, 2026 trim): the "My attendance" month arrows report (likely disabled by design when the season starts in the current or a future month, but disabled arrows are only `opacity-60` and look broken; production season `startsAt` unverified); Inbox items have no Urgent badge; owner decision on sign-in session length; slow `signUp` (about 10 s on development); DSHS STEM Center address and drop-off note not added.
+- Persona findings, observed 2026-11-08 on development with synthetic data:
+  - A Student cannot see their own consent-form status; there is no student-side path and `/permissions` is staff-only.
+  - Student Home: the Balance due card sits at the bottom of a long page and does not say what the charge is for.
+  - Student Home: the next-up card shows "Signed up" directly above "Optional: sign up only if you want to go".
+  - Venue names truncate in the This Week list.
+  - The Inbox badge shows a large unread count with no explanation.
+  - Announcement compose shows no recipient count or preview, Pin to Home defaults on, and Send as urgent bypasses school hours.
+  - The Fundraising page says there are no fundraisers while Money shows fundraiser credit.
+  - The per-student Record payment dialog has no date field (the Money tools CSV import has one).
+  - Rooming is only reachable on overnight events, and how adult rooms work is unclear.
+  - Money tools are only linked from a small line at the bottom of Money.
+
+## Code health (owner decisions pending)
+
+Found by the November 2026 audit ([receipt](releases/RELEASE_2026-11-08_AUDIT_CLEANUP.md)); each needs an owner decision before any change.
+
+- Decide which single registration of the `feeBulk.*` functions to keep: the `feeBulk` module itself or the re-export through `feeDefinitions.ts` (today both are registered).
+- Decide whether `timeclockHistoryImport.importOccurrence` stays public (CLI use), becomes internal or is removed; the import completed 2026-10-22.
+- Decide whether `participation.setParticipation` and `eventShifts.setStudentShifts`, Coach actions with no UI, get a UI or are removed.
+- Decide whether `eventCalendar.linkOwner`, `eventCalendar.reconcileOne`, `eventCalendar.reconcileLinked` and `calendar.refresh`, which have no callers, are kept for manual repair or removed.
+- Decide whether the undocumented rehearsal modules `consentRehearsal`, `consentPdfRehearsal` and `reviewerRehearsal` are documented or removed, and whether the production-targeted delete tool `syntheticRehearsalCleanup` is kept or removed; the 2026-10-18 cleanup it served is not confirmed finished.
+- Decide whether the `attendanceMeetings` and `attendanceRecords` tables (no live writers, still read) stay as they are or are consolidated with the Timeclock attendance report, which would be a data migration.
+- Decide whether `src/fixtures.ts` (synthetic prototype data) stays in the production bundle or is kept out of it.
+- Decide whether to keep or remove the 22 schema indexes with no `.withIndex` reference in app or test code (25 outside tests; the audit counted 24); regenerate the list first. As of main `18ffc06`: `zeffyRuns.by_startedAt`, `zeffyCampaignMappings.by_studentId_and_seasonId`, `zeffyPayments.by_studentId_and_seasonId`, `historicalCorrectionSessions.by_actorId_and_seasonId`, `fundraiserPostingJobs.by_actorId_and_idempotencyKey`, `adminContactRequests.by_requestedBy_and_createdAt`, `joinAttempts.by_seasonId_and_assignmentScope`, `joinAttempts.by_seasonId_and_audienceKind_and_archived_and_startsAt`, `eventSeriesCalendarClaims.by_seriesId`, `eventQuestionAnswers.by_eventId_and_studentId_and_questionId`, `shiftSignups.by_shiftId_and_studentId`, `feeMappingRows.by_jobId_and_chargeId`, `feeBulkRows.by_jobId_and_chargeId`, `feeDefinitions.by_eventId_and_kind`, `permissionSubmissions.by_draftId`, `permissionSubmissions.by_recordedBy_and_idempotencyKey`, `timeclockHistoryImports.by_sourceSha256`, `timeclockScheduleRevisions.by_occurrenceId_and_revision`, `timeclockExtensions.by_sessionId_and_at`, `timeclockCorrections.by_originalIntervalId`, `timeclockCorrections.by_targetCorrectionId`, `audit.by_actorId_and_at`; test-only: `financialAllocationJobs.by_studentId_and_state`, `financialOperationJobs.by_studentId_and_state`, `timeclockAttendanceSummaries.by_studentId_and_scheduledStart`.
+- Decide whether the `demo/` static prototypes, tracked in Git but not deployed, stay in the repository or are removed.
 
 ## Testing
 
