@@ -8,10 +8,10 @@ import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { Card, CardTitle } from './components/ui/card'
 import { NativeSelect, NativeSelectOption } from './components/ui/native-select'
-import { parseFundraisingDecimal, formatFundraisingCents } from './Fundraising'
+import { chargeCurrency, parseChargeTarget } from './lib/charge-money'
 import { historicalFinanceCopy as copy } from './lib/historical-finance-copy'
 import styles from './ChargeAdministration.module.css'
-const usd = formatFundraisingCents
+const usd = chargeCurrency
 class HistoricalFinanceBoundary extends Component<{ children: ReactNode; retry: () => void }, { error: unknown }> {
   state = { error: null as unknown }
   static getDerivedStateFromError(error: unknown) { return { error } }
@@ -33,7 +33,7 @@ function HistoricalCharges({ seasonId, studentId, grantId }: { seasonId: Id<'sea
 }
 function CorrectionForm({ seasonId, chargeId, grantId, onAnother }: { seasonId: Id<'seasons'>; chargeId: Id<'charges'>; grantId: Id<'historicalCorrectionSessions'>; onAnother: () => void }) {
   const [kind, setKind] = useState<'adjustment' | 'cancellation'>('adjustment'); const [amount, setAmount] = useState(''); const [reason, setReason] = useState(''); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [requested, setRequested] = useState<Id<'financialOperationJobs'> | null>(null); const key = useRef(crypto.randomUUID()); const guard = useRef(false)
-  const target = parseFundraisingDecimal(amount)
+  const target = parseChargeTarget(amount)
   const preview = useQuery(api.historicalFinancialCorrections.preview, target === null ? 'skip' : { seasonId, chargeId, targetEffectiveCents: target, kind })
   const [review, setReview] = useState<FunctionReturnType<typeof api.historicalFinancialCorrections.preview> | null>(null)
   const status = useQuery(api.historicalFinancialCorrections.status, { seasonId, chargeId, ...(requested ? { jobId: requested } : {}) })

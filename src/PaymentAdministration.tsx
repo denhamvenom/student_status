@@ -8,7 +8,7 @@ import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { Card, CardTitle } from './components/ui/card'
 import { NativeSelect, NativeSelectOption } from './components/ui/native-select'
-import { parseFundraisingDecimal, formatFundraisingCents } from './Fundraising'
+import { chargeCurrency, parseChargeTarget } from './lib/charge-money'
 import styles from './ChargeAdministration.module.css'
 import { paymentAdministrationCopy as copy } from './lib/payment-admin-copy'
 import { FeePaymentImport } from './FeePaymentImport'
@@ -17,7 +17,7 @@ import { chicagoMidnight } from '../shared/chicago-time'
 type PaymentRow = { studentEmail: string; amountCents: number; method: 'cash' | 'check' | 'other'; reference: string; occurredAt: number; rowReference: string }
 type ReviewedRow = PaymentRow & FunctionReturnType<typeof api.paymentAdministration.previewPayments>[number]
 const message = (error: unknown) => userFacingError(error)
-const usd = formatFundraisingCents
+const usd = chargeCurrency
 
 /** CSV stays in memory; quoted commas, quotes, CRLF and multiline fields are supported. */
 export function parsePaymentCsv(text: string): PaymentRow[] {
@@ -39,7 +39,7 @@ export function parsePaymentCsv(text: string): PaymentRow[] {
   return records.map((cells, index) => {
     if (cells.length !== header.length) throw new Error(copy.badColumns(index + 2))
     const value = (key: string) => cells[header.indexOf(key)].trim()
-    const amountCents = parseFundraisingDecimal(value('amount')); const method = value('method').toLowerCase(); const date = value('date')
+    const amountCents = parseChargeTarget(value('amount')); const method = value('method').toLowerCase(); const date = value('date')
     const occurredAt = /^\d{4}-\d{2}-\d{2}$/.test(date) ? Date.parse(`${date}T00:00:00Z`) : NaN
     if (!amountCents || !Number.isSafeInteger(occurredAt) || new Date(occurredAt).toISOString().slice(0, 10) !== date || !['cash', 'check', 'other'].includes(method)) throw new Error(copy.badRow(index + 2))
     const teamMidnight = chicagoMidnight(date)
@@ -106,7 +106,7 @@ function PaymentCorrections({ studentId }: { studentId: Id<'students'> }) {
   return <Card className={styles.card}><CardTitle>{copy.correctionTitle}</CardTitle><p className={styles.muted}>{copy.correctionPurpose}</p><div className={styles.history}>{page.results.map(row => <div className={styles.historyRow} key={row.sourceEntryId}><strong>{row.reference} / {usd(row.currentAmountCents)}</strong><span>{copy.original} {usd(row.originalAmountCents)} / {copy.available} {usd(row.availableCents)} / {new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago' }).format(new Date(row.occurredAt))}</span><Button variant="outline" disabled={row.carried} onClick={() => setSelected(row.sourceEntryId)}>{row.carried ? copy.linkedCarryover : copy.reviewCorrection}</Button></div>)}</div>{page.status === 'CanLoadMore' && <Button variant="outline" onClick={() => page.loadMore(20)}>{copy.loadMore}</Button>}{page.status === 'LoadingFirstPage' && <p role="status">{copy.loading}</p>}{page.status !== 'LoadingFirstPage' && !page.results.length && <p>{copy.noPayments}</p>}{selected && <CorrectionForm key={selected} studentId={studentId} sourceEntryId={selected}/>}</Card>
 }
 function CorrectionForm({ sourceEntryId, studentId }: { sourceEntryId: Id<'ledgerEntries'>; studentId: Id<'students'> }) {
-  const [amount, setAmount] = useState(''); const target = parseFundraisingDecimal(amount); const [reason, setReason] = useState(''); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [jobId, setJobId] = useState<Id<'financialOperationJobs'> | null>(null); const key = useRef(crypto.randomUUID()); const guard = useRef(false)
+  const [amount, setAmount] = useState(''); const target = parseChargeTarget(amount); const [reason, setReason] = useState(''); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [jobId, setJobId] = useState<Id<'financialOperationJobs'> | null>(null); const key = useRef(crypto.randomUUID()); const guard = useRef(false)
   const current = useQuery(api.paymentAdministration.previewCorrection, target === null ? 'skip' : { sourceEntryId, targetAmountCents: target })
   const [review, setReview] = useState<FunctionReturnType<typeof api.paymentAdministration.previewCorrection> | null>(null)
   const job = useQuery(api.paymentAdministration.correctionStatus, jobId ? { jobId } : 'skip')

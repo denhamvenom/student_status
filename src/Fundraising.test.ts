@@ -1,32 +1,33 @@
 import { describe, expect, it } from 'vitest'
-import { collectFundraisingPreview, formatFundraisingCents, fundraisingDecimalValue, parseFundraisingDecimal } from './Fundraising'
+import { collectFundraisingPreview, fundraisingDecimalValue } from './Fundraising'
+import { chargeCurrency, parseChargeTarget } from './lib/charge-money'
 import type { FunctionReturnType } from 'convex/server'
 import type { Id } from '../convex/_generated/dataModel'
 import { api } from '../convex/_generated/api'
 
 describe('fundraising decimal entry', () => {
   it('preserves exact pennies and percentage hundredths', () => {
-    expect(parseFundraisingDecimal('0.29')).toBe(29)
-    expect(parseFundraisingDecimal('12.01')).toBe(1201)
-    expect(parseFundraisingDecimal('33.33')).toBe(3333)
-    expect(parseFundraisingDecimal('100')).toBe(10000)
-    expect(parseFundraisingDecimal('0')).toBe(0)
-    expect(parseFundraisingDecimal(' 1.5 ')).toBe(150)
+    expect(parseChargeTarget('0.29')).toBe(29)
+    expect(parseChargeTarget('12.01')).toBe(1201)
+    expect(parseChargeTarget('33.33')).toBe(3333)
+    expect(parseChargeTarget('100')).toBe(10000)
+    expect(parseChargeTarget('0')).toBe(0)
+    expect(parseChargeTarget(' 1.5 ')).toBe(150)
   })
 
   it('rejects missing, fractional pennies, unsafe amounts and ambiguous formats', () => {
     for (const value of ['', ' ', '-1', '1.001', '1e3', '1,000', 'Infinity', '90071992547410']) {
-      expect(parseFundraisingDecimal(value)).toBeNull()
+      expect(parseChargeTarget(value)).toBeNull()
     }
-    expect(parseFundraisingDecimal('90071992547409.91')).toBe(Number.MAX_SAFE_INTEGER)
-    expect(parseFundraisingDecimal('90071992547409.92')).toBeNull()
+    expect(parseChargeTarget('90071992547409.91')).toBe(Number.MAX_SAFE_INTEGER)
+    expect(parseChargeTarget('90071992547409.92')).toBeNull()
   })
 
   it('formats every penny even at the supported integer limit', () => {
-    expect(formatFundraisingCents(Number.MAX_SAFE_INTEGER)).toBe('$90,071,992,547,409.91')
-    expect(formatFundraisingCents(-1)).toBe('-$0.01')
+    expect(chargeCurrency(Number.MAX_SAFE_INTEGER)).toBe('$90,071,992,547,409.91')
+    expect(chargeCurrency(-1)).toBe('-$0.01')
     expect(fundraisingDecimalValue(Number.MAX_SAFE_INTEGER)).toBe('90071992547409.91')
-    expect(parseFundraisingDecimal(fundraisingDecimalValue(Number.MAX_SAFE_INTEGER))).toBe(Number.MAX_SAFE_INTEGER)
+    expect(parseChargeTarget(fundraisingDecimalValue(Number.MAX_SAFE_INTEGER))).toBe(Number.MAX_SAFE_INTEGER)
   })
 })
 
