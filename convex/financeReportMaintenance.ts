@@ -1,25 +1,13 @@
-import { savedPublicError, publicErrorResult } from './lib/publicErrors';
+import { savedPublicError } from './lib/publicErrors';
 import { requireSeasonTransitionFinancialAccess, seasonFinanceControl } from "./lib/seasonFinance";
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, mutation } from "./_generated/server";
 import { activeSeason, requireRole, viewer } from "./lib/access";
 import { FINANCE_SUMMARY_VERSION, refreshStudentFinance } from "./lib/financeSummaries";
 import type { Id } from "./_generated/dataModel";
 import { startFinancialRebuild } from "./financialSources";
 import { ensureFinancialAccount, financialAccount } from "./lib/financialSources";
-
-const statusValidator = v.object({ state: v.union(v.literal("running"), v.literal("failed"), v.literal("complete")), processed: v.number(), updatedAt: v.number(), lastError: v.union(v.string(), v.null()) });
-
-export const status = query({
-  args: {}, returns: v.union(v.null(), statusValidator),
-  handler: async ctx => {
-    requireRole(await viewer(ctx), "coach");
-    const season = await activeSeason(ctx);
-    const row = await ctx.db.query("financeSummaryBackfills").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).unique();
-    return publicErrorResult(row ? { state: row.state, processed: row.processed, updatedAt: row.updatedAt, lastError: row.lastError ?? null } : null);
-  },
-});
 
 /** Start or resume current-season rebuild. A failed source row keeps its cursor for repair/retry. */
 export const start = mutation({

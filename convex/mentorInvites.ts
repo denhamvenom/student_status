@@ -10,40 +10,6 @@ import {
 import { notifyStaffInvited, queueMentorMeetingActivityDigest } from "./lib/notificationTriggers";
 import { questionsValidator, requireMentor, seriesScopeValidator, signupArgs } from "./mentorMeetings";
 
-/** Current events scanned for a Mentor's invitations (the same order of size as app.listEvents' 200). */
-const MAX_CURRENT_EVENTS = 300;
-
-const myInvite = v.object({
-  eventId: v.id("events"), title: v.string(), startsAt: v.number(), endsAt: v.number(), location: v.string(), virtual: v.boolean(),
-  locationType: v.union(v.literal("inPerson"), v.literal("virtual")),
-  cancelled: v.boolean(), status: v.union(v.literal("invited"), v.literal("accepted"), v.literal("declined")),
-});
-
-/** The signed-in Mentor's own invitations: title, time, place and status only (no rosters, fees or health data). */
-export const myInvitedEvents = query({
-  args: {}, returns: v.array(myInvite),
-  handler: async ctx => {
-    const user = await viewer(ctx);
-    const stored = await ctx.db.get(user._id);
-    if (!isMentorCapable(stored)) throw new ConvexError("Only a Mentor has event invitations.");
-    const season = await activeSeason(ctx);
-    const out: (typeof myInvite.type)[] = [];
-    // Read from the season's current (not yet archived) events, soonest end first, with a point lookup of this Mentor's
-    // invite on each. Invite rows have no event time, so reading them oldest-first could miss upcoming invitations behind
-    // many old accepted ones (past events are archived and drop out here). Bounded like the event list.
-    const events = await ctx.db.query("events").withIndex("by_seasonId_and_archived_and_endsAt", q => q.eq("seasonId", season._id).eq("archived", false)).take(MAX_CURRENT_EVENTS);
-    for (const event of events) {
-      // .first(), not .unique(): a duplicate invite row must not break the whole invitations page.
-      const invite = await ctx.db.query("eventMentorInvites").withIndex("by_eventId_and_mentorUserId", q => q.eq("eventId", event._id).eq("mentorUserId", user._id)).first();
-      // Declined invitations for current events are returned too, so /invited can offer "I'll be there after all" (respond
-      // accepts again).
-      if (!invite) continue;
-      out.push({ eventId: event._id, title: event.name, startsAt: event.startsAt, endsAt: event.endsAt, location: event.destination, virtual: event.locationType === "virtual", locationType: event.locationType ?? "inPerson", cancelled: event.cancelled ?? false, status: invite.status });
-    }
-    return out.sort((a, b) => a.startsAt - b.startsAt);
-  },
-});
-
 /**
  * A Mentor answers only their own invitation, for a current event (active season, not archived, canceled or over).
  * Accepting takes the same answers and series choice as mentorMeetings.signUp (canDriveStudents for travel, needsHotelRoom
@@ -126,17 +92,9 @@ async function eventMentorRows(ctx: QueryCtx, eventId: Id<"events">): Promise<{ 
   return { event, mentors: out.sort((a, b) => a.name.localeCompare(b.name)) };
 }
 
-/** Coach / Travel Lead (requireInviter): an event's Mentors with status, source, answers and series choice (bounded to the per-event cap). */
-export const forEvent = query({
-  args: { eventId: v.id("events") }, returns: v.array(eventInvite),
-  handler: async (ctx, args) => {
-    await requireInviter(ctx);
-    return (await eventMentorRows(ctx, args.eventId)).mentors;
-  },
-});
-
 /**
- * Coach / Travel Lead (requireInviter): forEvent plus the questions this event asks and counts of going Mentors: how many can drive
+ * Coach / Travel Lead (requireInviter): an event's Mentors with status, source, answers and series choice (bounded to the per-event
+ * cap), plus the questions this event asks and counts of going Mentors: how many can drive
  * students, how many need a hotel room, and how many haven't answered a question that applies.
  */
 export const forEventSummary = query({

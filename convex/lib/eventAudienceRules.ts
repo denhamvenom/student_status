@@ -2,7 +2,6 @@ import { canonicalSubteam, subteamOptions } from "../../src/lib/subteams";
 
 /**
  * Pure audience rules for events: who an event is for, and how the audience choice maps onto stored event fields.
- * Types are declared locally because the audience fields are not in the schema yet.
  */
 
 export const PRIMARY_SUBTEAMS = subteamOptions;

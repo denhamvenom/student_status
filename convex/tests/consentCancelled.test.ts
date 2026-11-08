@@ -1,15 +1,20 @@
 /// <reference types="vite/client" />
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { convexTest } from "convex-test";
-import { api } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import schema from "../schema";
 import { chicagoDate } from "../lib/calendarDates";
 import { addDays, weekdayOf } from "../lib/seriesRecurrence";
 
 const modules = import.meta.glob("../**/*.ts");
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
-const choices = { pain: "allow" as const, allergy: "contact" as const, cold: "deny" as const };
-const wording = { version: "SYNTHETIC-DRAFT-1", title: "Synthetic permission", wording: "Denham Springs High School and FIRST Team 8044, Denham Venom: participation, travel and minor first aid. Synthetic unapproved wording only.", schoolName: "Denham Springs High School", teamName: "FIRST Team 8044, Denham Venom", medications: (["pain", "allergy", "cold"] as const).map(key => ({ key, label: `${key[0].toUpperCase()}${key.slice(1)} Medication`, productsText: "Unapproved synthetic products", exceptionsText: "Unapproved exceptions" })), administrationText: "Synthetic administration only; Coach approval pending.", acknowledgmentText: "I authorize the options selected for these listed events." };
+const profile = {
+  grade: "10", dateOfBirth: "2010-05-12",
+  guardian: { name: "Parent Example", relationship: "Parent", phone: "202-555-0100", email: "parent-example@example.invalid" },
+  emergency: { name: "Emergency Person", relationship: "Guardian", phone: "202-555-0101" },
+  allergies: { state: "none" as const, entries: [] }, prescriptions: { state: "none" as const, entries: [] },
+  insurance: { state: "unavailable" as const, provider: null, policy: null }, physician: { state: "none" as const, name: null, phone: null },
+};
 
 async function fixture() {
   vi.stubEnv("CONVEX_CLOUD_URL", "https://third-bandicoot-18.convex.cloud");
@@ -39,8 +44,9 @@ async function fixture() {
   });
   const as = (auth: typeof ids.coach.auth) => t.withIdentity({ subject: `${auth}|session` });
   const f = { t, ids, coach: as(ids.coach.auth), parent: as(ids.parent.auth) };
-  await f.coach.mutation(api.permissionVersions.createVersion, wording);
+  await f.coach.mutation(api.permissionVersions.selectApprovedFieldTripTemplate, {});
   await f.coach.mutation(api.permissions.setSigningPaused, { paused: false });
+  await f.parent.mutation(api.permissionsV2.saveProfile, { studentId: ids.student, expectedRevision: 0, value: profile });
   return f;
 }
 
@@ -48,8 +54,8 @@ describe("Forms page with cancelled events", () => {
   it("covers only active events when a participant event is cancelled, and a signed form still lists", async () => {
     const f = await fixture();
     const [active, cancelled] = f.ids.events;
-    const draft = await f.parent.mutation(api.permissions.prepare, { studentId: f.ids.student, eventIds: [active, cancelled] });
-    await f.parent.mutation(api.permissions.submitDraft, { draftId: draft.draftId, typedName: "Parent Example", acknowledged: true, choices });
+    const prepared = await f.parent.action(api.permissionsV2Pdf.prepare, { studentId: f.ids.student, eventIds: [active, cancelled] });
+    await f.parent.action(api.permissionsV2Pdf.submit, { draftId: prepared.draftId, typedName: "Parent Example", acknowledged: true });
     await f.t.run(ctx => ctx.db.patch(cancelled, { cancelled: true }));
 
     const view = await f.parent.query(api.permissions.workspace, { studentId: f.ids.student });
@@ -57,7 +63,7 @@ describe("Forms page with cancelled events", () => {
     expect(view.coverage.map(row => row.eventId)).toEqual([active]);
     expect(view.receipts).toHaveLength(1);
     // Signing a cancelled event stays refused.
-    await expect(f.parent.mutation(api.permissions.prepare, { studentId: f.ids.student, eventIds: [cancelled] })).rejects.toThrow("A covered event is unavailable.");
+    await expect(f.parent.mutation(internal.permissionsV2.createDraft, { studentId: f.ids.student, eventIds: [cancelled], source: "electronic" })).rejects.toThrow("A covered event is unavailable.");
   });
 
   it("loads when a recurring series is cancelled with cancelFuture", async () => {

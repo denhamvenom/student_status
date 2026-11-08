@@ -75,7 +75,6 @@ it("requires student setup and explicit parent confirmation before a populated P
   const student = await f.t.run(ctx => ctx.db.get(f.ids.student));
   expect(student?.allergies.text).toBe("Original free-text allergy");
   expect(privateStudent(student!).allergies).toMatchObject({state: "reported", text: expect.stringContaining("Synthetic pollen")});
-  await expect(f.parent.mutation(api.permissions.prepare, {studentId: f.ids.student, eventIds: [f.ids.event]})).rejects.toThrow("uses the new permission form");
 });
 
 it("rejects incomplete insurance and ungranted paper preparation without changing old health evidence", async () => {
@@ -116,7 +115,7 @@ it("seals reviewed and signed PDFs, preserves the reviewed pages, and retries on
   const reviewed = await f.parent.action(api.permissionsV2Pdf.pdf, {submissionId, rendition: "reviewed"});
   const signed = await f.parent.action(api.permissionsV2Pdf.pdf, {submissionId, rendition: "signed"});
   expect(await PDFDocument.load(signed.bytes).then(document => document.getPageCount())).toBe((await PDFDocument.load(reviewed.bytes)).getPageCount());
-  const summary = await f.coach.query(api.permissions.listSubmissions, {studentId: f.ids.student});
+  const summary = (await f.coach.query(api.permissions.workspace, {studentId: f.ids.student})).receipts;
   expect(summary[0]).toMatchObject({submissionId, format: 2, legacy: false});
   await f.coach.mutation(api.permissions.review, {submissionId, status: "accepted", expectedLatestReviewId: null, expectedCoverage: summary[0].controlledCoverage, idempotencyKey: "fictional-review-1"});
   await expect(f.parent.action(api.permissionsV2Pdf.submit, {draftId: prepared.draftId, typedName: "Different Name", acknowledged: true})).rejects.toThrow("already signed differently");
@@ -129,7 +128,6 @@ it("selects one immutable approved version and keeps prior V2 snapshot parsing",
   const f = await fixture();
   const first = await f.coach.mutation(api.permissionVersions.selectApprovedFieldTripTemplate, {});
   expect(await f.coach.mutation(api.permissionVersions.selectApprovedFieldTripTemplate, {})).toBe(first);
-  await expect(f.coach.mutation(api.permissionVersions.createVersionV2, {version: "other", title: "Other", wording: "minor first aid", acknowledgmentText: "Other"})).rejects.toThrow("wording can't be edited");
   await f.t.run(ctx => ctx.db.patch(f.ids.student, {profileCompletedAt: 1}));
   await f.parent.mutation(api.permissionsV2.saveProfile, {studentId: f.ids.student, expectedRevision: 0, value: profile});
   const draft = await f.parent.mutation(internal.permissionsV2.createDraft, {studentId: f.ids.student, eventIds: [f.ids.event], source: "electronic"});
@@ -168,7 +166,7 @@ it("fails closed until real signing is explicitly bound to this non-development 
   const submissionId = await f.parent.action(api.permissionsV2Pdf.submit, {draftId: prepared.draftId, typedName: "Fictional Parent", acknowledged: true});
   const receipt = await f.parent.query(api.permissionsV2.receipt, {submissionId});
   expect(receipt.snapshot.synthetic).toBe(false);
-  const summary = await f.coach.query(api.permissions.listSubmissions, {studentId: f.ids.student});
+  const summary = (await f.coach.query(api.permissions.workspace, {studentId: f.ids.student})).receipts;
   expect(summary[0].synthetic).toBe(false);
   expect(await f.t.run(ctx => permissionAccepted(ctx, f.ids.student, f.ids.event))).toBe(false);
   await f.coach.mutation(api.permissions.review, {submissionId, status: "accepted", expectedLatestReviewId: null, expectedCoverage: summary[0].controlledCoverage, idempotencyKey: "real-review-1"});
@@ -184,4 +182,55 @@ it("fails closed until real signing is explicitly bound to this non-development 
   vi.stubEnv("PERMISSION_REAL_SIGNING_ENABLED", "false");
   expect((await f.parent.query(api.permissionsV2.receipt, {submissionId})).snapshot.synthetic).toBe(false);
   expect((await f.parent.action(api.permissionsV2Pdf.pdf, {submissionId, rendition: "signed"})).sha256).toBe(receipt.signedPdfSha256);
+});
+
+async function readyToSign(f: Awaited<ReturnType<typeof fixture>>) {
+  await f.t.run(ctx => ctx.db.patch(f.ids.student, {profileCompletedAt: 1}));
+  await f.parent.mutation(api.permissionsV2.saveProfile, {studentId: f.ids.student, expectedRevision: 0, value: profile});
+}
+/** Signed evidence and its side effects; a refused signing attempt must leave all of it unchanged. */
+const evidence = (f: Awaited<ReturnType<typeof fixture>>) => f.t.run(async ctx => ({
+  submissions: (await ctx.db.query("permissionSubmissions").take(20)).map(row => row._id),
+  coverage: await ctx.db.query("permissionCoverage").take(20),
+  drafts: (await ctx.db.query("permissionDrafts").take(20)).map(row => [row._id, row.usedSubmissionId ?? null]),
+  audit: (await ctx.db.query("audit").take(50)).length,
+}));
+
+it("refuses another signer, a Coach, an unlinked and a revoked parent, and bad signatures without writing evidence", async () => {
+  const f = await fixture();
+  await readyToSign(f);
+  const prepared = await f.parent.action(api.permissionsV2Pdf.prepare, {studentId: f.ids.student, eventIds: [f.ids.event]});
+  const signature = {draftId: prepared.draftId, typedName: "Fictional Parent", acknowledged: true};
+  const before = await evidence(f);
+  await expect(f.other.action(api.permissionsV2Pdf.prepare, {studentId: f.ids.student, eventIds: [f.ids.event]})).rejects.toThrow("permission");
+  await expect(f.other.action(api.permissionsV2Pdf.submit, {...signature, typedName: "Other Parent"})).rejects.toThrow("unavailable for this signer");
+  await expect(f.coach.action(api.permissionsV2Pdf.submit, {...signature, typedName: "Coach"})).rejects.toThrow("unavailable for this signer");
+  await expect(f.parent.action(api.permissionsV2Pdf.submit, {...signature, acknowledged: false})).rejects.toThrow("unavailable for this signer");
+  await expect(f.parent.action(api.permissionsV2Pdf.submit, {...signature, typedName: "Someone Else"})).rejects.toThrow("type the signer name exactly");
+  await expect(f.parent.action(api.permissionsV2Pdf.submitPaper, {...signature, paperReference: "PAPER-1", paperSignedAt: Date.now() - 1000})).rejects.toThrow("not applicable to electronic signing");
+  await f.t.run(async ctx => {for (const link of await ctx.db.query("familyLinks").take(10)) await ctx.db.patch(link._id, {active: false})});
+  await expect(f.parent.action(api.permissionsV2Pdf.submit, signature)).rejects.toThrow("permission");
+  await expect(f.parent.action(api.permissionsV2Pdf.prepare, {studentId: f.ids.student, eventIds: [f.ids.event]})).rejects.toThrow("permission");
+  expect(await evidence(f)).toEqual(before);
+});
+
+it("records a paper form once with the recorder separate from the named signer, and retries only with identical details", async () => {
+  const f = await fixture();
+  await readyToSign(f);
+  const paper = await f.coach.action(api.permissionsV2Pdf.preparePaper, {studentId: f.ids.student, eventIds: [f.ids.event], signerName: "Fictional Paper Guardian"});
+  const args = {draftId: paper.draftId, typedName: "Fictional Paper Guardian", acknowledged: true, paperReference: "PAPER-1", paperSignedAt: Date.now() - 1000};
+  const untouched = await evidence(f);
+  await expect(f.coach.action(api.permissionsV2Pdf.submitPaper, {...args, paperSignedAt: Date.now() + 60_000})).rejects.toThrow("Paper signing date is invalid");
+  await expect(f.coach.action(api.permissionsV2Pdf.submitPaper, {...args, typedName: "Fictional Parent"})).rejects.toThrow("type the signer name exactly");
+  await expect(f.parent.action(api.permissionsV2Pdf.submitPaper, args)).rejects.toThrow("unavailable for this signer");
+  expect(await evidence(f)).toEqual(untouched);
+  const submissionId = await f.coach.action(api.permissionsV2Pdf.submitPaper, args);
+  expect(await f.coach.action(api.permissionsV2Pdf.submitPaper, args)).toBe(submissionId);
+  const recorded = await evidence(f);
+  expect(recorded.submissions).toEqual([submissionId]);
+  await expect(f.coach.action(api.permissionsV2Pdf.submitPaper, {...args, paperReference: "PAPER-2"})).rejects.toThrow("already signed differently");
+  expect(await evidence(f)).toEqual(recorded);
+  const recordedDoc = await f.t.run(ctx => ctx.db.get(submissionId));
+  expect(recordedDoc).not.toHaveProperty("signedBy");
+  expect(recordedDoc).toMatchObject({source: "paper", signerName: "Fictional Paper Guardian", recordedBy: f.ids.coach.id, paperReference: "PAPER-1", paperAttestation: true});
 });

@@ -134,12 +134,11 @@ describe("B: sign-up answers", () => {
     expect(summary.questions).toEqual({ askDrive: true, askHotel: true });
     expect(summary.counts).toEqual({ accepted: 2, invited: 0, declined: 0, drivers: 1, hotelRooms: 2, unansweredDrive: 0, unansweredHotel: 0 });
     expect(summary.mentors.find(row => row.mentorUserId === f.ids.mentorA.id)).toMatchObject({ status: "accepted", source: "self", canDriveStudents: true, needsHotelRoom: true });
-    expect(await f.as(f.ids.lead).query(api.mentorInvites.forEvent, { eventId })).toHaveLength(2);
+    expect((await f.as(f.ids.lead).query(api.mentorInvites.forEventSummary, { eventId })).mentors).toHaveLength(2);
     // Mentors first: a Parent with a Travel Lead grant acting as Travel Lead gets the same list and answers; in Parent mode, nothing.
     expect(await f.as(f.ids.parentLead).query(api.mentorInvites.forEventSummary, { eventId })).toEqual(summary);
-    expect(await f.as(f.ids.parentLead).query(api.mentorInvites.forEvent, { eventId })).toEqual(summary.mentors);
     await expect(f.as({ auth: f.ids.parentLead.auth }).query(api.mentorInvites.forEventSummary, { eventId })).rejects.toThrow("Only a Coach or Travel Lead");
-    await expect(f.as(f.ids.mentorB).query(api.mentorInvites.forEvent, { eventId })).rejects.toThrow("Only a Coach or Travel Lead");
+    await expect(f.as(f.ids.mentorB).query(api.mentorInvites.forEventSummary, { eventId })).rejects.toThrow("Only a Coach or Travel Lead");
     // Mentor B sees their own answers, and only names (no answers) for other Mentors.
     const view = await f.as(f.ids.mentorB).query(api.mentorMeetings.view, { eventId, asOf: Date.now() });
     expect(view.meeting.myAnswers).toEqual({ canDriveStudents: false, needsHotelRoom: true });

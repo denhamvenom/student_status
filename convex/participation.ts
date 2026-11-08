@@ -72,7 +72,8 @@ const availabilityResult = v.object({
 });
 // Compile-time guard: the return validator and the shared screen contract must stay identical.
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
-const _availabilityMatchesContract: Same<Infer<typeof availabilityResult>, SignupAvailability> = true;
+type Assert<T extends true> = T;
+export type AvailabilityMatchesContract = Assert<Same<Infer<typeof availabilityResult>, SignupAvailability>>;
 
 /**
  * What pressing Sign up would do right now, with signUp's rules except the close time (the browser checks that). Counts only, never names.

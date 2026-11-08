@@ -12,7 +12,6 @@ const modules = import.meta.glob("./**/*.ts");
 type Maintenance = ApiFromModules<{ financeReportMaintenance: typeof maintenance }>["financeReportMaintenance"];
 const start = makeFunctionReference<"mutation", FunctionArgs<Maintenance["start"]>, FunctionReturnType<Maintenance["start"]>>("financeReportMaintenance:start");
 const worker = makeFunctionReference<"mutation", FunctionArgs<Maintenance["continueBackfill"]>, null>("financeReportMaintenance:continueBackfill");
-const status = makeFunctionReference<"query", FunctionArgs<Maintenance["status"]>, FunctionReturnType<Maintenance["status"]>>("financeReportMaintenance:status");
 async function fixture(count=7) {
   const t=convexTest(schema,modules);
   const ids=await t.run(async ctx=>{
@@ -45,14 +44,12 @@ describe("source-authoritative finance report maintenance",()=>{
     const id=await f.coach.mutation(start,{});
     expect(await f.coach.mutation(start,{})).toBe(id);
     await f.t.mutation(worker,{backfillId:id,expectedCursor:null});
-    expect(await f.coach.query(status,{})).toMatchObject({state:"running",processed:5});
-    expect(await f.coach.query(api.dashboardReports.team,{})).toMatchObject({finance:null});
+    expect(await f.coach.query(api.dashboardReports.team,{})).toMatchObject({state:"updating",finance:null,processed:5,rebuildRunning:true,canRebuild:false});
     await f.t.mutation(worker,{backfillId:id,expectedCursor:null});
-    expect((await f.coach.query(status,{}))?.processed).toBe(5);
+    expect(await f.coach.query(api.dashboardReports.team,{})).toMatchObject({state:"updating",processed:5,rebuildRunning:true});
     const row=await f.t.run(ctx=>ctx.db.get(id));
     await f.t.mutation(worker,{backfillId:id,expectedCursor:row!.cursor});
-    expect(await f.coach.query(status,{})).toMatchObject({state:"complete",processed:7});
-    expect(await f.coach.query(api.dashboardReports.team,{})).toMatchObject({activeStudents:7,finance:{chargedCents:0,dueCents:0}});
+    expect(await f.coach.query(api.dashboardReports.team,{})).toMatchObject({state:"ready",activeStudents:7,finance:{chargedCents:0,dueCents:0}});
   });
   it("fails on inconsistent source data and resumes the failed page after repair",async()=>{
     const f=await fixture(1),studentId=f.ids.students[0];
@@ -65,8 +62,7 @@ describe("source-authoritative finance report maintenance",()=>{
       await f.t.mutation(makeFunctionReference<"mutation">("financialSources:run"),{accountId:account._id});
     }
     await f.t.mutation(worker,{backfillId:id,expectedCursor:null});
-    expect(await f.coach.query(status,{})).toMatchObject({state:"failed",processed:0});
-    expect(await f.coach.query(api.dashboardReports.team,{})).toMatchObject({finance:null});
+    expect(await f.coach.query(api.dashboardReports.team,{})).toMatchObject({state:"failed",finance:null,processed:0,rebuildRunning:false,canRebuild:true});
     await f.t.run(ctx=>ctx.db.patch(bad,{appliedCents:0}));
     await f.coach.mutation(start,{});
     for (let step=0; step<10; step++) {
@@ -75,13 +71,11 @@ describe("source-authoritative finance report maintenance",()=>{
       await f.t.mutation(makeFunctionReference<"mutation">("financialSources:run"),{accountId:account._id});
     }
     await f.t.mutation(worker,{backfillId:id,expectedCursor:null});
-    expect(await f.coach.query(status,{})).toMatchObject({state:"complete",processed:1});
-    expect(await f.coach.query(api.dashboardReports.team,{})).toMatchObject({finance:{chargedCents:100,dueCents:100}});
+    expect(await f.coach.query(api.dashboardReports.team,{})).toMatchObject({state:"ready",finance:{chargedCents:100,dueCents:100}});
   });
   it("denies unauthenticated maintenance and fails if coverage is missing after completion",async()=>{
     const f=await fixture(1);
     await expect(f.t.mutation(start,{})).rejects.toThrow();
-    await expect(f.t.query(status,{})).rejects.toThrow();
     const id=await f.coach.mutation(start,{});
     await f.t.mutation(worker,{backfillId:id,expectedCursor:null});
     await f.t.run(async ctx=>{const summary=await ctx.db.query("studentFinanceSummaries").withIndex("by_studentId",q=>q.eq("studentId",f.ids.students[0])).unique();await ctx.db.delete(summary!._id)});
@@ -100,6 +94,6 @@ describe("source-authoritative finance report maintenance",()=>{
     await f.t.mutation(worker,{backfillId:id,expectedCursor:null});
     row=await f.t.run(ctx=>ctx.db.get(id));
     await f.t.mutation(worker,{backfillId:id,expectedCursor:row!.cursor});
-    expect(await f.coach.query(status,{})).toMatchObject({state:"complete",processed:7});
+    expect(await f.coach.query(api.dashboardReports.team,{})).toMatchObject({state:"ready",activeStudents:7,finance:{chargedCents:0,dueCents:0}});
   });
 });

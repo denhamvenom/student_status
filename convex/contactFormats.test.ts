@@ -21,19 +21,18 @@ async function fixture() {
   });
   return { t, ids, coach: t.withIdentity({ subject: `${ids.coach.auth}|session` }), parent: t.withIdentity({ subject: `${ids.parent.auth}|session` }), student: t.withIdentity({ subject: `${ids.pupil.auth}|session` }) };
 }
-it('normalizes student setup, emergency editing and parent wizard contacts at the server', async () => {
+it('normalizes emergency editing and parent wizard contacts at the server', async () => {
   const f = await fixture();
-  await f.student.mutation(api.profileSetup.complete, { expectedRevision: 0, shirtSize: 'M', roomCategory: 'Girls', guardianPhone: '12025550123', guardianEmail: ' Parent@Example.Invalid ' });
-  expect(await f.t.run(ctx => ctx.db.get(f.ids.student))).toMatchObject({ guardianPhone: '(202) 555-0123', guardianEmail: 'parent@example.invalid' });
+  await f.t.run(ctx => ctx.db.patch(f.ids.student, { shirtSize: 'M', roomCategory: 'Girls', roomCategoryLocked: true, profileCompletedAt: 1, profileRevision: 1 }));
   await expect(f.parent.mutation(api.app.updateStudentProfile, { studentId: f.ids.student, expectedRevision: 1, emergencyPhone: 'bad' })).rejects.toThrow('10-digit');
   await f.parent.mutation(api.app.updateStudentProfile, { studentId: f.ids.student, expectedRevision: 1, emergencyPhone: '202.555.0124' });
   await f.parent.mutation(api.setupWizard.saveContacts, { studentId: f.ids.student, expectedRevision: 2, guardian: { name: 'Synthetic Parent', relationship: 'Parent', phone: '+1 202 555 0123', email: ' PARENT@EXAMPLE.INVALID ' }, emergency: { name: 'Synthetic Contact', relationship: 'Other', phone: '2025550124' } });
   expect(await f.t.run(ctx => ctx.db.get(f.ids.student))).toMatchObject({ guardianPhone: '(202) 555-0123', emergencyPhone: '(202) 555-0124', guardianEmail: 'parent@example.invalid' });
   await expect(f.parent.mutation(api.setupWizard.saveMedical, { studentId: f.ids.student, expectedRevision: 3, allergies: { state: 'none', entries: [] }, prescriptions: { state: 'none', entries: [] }, insurance: { state: 'none', provider: null, policy: null }, physician: { state: 'provided', name: 'Synthetic Doctor', phone: 'abc' } })).rejects.toThrow('10-digit');
 });
-it('normalizes both driver creation endpoints and rejects malformed payment lookup emails', async () => {
+it('normalizes driver contacts and rejects malformed payment lookup emails', async () => {
   const f = await fixture();
-  const driverId = await f.coach.mutation(api.admin.createDriver, { name: 'Synthetic Driver', email: ' Driver@Example.Invalid ', phone: '2025550100', seats: 3, approved: false });
+  const driverId = await f.coach.mutation(api.travel.saveDriver, { name: 'Synthetic Driver', email: ' Driver@Example.Invalid ', phone: '2025550100', vehicleName: '', seats: 3, approved: false, towCapable: false, active: true });
   expect(await f.t.run(ctx => ctx.db.get(driverId))).toMatchObject({ email: 'driver@example.invalid', phone: '(202) 555-0100' });
   await expect(f.coach.mutation(api.travel.saveDriver, { driverId, name: 'Driver', email: 'bad', phone: '2025550100', seats: 3, approved: false, vehicleName: '', towCapable: false, active: true })).rejects.toThrow('valid email');
   const result = await f.coach.query(api.paymentAdministration.previewPayments, { rows: [{ studentEmail: 'bad', amountCents: 100, method: 'cash', reference: 'Synthetic', occurredAt: 1, rowReference: '1' }] });

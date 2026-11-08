@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
 import { createTest as convexTest } from "../testUtils";
 import { api } from "./_generated/api";
 import schema from "./schema";
@@ -24,31 +24,10 @@ async function fixture() {
   return { t, ids, coach: t.withIdentity({ subject: `${ids.coachAuth}|session` }), parent: t.withIdentity({ subject: `${ids.parentAuth}|session` }) };
 }
 
-describe("permission draft gate", () => {
-  it("blocks event-bearing draft legal consent even when the season version has no draft marker, without writes", async () => {
-    const f = await fixture();
-    const snapshot = () => f.t.run(async ctx => ({
-      submissions: await ctx.db.query("permissionSubmissions").take(10),
-      coverage: await ctx.db.query("permissionCoverage").take(10),
-      audit: await ctx.db.query("audit").take(10),
-      student: await ctx.db.get(f.ids.student),
-      participants: await ctx.db.query("participants").take(10),
-    }));
-    const before = await snapshot();
-    for (const eventIds of [[], [f.ids.event]]) {
-      await expect(f.parent.mutation(api.permissions.submit, { studentId: f.ids.student, eventIds, typedName: "Parent", answersJson: "{}" })).rejects.toThrow("draft");
-      expect(await snapshot()).toEqual(before);
-    }
-  });
-
-  it("retains role and student-scope checks while submission is closed", async () => {
-    const f = await fixture();
-    const args = { studentId: f.ids.other, eventIds: [], typedName: "Parent", answersJson: "{}" };
-    await expect(f.parent.mutation(api.permissions.submit, args)).rejects.toThrow("permission");
-    await expect(f.parent.query(api.permissions.listSubmissions, { studentId: f.ids.other })).rejects.toThrow("permission");
-    await expect(f.coach.mutation(api.permissions.submit, { ...args, studentId: f.ids.student })).rejects.toThrow("Only a linked parent");
-    expect(await f.parent.query(api.permissions.listSubmissions, { studentId: f.ids.student })).toEqual([]);
-  });
+it("keeps the permission workspace to linked students", async () => {
+  const f = await fixture();
+  await expect(f.parent.query(api.permissions.workspace, { studentId: f.ids.other })).rejects.toThrow("permission");
+  expect((await f.parent.query(api.permissions.workspace, { studentId: f.ids.student })).receipts).toEqual([]);
 });
 
 it("allows Coach and Travel Lead to request a new signature, but not an ordinary Mentor", async () => {

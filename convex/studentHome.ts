@@ -55,7 +55,8 @@ const summaryResult = v.object({
 
 // Compile-time guard: the return validator and the shared screen contract must stay identical.
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
-const _summaryMatchesContract: Same<Infer<typeof summaryResult>, StudentHomeSummary> = true;
+type Assert<T extends true> = T;
+export type SummaryMatchesContract = Assert<Same<Infer<typeof summaryResult>, StudentHomeSummary>>;
 
 type WhatsLeftItem = Infer<typeof whatsLeftItem>;
 type RoomChoice = Infer<typeof roomChoice>;
@@ -279,7 +280,7 @@ export const summary = query({
 
 const nextEvent = v.union(v.null(), v.object({ eventId: v.id("events"), name: v.string(), startsAt: v.number(), location: v.union(v.string(), v.null()), status: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("waitlist")) }));
 const parentSummaryResult = v.object({ studentId: v.id("students"), whatsLeft: v.array(whatsLeftItem), nextEvent });
-const _parentSummaryMatchesContract: Same<Infer<typeof parentSummaryResult>, ParentHomeSummary> = true;
+export type ParentSummaryMatchesContract = Assert<Same<Infer<typeof parentSummaryResult>, ParentHomeSummary>>;
 
 /** One linked student's Parent Home data. */
 export const parentSummary = query({

@@ -197,7 +197,6 @@ describe("Mentor edit and cancel", () => {
     await expect(other.mutation(api.eventSeries.editFuture, { seriesId: owned.seriesId, fromKey: owned.startDate, name: "x" })).rejects.toThrow("only repeating meetings they created");
     await expect(other.mutation(api.eventSeries.cancelFuture, { seriesId: owned.seriesId, fromKey: owned.startDate })).rejects.toThrow("only repeating meetings they created");
     await expect(other.mutation(api.eventSeries.setEndDate, { seriesId: owned.seriesId, endDate: addDays(owned.startDate, 14) })).rejects.toThrow("only repeating meetings they created");
-    await expect(other.query(api.eventSeries.get, { seriesId: owned.seriesId, fromKey: owned.startDate })).rejects.toThrow("only repeating meetings they created");
     expect(await other.query(api.eventSeries.endDateDetails, { seriesId: owned.seriesId })).toBeNull();
     const mine = f.as(f.ids.mentorA);
     await mine.mutation(api.eventSeries.editOccurrence, { eventId: owned.eventId, name: "Renamed once" });
@@ -467,12 +466,11 @@ describe("Mentor review fixes (round 2)", () => {
     });
     const owned = await seedSeries(f, parentMentor.id); // even a series recorded under that account
     const caller = f.t.withIdentity({ subject: `${parentMentor.auth}|${parentMentor.session}` });
-    expect((await caller.query(api.eventSeries.get, { seriesId: owned.seriesId, fromKey: owned.startDate })).series.seriesId).toBe(owned.seriesId);
     expect(await caller.query(api.eventSeries.endDateDetails, { seriesId: owned.seriesId })).not.toBeNull();
     await caller.mutation(api.eventSeries.setEndDate, { seriesId: owned.seriesId, endDate: addDays(owned.startDate, 14) });
     // Not someone else's series.
     const others = await seedSeries(f, f.ids.mentorA.id);
-    await expect(caller.query(api.eventSeries.get, { seriesId: others.seriesId, fromKey: others.startDate })).rejects.toThrow("only repeating meetings they created");
+    expect(await caller.query(api.eventSeries.endDateDetails, { seriesId: others.seriesId })).toBeNull();
   });
 
   it("M4 continues across pages: every eligible Mentor is covered, one page per transaction", async () => {

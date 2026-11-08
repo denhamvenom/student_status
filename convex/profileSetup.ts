@@ -1,4 +1,3 @@
-import { normalizeChangedPhone, normalizeChangedEmail } from "./lib/contactValidation";
 import { ConvexError, v } from "convex/values";
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
 import { mutation, query } from "./_generated/server";
@@ -7,7 +6,6 @@ import { markRoomCategoryReview } from "./lib/profileCorrections";
 import { queueProfileCorrectionDigest } from "./lib/notificationTriggers";
 
 const category = v.union(v.literal("Boys"), v.literal("Girls"));
-const sizes = ["XS", "S", "M", "L", "XL", "2XL", "3XL"];
 const correctionField = v.union(v.literal("roomCategory"), v.literal("legalName"), v.literal("account"));
 export const get = query({
   args: {}, returns: v.object({ studentId: v.id("students"), legalName: v.string(), preferredName: v.string(), email: v.string(), subteam: v.string(), shirtSize: v.union(v.string(), v.null()), roomCategory: v.union(category, v.null()), roomCategoryLocked: v.boolean(), setupRequired: v.boolean(), revision: v.number(), guardianName: v.union(v.string(), v.null()), guardianRelationship: v.union(v.string(), v.null()), guardianPhone: v.union(v.string(), v.null()), guardianEmail: v.union(v.string(), v.null()) }),
@@ -15,26 +13,6 @@ export const get = query({
     const actor = await viewer(ctx); const student = await ownStudent(ctx, actor); const season = await activeSeason(ctx);
     if (student.seasonId !== season._id) throw new ConvexError("Your profile isn't on this season's roster. Ask a Coach for help.");
     return { studentId: student._id, legalName: student.legalName, preferredName: student.preferredName, email: student.email, subteam: student.subteam, shirtSize: student.shirtSize ?? null, roomCategory: student.roomCategory ?? null, roomCategoryLocked: student.roomCategoryLocked, setupRequired: student.profileCompletedAt === undefined, revision: student.profileRevision ?? 0, guardianName: student.guardianName ?? null, guardianRelationship: student.guardianRelationship ?? null, guardianPhone: student.guardianPhone ?? null, guardianEmail: student.guardianEmail ?? null };
-  },
-});
-
-export const complete = mutation({
-  args: { expectedRevision: v.number(), preferredName: v.optional(v.string()), shirtSize: v.string(), roomCategory: category, guardianName: v.optional(v.string()), guardianRelationship: v.optional(v.string()), guardianPhone: v.optional(v.string()), guardianEmail: v.optional(v.string()) }, returns: v.null(),
-  handler: async (ctx, args) => {
-    const actor = await viewer(ctx); const student = await ownStudent(ctx, actor); const season = await activeSeason(ctx);
-    if (student.seasonId !== season._id) throw new ConvexError("Your profile isn't on this season's roster. Ask a Coach for help.");
-    if (student.profileCompletedAt !== undefined) throw new ConvexError("Profile setup is already done. Make changes on your profile instead.");
-    if ((student.profileRevision ?? 0) !== args.expectedRevision) throw new ConvexError("Profile changed since you opened it. Reload to see the latest, then try again.");
-    if (!sizes.includes(args.shirtSize) || (args.preferredName?.trim().length ?? 0) > 80) throw new ConvexError("Choose a valid shirt size and a preferred name of up to 80 characters.");
-    if (student.roomCategoryLocked && student.roomCategory !== args.roomCategory) throw new ConvexError("Room type is locked. Ask a Coach to change it.");
-    for (const field of [args.guardianName, args.guardianRelationship, args.guardianPhone, args.guardianEmail]) if ((field?.trim().length ?? 0) > 254) throw new ConvexError("Parent contact details must be 254 characters or fewer.");
-    const email = args.guardianEmail === undefined ? undefined : normalizeChangedEmail(args.guardianEmail, student.guardianEmail, "Parent contact email");
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ConvexError("Enter a valid parent email, like name@example.com.");
-    if (student.roomCategory !== args.roomCategory) await markRoomCategoryReview(ctx, student._id, student.seasonId, false);
-    const preferredName = args.preferredName?.trim() || student.firstName || student.preferredName || student.legalName;
-    await ctx.db.patch(student._id, { preferredName, shirtSize: args.shirtSize, roomCategory: args.roomCategory, roomCategoryLocked: true, profileCompletedAt: Date.now(), profileRevision: (student.profileRevision ?? 0) + 1, guardianName: args.guardianName?.trim() || undefined, guardianRelationship: args.guardianRelationship?.trim() || undefined, guardianPhone: args.guardianPhone === undefined ? undefined : normalizeChangedPhone(args.guardianPhone, student.guardianPhone, "Parent contact phone") || undefined, guardianEmail: email || undefined });
-    await audit(ctx, actor, "students", student._id, "completeProfileSetup", { revision: student.profileRevision ?? 0 }, { roomCategory: args.roomCategory, shirtSize: args.shirtSize, revision: (student.profileRevision ?? 0) + 1 });
-    return null;
   },
 });
 

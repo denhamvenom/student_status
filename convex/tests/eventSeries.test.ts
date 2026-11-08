@@ -99,8 +99,7 @@ describe("recurring meeting series", () => {
     await expect(f.lead.mutation(api.eventSeries.create, { ...args, mandatory: true })).rejects.toThrow("Only Coaches can make an event mandatory");
     await expect(f.lead.mutation(api.eventSeries.create, { ...args, audienceKind: "subteams", audienceSubteams: ["Build"], mandatory: true })).rejects.toThrow("Only Coaches can make an event mandatory");
     const { seriesId } = await f.lead.mutation(api.eventSeries.create, args);
-    expect(await f.lead.query(api.eventSeries.list, {})).toEqual([expect.objectContaining({ seriesId, name: "Meeting", mandatory: false })]);
-    await expect(f.mentor.query(api.eventSeries.list, {})).rejects.toThrow("Coach or Travel Lead");
+    expect(await f.t.run(ctx => ctx.db.get(seriesId))).toMatchObject({ name: "Meeting", template: expect.objectContaining({ mandatory: false }) });
     await expect(f.mentor.mutation(api.eventSeries.create, { ...args, name: "Mentor meeting", rule: weeklyFrom(3) })).resolves.toMatchObject({ seriesId: expect.anything() });
     await expect(f.lead.action(api.eventSeries.googleSeriesCandidates, {})).rejects.toThrow("Only a Coach");
     await expect(f.coach.mutation(api.eventSeries.create, { ...args, rule: { ...weeklyFrom(-7) } })).rejects.toThrow("today or later");

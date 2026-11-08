@@ -25,30 +25,10 @@ async function fixture() {
   const as = (auth: typeof ids.coachAuth) => t.withIdentity({ subject: `${auth}|session` });
   return { t, ids, coach: as(ids.coachAuth), student: as(ids.studentAuth), parent: as(ids.parentAuth) };
 }
-const setup = { expectedRevision: 0, shirtSize: "M", roomCategory: "Boys" as const };
 describe("profile setup and corrections", () => {
-  it("requires explicit setup, validates required fields, locks category and rejects repeat and stale saves", async () => {
-    const f = await fixture();
-    expect(await f.student.query(api.profileSetup.get, {})).toMatchObject({ setupRequired: true, revision: 0, roomCategoryLocked: false });
-    await expect(f.student.mutation(api.profileSetup.complete, { ...setup, shirtSize: "" })).rejects.toThrow("valid shirt");
-    await expect(f.student.mutation(api.profileSetup.complete, { ...setup, expectedRevision: 1 })).rejects.toThrow("Profile changed");
-    await expect(f.parent.mutation(api.profileSetup.complete, setup)).rejects.toThrow("permission");
-    await f.student.mutation(api.profileSetup.complete, { ...setup, preferredName: " ", guardianName: "Guardian", guardianEmail: " GUARDIAN@EXAMPLE.INVALID " });
-    expect(await f.student.query(api.profileSetup.get, {})).toMatchObject({ setupRequired: false, preferredName: "Student", revision: 1, roomCategoryLocked: true, guardianEmail: "guardian@example.invalid" });
-    await expect(f.student.mutation(api.profileSetup.complete, setup)).rejects.toThrow("already done");
-  });
-
-  it("preserves an existing legacy locked category during first setup", async () => {
-    const f = await fixture();
-    await f.t.run(ctx => ctx.db.patch(f.ids.student, { roomCategory: "Girls", roomCategoryLocked: true }));
-    await expect(f.student.mutation(api.profileSetup.complete, setup)).rejects.toThrow("Room type is locked");
-    await f.student.mutation(api.profileSetup.complete, { ...setup, roomCategory: "Girls" });
-    expect(await f.student.query(api.profileSetup.get, {})).toMatchObject({ roomCategory: "Girls", roomCategoryLocked: true, setupRequired: false });
-  });
-
   it("uses Coach-only revisioned corrections and marks existing room placement for review", async () => {
     const f = await fixture();
-    await f.student.mutation(api.profileSetup.complete, setup);
+    await f.t.run(ctx => ctx.db.patch(f.ids.student, { shirtSize: "M", roomCategory: "Boys", roomCategoryLocked: true, profileCompletedAt: 1, profileRevision: 1 }));
     const requestId = await f.parent.mutation(api.profileSetup.requestCorrection, { studentId: f.ids.student, expectedRevision: 1, field: "roomCategory", note: "Please correct category" });
     await expect(f.parent.mutation(api.profileSetup.correct, { studentId: f.ids.student, expectedRevision: 1, roomCategory: "Girls", reason: "Correction" })).rejects.toThrow("Only a Coach");
     await expect(f.coach.mutation(api.profileSetup.correct, { studentId: f.ids.student, expectedRevision: 0, roomCategory: "Girls", reason: "Correction" })).rejects.toThrow("Profile changed");

@@ -60,7 +60,7 @@ describe("automatic past-event archive", () => {
     await expect(f.student.query(api.rooms.mine, { eventId: f.ids.past })).rejects.toThrow();
     await expect(f.student.mutation(api.participation.signUp, { eventId: f.ids.past })).rejects.toThrow();
     await expect(f.student.mutation(api.withdrawals.requestWithdrawal, { eventId: f.ids.past, idempotencyKey: "synthetic-archived" })).rejects.toThrow();
-    expect(await f.parent.query(api.permissions.listSubmissions, { studentId: f.ids.studentId })).toEqual([]);
+    expect((await f.parent.query(api.permissions.workspace, { studentId: f.ids.studentId })).receipts).toEqual([]);
     await expect(f.parent.query(api.permissions.receipt, { submissionId: f.ids.submission })).rejects.toThrow("Past events");
     await expect(f.parent.query(api.permissionsV2.receipt, { submissionId: f.ids.submission })).rejects.toThrow("Past events");
     await expect(f.parent.query(internal.permissionsV2.pdfAccess, { submissionId: f.ids.submission, rendition: "signed", now: Date.now() })).rejects.toThrow("Past events");

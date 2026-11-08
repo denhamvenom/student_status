@@ -49,7 +49,7 @@ describe("bulk student invitations", () => {
       const batch = await f.coach.mutation(api.bulkInvites.createBatch, { entries: [{ firstName: "Separate", lastName: "Student", resolution: "create" }], idempotencyKey: "separate_codes_1" });
       const invite = (await f.coach.query(api.bulkInvites.batchDetail, { batchId: batch.batchId, asOf: Date.now() })).invites[0];
       expect(invite.code).toMatch(/^[1-9][0-9]{5}$/);
-      expect(await f.applicant.mutation(api.bulkInvites.previewCode, { code: first.code })).toMatchObject({ status: "unavailable" });
+      expect(await f.applicant.mutation(api.bulkInvites.checkInvitationCode, { code: first.code })).toEqual({ kind: "team" });
       expect(await f.applicant.mutation(api.bulkInvites.redeem, { code: first.code })).toEqual({ studentId: null, requestId: null });
       expect(await f.applicant.mutation(api.app.requestJoin, { code: invite.code!, firstName: "Separate", lastName: "Student" })).toBeNull();
       const request = await f.applicant.mutation(api.app.requestJoin, { code: first.code, firstName: "Separate", lastName: "Student" });
@@ -81,7 +81,7 @@ describe("bulk student invitations", () => {
       expect(last.code).toBe("100002");
       expect(await f.applicant.mutation(api.bulkInvites.redeem, { code: "100000" })).toEqual({ studentId: null, requestId: null });
       expect(await f.applicant.mutation(api.bulkInvites.redeem, { code: "100001" })).toEqual({ studentId: null, requestId: null });
-      expect(await f.applicant.mutation(api.bulkInvites.previewCode, { code: last.code })).toMatchObject({ status: "valid" });
+      expect(await f.applicant.mutation(api.bulkInvites.checkInvitationCode, { code: last.code })).toEqual({ kind: "individual" });
       expect(await approve(f, f.applicant, last.code)).toMatchObject({ studentId: invite.studentId });
     } finally { random.mockRestore(); }
   });
@@ -114,7 +114,7 @@ describe("bulk student invitations", () => {
     const batch = await f.coach.mutation(api.bulkInvites.createBatch, { entries: [{ firstName: "Alex", lastName: "Doe", resolution: "link", existingStudentId: studentId }], idempotencyKey: "batch_0003" });
     const detail = await f.coach.query(api.bulkInvites.batchDetail, { batchId: batch.batchId, asOf: Date.now() });
     const code = detail.invites[0].code!;
-    expect(await f.applicant.mutation(api.bulkInvites.previewCode, { code })).toMatchObject({ status: "valid", studentName: null });
+    expect(await f.applicant.mutation(api.bulkInvites.checkInvitationCode, { code })).toEqual({ kind: "individual" });
     expect(await approve(f, f.other, code)).toMatchObject({ studentId });
     expect(await f.other.mutation(api.bulkInvites.redeem, { code })).toEqual({ studentId: null, requestId: null });
     expect(await f.applicant.mutation(api.bulkInvites.redeem, { code })).toEqual({ studentId: null, requestId: null });
@@ -145,7 +145,7 @@ describe("bulk student invitations", () => {
     const f = await fixture();
     const batch = await f.coach.mutation(api.bulkInvites.createBatch, { entries: [{ firstName: "Morgan", lastName: "Lane", resolution: "create" }], idempotencyKey: "batch_0005" });
     const code = (await f.coach.query(api.bulkInvites.batchDetail, { batchId: batch.batchId, asOf: Date.now() })).invites[0].code!;
-    for (let i = 0; i < 10; i++) expect(await f.applicant.mutation(api.bulkInvites.previewCode, { code: `DV-${i.toString(16).padStart(32, "0")}` })).toMatchObject({ status: "unavailable" });
+    for (let i = 0; i < 10; i++) expect(await f.applicant.mutation(api.bulkInvites.redeem, { code: `DV-${i.toString(16).padStart(32, "0")}` })).toEqual({ studentId: null, requestId: null });
     expect(await f.applicant.mutation(api.bulkInvites.redeem, { code })).toEqual({ studentId: null, requestId: null });
     await f.t.run(async ctx => { await ctx.db.patch(f.ids.season, { endsAt: Date.now() - 1 }); });
     expect((await f.coach.query(api.bulkInvites.batchDetail, { batchId: batch.batchId, asOf: Date.now() })).invites[0].code).toBeNull();
@@ -200,7 +200,7 @@ describe("bulk student invitations", () => {
     await expect(f.other.mutation(api.bulkInvites.createBatch, { entries: [{ firstName: "No", lastName: "Access", resolution: "create" }], idempotencyKey: "batch_role2" })).rejects.toThrow("permission");
     await expect(f.other.mutation(api.bulkInvites.revoke, { inviteId: invite.inviteId, expectedCode: invite.code! })).rejects.toThrow("permission");
     await expect(f.other.mutation(api.bulkInvites.replace, { inviteId: invite.inviteId, expectedCode: invite.code! })).rejects.toThrow("permission");
-    expect(await f.other.mutation(api.bulkInvites.previewCode, { code: invite.code! })).toMatchObject({ status: "accountConflict" });
+    expect(await f.other.mutation(api.bulkInvites.checkInvitationCode, { code: invite.code! })).toEqual({ kind: "unavailable" });
     expect(await f.other.mutation(api.bulkInvites.redeem, { code: invite.code! })).toEqual({ studentId: null, requestId: null });
   });
 });
@@ -213,7 +213,7 @@ async function oneInvite(f: Awaited<ReturnType<typeof fixture>>) {
 describe("Coach-approved bulk account connections", () => {
   it("does not expose a name or grant profile/finance access until the Coach chooses one of two applicants", async () => {
     const f = await fixture(); const invite = await oneInvite(f);
-    expect(await f.applicant.mutation(api.bulkInvites.previewCode, { code: invite.code! })).toEqual({ status: "valid", studentName: null });
+    expect(await f.applicant.mutation(api.bulkInvites.checkInvitationCode, { code: invite.code! })).toEqual({ kind: "individual" });
     const [a, b] = await Promise.all([f.applicant.mutation(api.bulkInvites.redeem, { code: invite.code! }), f.other.mutation(api.bulkInvites.redeem, { code: invite.code! })]);
     expect(a.requestId).not.toBeNull(); expect(b.requestId).not.toBeNull();
     expect(a.studentId).toBeNull(); expect(b.studentId).toBeNull();
@@ -295,7 +295,7 @@ describe("Coach-approved bulk account connections", () => {
     expect(await f.other.mutation(api.bulkInvites.redeem, { code: invite.code! })).toEqual({ studentId: null, requestId: null });
   });
 
-  it("shares the daily 30-attempt allowance between preview and submission across minute resets", async () => {
+  it("shares the daily 30-attempt allowance between code checks and submission across minute resets", async () => {
     vi.useFakeTimers();
     try {
       vi.setSystemTime(new Date("2026-10-19T12:00:00Z"));
@@ -303,10 +303,10 @@ describe("Coach-approved bulk account connections", () => {
       for (let i = 0; i < 30; i++) {
         if (i && i % 10 === 0) vi.advanceTimersByTime(61_000);
         if (i % 2) expect(await f.applicant.mutation(api.bulkInvites.redeem, { code: "00000" })).toEqual({ studentId: null, requestId: null });
-        else expect(await f.applicant.mutation(api.bulkInvites.previewCode, { code: "00000" })).toMatchObject({ status: "unavailable" });
+        else expect(await f.applicant.mutation(api.bulkInvites.checkInvitationCode, { code: invite.code! })).toEqual({ kind: "individual" });
       }
       vi.advanceTimersByTime(61_000);
-      expect(await f.applicant.mutation(api.bulkInvites.previewCode, { code: invite.code! })).toMatchObject({ status: "unavailable" });
+      expect(await f.applicant.mutation(api.bulkInvites.checkInvitationCode, { code: invite.code! })).toEqual({ kind: "tooManyAttempts" });
       expect(await f.applicant.mutation(api.bulkInvites.redeem, { code: invite.code! })).toEqual({ studentId: null, requestId: null });
       vi.advanceTimersByTime(86_400_001);
       expect((await f.applicant.mutation(api.bulkInvites.redeem, { code: invite.code! })).requestId).not.toBeNull();
