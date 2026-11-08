@@ -13,6 +13,7 @@ import styles from './ChargeAdministration.module.css'
 import { paymentAdministrationCopy as copy } from './lib/payment-admin-copy'
 import { FeePaymentImport } from './FeePaymentImport'
 import { normalizeEmail } from '../shared/contact-format'
+import { chicagoMidnight } from '../shared/chicago-time'
 type PaymentRow = { studentEmail: string; amountCents: number; method: 'cash' | 'check' | 'other'; reference: string; occurredAt: number; rowReference: string }
 type ReviewedRow = PaymentRow & FunctionReturnType<typeof api.paymentAdministration.previewPayments>[number]
 const message = (error: unknown) => userFacingError(error)
@@ -41,11 +42,7 @@ export function parsePaymentCsv(text: string): PaymentRow[] {
     const amountCents = parseFundraisingDecimal(value('amount')); const method = value('method').toLowerCase(); const date = value('date')
     const occurredAt = /^\d{4}-\d{2}-\d{2}$/.test(date) ? Date.parse(`${date}T00:00:00Z`) : NaN
     if (!amountCents || !Number.isSafeInteger(occurredAt) || new Date(occurredAt).toISOString().slice(0, 10) !== date || !['cash', 'check', 'other'].includes(method)) throw new Error(copy.badRow(index + 2))
-    const guess = Date.parse(`${date}T06:00:00Z`)
-    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(guess))
-    const number = (type: string) => Number(parts.find(part => part.type === type)?.value)
-    const localAtGuess = Date.UTC(number('year'), number('month') - 1, number('day'), number('hour'), number('minute'))
-    const teamMidnight = occurredAt - (localAtGuess - guess)
+    const teamMidnight = chicagoMidnight(date)
     const studentEmail = normalizeEmail(value('studentemail'), `Row ${index + 2} student email`)
     if (!studentEmail) throw new Error(`Row ${index + 2}: student email is required.`)
     return { studentEmail, amountCents, method: method as PaymentRow['method'], reference: value('reference'), occurredAt: teamMidnight, rowReference: value('rowreference') }

@@ -6,7 +6,8 @@ import type { Id } from "../_generated/dataModel";
 import schema from "../schema";
 import { chicagoDate } from "../lib/calendarDates";
 import { googleInstanceId } from "../lib/rrule";
-import { addDays, occurrencesBetween, weekdayOf, zonedWallTimeToUtc } from "../lib/seriesRecurrence";
+import { addDays, occurrencesBetween, weekdayOf } from "../lib/seriesRecurrence";
+import { zonedWallTimeToUtc } from "../../shared/chicago-time";
 
 const modules = import.meta.glob("../**/*.ts");
 const calendarId = "synthetic-calendar@example.invalid";

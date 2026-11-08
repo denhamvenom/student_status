@@ -6,7 +6,8 @@ import type { Doc, Id } from "../_generated/dataModel";
 import schema from "../schema";
 import { chicagoDate } from "../lib/calendarDates";
 import { googleInstanceId } from "../lib/rrule";
-import { addDays, occurrencesBetween, weekdayOf, zonedWallTimeToUtc } from "../lib/seriesRecurrence";
+import { addDays, occurrencesBetween, weekdayOf } from "../lib/seriesRecurrence";
+import { zonedWallTimeToUtc } from "../../shared/chicago-time";
 import { validCalendarEventId } from "../eventCalendar";
 
 const modules = import.meta.glob("../**/*.ts");

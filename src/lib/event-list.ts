@@ -1,6 +1,7 @@
 // Events list order: soonest first in date sections (This week / Coming up / Later), canceled events hidden unless asked
 // for, and a repeating series shown as one row ("Every Tuesday · next: …") that expands to its meetings. Pure so the
 // rules are tested directly.
+import { chicagoDateString } from '../../shared/chicago-time'
 export type ListedEvent = { _id: string; startsAt: number; endsAt: number; cancelled?: boolean; seriesId?: string; seriesDetached?: boolean }
 export type ListedRow = { event: ListedEvent }
 export type ListItem<R extends ListedRow> =
@@ -65,11 +66,9 @@ export const itemAnchor = <R extends ListedRow>(item: ListItem<R>): R => item.ki
 export type DateBucket = keyof typeof eventListCopy.buckets
 export const dateBucketOrder: readonly DateBucket[] = ['thisWeek', 'comingUp', 'later', 'past']
 
-const dayFormat = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', year: 'numeric', month: 'numeric', day: 'numeric' })
 /** Days since 1970-01-01 of the Central Time calendar date, so week math ignores DST and time of day. */
 function chicagoDay(epoch: number) {
-  const parts = Object.fromEntries(dayFormat.formatToParts(epoch).map(part => [part.type, part.value]))
-  return Math.round(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day)) / 86_400_000)
+  return Math.round(Date.parse(`${chicagoDateString(epoch)}T00:00:00Z`) / 86_400_000)
 }
 
 /**

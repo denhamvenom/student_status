@@ -1,7 +1,8 @@
 import type { Id } from '../../../convex/_generated/dataModel'
 import { resolveAudience, type AudienceEventFields } from '../../../convex/lib/eventAudienceRules'
 import { eventLocation } from '@/lib/event-place'
-import { formatDateRange, formatMoney, TEAM_TIME_ZONE } from './format'
+import { TEAM_TIME_ZONE } from '../../../shared/chicago-time'
+import { formatDateRange, formatMoney } from './format'
 
 /*
  * "Next up" and "This week" for Student and Parent Home, read from app.listEvents (the events this viewer may see,

@@ -10,9 +10,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Checkbox } from '../../components/ui/checkbox'
 import { Input } from '../../components/ui/input'
 import { Textarea } from '../../components/ui/textarea'
-import { chicagoInputTime, parseChicagoInput } from '../../lib/chicago-time'
 import { announcementsCopy as copy } from './copy'
 import { anyHomeFull, COACH_AUDIENCES, coachOnly, hasPinRoom, TRAVEL_LEAD_AUDIENCES, type Audience } from './audience'
+import { chicagoDateString, endOfChicagoDay } from '../../../shared/chicago-time'
 
 type StaffAnnouncement = FunctionReturnType<typeof api.announcements.listForStaff>['pinned'][number]
 type AnnouncementId = Id<'teamAnnouncements'>
@@ -23,13 +23,6 @@ const TITLE_MAX = 80
 const BODY_MAX = 500
 const dateFormat = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeZone: 'America/Chicago' })
 const formatDate = (at: number) => dateFormat.format(at)
-/** The America/Chicago calendar date (YYYY-MM-DD) that a date input shows for this time. */
-const chicagoDate = (at: number) => chicagoInputTime(at).slice(0, 10)
-/** A chosen Show until date lasts through the end of that day in America/Chicago. */
-function endOfChicagoDay(date: string) {
-  const lastMinute = parseChicagoInput(`${date}T23:59`)
-  return Number.isNaN(lastMinute) ? Number.NaN : lastMinute + 59_999
-}
 const shortLabel = (row: StaffAnnouncement) => row.title ?? (row.body.length > 60 ? `${row.body.slice(0, 57).trimEnd()}…` : row.body)
 
 function AnnouncementForm({ initial, pinned, pinLimit, coach, submitLabel, onSubmit, onCancel }: {
@@ -43,7 +36,7 @@ function AnnouncementForm({ initial, pinned, pinLimit, coach, submitLabel, onSub
   onCancel?: () => void
 }) {
   const id = useId()
-  const initialDate = initial.showUntil === null ? '' : chicagoDate(initial.showUntil)
+  const initialDate = initial.showUntil === null ? '' : chicagoDateString(initial.showUntil)
   const [title, setTitle] = useState(initial.title ?? '')
   const [body, setBody] = useState(initial.body)
   const [date, setDate] = useState(initialDate)
@@ -79,7 +72,7 @@ function AnnouncementForm({ initial, pinned, pinLimit, coach, submitLabel, onSub
     <label className="grid gap-2 font-semibold">{copy.messageLabel}<Textarea value={body} required maxLength={BODY_MAX} rows={4} disabled={busy} aria-describedby={`${id}-count`} onChange={event => { setBody(event.target.value); setDone('') }}/></label>
     <p id={`${id}-count`} className="-mt-2 text-sm text-muted-foreground">{copy.characters(body.length, BODY_MAX)}</p>
     <label className="grid gap-2 font-semibold">{copy.audienceLabel}<select className="min-h-11 rounded-md border border-input bg-background px-3 text-foreground" value={audience} disabled={busy} onChange={event => { setAudience(event.target.value as Audience); setDone('') }}>{(coach ? COACH_AUDIENCES : TRAVEL_LEAD_AUDIENCES).map(value => <option key={value} value={value}>{copy.audiences[value]}</option>)}</select></label>
-    <label className="grid gap-2 font-semibold">{copy.showUntilLabel}<Input type="date" value={date} min={date !== initialDate ? chicagoDate(Date.now()) : undefined} disabled={busy} aria-describedby={`${id}-until`} onChange={event => { setDate(event.target.value); setDone('') }}/></label>
+    <label className="grid gap-2 font-semibold">{copy.showUntilLabel}<Input type="date" value={date} min={date !== initialDate ? chicagoDateString(Date.now()) : undefined} disabled={busy} aria-describedby={`${id}-until`} onChange={event => { setDate(event.target.value); setDone('') }}/></label>
     <p id={`${id}-until`} className="-mt-2 text-sm text-muted-foreground">{copy.showUntilHint}</p>
     {creating && <>
       <label className="flex min-h-11 items-center gap-3"><Checkbox className="size-6" checked={willPin} disabled={busy || !pinAvailable} aria-describedby={pinAvailable ? undefined : `${id}-limit`} onCheckedChange={setPin}/><span>{copy.pinLabel}</span></label>

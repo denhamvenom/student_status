@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { firstOccurrence, occurrenceIndex, occurrencesBetween, splitRuleAt, validateSeriesRule, zonedWallTimeToUtc, type SeriesRule } from "./seriesRecurrence";
+import { firstOccurrence, occurrenceIndex, occurrencesBetween, splitRuleAt, validateSeriesRule, type SeriesRule } from "./seriesRecurrence";
+import { zonedWallTimeToUtc } from "../../shared/chicago-time";
 
 const at = (iso: string) => Date.parse(iso);
 const keys = (rule: SeriesRule, from: string, to: string) => occurrencesBetween(rule, from, to).map(o => o.occurrenceKey);

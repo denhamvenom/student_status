@@ -11,21 +11,18 @@ import { chargeCurrency } from './lib/charge-money'
 import { downloadInviteCsv } from './lib/bulk-invite-csv'
 import { collectFeeExport, feePaymentCsv, parseFeePaymentCsv, type FeeCsvRow, type PaymentManifestRow } from './lib/fee-payment-csv'
 import styles from './ChargeAdministration.module.css'
+import { chicagoDateString, chicagoMidnight } from '../shared/chicago-time'
 
 type Filter = 'all' | 'paid' | 'unpaid'
 type Method = 'cash' | 'check' | 'other'
 type Review = { exportId: string; feeDefinitionId: Id<'feeDefinitions'>; feeLabel: string; rows: FeeCsvRow[]; payments: PaymentManifestRow[]; method: Method; reference: string; occurredAt: number; states: Array<{ rowKey: string; state: 'ready' | 'recorded' | 'stale' | 'invalid'; message: string | null; studentName: string | null; chargedCents: number | null; appliedCents: number | null; owedCents: number | null }> }
 const serverRows = (rows: PaymentManifestRow[]) => rows.map(row => ({ ...row, studentId: row.studentId as Id<'students'>, chargeId: row.chargeId as Id<'charges'> }))
 const errorText = (failure: unknown) => userFacingError(failure)
-const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+const today = () => chicagoDateString(Date.now())
 
 function teamMidnight(date: string): number {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || new Date(date + 'T00:00:00Z').toISOString().slice(0, 10) !== date) throw new Error('Choose a valid payment date.')
-  const utcMidnight = Date.parse(date + 'T00:00:00Z')
-  const guess = Date.parse(date + 'T06:00:00Z')
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(guess))
-  const number = (type: string) => Number(parts.find(part => part.type === type)?.value)
-  return utcMidnight - (Date.UTC(number('year'), number('month') - 1, number('day'), number('hour'), number('minute')) - guess)
+  return chicagoMidnight(date)
 }
 
 export function FeePaymentImport() {

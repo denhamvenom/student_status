@@ -5,6 +5,8 @@
  * index is a multiple of `intervalWeeks` repeat. Occurrences never fall before `anchorDate`. Start times follow local wall
  * time, so a 6:00 PM meeting stays at 6:00 PM across DST changes; `endsAt` is `startsAt + durationMinutes`.
  */
+import { zonedWallTimeToUtc } from "../../shared/chicago-time";
+
 export type SeriesRule = {
   /** YYYY-MM-DD local date the series starts on (occurrences begin on the first matching weekday on or after it). */
   anchorDate: string;
@@ -30,7 +32,6 @@ export type SeriesOccurrence = {
   index: number;
 };
 
-export const SERIES_TIME_ZONE = "America/Chicago";
 export const MAX_OCCURRENCES_PER_QUERY = 200;
 export const MAX_SERIES_OCCURRENCES = 104;
 export const MAX_INTERVAL_WEEKS = 8;
@@ -77,42 +78,6 @@ function weekdayOfDay(day: number): number {
 /** 0 = Sunday … 6 = Saturday. */
 export function weekdayOf(date: string): number {
   return weekdayOfDay(dayNumber(date));
-}
-
-// ---------- time zone helpers ----------
-
-const offsetFormatters = new Map<string, Intl.DateTimeFormat>();
-
-/** UTC offset in minutes (e.g. -300 for CDT) of `timeZone` at the instant `ms`. Throws RangeError for unknown zones. */
-export function zoneOffsetMinutes(ms: number, timeZone: string = SERIES_TIME_ZONE): number {
-  let formatter = offsetFormatters.get(timeZone);
-  if (!formatter) {
-    formatter = new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "shortOffset" });
-    offsetFormatters.set(timeZone, formatter);
-  }
-  const label = formatter.formatToParts(new Date(ms)).find(part => part.type === "timeZoneName")?.value ?? "";
-  if (label === "GMT" || label === "UTC") return 0;
-  const match = /^GMT([+-])(\d{1,2})(?::(\d{2}))?$/.exec(label);
-  if (!match) throw new Error(`Time zone offset for ${timeZone} could not be resolved.`);
-  return (Number(match[2]) * 60 + Number(match[3] ?? 0)) * (match[1] === "+" ? 1 : -1);
-}
-
-/**
- * The UTC instant of a local wall time ("HH:mm" or "HH:mm:ss") in `timeZone`.
- * Ambiguous fall-back times resolve to the earlier (daylight) instant; skipped spring-forward times move forward by the gap
- * (2:30 AM becomes 3:30 AM CDT), matching Google Calendar.
- */
-export function zonedWallTimeToUtc(date: string, time: string, timeZone: string = SERIES_TIME_ZONE): number {
-  const [year, month, day] = date.split("-").map(Number);
-  const [hour, minute, second = 0] = time.split(":").map(Number);
-  const wall = Date.UTC(year, month - 1, day, hour, minute, second);
-  const before = zoneOffsetMinutes(wall - DAY_MS, timeZone);
-  const after = zoneOffsetMinutes(wall + DAY_MS, timeZone);
-  const valid = [...new Set([before, after])]
-    .map(offset => wall - offset * MINUTE_MS)
-    .filter(utc => zoneOffsetMinutes(utc, timeZone) * MINUTE_MS === wall - utc)
-    .sort((a, b) => a - b);
-  return valid[0] ?? wall - before * MINUTE_MS;
 }
 
 // ---------- validation ----------

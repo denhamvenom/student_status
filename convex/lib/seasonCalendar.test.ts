@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildSeasonStatusAt, chicagoCalendarDateAt, kickoffForCompetitionYear, REPORTING_TIME_ZONE, kickoffBoundaryForCompetitionYear } from "./seasonCalendar";
+import { TEAM_TIME_ZONE } from "../../shared/chicago-time";
+import { buildSeasonStatusAt, chicagoCalendarDateAt, kickoffForCompetitionYear, kickoffBoundaryForCompetitionYear } from "./seasonCalendar";
 
 describe("verified FIRST kickoff calendar", () => {
   it("uses an explicit competition year and carries official provenance", () => {
-    expect(kickoffForCompetitionYear(2027)).toEqual({ state: "verified", competitionYear: 2027, kickoffDate: "2027-01-09", timeZone: REPORTING_TIME_ZONE, sourceUrl: "https://www.firstinspires.org/programs/frc/game-and-season", verifiedOn: "2026-10-13" });
+    expect(kickoffForCompetitionYear(2027)).toEqual({ state: "verified", competitionYear: 2027, kickoffDate: "2027-01-09", timeZone: TEAM_TIME_ZONE, sourceUrl: "https://www.firstinspires.org/programs/frc/game-and-season", verifiedOn: "2026-10-13" });
     expect(kickoffForCompetitionYear(2026)).toMatchObject({ state: "verified", kickoffDate: "2026-01-10" });
     expect(kickoffForCompetitionYear(2028)).toEqual({ state: "unavailable", competitionYear: 2028, reason: "kickoffDateNotVerified" });
     expect(() => kickoffForCompetitionYear(Number.NaN)).toThrow("Competition year");

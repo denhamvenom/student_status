@@ -2,6 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { chicagoDateString } from "../shared/chicago-time";
 import { activeSeason, audit, studentAccess, viewer } from "./lib/access";
 
 type Ctx = QueryCtx | MutationCtx;
@@ -14,10 +15,9 @@ export function age18(birth: string | undefined, now: number) {
   if (!birth || !/^\d{4}-\d{2}-\d{2}$/.test(birth)) return false;
   const born = Date.parse(`${birth}T00:00:00Z`);
   if (!Number.isFinite(born) || new Date(born).toISOString().slice(0,10) !== birth || born >= now) return false;
-  const parts = new Intl.DateTimeFormat("en-US", {timeZone:"America/Chicago",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date(now));
-  const part = (kind:string) => parts.find(value=>value.type===kind)?.value ?? "";
-  const year = Number(part("year")) - Number(birth.slice(0,4));
-  return year > 18 || year === 18 && `${part("month")}-${part("day")}` >= birth.slice(5);
+  const today = chicagoDateString(now);
+  const year = Number(today.slice(0,4)) - Number(birth.slice(0,4));
+  return year > 18 || year === 18 && today.slice(5) >= birth.slice(5);
 }
 async function eligible(ctx: Ctx, actor: Doc<"appUsers">, student: Doc<"students">, now: number) {
   if (actor.role === "parent") return {adultEligible: false, allowed: true};

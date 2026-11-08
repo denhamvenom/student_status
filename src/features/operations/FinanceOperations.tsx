@@ -10,6 +10,7 @@ import { Input } from '../../components/ui/input'
 import { NativeSelect, NativeSelectOption } from '../../components/ui/native-select'
 import styles from './FinanceOperations.module.css'
 import { chargeCurrency } from '../../lib/charge-money'
+import { chicagoDateString, chicagoMidnight } from '../../../shared/chicago-time'
 
 const usd = chargeCurrency
 const errorText = (error: unknown) => userFacingError(error)
@@ -22,18 +23,7 @@ export function TeamTransferReview({ preview, current, amountCents, busy, reason
   const ready = teamTransferReviewReady(preview, current, amountCents)
   return <><Button type="button" variant="outline" disabled={busy || !current} onClick={onReview}>{operationsCopy.finance.teamTransferPreview}</Button>{preview && <div className={styles.wide}><p>{operationsCopy.finance.teamTransferDestination} · Requested {usd(preview.amountCents)} · Available fundraising {preview.fundraisingAvailableCents === null ? 'Unavailable' : usd(preview.fundraisingAvailableCents)}</p>{preview.message && <p role="status" className={styles.note}>{preview.message}</p>}{!ready && <p role="status" className={styles.note}>This preview is not ready or financial records changed. Review again before confirming.</p>}</div>}<Button type="submit" disabled={busy || !ready || !reasonValid}>{busy ? operationsCopy.finance.recording : operationsCopy.finance.teamTransferConfirm}</Button></>
 }
-function chicagoDate() {
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date())
-  const part = (type: string) => parts.find(value => value.type === type)?.value ?? ''
-  return `${part('year')}-${part('month')}-${part('day')}`
-}
-function chicagoStartOfDay(date: string) {
-  const guess = Date.parse(`${date}T06:00:00Z`)
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(guess))
-  const number = (type: string) => Number(parts.find(value => value.type === type)?.value)
-  const localAtGuess = Date.UTC(number('year'), number('month') - 1, number('day'), number('hour'), number('minute'))
-  return Date.parse(`${date}T00:00:00Z`) - (localAtGuess - guess)
-}
+const chicagoDate = () => chicagoDateString(Date.now())
 function cents(value: string) {
   if (!/^\d+(?:\.\d{1,2})?$/.test(value)) return null
   const [dollars, fraction = ''] = value.split('.')
@@ -87,7 +77,7 @@ function FinanceOperationsForStudent({ studentId }: { studentId: Id<'students'> 
     setBusy(true); setError(''); setSaved('')
     try {
       if (mode === 'payout') {
-        const occurredAt = chicagoStartOfDay(occurredDate)
+        const occurredAt = chicagoMidnight(occurredDate)
         setOperationId(await payout({ studentId, amountCents, reason: reason.trim(), method, reference: reference.trim(), occurredAt, idempotencyKey }))
         setSaved('Refund record submitted. Financial processing must finish before this account is available again.')
       } else if (mode === 'transfer') {

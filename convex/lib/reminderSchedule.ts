@@ -1,4 +1,4 @@
-import { REPORTING_TIME_ZONE } from "./seasonCalendar";
+import { chicagoMidnight, TEAM_TIME_ZONE } from "../../shared/chicago-time";
 
 /** Pure timing rules for scheduled reminders and the daily digest. All wall-clock rules use America/Chicago. */
 export const HOUR_MS = 60 * 60 * 1000;
@@ -20,7 +20,7 @@ export const R6_DUE_SOON_MS = 7 * DAY_MS;
 
 export type ReminderKind = "r1EventTomorrow" | "r2PermissionMissing" | "r3SignupCloses" | "r4RoomingDeadline" | "r5RequirementDue" | "r6UnpaidBalance" | "r7SetupUnfinished";
 
-const formatter = new Intl.DateTimeFormat("en-US", { timeZone: REPORTING_TIME_ZONE, weekday: "short", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", hourCycle: "h23" });
+const formatter = new Intl.DateTimeFormat("en-US", { timeZone: TEAM_TIME_ZONE, weekday: "short", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", hourCycle: "h23" });
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export function chicagoParts(ms: number) {
@@ -33,18 +33,6 @@ export function chicagoParts(ms: number) {
 export function chicagoDateKey(ms: number, offsetDays = 0): string {
   const { year, month, day } = chicagoParts(ms);
   return new Date(Date.UTC(year, month - 1, day + offsetDays)).toISOString().slice(0, 10);
-}
-
-/** The instant of local midnight starting a Chicago calendar date (DST-safe). */
-export function chicagoMidnight(dateKey: string): number {
-  const [year, month, day] = dateKey.split("-").map(Number);
-  const wall = Date.UTC(year, month - 1, day);
-  let guess = wall + 6 * HOUR_MS;
-  for (let i = 0; i < 3; i++) {
-    const p = chicagoParts(guess);
-    guess += wall - Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute);
-  }
-  return guess;
 }
 
 /** [start, end) of the Chicago calendar date `offsetDays` after today; 23 or 25 hours long across DST changes. */
@@ -85,8 +73,8 @@ export function shouldSendUnpaidReminder(nowMs: number, unpaidDueAts: (number | 
   return isR6ParityMonday(nowMs) || unpaidDueAts.some(dueAt => dueAt !== undefined && dueAt >= nowMs && dueAt <= nowMs + R6_DUE_SOON_MS);
 }
 
-const timeFormatter = new Intl.DateTimeFormat("en-US", { timeZone: REPORTING_TIME_ZONE, hour: "numeric", minute: "2-digit" });
-const dayFormatter = new Intl.DateTimeFormat("en-US", { timeZone: REPORTING_TIME_ZONE, weekday: "short", month: "short", day: "numeric" });
+const timeFormatter = new Intl.DateTimeFormat("en-US", { timeZone: TEAM_TIME_ZONE, hour: "numeric", minute: "2-digit" });
+const dayFormatter = new Intl.DateTimeFormat("en-US", { timeZone: TEAM_TIME_ZONE, weekday: "short", month: "short", day: "numeric" });
 
 export function formatChicagoTime(ms: number): string {
   return timeFormatter.format(new Date(ms));

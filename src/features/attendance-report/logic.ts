@@ -1,7 +1,8 @@
 import type { FunctionReturnType } from 'convex/server'
 import type { api } from '../../../convex/_generated/api'
 import { compareMonths, type ReportStatus } from '../../../convex/lib/attendanceReportView'
-import { chicagoDateKey, TEAM_TIME_ZONE } from '../student-home/format'
+import { TEAM_TIME_ZONE } from '../../../shared/chicago-time'
+import { chicagoDateKey } from '../student-home/format'
 import { reportCopy as copy } from './copy'
 
 export type AttendanceMonth = FunctionReturnType<typeof api.attendanceReport.month>

@@ -1,3 +1,5 @@
+import { zonedWallTimeToUtc } from '../../shared/chicago-time'
+
 const parts = new Intl.DateTimeFormat('en-US', {timeZone:'America/Chicago',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'})
 
 export function chicagoInputTime(epoch: number) {
@@ -8,13 +10,9 @@ export function chicagoInputTime(epoch: number) {
 
 export function parseChicagoInput(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return NaN
-  const [year,month,day,hour,minute] = value.match(/\d+/g)!.map(Number)
-  const utc = Date.UTC(year,month-1,day,hour,minute)
-  for (const hours of [5,6]) {
-    const candidate = utc + hours*60*60*1000
-    if (chicagoInputTime(candidate)===value) return candidate
-  }
-  return NaN
+  const candidate = zonedWallTimeToUtc(value.slice(0, 10), value.slice(11))
+  // A time the clocks skip is shifted forward by the shared rule; this entry point rejects it, as do impossible dates.
+  return chicagoInputTime(candidate)===value ? candidate : NaN
 }
 
 export function chicagoDisplayTime(epoch: number) {

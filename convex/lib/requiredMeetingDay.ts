@@ -1,9 +1,10 @@
 // The Required-meeting weekday rule, shared by attendance reports (attendanceReports.ts) and the app's Team Calendar
 // defaults for new meetings (src/features/event-setup/new-event-defaults.ts). Pure: no Convex server imports, so the
 // browser bundle can use it too.
-import { kickoffBoundaryForCompetitionYear, REPORTING_TIME_ZONE } from "./seasonCalendar";
+import { TEAM_TIME_ZONE } from "../../shared/chicago-time";
+import { kickoffBoundaryForCompetitionYear } from "./seasonCalendar";
 
-const chicagoWeekday = new Intl.DateTimeFormat("en-US", { timeZone: REPORTING_TIME_ZONE, weekday: "long" });
+const chicagoWeekday = new Intl.DateTimeFormat("en-US", { timeZone: TEAM_TIME_ZONE, weekday: "long" });
 
 /** The weekday a meeting must fall on to count as Required: Tuesday before Build Season kickoff, Monday from kickoff. */
 function requiredWeekday(scheduledStart: number, kickoffAt: number | null): "Monday" | "Tuesday" {
