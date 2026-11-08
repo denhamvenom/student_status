@@ -78,7 +78,7 @@ import Adults, { AdultInvitationLanding } from './Adults'
 import { RequestProfileCorrection, ProfileCorrectionQueue } from './ProfileCorrections'
 import { EventEnrollmentNotice } from './EventEnrollmentNotice'
 import { RoomViewBoundary } from './RoomViewBoundary'
-import { FamilyAttendanceSummary, FamilyFunding, TeamFinanceOverview, TeamRosterSummary } from './DashboardReports'
+import { FamilyFunding, TeamFinanceOverview, TeamRosterSummary } from './DashboardReports'
 import { reportCopy } from './lib/report-copy'
 import familyStyles from './FamilyDashboard.module.css'
 import { familyCopy, moneyMeanings } from './lib/family-copy'
@@ -160,45 +160,6 @@ function State({children}:{children:React.ReactNode}){return <div className="car
 
 
 function Home({viewer,studentId}:{viewer:Viewer;studentId:string|null}){const r=role(viewer);if(r==='mentor')return <MentorHome name={viewer.user?.name??''} userId={viewer.user?.id??''}/>;if(r==='coach'||r==='travelLead')return <>{r==='travelLead'&&viewer.user?.role!=='coach'&&<TravelLeadSchedule/>}<StaffHomeAnnouncements/><CalendarSyncAlert/><Roster viewer={viewer}/></>;if(!studentId)return <State>{liveCopy.states.noLinkedStudent}</State>;if(r==='student')return <><HomeInstallBanner role={r}/><StudentHome studentId={sid(studentId)}/></>;const student=viewer.students.find(s=>s._id===studentId);return <><HomeInstallBanner role={r}/><p><Link className="button button-outline" to="/setup?edit=1">Edit profile</Link></p><ParentHome key={studentId} studentId={sid(studentId)} studentName={student?name(student):'Student'}/></>}
-type WaitingTodo={eventName:string;label:string;responsible:'student'|'parent'|'coach'}
-function waitingSentence(todo:WaitingTodo,studentName:string,viewerRole:string){
-  const student=viewerRole==='student'?'your':`${studentName}'s`
-  const label=todo.label.toLowerCase()
-  if(todo.eventName==='Student setup')return `Waiting on ${studentName} to finish student setup.`
-  if(todo.eventName==='Profile & health')return viewerRole==='student'?'Your parent still needs to finish your health profile.':`Waiting on a parent or guardian to finish ${student} health profile.`
-  if(todo.eventName==='FIRST registration and Consent & Release')return todo.responsible==='coach'?`Waiting on the Coach to confirm ${student} FIRST registration.`:viewerRole==='student'?'Your parent still needs to complete your FIRST registration.':`Waiting on ${studentName} to complete ${student} FIRST registration.`
-  if(label.includes('permission')){
-    if(label.includes('student setup'))return `Waiting on ${studentName} to finish setup before the permission form for ${todo.eventName}.`
-    if(label.includes('health and contact'))return `Waiting for ${student} health profile before the permission form for ${todo.eventName}.`
-    if(todo.responsible==='coach')return label.includes('signing')?`Waiting on the Coach to open permission signing for ${todo.eventName}.`:`Waiting on the Coach to review ${student} permission form for ${todo.eventName}.`
-    return `Waiting on ${viewerRole==='student'?'your parent':'a parent or guardian'} to sign ${student} permission form for ${todo.eventName}.`
-  }
-  if(todo.responsible==='parent'&&label.includes('payment'))return `Waiting on your parent to review payment for ${todo.eventName}.`
-  if(todo.responsible==='student'&&label.includes('room'))return `Waiting on ${studentName} to choose room preferences for ${todo.eventName}.`
-  if(todo.responsible==='student'&&label.includes('first registration'))return `Waiting on ${studentName} to complete FIRST registration for ${todo.eventName}.`
-  if(todo.responsible==='coach'&&(label.includes('financial')||label.includes('fee maintenance')))return `Waiting on the Coach to review financial records for ${todo.eventName}.`
-  if(todo.responsible==='coach')return `Waiting on the Coach to review ${student} requirements for ${todo.eventName}.`
-  return `Waiting on ${todo.responsible==='student'?studentName:'a parent or guardian'} to complete ${student} requirements for ${todo.eventName}.`
-}
-function _DashboardPage({studentId,viewerRole}:{studentId:string;viewerRole:string}) {
-  const [asOf]=useState(Date.now)
-  const data=useQuery(qDashboard,{studentId:sid(studentId),asOf})
-  if(!data)return <State>{familyCopy.dashboard.loading}</State>
-  const actionable=data.todos.filter(t=>!t.blocked&&!!t.href)
-  const waiting=data.todos.filter(t=>t.blocked||!t.href)
-  const todoGroups=Array.from(new Set(actionable.map(t=>t.eventId??t.eventName))).map(key=>({eventId:key,todos:actionable.filter(t=>(t.eventId??t.eventName)===key)}))
-  return <>
-    <Heading title={name(data.student)}/>
-    {actionable.length>0&&<div className="section-head"><h2>{familyCopy.dashboard.toDo} · {actionable.length}</h2></div>}
-    {actionable.length?<div className={familyStyles.todoGroups}>{todoGroups.map(group=><section key={group.eventId??'profile'} className={familyStyles.todoGroup}><h3>{group.todos[0].eventName}</h3>{group.todos[0].eventName==='FIRST registration and Consent & Release'&&<p className="muted">{setupWizardCopy.consentReleaseExplanation}</p>}<div className={familyStyles.todoCards}>{group.todos.map((t,i)=><article key={i} className={`card ${familyStyles.todoCard}`}><strong>{t.label}</strong>{t.dueAt&&<span className="muted">{familyCopy.dashboard.duePrefix} {date(t.dueAt)}</span>}{t.href&&<Link className="button button-primary" to={t.href}>{t.href==='/setup'?(t.eventName==='Profile & health'?'Finish health profile':t.eventName==='FIRST registration and Consent & Release'?'Finish FIRST registration':'Finish setup'):t.href==='/profile'?'Open profile':t.href==='/forms'?'Open permission form':t.href==='/finances'?'Open Money':'View event'}</Link>}</article>)}</div></section>)}</div>:<State>{familyCopy.dashboard.caughtUp}</State>}
-    {waiting.map((todo,index)=><p className="muted" key={`${todo.eventId??'profile'}:${index}`}>{waitingSentence(todo,name(data.student),viewerRole)}</p>)}
-    <div className="summary-grid">
-      <FamilyFunding studentId={sid(studentId)} compact/>
-      <section className="card"><div className="card-head"><h2>{familyCopy.dashboard.events}</h2><Link to="/events">{familyCopy.dashboard.allEvents}</Link></div><div className="event-mini-list">{data.events.length?data.events.map(x=><Link key={x.event._id} className="event-mini" to={`/events/${x.event._id}`}><div><strong>{x.event.name}</strong><span>{eventSchedule(x.event)} · {participation(x.participation)}</span></div>{x.readiness.state!=='notApplicable'&&<span className={`badge badge-${x.readiness.state==='ready'?'ready':x.readiness.state==='open'?'open':'pending'}`}>{x.readiness.state==='open'?`${x.readiness.open.length} ${uiCopy.status.open.toLowerCase()}`:status(x.readiness.state)}</span>}</Link>):<p className="muted">{familyCopy.dashboard.noEvents}</p>}</div></section>
-      <FamilyAttendanceSummary studentId={sid(studentId)} compact/>
-    </div>
-  </>
-}
 const eventSectionTitle:Record<EventType,string>={Competition:liveCopy.events.competitions,Outreach:liveCopy.events.outreach,Team:eventCopy.types.team,Fundraiser:liveCopy.events.fundraisers}
 function EventList({viewer,studentId}:{viewer:Viewer;studentId:string|null}){const location=useLocation();const restoredFocus=useRef(false);const listed=useQuery(qEvents,{});useEffect(()=>{if(listed&&location.pathname==='/events'&&location.state?.focusNewEvent&&!restoredFocus.current){document.getElementById('new-event-link')?.focus();restoredFocus.current=true}},[listed,location.pathname,location.state]);const dashboard=useQuery(qDashboard,studentId&&(viewer.user?.role==='student'||viewer.user?.role==='parent')?{studentId:sid(studentId)}:'skip');const rows=listed?.map(row=>({...row,participation:dashboard?.events.find(item=>item.event._id===row.event._id)?.participation??row.participation}));if(!rows||(studentId&&(viewer.user?.role==='student'||viewer.user?.role==='parent')&&dashboard===undefined))return <State>{liveCopy.states.loadingEvents}</State>;return <><Heading title={liveCopy.events.title} description={liveCopy.events.description}/>{(viewer.user?.role==='coach'||viewer.user?.travelLead)&&<p className="action-row"><Link id="new-event-link" className="button button-primary" to="/events/new">{liveCopy.events.newEvent}</Link><TeamMeetingButton isCoach={viewer.user?.role==='coach'} seasonYear={viewer.season?.year??null}/><Link className="button button-outline" to="/events/archive">Archived events</Link>{viewer.user?.role==='coach'&&<EventsMoreMenu/>}</p>}<EventListSections rows={rows} types={eventTypeOrder} sectionTitle={type=>eventSectionTitle[type as EventType]} renderSeriesExtras={x=><><EventBadges event={x.event}/><MentorMeetingTag createdBy={'createdBy' in x?x.createdBy:null}/></>} renderCard={x=><Box key={x.event._id}><span className="eyebrow">{eventTypeLabel(x.event.type)}</span><h3>{x.event.name}</h3><EventBadges event={x.event}/><MentorMeetingTag createdBy={'createdBy' in x?x.createdBy:null}/>{'cancelled' in x.event&&x.event.cancelled&&<span className="badge badge-open">Canceled</span>}<p>{eventSchedule(x.event)}</p><p className="muted">{eventLocation(x.event)}{'travel' in x.event && x.event.travel && hasTravel(x.event) ? <> · {transportationLabel(x.event.travel)}</> : null}</p>{(viewer.user?.role==='student'||viewer.user?.role==='parent')&&<p><span className="badge badge-pending">{participation(x.participation)}</span></p>}{(viewer.user?.role==='coach'||viewer.user?.travelLead)&&<WaitingSignups eventId={x.event._id}/>}<Link className="button button-outline" to={`/events/${x.event._id}`}>{liveCopy.events.viewEvent}</Link></Box>}/></>}
 function EventPage({eventId,viewer,studentId}:{eventId:string;viewer:Viewer;studentId:string|null}){

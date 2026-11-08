@@ -118,7 +118,7 @@ export const preflightSubmit = internalMutation({
       const previous = await ctx.db.get(draft.usedSubmissionId);
       if (!previous || previous.draftId !== draft._id || previous.recordedBy !== actor._id || previous.typedName !== args.typedName.trim() || previous.paperReference !== args.paperReference?.trim() || previous.paperSignedAt !== args.paperSignedAt) throw new Error("This PDF draft was already signed differently.");
       if (previous.source === "electronic") await parentSigner(ctx, actor); else operations(actor);
-      await studentAccess(ctx, actor, previous.studentId); await requireFamilyEventAccess(ctx, actor, previous.eventIds); await sealedSnapshotV2(ctx, previous);
+      await studentAccess(ctx, actor, previous.studentId); await requireFamilyEventAccess(ctx, actor, previous.eventIds); await sealedSnapshotV2(previous);
       return {kind: "existing" as const, submissionId: previous._id};
     }
     const {snapshot} = await currentDraft(ctx, draft, actor, Date.now());
@@ -135,7 +135,7 @@ export const commitSubmit = internalMutation({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); const draft = await ctx.db.get(args.draftId); if (!draft) throw new Error("PDF draft not found.");
     if (draft.parentId !== actor._id) throw new Error("PDF draft is unavailable for this signer.");
-    if (draft.usedSubmissionId) {const previous = await ctx.db.get(draft.usedSubmissionId); if (!previous || previous.draftId !== draft._id || previous.recordedBy !== actor._id || previous.typedName !== args.typedName.trim() || previous.paperReference !== args.paperReference?.trim() || previous.paperSignedAt !== args.paperSignedAt) throw new Error("This PDF draft was already signed differently."); if (previous.source === "electronic") await parentSigner(ctx, actor); else operations(actor); await studentAccess(ctx, actor, previous.studentId); await requireFamilyEventAccess(ctx, actor, previous.eventIds); await sealedSnapshotV2(ctx, previous); return previous._id;}
+    if (draft.usedSubmissionId) {const previous = await ctx.db.get(draft.usedSubmissionId); if (!previous || previous.draftId !== draft._id || previous.recordedBy !== actor._id || previous.typedName !== args.typedName.trim() || previous.paperReference !== args.paperReference?.trim() || previous.paperSignedAt !== args.paperSignedAt) throw new Error("This PDF draft was already signed differently."); if (previous.source === "electronic") await parentSigner(ctx, actor); else operations(actor); await studentAccess(ctx, actor, previous.studentId); await requireFamilyEventAccess(ctx, actor, previous.eventIds); await sealedSnapshotV2(previous); return previous._id;}
     const {snapshot, student} = await currentDraft(ctx, draft, actor, Date.now());
     if (!args.acknowledged || args.typedName.trim() !== snapshot.signer.name.trim() || draft.reviewedPdfSha256 !== args.reviewedPdfSha256 || !hashPattern.test(args.signedPdfSha256)) throw new Error("Signed PDF evidence is inconsistent.");
     const signedAt = args.signedAt;
@@ -152,7 +152,7 @@ export const commitSubmit = internalMutation({
     return submissionId;
   },
 });
-export async function sealedSnapshotV2(ctx: Ctx, submission: Doc<"permissionSubmissions">) {
+export async function sealedSnapshotV2(submission: Doc<"permissionSubmissions">) {
   if (submission.snapshotFormat !== 2 || typeof submission.synthetic !== "boolean" || !submission.snapshotJson || !submission.snapshotHash || !submission.reviewedPdfId || !submission.reviewedPdfSha256 || !submission.signedPdfId || !submission.signedPdfSha256 || !hashPattern.test(submission.reviewedPdfSha256) || !hashPattern.test(submission.signedPdfSha256)) throw new Error("PDF permission evidence is incomplete.");
   const snapshot = parseV2(submission.snapshotJson);
   if (!snapshot.pdf || snapshot.synthetic !== submission.synthetic || snapshot.pdf.reviewedStorageId !== submission.reviewedPdfId || snapshot.pdf.reviewedSha256 !== submission.reviewedPdfSha256 || snapshot.pdf.signedStorageId !== submission.signedPdfId || snapshot.pdf.signedSha256 !== submission.signedPdfSha256) throw new Error("PDF evidence binding is inconsistent.");
@@ -165,7 +165,7 @@ export const receipt = query({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); formReader(actor); const submission = await ctx.db.get(args.submissionId);
     if (!submission) throw new ConvexError("This signed permission form isn't available. Reload the page to see the current list."); await studentAccess(ctx, actor, submission.studentId); await requireFamilyEventAccess(ctx, actor, submission.eventIds);
-    const snapshot = await sealedSnapshotV2(ctx, submission);
+    const snapshot = await sealedSnapshotV2(submission);
     return {snapshot, reviewedPdfSha256: submission.reviewedPdfSha256!, signedPdfSha256: submission.signedPdfSha256!};
   },
 });
@@ -181,7 +181,7 @@ export const pdfAccess = internalQuery({
       return {storageId: draft.reviewedPdfId, sha256: draft.reviewedPdfSha256};
     }
     const submission = await ctx.db.get(args.submissionId!); if (!submission) throw new Error("Signed form PDF not found.");
-    await studentAccess(ctx, actor, submission.studentId); await requireFamilyEventAccess(ctx, actor, submission.eventIds); await sealedSnapshotV2(ctx, submission);
+    await studentAccess(ctx, actor, submission.studentId); await requireFamilyEventAccess(ctx, actor, submission.eventIds); await sealedSnapshotV2(submission);
     return args.rendition === "reviewed" ? {storageId: submission.reviewedPdfId!, sha256: submission.reviewedPdfSha256!} : {storageId: submission.signedPdfId!, sha256: submission.signedPdfSha256!};
   },
 });

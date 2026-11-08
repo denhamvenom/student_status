@@ -103,7 +103,7 @@ async function linkedSeries(f: Fixture) {
   return { seriesId, rows, single, items };
 }
 
-function expectOneSeriesNoticeEach(f: Fixture, notices: Doc<"notifications">[][], rows: Doc<"events">[], single: Id<"events">) {
+function expectOneSeriesNoticeEach(notices: Doc<"notifications">[][], rows: Doc<"events">[], single: Id<"events">) {
   for (const [index, list] of notices.entries()) {
     const series = list.filter(row => rows.some(meeting => row.dedupeKey!.includes(meeting._id)));
     expect(series).toHaveLength(1);
@@ -128,7 +128,7 @@ describe("main Calendar sync: one notice per series", () => {
     await f.t.action(internal.calendar.refresh, {});
     const saved = await seriesRows(f, seriesId);
     expect(saved.filter(row => rows.some(meeting => meeting._id === row._id)).every(row => row.destination === "New gym")).toBe(true);
-    expectOneSeriesNoticeEach(f, await Promise.all(f.ids.students.map(student => changedNotices(f, student.userId))), rows, single);
+    expectOneSeriesNoticeEach(await Promise.all(f.ids.students.map(student => changedNotices(f, student.userId))), rows, single);
   });
 
   it("reconcileLinked (full-token reset) also sends one notice per series", async () => {
@@ -144,7 +144,7 @@ describe("main Calendar sync: one notice per series", () => {
       return item ? new Response(JSON.stringify(item), { status: 200 }) : new Response("{}", { status: 404 });
     });
     await f.t.action(internal.eventCalendar.reconcileLinked, {});
-    expectOneSeriesNoticeEach(f, await Promise.all(f.ids.students.map(student => changedNotices(f, student.userId))), rows, single);
+    expectOneSeriesNoticeEach(await Promise.all(f.ids.students.map(student => changedNotices(f, student.userId))), rows, single);
   });
 });
 

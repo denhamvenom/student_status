@@ -99,7 +99,7 @@ export const review = mutation({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); operations(actor); boundedText(args.idempotencyKey, 128, "Retry key");
     const submission = await ctx.db.get(args.submissionId); if (!submission) throw new ConvexError("This signed permission form isn't available. Reload the page to see the current list.");
-    await studentAccess(ctx, actor, submission.studentId); await requireFamilyEventAccess(ctx, actor, submission.eventIds); if (submission.snapshotFormat === 2) {if (actor.role === "mentor" && !actor.healthExport) throw new ConvexError("The Health export permission is required to review signed form PDFs."); await sealedSnapshotV2(ctx, submission);} else await sealedSnapshot(ctx, submission);
+    await studentAccess(ctx, actor, submission.studentId); await requireFamilyEventAccess(ctx, actor, submission.eventIds); if (submission.snapshotFormat === 2) {if (actor.role === "mentor" && !actor.healthExport) throw new ConvexError("The Health export permission is required to review signed form PDFs."); await sealedSnapshotV2(submission);} else await sealedSnapshot(ctx, submission);
     if (args.status === "correction") boundedText(args.note ?? "", 1000, "Correction note");
     if ((args.note?.length ?? 0) > 1000) throw new ConvexError("Shorten the review note to 1,000 characters or fewer.");
     const operationHash = await tokenHash(JSON.stringify({...args, expectedCoverage: [...args.expectedCoverage].sort((a,b) => a.eventId.localeCompare(b.eventId))}));
@@ -159,7 +159,7 @@ export const exportPacket = mutation({
       const student = await ctx.db.get(participant.studentId);
       if (!student?.active || student.seasonId !== season._id) continue;
       const row = await coverageFor(ctx, student._id, event._id); const submission = row?.latestSubmissionId ? await ctx.db.get(row.latestSubmissionId) : null;
-      const snapshot = args.includeHealth && submission?.snapshotFormat === 1 ? await sealedSnapshot(ctx, submission) : args.includeHealth && submission?.snapshotFormat === 2 ? await sealedSnapshotV2(ctx, submission) : undefined;
+      const snapshot = args.includeHealth && submission?.snapshotFormat === 1 ? await sealedSnapshot(ctx, submission) : args.includeHealth && submission?.snapshotFormat === 2 ? await sealedSnapshotV2(submission) : undefined;
       records.push({studentId: student._id, studentName: student.legalName || student.preferredName, state: row?.state ?? "required", revision: row?.revision ?? 0, submissionId: submission?._id ?? null, signerName: submission?.signerName ?? null, signedAt: submission?.signedAt ?? null, source: submission?.source ?? null, synthetic: submission?.synthetic ?? null, ...(snapshot ? {snapshot} : {}), collectedAt: generatedAt});
     }
     await audit(ctx, actor, "permissionExports", event._id, "export", null, {includeHealth: args.includeHealth, count: records.length, generatedAt});
