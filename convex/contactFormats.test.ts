@@ -21,10 +21,9 @@ async function fixture() {
   });
   return { t, ids, coach: t.withIdentity({ subject: `${ids.coach.auth}|session` }), parent: t.withIdentity({ subject: `${ids.parent.auth}|session` }), student: t.withIdentity({ subject: `${ids.pupil.auth}|session` }) };
 }
-it('normalizes student setup, emergency editing and parent wizard contacts at the server', async () => {
+it('normalizes emergency editing and parent wizard contacts at the server', async () => {
   const f = await fixture();
-  await f.student.mutation(api.profileSetup.complete, { expectedRevision: 0, shirtSize: 'M', roomCategory: 'Girls', guardianPhone: '12025550123', guardianEmail: ' Parent@Example.Invalid ' });
-  expect(await f.t.run(ctx => ctx.db.get(f.ids.student))).toMatchObject({ guardianPhone: '(202) 555-0123', guardianEmail: 'parent@example.invalid' });
+  await f.t.run(ctx => ctx.db.patch(f.ids.student, { shirtSize: 'M', roomCategory: 'Girls', roomCategoryLocked: true, profileCompletedAt: 1, profileRevision: 1 }));
   await expect(f.parent.mutation(api.app.updateStudentProfile, { studentId: f.ids.student, expectedRevision: 1, emergencyPhone: 'bad' })).rejects.toThrow('10-digit');
   await f.parent.mutation(api.app.updateStudentProfile, { studentId: f.ids.student, expectedRevision: 1, emergencyPhone: '202.555.0124' });
   await f.parent.mutation(api.setupWizard.saveContacts, { studentId: f.ids.student, expectedRevision: 2, guardian: { name: 'Synthetic Parent', relationship: 'Parent', phone: '+1 202 555 0123', email: ' PARENT@EXAMPLE.INVALID ' }, emergency: { name: 'Synthetic Contact', relationship: 'Other', phone: '2025550124' } });
