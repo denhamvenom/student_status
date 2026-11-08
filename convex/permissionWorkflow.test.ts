@@ -213,6 +213,23 @@ describe("synthetic versioned permission workflow", () => {
     await expect(f.coach.mutation(api.permissions.exportPacket, {eventId: f.ids.events[0], includeHealth: true, paginationOpts: {cursor: null, numItems: 11}})).rejects.toThrow("at most 10");
   }, 15_000);
 
+  it("refuses sealed format-1 receipts and reviews to unlinked and revoked parents without recording a review", async () => {
+    const f = await fixture(); const {submissionId} = await sign(f, [f.ids.events[0]]);
+    const summary = (await f.coach.query(api.permissions.receipt, {submissionId})).summary;
+    const args = {submissionId, status: "accepted" as const, expectedCoverage: summary.controlledCoverage, expectedLatestReviewId: summary.latestReviewId, idempotencyKey: "family-review"};
+    const state = () => f.t.run(async ctx => ({reviews: await ctx.db.query("permissionReviews").take(5), coverage: await ctx.db.query("permissionCoverage").take(5)}));
+    const before = await state();
+    await expect(f.other.query(api.permissions.receipt, {submissionId})).rejects.toThrow("permission");
+    for (const family of [f.other, f.parent]) await expect(family.mutation(api.permissions.review, args)).rejects.toThrow("Coach or Travel Lead");
+    expect((await f.parent.query(api.permissions.receipt, {submissionId})).summary.submissionId).toBe(submissionId);
+    await f.t.run(ctx => ctx.db.patch(f.ids.link, {active: false}));
+    await expect(f.parent.query(api.permissions.receipt, {submissionId})).rejects.toThrow("permission");
+    await expect(f.parent.query(api.permissions.workspace, {studentId: f.ids.student})).rejects.toThrow("permission");
+    await expect(f.parent.mutation(api.permissions.review, args)).rejects.toThrow("Coach or Travel Lead");
+    expect(await state()).toEqual(before);
+    expect(await accepted(f)).toBe(false);
+  });
+
   it("never infers coverage from legacy answers JSON and refuses legacy review promotion", async () => {
     const f = await fixture();
     const submissionId = await f.t.run(async ctx => {const id = await ctx.db.insert("permissionSubmissions", {studentId: f.ids.student, seasonId: f.ids.season, signedBy: f.ids.parent.id, typedName: "Parent Example", wordingVersion: "Approved looking legacy", eventIds: [f.ids.events[0]], answersJson: "{}", signedAt: Date.now()}); await ctx.db.insert("permissionReviews", {submissionId: id, status: "accepted", reviewedBy: f.ids.coach.id, reviewedAt: Date.now()}); return id});
