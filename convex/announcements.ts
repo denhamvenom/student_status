@@ -4,6 +4,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { makeFunctionReference } from "convex/server";
 import { activeSeason, audit, isCoachOrTravelLead, viewer, type AppUser } from "./lib/access";
+import { coachOnly, reaches, type Audience } from "../shared/announcement-audience";
 import { notifyUsers, parentUserIdsForStudents, studentUserIds } from "./lib/notify";
 
 /** Student Home shows at most this many pinned messages; pinning one more is refused. */
@@ -19,13 +20,7 @@ type AuthorRole = Announcement["authorRole"];
 
 const authorRole = v.union(v.literal("coach"), v.literal("travelLead"));
 const audience = v.union(v.literal("students"), v.literal("parents"), v.literal("both"), v.literal("staff"), v.literal("everyone"));
-type Audience = "students" | "parents" | "both" | "staff" | "everyone";
-type Destination = "students" | "parents" | "staff";
 const DESTINATIONS = ["students", "parents", "staff"] as const;
-/** Both = Students + Parents; Everyone = Students + Parents + staff (Coaches, Mentors, Travel Leads, Parents with staff access). */
-const reaches = (audience: Audience, destination: Destination) => audience === "everyone" || audience === destination || audience === "both" && destination !== "staff";
-/** Anything reaching Parents is Coach-only; Travel Leads may post to Students or staff. */
-const coachOnly = (audience: Audience) => reaches(audience, "parents");
 const destinationOf = (row: Announcement): Audience => row.audience ?? "students";
 
 // Each destination has at most five current pins. Disjoint lists therefore hold at most fifteen rows;

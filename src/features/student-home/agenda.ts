@@ -1,6 +1,7 @@
 import type { Id } from '../../../convex/_generated/dataModel'
 import { resolveAudience, type AudienceEventFields } from '../../../convex/lib/eventAudienceRules'
 import { eventLocation } from '@/lib/event-place'
+import { uiCopy } from '@/lib/ui-copy'
 import { TEAM_TIME_ZONE } from '../../../shared/chicago-time'
 import { formatDateRange, formatMoney } from './format'
 
@@ -107,7 +108,8 @@ export function formatWhen(startsAt: number, endsAt: number) {
 /** "Free" or "$85". */
 export const costLabel = (feeCents: number) => feeCents > 0 ? formatMoney(feeCents) : 'Free'
 
-export const statusLabel: Record<AgendaStatus, string> = { confirmed: 'Signed up', pending: 'Waiting for approval', waitlist: 'Waitlisted' }
+const { confirmed, pending, waitlist } = uiCopy.familyParticipation
+export const statusLabel: Record<AgendaStatus, string> = { confirmed, pending, waitlist }
 
 /** Required or Optional, with what it means. */
 export const requiredBadge = (required: boolean) => required
