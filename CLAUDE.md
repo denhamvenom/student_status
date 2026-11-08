@@ -13,7 +13,7 @@
 
 ## Project overview
 
-Student Status helps Team 8044 Coaches, Mentors, Travel Leads, Parents and Students manage accounts, events, travel readiness, attendance, permission forms and student funds. Timeclock gives Coaches and Mentors a shared clock-in/out console whose attendance feeds Student Status; each role sees only the records and actions it is allowed to access.
+Student Status (shown to people as Venom Status) helps Team 8044 Coaches, Mentors, Travel Leads, Parents and Students manage accounts, events, travel readiness, attendance, permission forms and student funds. Timeclock gives Coaches and Mentors a shared clock-in/out console whose attendance feeds Student Status; each role sees only the records and actions it is allowed to access.
 
 ## Start and handoff
 
@@ -38,12 +38,20 @@ Student Status helps Team 8044 Coaches, Mentors, Travel Leads, Parents and Stude
 
 - App entry/navigation: `src/main.tsx`, `src/LiveApp.tsx`, `src/AppShell.tsx`.
 - Accounts/auth: `src/SignIn.tsx`, `convex/accounts.ts`, `convex/auth.ts`, `convex/lib/access.ts`.
+- Developer sign-in (development only): `src/DeveloperSignIn.tsx`, `convex/developerSignIn.ts`.
 - Parent linking: `src/ParentInvites.tsx`, `convex/parentInvites.ts`, `convex/parentInviteEmail.ts`, `convex/parentEmailAuth.ts`.
 - Setup/FIRST: `src/SetupWizard.tsx`, `src/StaffSetupWizard.tsx`, `src/FirstRegistration.tsx`, `convex/setupWizard.ts`, `convex/firstRegistration.ts`.
 - Events: `src/features/operations/EventOperations.tsx`, `convex/admin.ts`, `convex/eventOperations.ts`, `convex/eventEnrollment.ts`.
+- Repeating meetings: `convex/eventSeries.ts`, `convex/eventSeriesCalendar.ts`.
+- Withdrawals: `src/Withdrawals.tsx`, `convex/withdrawals.ts`, `convex/lib/withdrawalState.ts`.
+- Mentor Home/meetings/invitations: `src/features/mentor-home/`, `src/features/mentor-invites/`, `convex/mentorHome.ts`, `convex/mentorMeetings.ts`, `convex/mentorInvites.ts`.
 - Rooms/transport: `src/features/operations/RoomOperations.tsx`, `src/Travel.tsx`, `convex/rooms.ts`, `convex/travel.ts`.
+- Announcements: `src/features/announcements/`, `convex/announcements.ts`.
+- Notifications/push/PWA: `src/notifications/`, `src/pwa/`, `convex/notifications.ts`, `convex/push.ts`.
+- Attendance report: `src/features/operations/AttendanceOperations.tsx`, `convex/attendanceReport.ts`.
 - Reports: `src/DashboardReports.tsx`, `src/TeamReports.tsx`, `convex/dashboardReports.ts`, `convex/teamReports.ts`.
 - Finance: `src/CoachFinanceWorkspace.tsx`, `convex/finance.ts`, `convex/financeOperations.ts`, `convex/financialSources.ts`, `convex/lib/money.ts`.
+- Fees: `src/FeeAdministration.tsx`, `convex/feeDefinitions.ts`, `convex/feePayments.ts`, `convex/chargeAdmin.ts`.
 - Zeffy: `src/ZeffySync.tsx`, `convex/zeffy.ts`, `convex/zeffyActions.ts`, `convex/lib/zeffy.ts`.
 - Season/history: `src/SeasonAdministration.tsx`, `convex/seasonAdmin.ts`, `convex/seasonTransition.ts`, `convex/seasonHistory.ts`.
 - Consent/PDF: `src/PermissionWorkflow.tsx`, `src/SecurePermissionPdf.tsx`, `src/lib/field-trip-pdf.ts`, `convex/permissionsV2.ts`, `convex/permissionsV2Pdf.ts`.

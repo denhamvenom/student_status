@@ -1,8 +1,8 @@
 # Denham Venom Student Status
 
-Team 8044's student, family, travel and financial application, with a separate Timeclock operator app in the same repository. Both are React/Vite SPAs backed by one Convex deployment.
+Team 8044's student, family, travel and financial application, shown to people as **Venom Status** since October 25, 2026 (repository, folder and script names still say Student Status), with a separate Timeclock operator app in the same repository. Both are React/Vite SPAs backed by one Convex deployment.
 
-Read [HANDOFF.md](HANDOFF.md) first for current work, verification limits and the documentation cleanup backlog. Read [AGENTS.md](AGENTS.md) before making changes. Historical notes are not current instructions.
+Read [HANDOFF.md](HANDOFF.md) first for current work, verification limits and open follow-ups; see [docs/BACKLOG.md](docs/BACKLOG.md) for deferred work. Read [AGENTS.md](AGENTS.md) before making changes. Historical notes are not current instructions.
 
 ## Applications and local startup
 
@@ -29,7 +29,8 @@ Main is connected to automatic Cloudflare builds for both frontends according to
 
 ## Documentation
 
-- [Current handoff and backlog](HANDOFF.md)
+- [Current handoff](HANDOFF.md)
+- [Backlog](docs/BACKLOG.md)
 - [Completed-work history](CHANGELOG.md)
 - [Architecture and domain rules](docs/ARCHITECTURE.md)
 - [Repository and privacy workflow](docs/REPOSITORY.md)
