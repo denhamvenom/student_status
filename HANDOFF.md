@@ -1,6 +1,10 @@
 # Handoff
 
-November 7, 2026 | main `1e9768b` (Team Calendar meetings PR #80; withdrawals `3d27afd`, parallel-work guard merged)
+November 8, 2026 | main `480b44e` (audit cleanup PRs #81–#84 released; Team Calendar meetings PR #80 `1e9768b`)
+
+## November 2026 audit cleanup (released)
+
+PRs #81–#84 merged as main `ab7824b` (docs drift, no deploy), `4c9894a` (dead code), `08eb5e7` (strict Coach-or-Travel-Lead rule) and `480b44e` (shared Chicago-time, money and announcement-audience helpers). Production Convex amicable-eel-413 deployed from main after each code merge (no schema or index change); 23 unused functions removed (577 to 554), including `admin.createDriver`, `bulkInvites.previewCode` and `bootstrap.productionFirstCoach`. #83 tightens 15 checks that trusted a stored `travelLead` flag on non-Mentor roles. Removing `previewCode` ends backend compatibility with the pre-2026-10-25 frontend. Both Workers Builds succeeded on `480b44e` and both sites returned 200 with new bundles. Still open: Worker version IDs (VERIFY), signed-in production walkthrough, Timeclock authenticated console check. [Release receipt](docs/releases/RELEASE_2026-11-08_AUDIT_CLEANUP.md)
 
 ## Team Calendar meetings (merged)
 
