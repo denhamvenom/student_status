@@ -1,4 +1,3 @@
-import { ConvexError } from 'convex/values';
 import { savedPublicError, publicErrorResult } from './lib/publicErrors';
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
@@ -89,15 +88,6 @@ export const processSeasonPage=internalMutation({
       await ctx.db.patch(state._id,{state:page.isDone?"complete":"running",cursor:page.isDone?null:page.continueCursor,processed:state.processed+page.page.length,updatedAt:Date.now()});
       if(!page.isDone)await ctx.scheduler.runAfter(0,internal.attendanceReportMaintenance.continueSeason,{backfillId:state._id,expectedCursor:page.continueCursor});
     return null;
-  },
-});
-
-export const rebuildSession=mutation({
-  args:{sessionId:v.id("timeclockSessions")},returns:v.null(),
-  handler:async(ctx,args)=>{
-    requireRole(await viewer(ctx),"coach");const season=await activeSeason(ctx);const session=await ctx.db.get(args.sessionId);
-    if(!session||session.seasonId!==season._id)throw new ConvexError("This meeting is no longer in the current season. Reload the meeting list and try again.");
-    await invalidateAttendanceSession(ctx,session._id);return null;
   },
 });
 

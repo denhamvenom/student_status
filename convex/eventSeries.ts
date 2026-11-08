@@ -13,7 +13,7 @@ import { savedPublicError } from "./lib/publicErrors";
 import { parseGoogleRecurrence } from "./lib/rrule";
 import { requireSeasonFinanceReady } from "./lib/seasonFinance";
 import type { AssignmentScope, SignupMode } from "./lib/eventAudienceRules";
-import { chicagoLocalDateTime, generateRuleOccurrences, seriesProgress, hasOccurrenceFrom, isOccurrence, occurrenceStart, rowsFrom, ruleOf, seriesAudienceStudentIds, seriesFieldsFromRule, sessionsExistOn, todayKey, WINDOW_DAYS, windowEndKey, windowEndMs } from "./lib/seriesGenerate";
+import { chicagoLocalDateTime, generateRuleOccurrences, hasOccurrenceFrom, isOccurrence, occurrenceStart, rowsFrom, ruleOf, seriesAudienceStudentIds, seriesFieldsFromRule, sessionsExistOn, todayKey, WINDOW_DAYS, windowEndKey, windowEndMs } from "./lib/seriesGenerate";
 import { addDays, firstOccurrence, isLocalDate, MAX_OCCURRENCES_PER_QUERY, occurrencesBetween, SERIES_TIME_ZONE, splitRuleAt, validateSeriesRule, type SeriesRule } from "./lib/seriesRecurrence";
 import { assignSubteamMember, isSubteamMandatory } from "./lib/subteamEnrollment";
 import { onsiteLocation, teamTransportEnabled } from "./lib/transportation";
@@ -788,53 +788,5 @@ export const adoptGoogleSeries = action({
     });
     await syncInstancesNow(ctx, seriesId, auth, false);
     return seriesId;
-  },
-});
-
-// ---------- queries for the UI ----------
-
-const seriesSummary = v.object({
-  seriesId: v.id("eventSeries"), name: v.string(), status: v.string(), origin: v.string(), weekdays: v.array(v.number()), intervalWeeks: v.number(), localStartTime: v.string(), durationMinutes: v.number(),
-  startDate: v.string(), untilDate: v.union(v.string(), v.null()), count: v.union(v.number(), v.null()), onCalendar: v.boolean(), calendarSyncState: v.union(v.string(), v.null()), calendarError: v.union(v.string(), v.null()),
-  audienceKind: v.union(v.string(), v.null()), mandatory: v.boolean(),
-  // Rolling window: meetings exist through generatedThroughDate; more are added automatically (lib/seriesGenerate seriesProgress).
-  generatedThrough: v.union(v.number(), v.null()), generatedThroughDate: v.union(v.string(), v.null()), plannedMeetingCount: v.union(v.number(), v.null()), moreMeetingsScheduled: v.boolean(), windowDays: v.number(),
-});
-function summary(series: Doc<"eventSeries">) {
-  return { seriesId: series._id, name: series.name, status: series.status, origin: series.origin, weekdays: series.weekdays, intervalWeeks: series.intervalWeeks, localStartTime: series.localStartTime, durationMinutes: series.durationMinutes, startDate: series.startDate, untilDate: series.untilDate ?? null, count: series.count ?? null, onCalendar: !!series.calendarMasterId, calendarSyncState: series.calendarSyncState ?? null, calendarError: series.calendarError ?? null, audienceKind: series.template.audienceKind ?? null, mandatory: series.template.mandatory ?? false, ...seriesProgress(series) };
-}
-
-export const list = query({
-  args: {}, returns: v.array(seriesSummary),
-  handler: async ctx => {
-    requireSeriesStaff(await viewer(ctx));
-    const season = await activeSeason(ctx);
-    const out: ReturnType<typeof summary>[] = [];
-    for (const status of ["active", "needsReview", "conflict"] as const) {
-      const rows = await ctx.db.query("eventSeries").withIndex("by_seasonId_and_status", q => q.eq("seasonId", season._id).eq("status", status)).take(50);
-      out.push(...rows.map(summary));
-    }
-    return out;
-  },
-});
-
-export const get = query({
-  args: { seriesId: v.id("eventSeries"), fromKey: v.string() },
-  returns: v.object({ series: seriesSummary, occurrences: v.array(v.object({ eventId: v.id("events"), key: v.string(), name: v.string(), startsAt: v.number(), endsAt: v.number(), cancelled: v.boolean(), detached: v.boolean(), calendarRevision: v.number(), calendarSyncState: v.union(v.string(), v.null()) })), nextKeys: v.array(v.string()) }),
-  handler: async (ctx, args) => {
-    const user = await seriesUser(ctx);
-    if (!isPlainMentor(user)) requireSeriesStaff(user);
-    const season = await activeSeason(ctx);
-    const series = await ctx.db.get(args.seriesId);
-    if (!series || series.seasonId !== season._id) throw new ConvexError("This series is no longer available. Reload to see the latest.");
-    if (!isSeriesStaff(user)) requireSeriesEditor(user, series);
-    const rows = await ctx.db.query("events").withIndex("by_seriesId_and_seriesOccurrenceKey", q => q.eq("seriesId", series._id).gte("seriesOccurrenceKey", args.fromKey)).take(60);
-    const rule = ruleOf(series);
-    return {
-      series: summary(series),
-      occurrences: rows.map(row => ({ eventId: row._id, key: row.seriesOccurrenceKey!, name: row.name, startsAt: row.startsAt, endsAt: row.endsAt, cancelled: row.cancelled ?? false, detached: row.seriesDetached ?? false, calendarRevision: row.calendarRevision ?? 0, calendarSyncState: row.calendarSyncState ?? null })),
-      // Upcoming rule dates (generated or not yet), so the UI can show the pattern beyond the window.
-      nextKeys: /^\d{4}-\d{2}-\d{2}$/.test(args.fromKey) ? occurrencesBetween(rule, args.fromKey, addDays(args.fromKey, 7 * 26), 26).map(occurrence => occurrence.occurrenceKey) : [],
-    };
   },
 });

@@ -226,28 +226,11 @@ export const replace = mutation({
   },
 });
 
-export const previewCode = mutation({
-  args: { code: v.string() }, returns: v.object({ status: v.union(v.literal("valid"), v.literal("unavailable"), v.literal("signInRequired"), v.literal("accountConflict")), studentName: v.union(v.string(), v.null()) }),
-  handler: async (ctx, args) => {
-    const person = await applicant(ctx);
-    if (!person?.who) return { status: "signInRequired" as const, studentName: null };
-    const attempt = await limiter.limit(ctx, "studentCodeAttempts", { key: person.authUserId });
-    if (!attempt.ok || !(await limiter.limit(ctx, "studentCodeDailyAttempts", { key: person.authUserId })).ok) return { status: "unavailable" as const, studentName: null };
-    const found = await usableCode(ctx, args.code);
-    if (!found) return { status: "unavailable" as const, studentName: null };
-    const who = person.who;
-    const account = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", person.authUserId)).unique();
-    const emailAccounts = await ctx.db.query("appUsers").withIndex("by_email", q => q.eq("email", who.email)).take(2);
-    if (account || emailAccounts.length) return { status: "accountConflict" as const, studentName: null };
-    return { status: "valid" as const, studentName: null };
-  },
-});
-
 // One field accepts every invitation code; the answer tells the join page whether to ask
 // for a name (team code) or to request an account connection (individual invitation).
-// It reveals no more than requestJoin and previewCode already do: whether this account can
+// It reveals no more than requestJoin and redeem already do: whether this account can
 // use the code. Wrong codes count toward the same 15-minute lockout as requestJoin, and every
-// check shares the per-account limits used by previewCode and redeem.
+// check shares the per-account limits used by redeem.
 export const checkInvitationCode = mutation({
   args: { code: v.string() },
   returns: v.object({ kind: v.union(v.literal("team"), v.literal("individual"), v.literal("unavailable"), v.literal("tooManyAttempts")) }),

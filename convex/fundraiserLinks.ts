@@ -41,24 +41,6 @@ export const list = query({
   },
 });
 
-export const save = mutation({
-  args: { studentId: v.id("students"), url: v.string(), expectedRevision: v.number() },
-  returns: v.object({ revision: v.number() }),
-  handler: async (ctx, args) => {
-    const actor = await viewer(ctx);
-    requireRole(actor, "coach");
-    const student = await studentAccess(ctx, actor, args.studentId);
-    const beforeRevision = student.fundraiserLinkRevision ?? 0;
-    if (!Number.isSafeInteger(args.expectedRevision) || args.expectedRevision < 0 || args.expectedRevision !== beforeRevision) throw new ConvexError("This fundraiser link changed since you opened it. Reload to see the latest, then save again.");
-    const url = validatedUrl(args.url);
-    const revision = beforeRevision + 1;
-    await ctx.db.patch(student._id, { fundraiserUrl: url, fundraiserLinkRevision: revision });
-    // Keep link query parameters out of audit history; record presence and revision only.
-    await audit(ctx, actor, "students", student._id, "saveFundraiserLink", { hasLink: !!student.fundraiserUrl, revision: beforeRevision }, { hasLink: !!url, revision });
-    return { revision };
-  },
-});
-
 const importRow = v.object({ studentId: v.id("students"), url: v.string(), expectedRevision: v.number() });
 const importArgs = { rows: v.array(importRow) };
 async function prepareImport(ctx: import("./_generated/server").QueryCtx | import("./_generated/server").MutationCtx, rows: Array<{ studentId: import("./_generated/dataModel").Id<"students">; url: string; expectedRevision: number }>) {

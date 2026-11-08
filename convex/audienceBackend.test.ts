@@ -120,8 +120,7 @@ describe("Mentor invitations", () => {
     await expect(f.other.mutation(api.mentorInvites.respond, { eventId: id, status: "accepted" })).rejects.toThrow("no longer available");
     await expect(f.build.mutation(api.mentorInvites.respond, { eventId: id, status: "accepted" })).rejects.toThrow("Only a Mentor");
     await f.mentor.mutation(api.mentorInvites.respond, { eventId: id, status: "accepted" });
-    expect(await f.mentor.query(api.mentorInvites.myInvitedEvents, {})).toEqual([expect.objectContaining({ eventId: id, title: "Synthetic meeting", status: "accepted", virtual: false })]);
-    expect(await f.other.query(api.mentorInvites.myInvitedEvents, {})).toEqual([]);
+    expect((await f.t.run(ctx => ctx.db.query("eventMentorInvites").withIndex("by_eventId", q => q.eq("eventId", id)).take(10))).map(i => [i.mentorUserId, i.status])).toEqual([[f.ids.mentor.id, "accepted"]]);
   });
 
   it("adds only new Mentors later, lets a Travel Lead manage them, and rejects a Mentor doing so", async () => {
@@ -131,7 +130,7 @@ describe("Mentor invitations", () => {
     expect(await f.lead.mutation(api.mentorInvites.addMentorInvites, { eventId: id, mentorUserIds: [f.ids.mentor.id, f.ids.other.id] })).toBe(1);
     await expect(f.lead.mutation(api.mentorInvites.addMentorInvites, { eventId: id, mentorUserIds: [f.ids.build.id] })).rejects.toThrow("Mentors from the list");
     await f.lead.mutation(api.mentorInvites.removeMentorInvite, { eventId: id, mentorUserId: f.ids.other.id });
-    expect(await f.other.query(api.mentorInvites.myInvitedEvents, {})).toEqual([]);
+    expect((await f.t.run(ctx => ctx.db.query("eventMentorInvites").withIndex("by_eventId", q => q.eq("eventId", id)).take(10))).map(i => i.mentorUserId)).toEqual([f.ids.mentor.id]);
   });
 
   it("invites Mentors by subteam and requires a Mentor for mentor-only events", async () => {

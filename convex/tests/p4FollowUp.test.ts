@@ -223,31 +223,6 @@ describe("event editing rules", () => {
   });
 });
 
-describe("Mentor invitations", () => {
-  it("lists upcoming invitations even behind more than 100 old accepted ones", async () => {
-    const f = await fixture();
-    await f.t.run(async ctx => {
-      for (let i = 0; i < 120; i++) {
-        const old = await ctx.db.insert("events", { seasonId: f.ids.season, name: `Old ${i}`, type: "Team", startsAt: 1, endsAt: 2, destination: "Lab", travel: "None", overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "open", allowWithdrawal: true, permissionRequired: false, firstRequired: false, archived: true });
-        await ctx.db.insert("eventMentorInvites", { eventId: old, mentorUserId: f.ids.mentor.id, source: "individual", status: "accepted", invitedBy: f.ids.coach.id, createdAt: i });
-      }
-    });
-    const upcomingAccepted = await insertEvent(f, "Upcoming accepted");
-    const upcomingInvited = await insertEvent(f, "Upcoming invited", { startsAt: Date.now() + DAY, endsAt: Date.now() + DAY + 3_600_000 });
-    const declined = await insertEvent(f, "Declined");
-    await f.t.run(async ctx => {
-      await ctx.db.insert("eventMentorInvites", { eventId: upcomingAccepted, mentorUserId: f.ids.mentor.id, source: "individual", status: "accepted", invitedBy: f.ids.coach.id, createdAt: 500 });
-      await ctx.db.insert("eventMentorInvites", { eventId: upcomingInvited, mentorUserId: f.ids.mentor.id, source: "subteam", status: "invited", invitedBy: f.ids.coach.id, createdAt: 501 });
-      await ctx.db.insert("eventMentorInvites", { eventId: declined, mentorUserId: f.ids.mentor.id, source: "individual", status: "declined", invitedBy: f.ids.coach.id, createdAt: 502 });
-    });
-    const invites = await f.mentor.query(api.mentorInvites.myInvitedEvents, {});
-    // Declined invitations for current events stay listed (soonest first) so the Mentor can change their mind.
-    expect(invites.map(row => [row.eventId, row.status])).toEqual([[upcomingInvited, "invited"], [upcomingAccepted, "accepted"], [declined, "declined"]]);
-    await f.mentor.mutation(api.mentorInvites.respond, { eventId: declined, status: "accepted" });
-    expect((await f.mentor.query(api.mentorInvites.myInvitedEvents, {})).find(row => row.eventId === declined)?.status).toBe("accepted");
-  });
-});
-
 describe("Mentor Home profile", () => {
   it("adultProfile.own returns the signed-in user's own subteams, [] when none", async () => {
     const f = await fixture();
@@ -274,18 +249,18 @@ describe("series progress for staff", () => {
     const f = await fixture();
     const { seriesId, firstEventId } = await f.coach.mutation(api.eventSeries.create, { name: "Ten meetings", ...template, audienceKind: "everyone", rule: { ...weeklyFrom(1), count: 10 } });
     await f.drain();
-    const { series, occurrences } = await f.coach.query(api.eventSeries.get, { seriesId, fromKey: today() });
-    expect(occurrences.length).toBe(8);
-    expect(series).toMatchObject({ plannedMeetingCount: 10, moreMeetingsScheduled: true, windowDays: 56 });
+    type SeriesView = { series?: { seriesId: string; plannedMeetingCount: number | null; moreMeetingsScheduled: boolean; windowDays: number; generatedThrough: number | null; generatedThroughDate: string | null } | null };
+    const rows = await f.t.run(ctx => ctx.db.query("events").withIndex("by_seriesId_and_seriesOccurrenceKey", q => q.eq("seriesId", seriesId)).take(60));
+    expect(rows.length).toBe(8);
+    const detail = await f.lead.query(api.app.eventDetail, { eventId: firstEventId! }) as SeriesView;
+    const series = detail.series!;
+    expect(series).toMatchObject({ seriesId, plannedMeetingCount: 10, moreMeetingsScheduled: true, windowDays: 56 });
     expect(series.generatedThroughDate).toBe(addDays(chicagoDate(series.generatedThrough!), -1));
-    expect(occurrences.every(row => row.key <= series.generatedThroughDate!)).toBe(true);
-    type WithSeries = { series?: unknown };
-    const detail = await f.lead.query(api.app.eventDetail, { eventId: firstEventId! }) as WithSeries;
-    expect(detail.series).toMatchObject({ seriesId, plannedMeetingCount: 10, moreMeetingsScheduled: true });
-    expect((await f.student(0).query(api.app.eventDetail, { eventId: firstEventId! }) as WithSeries).series).toBeUndefined();
+    expect(rows.every(row => row.seriesOccurrenceKey! <= series.generatedThroughDate!)).toBe(true);
+    expect((await f.student(0).query(api.app.eventDetail, { eventId: firstEventId! }) as SeriesView).series).toBeUndefined();
     // A series with no end has no planned total.
-    const { seriesId: open } = await f.coach.mutation(api.eventSeries.create, { name: "Open lab", ...template, audienceKind: "everyone", rule: weeklyFrom(2) });
+    const { firstEventId: openFirst } = await f.coach.mutation(api.eventSeries.create, { name: "Open lab", ...template, audienceKind: "everyone", rule: weeklyFrom(2) });
     await f.drain();
-    expect((await f.coach.query(api.eventSeries.get, { seriesId: open, fromKey: today() })).series).toMatchObject({ plannedMeetingCount: null, moreMeetingsScheduled: true });
+    expect((await f.coach.query(api.app.eventDetail, { eventId: openFirst! }) as SeriesView).series).toMatchObject({ plannedMeetingCount: null, moreMeetingsScheduled: true });
   });
 });

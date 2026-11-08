@@ -34,11 +34,11 @@ describe("individual fundraiser links", () => {
     const f = await fixture();
     expect(await f.student.query(api.fundraiserLinks.forStudent, { studentId: f.ids.own })).toBeNull();
     const before = await f.t.run(ctx => ctx.db.get(f.ids.own));
-    expect(await f.coach.mutation(api.fundraiserLinks.save, { studentId: f.ids.own, url, expectedRevision: 0 })).toEqual({ revision: 1 });
+    expect(await f.coach.mutation(api.fundraiserLinks.importLinks, { rows: [{ studentId: f.ids.own, url, expectedRevision: 0 }] })).toEqual({ updated: 1, unchanged: 0 });
     for (const client of [f.student, f.parent]) expect(await client.query(api.fundraiserLinks.forStudent, { studentId: f.ids.own })).toBe(url);
-    await expect(f.coach.mutation(api.fundraiserLinks.save, { studentId: f.ids.own, url: "", expectedRevision: 0 })).rejects.toThrow("changed");
-    await f.coach.mutation(api.fundraiserLinks.save, { studentId: f.ids.own, url: " https://zeffy.com/another ", expectedRevision: 1 });
-    await f.coach.mutation(api.fundraiserLinks.save, { studentId: f.ids.own, url: " ", expectedRevision: 2 });
+    await expect(f.coach.mutation(api.fundraiserLinks.importLinks, { rows: [{ studentId: f.ids.own, url: "", expectedRevision: 0 }] })).rejects.toThrow("changed");
+    await f.coach.mutation(api.fundraiserLinks.importLinks, { rows: [{ studentId: f.ids.own, url: " https://zeffy.com/another ", expectedRevision: 1 }] });
+    await f.coach.mutation(api.fundraiserLinks.importLinks, { rows: [{ studentId: f.ids.own, url: " ", expectedRevision: 2 }] });
     expect(await f.parent.query(api.fundraiserLinks.forStudent, { studentId: f.ids.own })).toBeNull();
     expect(await f.t.run(ctx => ctx.db.get(f.ids.own))).toEqual({ ...before, fundraiserLinkRevision: 3 });
     expect(await f.t.run(ctx => ctx.db.query("ledgerEntries").take(1))).toEqual([]);
@@ -51,7 +51,7 @@ describe("individual fundraiser links", () => {
     const f = await fixture();
     for (const client of [f.parent, f.student]) await expect(client.query(api.fundraiserLinks.forStudent, { studentId: f.ids.other })).rejects.toThrow("permission");
     for (const client of [f.t, f.student, f.parent, f.mentor]) {
-      await expect(client.mutation(api.fundraiserLinks.save, { studentId: f.ids.own, url, expectedRevision: 0 })).rejects.toThrow();
+      await expect(client.mutation(api.fundraiserLinks.importLinks, { rows: [{ studentId: f.ids.own, url, expectedRevision: 0 }] })).rejects.toThrow();
       await expect(client.query(api.fundraiserLinks.list, { paginationOpts: { cursor: null, numItems: 20 } })).rejects.toThrow();
     }
     await expect(f.mentor.query(api.fundraiserLinks.forStudent, { studentId: f.ids.own })).rejects.toThrow("permission");
@@ -68,7 +68,7 @@ describe("individual fundraiser links", () => {
     expect([...page1.page, ...page2.page].map(row => row.studentId)).toEqual([f.ids.own, f.ids.other]);
     expect(page1.page[0]).toEqual({ studentId: f.ids.own, name: "Synthetic Student", url: null, revision: 0 });
     for (const studentId of [f.ids.archived, f.ids.historic]) {
-      await expect(f.coach.mutation(api.fundraiserLinks.save, { studentId, url, expectedRevision: 0 })).rejects.toThrow("active season");
+      await expect(f.coach.mutation(api.fundraiserLinks.importLinks, { rows: [{ studentId, url, expectedRevision: 0 }] })).rejects.toThrow("active season");
       await expect(f.parent.query(api.fundraiserLinks.forStudent, { studentId })).rejects.toThrow("active season");
     }
     await expect(f.coach.query(api.fundraiserLinks.list, { paginationOpts: { cursor: null, numItems: 101 } })).rejects.toThrow("page size");
@@ -77,9 +77,9 @@ describe("individual fundraiser links", () => {
   it("rejects unsafe schemes, lookalike hosts, credentials, ports, fragments and oversized URLs", async () => {
     const f = await fixture();
     for (const unsafe of ["http://zeffy.com/x", "javascript:alert(1)", "https://zeffy.com.evil.invalid/x", "https://evilzeffy.com", "https://sub.zeffy.com", "https://user@zeffy.com/x", "https://zeffy.com:443/x", "https://zeffy.com:8443/x", "https://zeffy.com/x#fragment", "https://zeffy.com\\@evil.invalid", "https://zeffy.com/x\nfoo", `https://zeffy.com/${"x".repeat(2048)}`]) {
-      await expect(f.coach.mutation(api.fundraiserLinks.save, { studentId: f.ids.own, url: unsafe, expectedRevision: 0 })).rejects.toThrow();
+      await expect(f.coach.mutation(api.fundraiserLinks.importLinks, { rows: [{ studentId: f.ids.own, url: unsafe, expectedRevision: 0 }] })).rejects.toThrow();
     }
-    await expect(f.coach.mutation(api.fundraiserLinks.save, { studentId: f.ids.own, url, expectedRevision: 0.5 })).rejects.toThrow("changed");
+    await expect(f.coach.mutation(api.fundraiserLinks.importLinks, { rows: [{ studentId: f.ids.own, url, expectedRevision: 0.5 }] })).rejects.toThrow("changed");
     expect(await f.t.run(ctx => ctx.db.get(f.ids.own))).not.toHaveProperty("fundraiserUrl");
   });
 });
@@ -87,7 +87,7 @@ describe("individual fundraiser links", () => {
 describe("fundraiser CSV import", () => {
   it("previews canonical names then applies connects and clears atomically without financial changes", async () => {
     const f = await fixture();
-    await f.coach.mutation(api.fundraiserLinks.save, { studentId: f.ids.other, url, expectedRevision: 0 });
+    await f.coach.mutation(api.fundraiserLinks.importLinks, { rows: [{ studentId: f.ids.other, url, expectedRevision: 0 }] });
     const rows = [{ studentId: f.ids.own, url, expectedRevision: 0 }, { studentId: f.ids.other, url: "", expectedRevision: 1 }];
     const preview = await f.coach.query(api.fundraiserLinks.previewImport, { rows });
     expect(preview).toEqual([{ studentId: f.ids.own, name: "Synthetic Student", before: null, after: url, changed: true }, { studentId: f.ids.other, name: "Synthetic Student", before: url, after: null, changed: true }]);

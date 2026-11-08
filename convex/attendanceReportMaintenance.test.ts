@@ -115,7 +115,7 @@ describe("attendance projection maintenance",()=>{
     await initialize(f);
     expect(await f.family.query(api.dashboardReports.familyAttendance,{studentId:f.ids.students[0],asOf:start+3*hour})).toMatchObject({state:"failed",verified:null});
     await f.t.run(ctx=>ctx.db.patch(bad,{inAt:start+hour,outAt:start+1.5*hour}));
-    await f.coach.mutation(api.attendanceReportMaintenance.rebuildSession,{sessionId:f.ids.session});await settle(f.t,f.ids.session);
+    await f.t.run(ctx=>invalidateAttendanceSession(ctx,f.ids.session));await settle(f.t,f.ids.session);
     expect(await f.family.query(api.dashboardReports.familyAttendance,{studentId:f.ids.students[0],asOf:start+3*hour})).toMatchObject({state:"ready",verified:{sessionsHeld:1,sessionsAttended:1}});
   });
   it("reads more than 500 held sessions through aggregates and paginates minimized cards",async()=>{
@@ -160,7 +160,7 @@ describe("attendance projection maintenance",()=>{
     expect(failed).toBe(true);
     expect(await f.t.run(ctx=>ctx.db.get(before!._id))).toEqual(before);
     expect(await f.family.query(api.dashboardReports.familyAttendance,{studentId:f.ids.students[0],asOf:nextStart+3*hour})).toMatchObject({state:"failed",verified:null});
-    await f.coach.mutation(api.attendanceReportMaintenance.rebuildSession,{sessionId:f.ids.session});await settle(f.t,f.ids.session);
+    await f.t.run(ctx=>invalidateAttendanceSession(ctx,f.ids.session));await settle(f.t,f.ids.session);
     expect(await f.family.query(api.dashboardReports.familyAttendance,{studentId:f.ids.students[0],asOf:nextStart+3*hour})).toMatchObject({state:"ready",verified:{sessionsHeld:1,sessionsAttended:1,tuesdayHeld:0,tuesdayAttended:0,thursdayAttended:1}});
   });
   it("updates report metadata after later corrections and uses elapsed cutoff only for open evidence",async()=>{

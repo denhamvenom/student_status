@@ -47,11 +47,11 @@ const allowed: Caller[] = ["coach", "mentorLead", "parentLead"];
 const refused: Caller[] = ["studentFlagged", "parentFlagged", "parentInParentMode"];
 
 describe("Travel Lead checks for Mentor invitations and event creation", () => {
-  it.each(refused)("refuses %s for forEvent, addMentorInvites, removeMentorInvite and createEvent", async caller => {
+  it.each(refused)("refuses %s for forEventSummary, addMentorInvites, removeMentorInvite and createEvent", async caller => {
     const f: Fixture = await fixture();
     await f.t.run(ctx => ctx.db.insert("eventMentorInvites", { eventId: f.ids.event, mentorUserId: f.ids.target.id, source: "individual", status: "invited", invitedBy: f.ids.coach.id, createdAt: 1 }));
     const who = f.as(f.ids[caller]);
-    await expect(who.query(api.mentorInvites.forEvent, { eventId: f.ids.event })).rejects.toThrow("Only a Coach or Travel Lead can manage Mentor invitations.");
+    await expect(who.query(api.mentorInvites.forEventSummary, { eventId: f.ids.event })).rejects.toThrow("Only a Coach or Travel Lead can manage Mentor invitations.");
     await expect(who.mutation(api.mentorInvites.addMentorInvites, { eventId: f.ids.event, mentorUserIds: [f.ids.target.id] })).rejects.toThrow("Only a Coach or Travel Lead can manage Mentor invitations.");
     await expect(who.mutation(api.mentorInvites.removeMentorInvite, { eventId: f.ids.event, mentorUserId: f.ids.target.id })).rejects.toThrow("Only a Coach or Travel Lead can manage Mentor invitations.");
     await expect(who.mutation(api.admin.createEvent, eventArgs())).rejects.toThrow("Only a Coach or Travel Lead can create events.");
@@ -59,14 +59,15 @@ describe("Travel Lead checks for Mentor invitations and event creation", () => {
     expect((await f.t.run(ctx => ctx.db.query("events").take(10))).length).toBe(1);
   });
 
-  it.each(allowed)("accepts %s for forEvent, addMentorInvites, removeMentorInvite and createEvent", async caller => {
+  it.each(allowed)("accepts %s for forEventSummary, addMentorInvites, removeMentorInvite and createEvent", async caller => {
     const f: Fixture = await fixture();
     const who = f.as(f.ids[caller]);
     expect(await who.mutation(api.mentorInvites.addMentorInvites, { eventId: f.ids.event, mentorUserIds: [f.ids.target.id] })).toBe(1);
-    // Mentor sign-ups and answers (forEvent, forEventSummary) are for a Coach or any Travel Lead, including a Parent acting as
+    // Mentor sign-ups and answers (forEventSummary) are for a Coach or any Travel Lead, including a Parent acting as
     // one: Parents with a Mentor/Travel Lead grant are Mentors first, Parents second (owner decision, Nov 6 2026).
-    expect(await who.query(api.mentorInvites.forEvent, { eventId: f.ids.event })).toEqual([expect.objectContaining({ mentorUserId: f.ids.target.id, status: "invited" })]);
-    expect((await who.query(api.mentorInvites.forEventSummary, { eventId: f.ids.event })).counts).toMatchObject({ invited: 1, accepted: 0 });
+    const summary = await who.query(api.mentorInvites.forEventSummary, { eventId: f.ids.event });
+    expect(summary.mentors).toEqual([expect.objectContaining({ mentorUserId: f.ids.target.id, status: "invited" })]);
+    expect(summary.counts).toMatchObject({ invited: 1, accepted: 0 });
     await who.mutation(api.mentorInvites.removeMentorInvite, { eventId: f.ids.event, mentorUserId: f.ids.target.id });
     expect(await f.inviteCount()).toBe(0);
     const eventId = await who.mutation(api.admin.createEvent, eventArgs());

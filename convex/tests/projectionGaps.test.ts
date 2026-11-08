@@ -34,16 +34,16 @@ async function fixture() {
   return { t, ids, coach: as(ids.coach), lead: as(ids.lead), mentor: as(ids.mentor), parent: as(ids.parent), student: as(ids.studentUser) };
 }
 
-describe("mentorInvites.forEvent", () => {
+describe("mentorInvites.forEventSummary", () => {
   it("lists invited Mentors for Coach and Travel Lead only", async () => {
     const f = await fixture();
-    const rows = await f.coach.query(api.mentorInvites.forEvent, { eventId: f.ids.event });
+    const rows = (await f.coach.query(api.mentorInvites.forEventSummary, { eventId: f.ids.event })).mentors;
     expect(rows).toEqual([
       { mentorUserId: f.ids.lead.id, name: "pg-lead", status: "invited", source: "subteam", canDriveStudents: null, needsHotelRoom: null, seriesScope: null, seriesCount: null },
       { mentorUserId: f.ids.mentor.id, name: "pg-mentor", status: "accepted", source: "individual", canDriveStudents: null, needsHotelRoom: null, seriesScope: null, seriesCount: null },
     ]);
-    expect(await f.lead.query(api.mentorInvites.forEvent, { eventId: f.ids.event })).toHaveLength(2);
-    for (const who of [f.student, f.mentor, f.parent]) await expect(who.query(api.mentorInvites.forEvent, { eventId: f.ids.event })).rejects.toThrow("Only a Coach or Travel Lead");
+    expect((await f.lead.query(api.mentorInvites.forEventSummary, { eventId: f.ids.event })).mentors).toHaveLength(2);
+    for (const who of [f.student, f.mentor, f.parent]) await expect(who.query(api.mentorInvites.forEventSummary, { eventId: f.ids.event })).rejects.toThrow("Only a Coach or Travel Lead");
   });
 });
 
@@ -77,15 +77,13 @@ describe("student group projections", () => {
 });
 
 describe("mentor event projection", () => {
-  it("includes locationType in the Mentor event view and invitation list", async () => {
+  it("includes locationType in the Mentor event views", async () => {
     const f = await fixture();
     const detail = await f.mentor.query(api.app.eventDetail, { eventId: f.ids.event });
     expect(detail.event.locationType).toBe("virtual");
     expect(detail.event).not.toHaveProperty("feeCents");
     const listed = await f.mentor.query(api.app.listEvents, {});
     expect(listed[0].event.locationType).toBe("virtual");
-    const invites = await f.mentor.query(api.mentorInvites.myInvitedEvents, {});
-    expect(invites[0]).toMatchObject({ eventId: f.ids.event, locationType: "virtual", virtual: true });
   });
 });
 
