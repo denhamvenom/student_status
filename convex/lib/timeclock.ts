@@ -1,3 +1,4 @@
+import { chicagoDateString, chicagoMidnight } from "../../shared/chicago-time";
 export const HOUR_MS = 60 * 60 * 1000;
 export const HALF_HOUR_MS = HOUR_MS / 2;
 export const MAX_EXTENSION_MS = 4 * HOUR_MS;
@@ -46,20 +47,8 @@ const chicagoParts = (at: number) => {
 export function chicagoDayBounds(at: number) {
   if (!Number.isFinite(at)) throw new Error("Invalid time.");
   const local = chicagoParts(at);
-  const midnight = (year: number, month: number, day: number) => {
-    const target = Date.UTC(year, month - 1, day);
-    let guess = target + 6 * HOUR_MS;
-    for (let i = 0; i < 3; i++) {
-      const p = chicagoParts(guess);
-      const displayedUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
-      guess = target - (displayedUtc - guess);
-    }
-    return guess;
-  };
-  return { start: midnight(local.year, local.month, local.day), end: midnight(local.year, local.month, local.day + 1) };
+  const midnight = (day: number) => chicagoMidnight(new Date(Date.UTC(local.year, local.month - 1, day)).toISOString().slice(0, 10));
+  return { start: midnight(local.day), end: midnight(local.day + 1) };
 }
 
-export function chicagoDateKey(at: number) {
-  const p = chicagoParts(at);
-  return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
-}
+export const chicagoDateKey = chicagoDateString;

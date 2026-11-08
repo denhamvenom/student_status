@@ -1,13 +1,8 @@
-export type Audience = 'students' | 'parents' | 'both' | 'staff' | 'everyone'
-type Home = 'students' | 'parents' | 'staff'
+import { coachOnly, reaches, type Audience } from '../../../shared/announcement-audience'
+
+export { coachOnly, reaches, type Audience }
 
 const HOMES = ['students', 'parents', 'staff'] as const
-
-/** Both = Students + Parents; Everyone = Students + Parents + Mentors & staff. Mirrors convex/announcements.ts. */
-export const reaches = (audience: Audience, home: Home) => audience === 'everyone' || audience === home || audience === 'both' && home !== 'staff'
-
-/** Anything Parents see is Coach-only; Travel Leads may post to Students or Mentors & staff. */
-export const coachOnly = (audience: Audience) => reaches(audience, 'parents')
 
 /** Audiences a Travel Lead may choose; a Coach may choose any. */
 export const TRAVEL_LEAD_AUDIENCES: readonly Audience[] = ['students', 'staff']

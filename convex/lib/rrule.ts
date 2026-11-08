@@ -1,5 +1,6 @@
 import { chicagoDate } from "./calendarDates";
-import { addDays, isLocalDate, isLocalTime, SERIES_TIME_ZONE, validateSeriesRule, weekdayOf, zonedWallTimeToUtc, type SeriesRule } from "./seriesRecurrence";
+import { TEAM_TIME_ZONE, zonedWallTimeToUtc } from "../../shared/chicago-time";
+import { addDays, isLocalDate, isLocalTime, validateSeriesRule, weekdayOf, type SeriesRule } from "./seriesRecurrence";
 
 /**
  * SeriesRule <-> RFC 5545 recurrence lines as used by Google Calendar events (`recurrence: string[]`).
@@ -50,7 +51,7 @@ export function toGoogleRecurrence(rule: SeriesRule, exdates: string[] = []): st
   const excluded = [...new Set(exdates)].sort();
   if (excluded.length > 0) {
     const time = `${rule.startLocalTime.replace(":", "")}00`;
-    lines.push(`EXDATE;TZID=${SERIES_TIME_ZONE}:${excluded.map(date => `${date.replace(/-/g, "")}T${time}`).join(",")}`);
+    lines.push(`EXDATE;TZID=${TEAM_TIME_ZONE}:${excluded.map(date => `${date.replace(/-/g, "")}T${time}`).join(",")}`);
   }
   return lines;
 }
@@ -95,7 +96,7 @@ function parseExdateLine(line: Line): string[] | string {
     if (/^\d{8}$/.test(raw)) date = basicDate(raw);
     else if (/^\d{8}T\d{6}Z$/.test(raw)) date = chicagoDate(utcFromBasic(raw));
     else if (/^\d{8}T\d{6}$/.test(raw)) {
-      if (!tzid || tzid === SERIES_TIME_ZONE) date = basicDate(raw);
+      if (!tzid || tzid === TEAM_TIME_ZONE) date = basicDate(raw);
       else {
         try {
           date = chicagoDate(zonedWallTimeToUtc(basicDate(raw), basicTime(raw.slice(9)), tzid));

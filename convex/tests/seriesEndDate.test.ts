@@ -6,7 +6,8 @@ import type { Id } from "../_generated/dataModel";
 import schema from "../schema";
 import { chicagoDate } from "../lib/calendarDates";
 import { formatUtcBasic, googleInstanceId } from "../lib/rrule";
-import { addDays, occurrencesBetween, weekdayOf, zonedWallTimeToUtc } from "../lib/seriesRecurrence";
+import { addDays, occurrencesBetween, weekdayOf } from "../lib/seriesRecurrence";
+import { zonedWallTimeToUtc } from "../../shared/chicago-time";
 
 // "Change end date" on a repeating series (eventSeries.setEndDate): no split, one notice at most, silent extension.
 

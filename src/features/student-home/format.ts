@@ -1,12 +1,12 @@
+import { chicagoDateString, TEAM_TIME_ZONE } from '../../../shared/chicago-time'
+
 /** Every Student Home date is shown in the team's time zone, whatever the device says. */
-export const TEAM_TIME_ZONE = 'America/Chicago'
 
 const formatter = (options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('en-US', { timeZone: TEAM_TIME_ZONE, ...options })
 const longDate = formatter({ weekday: 'long', month: 'short', day: 'numeric' })
 const shortDate = formatter({ weekday: 'short', month: 'short', day: 'numeric' })
 const monthDay = formatter({ month: 'short', day: 'numeric' })
 const weekday = formatter({ weekday: 'short' })
-const dateKey = formatter({ year: 'numeric', month: '2-digit', day: '2-digit' })
 const dateParts = formatter({ month: 'short', day: 'numeric', year: 'numeric' })
 
 /** "Monday, Oct 26" */
@@ -19,11 +19,7 @@ export const formatMonthDay = (epoch: number) => monthDay.format(epoch)
 export const formatWeekday = (epoch: number) => weekday.format(epoch)
 
 /** "YYYY-MM-DD" in Chicago; the calendar day the Student is living in. */
-export function chicagoDateKey(epoch: number) {
-  const parts = dateKey.formatToParts(epoch)
-  const part = (type: string) => parts.find(item => item.type === type)?.value ?? ''
-  return `${part('year')}-${part('month')}-${part('day')}`
-}
+export const chicagoDateKey = chicagoDateString
 
 /** "Nov 21–23", "Nov 30 – Dec 2", or "Nov 21" for a one-day event. */
 export function formatDateRange(startsAt: number, endsAt: number) {

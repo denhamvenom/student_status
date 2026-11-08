@@ -6,7 +6,7 @@ import type { Id } from '../convex/_generated/dataModel'
 import { Button } from './components/ui/button'
 import { NativeSelect, NativeSelectOption } from './components/ui/native-select'
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
-import { reportMoney } from './DashboardReports'
+import { chargeCurrency } from './lib/charge-money'
 import { teamReportCsv, teamReportStatus } from './lib/team-report-csv'
 import { canonicalSubteam, subteamDisplay, subteamOptions } from './lib/subteams'
 import { attendanceStatusLabel, eventReadinessLabel } from './lib/report-state-copy'
@@ -16,7 +16,7 @@ import styles from './TeamReports.module.css'
 
 type ReportRow = typeof api.teamReports.list._returnType['page'][number]
 const date=(at:number)=>new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',month:'short',day:'numeric',year:'numeric'}).format(at)
-const money=(value:number|null,unknown=false)=>value===null?unknown?'Not recorded':'Unavailable':reportMoney(value)
+const money=(value:number|null,unknown=false)=>value===null?unknown?'Not recorded':'Unavailable':chargeCurrency(value)
 const count=(value:number|null)=>value===null?'Unknown':String(value)
 const eventState=(row:ReportRow)=>row.selectedEvent?eventReadinessLabel(row.selectedEvent.state):'Choose an event to see readiness'
 const attendanceStateText=(state:string)=>state==='unknownKickoff'?'Not counted yet. Attendance totals start at kickoff, when the FIRST build season begins.':attendanceStatusLabel(state)

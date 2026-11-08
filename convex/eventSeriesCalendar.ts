@@ -5,7 +5,8 @@ import { internalAction, internalMutation, internalQuery, type ActionCtx, type M
 import { boundCalendar, calendarError, configured, eventUrl, googleDetails, MEDIA_MARKER, notifySeriesRepresentative, token, validCalendarEventId, writeEnabled } from "./eventCalendar";
 import { chicagoDate, chicagoMidnight } from "./lib/calendarDates";
 import { toGoogleRecurrence } from "./lib/rrule";
-import { addDays, firstOccurrence, SERIES_TIME_ZONE, zonedWallTimeToUtc } from "./lib/seriesRecurrence";
+import { TEAM_TIME_ZONE, zonedWallTimeToUtc } from "../shared/chicago-time";
+import { addDays, firstOccurrence } from "./lib/seriesRecurrence";
 import { chicagoLocalDateTime, createOccurrence, GENERATE_BATCH, isOccurrence, masterIdForSeries, ruleOf, sameRecurrence, seriesAudienceStudentIds, todayKey, truncateRecurrence, windowEndKey } from "./lib/seriesGenerate";
 
 /**
@@ -282,7 +283,7 @@ export async function createMasterNow(ctx: ActionCtx, seriesId: Id<"eventSeries"
     const auth = `Bearer ${await token(true)}`;
     const id = await masterIdForSeries(seriesId);
     let raw: unknown;
-    const response = await fetch(eventUrl(), { method: "POST", headers: { authorization: auth, "content-type": "application/json" }, body: JSON.stringify({ id, summary: snap.name, location: snap.destination, start: { dateTime: snap.firstStartLocal, timeZone: SERIES_TIME_ZONE }, end: { dateTime: snap.firstEndLocal, timeZone: SERIES_TIME_ZONE }, recurrence: snap.recurrence, extendedProperties: { private: { studentStatusSeriesId: seriesId } } }) });
+    const response = await fetch(eventUrl(), { method: "POST", headers: { authorization: auth, "content-type": "application/json" }, body: JSON.stringify({ id, summary: snap.name, location: snap.destination, start: { dateTime: snap.firstStartLocal, timeZone: TEAM_TIME_ZONE }, end: { dateTime: snap.firstEndLocal, timeZone: TEAM_TIME_ZONE }, recurrence: snap.recurrence, extendedProperties: { private: { studentStatusSeriesId: seriesId } } }) });
     if (response.status === 409) {
       const existing = await fetch(eventUrl(id), { headers: { authorization: auth } });
       if (!existing.ok) return await fail(calendarError(existing.status));

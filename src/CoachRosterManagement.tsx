@@ -9,7 +9,8 @@ import { Input } from './components/ui/input'
 import { Checkbox } from './components/ui/checkbox'
 import { NativeSelect, NativeSelectOption } from './components/ui/native-select'
 import { Card, CardTitle, CardHeader, CardContent } from './components/ui/card'
-import { TeamRosterSummary, reportMoney } from './DashboardReports'
+import { TeamRosterSummary } from './DashboardReports'
+import { chargeCurrency } from './lib/charge-money'
 import { liveCopy } from './lib/live-copy'
 import { rosterManagementCopy as copy } from './lib/roster-management-copy'
 import { balanceStatusLabel } from './lib/report-state-copy'
@@ -61,7 +62,7 @@ function RosterRow({row,grade}:{row:Row;grade:string|null}){
     <td data-label="FIRST registration"><FirstStudentStatus state={row.firstRegistrationState} compact /></td>
     <td data-label="Student sign-in">{access(row)}</td>
     <td data-label="Fundraiser Link">{row.fundraiserConnected?'Connected':'Disconnected'}</td>
-    <td data-label="Balance due"><span className={styles.money}>{row.balance.state==='ready'&&row.balance.dueCents!==null?reportMoney(row.balance.dueCents):balanceStatusLabel(row.balance.state)}</span></td>
+    <td data-label="Balance due"><span className={styles.money}>{row.balance.state==='ready'&&row.balance.dueCents!==null?chargeCurrency(row.balance.dueCents):balanceStatusLabel(row.balance.state)}</span></td>
     <td data-label="Next event readiness"><span className={row.nextEvent?.state==='ready'?styles.ready:styles.pending}>{row.nextEvent?.name??'—'}</span><small>{eventStatus(row)}</small></td>
     <td data-label="Missing profile information">{missingItems.length?missingItems.join(', '):'Nothing missing'}</td>
   </tr>

@@ -9,17 +9,9 @@ import { Radio } from '@base-ui/react/radio'
 import { Card, CardTitle } from './components/ui/card'
 import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
+import { chargeCurrency, parseChargeTarget } from './lib/charge-money'
 import { fundraisingCopy as copy } from './lib/fundraising-copy'
 import styles from './Fundraising.module.css'
-
-/** Parse cents or basis points without floating point rounding. */
-export function parseFundraisingDecimal(text: string): number | null {
-  const value = text.trim()
-  if (value.length > 128 || !/^\d+(?:\.\d{1,2})?$/.test(value)) return null
-  const [whole, fraction = ''] = value.split('.')
-  const scaled = BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0'))
-  return scaled <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(scaled) : null
-}
 
 type AllocationMode = 'team' | 'student' | 'split'
 type CreateInput = { name: string; teamBps: number; studentBps: number }
@@ -33,8 +25,8 @@ export function FundraiserCreationForm({ pending, onCreate }: {
   const [team, setTeam] = useState('')
   const [student, setStudent] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const teamBps = mode === 'team' ? 10000 : mode === 'student' ? 0 : parseFundraisingDecimal(team)
-  const studentBps = mode === 'student' ? 10000 : mode === 'team' ? 0 : parseFundraisingDecimal(student)
+  const teamBps = mode === 'team' ? 10000 : mode === 'student' ? 0 : parseChargeTarget(team)
+  const studentBps = mode === 'student' ? 10000 : mode === 'team' ? 0 : parseChargeTarget(student)
   const valid = teamBps !== null && studentBps !== null && teamBps <= 10000 && studentBps <= 10000 && teamBps + studentBps === 10000
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -68,18 +60,12 @@ export function FundraiserCreationForm({ pending, onCreate }: {
   </Card>
 }
 
-export function formatFundraisingCents(value: number) {
-  if (!Number.isSafeInteger(value)) throw new Error('An exact-cent amount is required.')
-  const exact = BigInt(value)
-  const absolute = exact < 0n ? -exact : exact
-  return `${exact < 0n ? '-' : ''}$${new Intl.NumberFormat('en-US').format(absolute / 100n)}.${String(absolute % 100n).padStart(2, '0')}`
-}
 export function fundraisingDecimalValue(value: number) {
   if (!Number.isSafeInteger(value) || value < 0) throw new Error('A nonnegative exact-cent amount is required.')
   const exact = BigInt(value)
   return `${exact / 100n}.${String(exact % 100n).padStart(2, '0')}`
 }
-const usd = formatFundraisingCents
+const usd = chargeCurrency
 const percentage = (value: number) => `${value / 100}%`
 const fundraiserStatuses: Record<string,string> = { draft: 'Draft', posting: 'Posting in progress', posted: 'Posted', held: 'Some amounts need Coach review', failed: 'Posting stopped; a Coach needs to review it', closed: 'Closed' }
 const postingStatuses: Record<string,string> = { running: 'In progress', held: 'Some amounts need Coach review', failed: 'Posting stopped; a Coach needs to review it', complete: 'Complete' }
@@ -160,7 +146,7 @@ function FundraiserWorkspace({ fundraiserId }: { fundraiserId: Id<'fundraisers'>
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   if (!workspace) return <Card className={styles.card}><p>{copy.loading}</p></Card>
   const editable = workspace.capabilities.canPost && !['posting', 'failed', 'held', 'closed'].includes(workspace.fundraiser.state)
-  const inputs = Object.entries(drafts).map(([studentId, value]) => ({ studentId: studentId as Id<'students'>, grossCents: parseFundraisingDecimal(value) }))
+  const inputs = Object.entries(drafts).map(([studentId, value]) => ({ studentId: studentId as Id<'students'>, grossCents: parseChargeTarget(value) }))
   const valid = inputs.length > 0 && inputs.length <= 500 && inputs.every(row => row.grossCents !== null)
   const ready = reviewed && reviewed.fundraiserRevision === workspace.fundraiser.revision && reviewed.rows.length > 0 && reviewed.rows.every(row => {
     const current = students.results.find(student => student.studentId === row.studentId)
@@ -191,7 +177,7 @@ function FundraiserWorkspace({ fundraiserId }: { fundraiserId: Id<'fundraisers'>
     catch (cause) { setError(userFacingError(cause, copy.failed)) }
     finally { busyGuard.current = false; setBusy(false) }
   }
-  const input = (row: (typeof students.results)[number]) => editable ? <Input aria-label={`${row.name} · ${copy.raised}`} inputMode="decimal" maxLength={24} value={drafts[row.studentId] ?? fundraisingDecimalValue(row.grossCents)} disabled={busy || row.financialState !== 'ready'} onChange={event => changed(row.studentId, event.target.value)} aria-invalid={drafts[row.studentId] !== undefined && parseFundraisingDecimal(drafts[row.studentId]) === null} /> : <span>{usd(row.grossCents)}</span>
+  const input = (row: (typeof students.results)[number]) => editable ? <Input aria-label={`${row.name} · ${copy.raised}`} inputMode="decimal" maxLength={24} value={drafts[row.studentId] ?? fundraisingDecimalValue(row.grossCents)} disabled={busy || row.financialState !== 'ready'} onChange={event => changed(row.studentId, event.target.value)} aria-invalid={drafts[row.studentId] !== undefined && parseChargeTarget(drafts[row.studentId]) === null} /> : <span>{usd(row.grossCents)}</span>
   return <div className={styles.form}>
     <Card className={`${styles.card} ${styles.amountsCard}`}>
       <div className={styles.amountsHead}><CardTitle>{workspace.fundraiser.name} · {copy.amounts}</CardTitle><p className={styles.muted}>Team {percentage(workspace.fundraiser.teamBps)} · Student travel {percentage(workspace.fundraiser.studentBps)}</p><dl className={styles.details}><dt>{copy.committedRaised}</dt><dd>{usd(workspace.totals.grossCents)}</dd><dt>{copy.team}</dt><dd>{usd(workspace.totals.teamCents)}</dd><dt>{copy.travelCredit}</dt><dd>{usd(workspace.totals.travelCreditCents)}</dd></dl><p className={styles.muted}>The amounts below are recorded totals. Edited amounts take effect after review and posting.</p></div>
@@ -243,7 +229,7 @@ function FundraiserPolicy({ workspace }: { workspace: FunctionReturnType<typeof 
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const teamBps = parseFundraisingDecimal(team); const studentBps = parseFundraisingDecimal(student)
+  const teamBps = parseChargeTarget(team); const studentBps = parseChargeTarget(student)
   const valid = teamBps !== null && studentBps !== null && teamBps + studentBps === 10000
   const allowed = !['posting', 'failed', 'held', 'closed'].includes(workspace.fundraiser.state)
   async function submit(kind: 'split' | 'close') {

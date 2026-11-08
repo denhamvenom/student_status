@@ -7,15 +7,11 @@ import type { Id } from '../convex/_generated/dataModel'
 import { Card, CardTitle } from './components/ui/card'
 import { Button } from './components/ui/button'
 import { familyCopy, moneyMeanings } from './lib/family-copy'
+import { chargeCurrency } from './lib/charge-money'
 import { reportCopy as copy } from './lib/report-copy'
 import styles from './DashboardReports.module.css'
 
-export function reportMoney(cents:number) {
-  if (!Number.isSafeInteger(cents)) throw new Error('An exact-cent report amount is required.')
-  const exact=BigInt(cents),absolute=exact<0n?-exact:exact
-  return `${exact<0n?'-':''}$${new Intl.NumberFormat('en-US').format(absolute/100n)}.${String(absolute%100n).padStart(2,'0')}`
-}
-const money=reportMoney
+const money=chargeCurrency
 export function fundraisingReportValues(earnedCents:number,availableCents:number) {
   return {
     earned: {label:copy.travelShare,value:money(earnedCents)},

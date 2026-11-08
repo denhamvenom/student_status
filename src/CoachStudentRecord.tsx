@@ -9,7 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
 import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './components/ui/dialog'
-import { FamilyAttendanceSummary, reportMoney } from './DashboardReports'
+import { FamilyAttendanceSummary } from './DashboardReports'
+import { chargeCurrency } from './lib/charge-money'
 import { rosterManagementCopy as copy } from './lib/roster-management-copy'
 import { balanceStatusLabel } from './lib/report-state-copy'
 import styles from './CoachRoster.module.css'
@@ -21,7 +22,7 @@ const date=(at:number)=>new Intl.DateTimeFormat('en-US',{timeZone:'America/Chica
 const value=(text:string|null)=>text?.trim()||'Not provided'
 const profileItem=(item:string)=>item==='Room category'?'Rooming category':item
 function Fact({label,children}:{label:string;children:React.ReactNode}){return <div><dt>{label}</dt><dd>{children}</dd></div>}
-function Money({label,cents}:{label:string;cents:number|null}){return <Fact label={label}>{cents===null?'Unavailable':reportMoney(cents)}</Fact>}
+function Money({label,cents}:{label:string;cents:number|null}){return <Fact label={label}>{cents===null?'Unavailable':chargeCurrency(cents)}</Fact>}
 /** The last loaded answer of a reloading query, remembered with the key (here the student) it was loaded for. */
 export type LoadedFor<K,T>={key:K;value:T}|null
 export function rememberLoaded<K,T>(kept:LoadedFor<K,T>,key:K,latest:T|undefined):LoadedFor<K,T>{return latest===undefined||(kept?.key===key&&kept.value===latest)?kept:{key,value:latest}}

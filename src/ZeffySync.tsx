@@ -6,16 +6,14 @@ import { ConfirmAction } from './ConfirmAction'
 import { Button } from './components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
 import styles from './ZeffySync.module.css'
+import { chargeCurrency } from './lib/charge-money'
 
 const chicagoDate = new Intl.DateTimeFormat('en-US', {
   dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Chicago',
 })
 
 function dollars(cents: number) {
-  if (!Number.isSafeInteger(cents)) return 'Amount needs review'
-  const amount = BigInt(cents)
-  const absolute = amount < 0n ? -amount : amount
-  return `${amount < 0n ? '-' : ''}$${new Intl.NumberFormat('en-US').format(absolute / 100n)}.${String(absolute % 100n).padStart(2, '0')}`
+  return Number.isSafeInteger(cents) ? chargeCurrency(cents) : 'Amount needs review'
 }
 
 function when(value: number | null | undefined) {

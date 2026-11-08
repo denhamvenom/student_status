@@ -5,7 +5,8 @@ import { chicagoDate, chicagoMidnight } from "./calendarDates";
 import { createEventCore, type MentorInvite, type NewEventFields } from "./createEventCore";
 import { studentInAudience } from "./eventAudienceRules";
 import { applySeriesSignups, isMentorCapable, mentorActor, mentorMeetingLimitError } from "./mentorMeetings";
-import { addDays, occurrenceIndex, occurrencesBetween, SERIES_TIME_ZONE, zonedWallTimeToUtc, type SeriesOccurrence, type SeriesRule } from "./seriesRecurrence";
+import { TEAM_TIME_ZONE, zonedWallTimeToUtc } from "../../shared/chicago-time";
+import { addDays, occurrenceIndex, occurrencesBetween, type SeriesOccurrence, type SeriesRule } from "./seriesRecurrence";
 import { formatUtcBasic } from "./rrule";
 
 /**
@@ -30,7 +31,7 @@ export function ruleOf(series: Pick<Series, "startDate" | "weekdays" | "interval
 }
 
 export function seriesFieldsFromRule(rule: SeriesRule) {
-  return { startDate: rule.anchorDate, weekdays: [...rule.weekdays].sort((a, b) => a - b), intervalWeeks: rule.intervalWeeks, localStartTime: rule.startLocalTime, durationMinutes: rule.durationMinutes, untilDate: rule.endsOnDate, count: rule.maxOccurrences, timeZone: SERIES_TIME_ZONE };
+  return { startDate: rule.anchorDate, weekdays: [...rule.weekdays].sort((a, b) => a - b), intervalWeeks: rule.intervalWeeks, localStartTime: rule.startLocalTime, durationMinutes: rule.durationMinutes, untilDate: rule.endsOnDate, count: rule.maxOccurrences, timeZone: TEAM_TIME_ZONE };
 }
 
 export function todayKey(now: number): string {
@@ -59,7 +60,7 @@ export async function masterIdForSeries(seriesId: string): Promise<string> {
 
 /** Chicago local wall time "YYYY-MM-DDTHH:MM:SS" for an instant (Google start/end with timeZone America/Chicago). */
 export function chicagoLocalDateTime(ms: number): string {
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone: SERIES_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).formatToParts(new Date(ms));
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: TEAM_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).formatToParts(new Date(ms));
   const get = (name: string) => parts.find(part => part.type === name)?.value ?? "00";
   return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:${get("second")}`;
 }

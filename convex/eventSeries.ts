@@ -14,7 +14,8 @@ import { parseGoogleRecurrence } from "./lib/rrule";
 import { requireSeasonFinanceReady } from "./lib/seasonFinance";
 import type { AssignmentScope, SignupMode } from "./lib/eventAudienceRules";
 import { chicagoLocalDateTime, generateRuleOccurrences, hasOccurrenceFrom, isOccurrence, occurrenceStart, rowsFrom, ruleOf, seriesAudienceStudentIds, seriesFieldsFromRule, sessionsExistOn, todayKey, WINDOW_DAYS, windowEndKey, windowEndMs } from "./lib/seriesGenerate";
-import { addDays, firstOccurrence, isLocalDate, MAX_OCCURRENCES_PER_QUERY, occurrencesBetween, SERIES_TIME_ZONE, splitRuleAt, validateSeriesRule, type SeriesRule } from "./lib/seriesRecurrence";
+import { TEAM_TIME_ZONE } from "../shared/chicago-time";
+import { addDays, firstOccurrence, isLocalDate, MAX_OCCURRENCES_PER_QUERY, occurrencesBetween, splitRuleAt, validateSeriesRule, type SeriesRule } from "./lib/seriesRecurrence";
 import { assignSubteamMember, isSubteamMandatory } from "./lib/subteamEnrollment";
 import { onsiteLocation, teamTransportEnabled } from "./lib/transportation";
 import { assignWholeTeamMember } from "./lib/wholeTeam";
@@ -697,7 +698,7 @@ function readMaster(raw: unknown): MasterRead {
   if (!Array.isArray(item.recurrence) || typeof item.recurringEventId === "string") return { ok: false, reason: "Choose a whole repeating series from Team Calendar." };
   if (detail.cancelled) return { ok: false, reason: "This series was deleted in Team Calendar." };
   if (detail.allDay || typeof item.start?.dateTime !== "string") return { ok: false, reason: "All-day repeating series can't be managed here." };
-  if (item.start.timeZone !== SERIES_TIME_ZONE) return { ok: false, reason: "This series uses a time zone other than America/Chicago. Change it in Team Calendar first." };
+  if (item.start.timeZone !== TEAM_TIME_ZONE) return { ok: false, reason: "This series uses a time zone other than America/Chicago. Change it in Team Calendar first." };
   if (detail.startsAt === null || detail.endsAt === null) return { ok: false, reason: "The series start or end couldn't be read." };
   const local = chicagoLocalDateTime(detail.startsAt);
   if (local.slice(17, 19) !== "00") return { ok: false, reason: "The series start time has seconds, which can't be managed here." };
@@ -750,7 +751,7 @@ export const insertAdopted = internalMutation({
     const now = Date.now();
     const seriesId = await ctx.db.insert("eventSeries", {
       seasonId: season._id, createdBy: user._id, createdAt: now, name, status: "active", origin: "adopted", template: built.template,
-      startDate: args.date, weekdays: args.weekdays, intervalWeeks: args.intervalWeeks, localStartTime: args.time, durationMinutes: args.durationMinutes, untilDate: args.untilDate, count: args.count, timeZone: SERIES_TIME_ZONE,
+      startDate: args.date, weekdays: args.weekdays, intervalWeeks: args.intervalWeeks, localStartTime: args.time, durationMinutes: args.durationMinutes, untilDate: args.untilDate, count: args.count, timeZone: TEAM_TIME_ZONE,
       templateRevision: 1, mentorInviteIds: built.mentorInviteIds, subteamMentorInviteIds: built.subteamMentorInviteIds, audienceStudentIds: built.audienceStudentIds, generatedThrough: 0,
       calendarMasterId: args.calendarMasterId, calendarEtag: args.etag, calendarRecurrence: args.recurrence, calendarSyncState: "synced",
     });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { chicagoLocalDateTime, masterIdForSeries, sameRecurrence, truncateRecurrence } from "../lib/seriesGenerate";
-import { zonedWallTimeToUtc } from "../lib/seriesRecurrence";
+import { zonedWallTimeToUtc } from "../../shared/chicago-time";
 
 describe("series master helpers", () => {
   it.each([
