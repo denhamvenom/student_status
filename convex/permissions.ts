@@ -4,7 +4,7 @@ import { paginationOptsValidator } from "convex/server";
 import { env, mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { activeSeason, audit, privateStudent, studentAccess, viewer } from "./lib/access";
+import { activeSeason, audit, privateStudent, studentAccess, viewer, isCoachOrTravelLead } from "./lib/access";
 import { verifiedParent, tokenHash } from "./lib/invitationIdentity";
 import { enrollmentPending } from "./lib/eventEnrollmentState";
 import { consentEventValidator, consentSnapshotValidator, correctionFieldValidator, expectedCoverageValidator, publicVersion, selectedEvents, boundedText, versionValidator } from "./lib/consentSnapshot";
@@ -45,8 +45,8 @@ export const workspaceValidator = v.object({
   coverage: v.array(v.object({eventId: v.id("events"), state: stateValidator, revision: v.number(), submissionId: nullableId, reviewId: v.union(v.id("permissionReviews"), v.null()), reason: v.union(v.string(), v.null()), field: v.union(correctionFieldValidator, v.null()), signatureRequestedAt: v.union(v.number(), v.null())})),
   receipts: v.array(receiptSummaryValidator), signingMode: v.union(v.literal("synthetic"), v.literal("real"), v.literal("closed")), signingPaused: v.boolean(), canSign: v.boolean(), canRecordPaper: v.boolean(), canReview: v.boolean(), canHealthExport: v.boolean(), gateReason: v.union(v.string(), v.null()),
 });
-function operations(actor: Doc<"appUsers">) {if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can do this with permission forms. Ask a Coach if you need Travel Lead access.")}
-function formAccess(actor: Doc<"appUsers">) {if (actor.role !== "parent" && actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Permission forms are open to Parents, Coaches and Travel Leads. Ask a Coach if you need access.")}
+function operations(actor: Doc<"appUsers">) {if (!isCoachOrTravelLead(actor)) throw new ConvexError("Only a Coach or Travel Lead can do this with permission forms. Ask a Coach if you need Travel Lead access.")}
+function formAccess(actor: Doc<"appUsers">) {if (actor.role !== "parent" && !isCoachOrTravelLead(actor)) throw new ConvexError("Permission forms are open to Parents, Coaches and Travel Leads. Ask a Coach if you need access.")}
 async function syntheticAllowed(ctx: Ctx, studentId: Id<"students">, parentId?: Id<"appUsers">) {
   if (env.CONVEX_CLOUD_URL !== DEV_URL) return false;
   const row = await ctx.db.query("syntheticConsentSubjects").withIndex("by_studentId_and_parentId", q => q.eq("studentId", studentId).eq("parentId", parentId)).unique();
@@ -78,7 +78,7 @@ export const workspace = query({
       if (controlling && controlling.studentId === student._id && controlling.seasonId === student.seasonId) submissions.push(controlling);
     }
     submissions.sort((a,b) => b.signedAt - a.signedAt || b._creationTime - a._creationTime);
-    const canReview = actor.role === "coach" || actor.role === "mentor" && actor.travelLead;
+    const canReview = isCoachOrTravelLead(actor);
     const who = actor.role === "parent" ? await verifiedParent(ctx) : null;
     const v2 = version?.formFormat === 2;
     const signingMode = v2 ? permissionSigningMode() : "synthetic";

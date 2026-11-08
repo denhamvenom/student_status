@@ -4,7 +4,7 @@ import { internalMutation, mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import type { SignupAvailability } from "../src/features/student-home/contract";
-import { activeSeason, audit, ownStudent, viewer } from "./lib/access";
+import { activeSeason, audit, ownStudent, viewer, isCoachOrTravelLead } from "./lib/access";
 import { activeApprovedWithdrawal, withdrawalHistory } from "./lib/withdrawalState";
 import { addCharge } from "./lib/money";
 import { enrollmentPending, requireEnrollmentComplete } from "./lib/eventEnrollmentState";
@@ -109,7 +109,7 @@ export const setParticipation = mutation({
   handler: async (ctx, args) => {
     await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const user = await viewer(ctx);
-    if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Only a Coach or Travel Lead can change signups.");
+    if (!isCoachOrTravelLead(user)) throw new ConvexError("Only a Coach or Travel Lead can change signups.");
     const event = await ctx.db.get(args.eventId); const student = await ctx.db.get(args.studentId); const season = await activeSeason(ctx);
     if (!event || event.archived || event.cancelled || !student || !student.active || event.seasonId !== season._id || student.seasonId !== season._id) throw new ConvexError("This student or event is no longer active in the current season. Reload to see the latest.");
     requireEnrollmentComplete(event);
@@ -169,7 +169,7 @@ export const recordRequirement = mutation({
   args: { eventId: v.id("events"), studentId: v.id("students"), key: v.string(), complete: v.boolean() }, returns: v.null(),
   handler: async (ctx, args) => {
     const user = await viewer(ctx);
-    if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Only a Coach or Travel Lead can update requirements.");
+    if (!isCoachOrTravelLead(user)) throw new ConvexError("Only a Coach or Travel Lead can update requirements.");
     const event = await ctx.db.get(args.eventId); const student = await ctx.db.get(args.studentId);
     const season = await activeSeason(ctx);
     if (!event || !student || !student.active || event.seasonId !== season._id || student.seasonId !== season._id || ["pay", "perm", "room"].includes(args.key)) throw new ConvexError("This requirement can't be updated here. Fees, permission forms and rooms update on their own pages. Reload and try again.");

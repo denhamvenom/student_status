@@ -1,7 +1,7 @@
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
 import { ConvexError, v } from "convex/values";
 import { query } from "./_generated/server";
-import { activeSeason, viewer } from "./lib/access";
+import { activeSeason, viewer, isCoachOrTravelLead } from "./lib/access";
 import { feeMaintenanceProjection, feeMaintenanceValidator } from "./lib/seasonFinance";
 import { financeRow } from "./lib/financeRow";
 
@@ -11,7 +11,7 @@ const row = v.object({ studentId: v.id("students"), name: v.string(), active: v.
 export const students = query({
   args: { paginationOpts: paginationOptsValidator, active: v.optional(v.boolean()) }, returns: paginationResultValidator(row).extend({ seasonId: v.id("seasons"), maintenance: feeMaintenanceValidator }),
   handler: async (ctx, args) => {
-    const actor = await viewer(ctx); const readable = actor.role === "coach" || actor.role === "mentor" && actor.travelLead;
+    const actor = await viewer(ctx); const readable = isCoachOrTravelLead(actor);
     if (!readable) throw new ConvexError("Only a Coach or Travel Lead can see team money.");
     const season = await activeSeason(ctx); const maintenance = await feeMaintenanceProjection(ctx, season._id); const opts = boundedFinancePage(args.paginationOpts);
     const result = await ctx.db.query("students").withIndex("by_seasonId_and_active", q => q.eq("seasonId", season._id).eq("active", args.active ?? true)).paginate(opts);
@@ -29,7 +29,7 @@ const change = v.object({ feeDefinitionId: v.union(v.id("feeDefinitions"), v.nul
 export const recentChanges = query({
   args: { paginationOpts: paginationOptsValidator }, returns: paginationResultValidator(change).extend({ seasonId: v.id("seasons"), coverage: v.object({ state: v.union(v.literal("updating"), v.literal("ready"), v.literal("failed")), startedAt: nullable, completedAt: nullable }) }),
   handler: async (ctx, args) => {
-    const actor = await viewer(ctx); if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can see team money.");
+    const actor = await viewer(ctx); if (!isCoachOrTravelLead(actor)) throw new ConvexError("Only a Coach or Travel Lead can see team money.");
     const season = await activeSeason(ctx); const result = await ctx.db.query("financeChangeEvents").withIndex("by_seasonId_and_occurredAt", q => q.eq("seasonId", season._id)).order("desc").paginate(boundedFinancePage(args.paginationOpts));
     if (result.page.length > 20) throw new ConvexError("This list couldn't load. Reload the page to try again.");
     const coverage = await ctx.db.query("financeChangeBackfills").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).unique();
@@ -50,7 +50,7 @@ export function boundedFinancePage<T extends Options>(opts: T): T {
 export const status = query({
   args: {}, returns: v.object({ seasonId: v.id("seasons"), maintenance: feeMaintenanceValidator, coverage: v.object({ state: v.union(v.literal("updating"), v.literal("ready"), v.literal("failed")), startedAt: nullable, completedAt: nullable }), canPrepareHistory: v.boolean() }),
   handler: async ctx => {
-    const actor = await viewer(ctx); if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can see team money.");
+    const actor = await viewer(ctx); if (!isCoachOrTravelLead(actor)) throw new ConvexError("Only a Coach or Travel Lead can see team money.");
     const season = await activeSeason(ctx);
     const coverage = await ctx.db.query("financeChangeBackfills").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).unique();
     return { seasonId: season._id, maintenance: await feeMaintenanceProjection(ctx, season._id), coverage: { state: coverage?.state === "complete" ? "ready" as const : coverage?.state === "failed" ? "failed" as const : "updating" as const, startedAt: coverage?.startedAt ?? null, completedAt: coverage?.completedAt ?? null }, canPrepareHistory: actor.role === "coach" && coverage?.state !== "running" && coverage?.state !== "complete" };

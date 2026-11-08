@@ -6,7 +6,7 @@ import { makeFunctionReference } from "convex/server";
 import { ConvexError, v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import schema from "./schema";
-import { activeSeason, audit, viewer } from "./lib/access";
+import { activeSeason, audit, viewer, isCoachOrTravelLead } from "./lib/access";
 import { financialAccount, recordProjectedEntry, saveFinancialAccount, verifyAppliedSources } from "./lib/financialSources";
 import { refreshStudentFinance } from "./lib/financeSummaries";
 import { allocateUnapplied } from "./lib/money";
@@ -22,7 +22,7 @@ export const status = query({
   args: { studentId: v.id("students"), operationId: v.optional(v.id("financeOperations")) }, returns: v.object({ job: v.union(schema.doc("financialOperationJobs"), v.null()), operation: v.union(schema.doc("financeOperations"), v.null()), canRetry: v.boolean() }),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); const season = await activeSeason(ctx); const student = await ctx.db.get(args.studentId);
-    if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can see team money.");
+    if (!isCoachOrTravelLead(actor)) throw new ConvexError("Only a Coach or Travel Lead can see team money.");
     if (!student || student.seasonId !== season._id) throw new ConvexError("This student isn't in the current season. Reload and choose a current student.");
     const account = await financialAccount(ctx, student._id);
     const operation = args.operationId ? await ctx.db.get(args.operationId) : null;

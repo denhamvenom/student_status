@@ -5,7 +5,7 @@ import { action, internalMutation, internalQuery, mutation, query, type Mutation
 import { boundCalendar, configured, eventUrl, googleDetails, invalidatePermissionCoverage, token, updateEventDetails, validCalendarEventId, writeEnabled } from "./eventCalendar";
 import { syncInstancesNow } from "./eventSeriesCalendar";
 import { scheduleEventArchive } from "./eventArchive";
-import { activeSeason, audit, viewer, type AppUser } from "./lib/access";
+import { activeSeason, audit, viewer, type AppUser, isCoachOrTravelLead } from "./lib/access";
 import { MAX_AUDIENCE_STUDENTS, MAX_MENTOR_INVITES, prepareEventAudience } from "./lib/createEventCore";
 import { canMentorManageEvent, carrySeriesSignups, isMentorCapable, isMentorSeriesNow, MENTOR_ONLY_MESSAGE, mentorActor, mentorUpdateEvent, requireInvitableMeetingMentors, requireMentorMeetingFields } from "./lib/mentorMeetings";
 import { notifyEventCancelled, notifyEventScheduleChange, notifyEventSeriesCreated, queueMentorMeetingOpenDigest } from "./lib/notificationTriggers";
@@ -50,7 +50,7 @@ type TemplateArgs = {
 
 const STAFF_ONLY = "Only a Coach or Travel Lead can manage recurring events.";
 const COACH_ONLY_GROUP = "Only a Coach can change a required series for the whole team or a subteam.";
-const isSeriesStaff = (user: AppUser) => user.role === "coach" || (user.role === "mentor" && user.travelLead);
+const isSeriesStaff = (user: AppUser) => isCoachOrTravelLead(user);
 /** Coach, or a Mentor with Travel Lead (a Parent's selected Travel Lead role resolves to that). A stored flag on any other role grants nothing. */
 function requireSeriesStaff(user: AppUser) {
   if (!isSeriesStaff(user)) throw new ConvexError(STAFF_ONLY);

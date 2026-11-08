@@ -4,7 +4,7 @@ import { action, env, internalMutation, internalQuery, internalAction, mutation,
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { ActionCtx, MutationCtx } from "./_generated/server";
-import { activeSeason, audit, viewer } from "./lib/access";
+import { activeSeason, audit, viewer, isCoachOrTravelLead } from "./lib/access";
 import { hashId, serviceToken } from "./lib/calendarAuth";
 import { chicagoDate, chicagoMidnight } from "./lib/calendarDates";
 import { timeclockTransitionLocked } from "./lib/timeclockTransition";
@@ -109,7 +109,7 @@ function safeDeadlines(event: Doc<"events">, startsAt: number) {
     ...(event.roomDeadline !== undefined && event.roomDeadline > startsAt ? { roomDeadline: startsAt } : {}),
   };
 }
-function requireStaff(actor: Doc<"appUsers">) { if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can manage Calendar events."); }
+function requireStaff(actor: Doc<"appUsers">) { if (!isCoachOrTravelLead(actor)) throw new ConvexError("Only a Coach or Travel Lead can manage Calendar events."); }
 export async function boundCalendar(ctx: { runQuery: (reference: typeof internal.eventCalendar.sourceBound, args: { calendarIdHash: string }) => Promise<boolean> }) {
   return configured() && await ctx.runQuery(internal.eventCalendar.sourceBound, { calendarIdHash: await hashId(env.TIMECLOCK_CALENDAR_ID!) });
 }

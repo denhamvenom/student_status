@@ -9,7 +9,7 @@ import { resolveAudience } from "./lib/eventAudienceRules";
 import { eventDetailReturns, familyEvent, listEventsReturns } from "./lib/eventProjection";
 import { creatorCaches, eventCreatorFor } from "./lib/eventCreator";
 import { seriesOf } from "./lib/mentorMeetings";
-import { activeSeason, identity, linkedStudents, maybeViewer, mentorEvent, mentorStudent, privateStudent, publicStudent, studentGroups, requireRole, studentAccess, viewer as requireViewer, audit } from "./lib/access";
+import { activeSeason, identity, linkedStudents, maybeViewer, mentorEvent, mentorStudent, privateStudent, publicStudent, studentGroups, requireRole, studentAccess, viewer as requireViewer, audit, isCoachOrTravelLead } from "./lib/access";
 import { attendanceFor, financeFor, studentReadiness } from "./lib/readModels";
 import { coverageFor } from "./lib/permissionCoverage";
 import { fieldTripApproved } from "../src/lib/field-trip-approved";
@@ -51,7 +51,7 @@ export const listEvents = query({
     const season = await activeSeason(ctx);
     const events = await ctx.db.query("events").withIndex("by_seasonId_and_archived_and_endsAt", q => q.eq("seasonId", season._id).eq("archived", false)).take(200).then(rows => rows.sort((a, b) => a.startsAt - b.startsAt));
     if (user.role === "mentor" && !user.travelLead) return events.filter(x => !x.archived).map(event => ({ event: mentorEvent(event), participation: null }));
-    if (user.role === "coach" || user.travelLead) {
+    if (isCoachOrTravelLead(user)) {
       // Coach and Travel Lead also see who created each event (name and role label only), read once per creator and series.
       const caches = creatorCaches();
       const rows = [];
@@ -103,14 +103,14 @@ export const eventDetail = query({
     const season = await activeSeason(ctx);
     if (!event || event.seasonId !== season._id) throw new ConvexError("This event is no longer available. It may have moved to Past events. Reload to see current events.");
     if (event.archived) {
-      if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new ConvexError("This event has ended and moved to Past events. Any balance due for it stays in Money.");
+      if (!isCoachOrTravelLead(user)) throw new ConvexError("This event has ended and moved to Past events. Any balance due for it stays in Money.");
       return { event, participation: null, requirements: [], readiness: null };
     }
     if (user.role === "mentor" && !user.travelLead) return { event: mentorEvent(event), participation: null, requirements: [], readiness: null };
     // Staff (Coach, Travel Lead) also get where a series meeting sits: meetings exist through a rolling window and more are
     // added automatically. `series` is null for a single event and absent for Students and Parents. `createdBy` (the creator's
     // name and role label) is staff only too.
-    const staff = user.role === "coach" || (user.role === "mentor" && user.travelLead);
+    const staff = isCoachOrTravelLead(user);
     // The series is read once through the creator caches, so eventCreatorFor reuses it.
     const caches = creatorCaches();
     const seriesDoc = staff && event.seriesId ? await seriesOf(ctx, event.seriesId, caches.series) : null;
@@ -204,7 +204,7 @@ export const teamRoster = query({
   args: {}, returns: v.any(),
   handler: async ctx => {
     const user = await requireViewer(ctx);
-    if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Only a Coach or Travel Lead can open the team roster.");
+    if (!isCoachOrTravelLead(user)) throw new ConvexError("Only a Coach or Travel Lead can open the team roster.");
     const season = await activeSeason(ctx);
     const students = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(500);
     // Travel Lead gets the public fields plus groups and profileRevision (to call setStudentSecondaryAndLeadership); no health or contact data.

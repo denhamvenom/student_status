@@ -1,6 +1,6 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { activeSeason, audit, requireSeasonProfileWritable, viewer } from "./lib/access";
+import { activeSeason, audit, requireSeasonProfileWritable, viewer, isCoachOrTravelLead } from "./lib/access";
 import { AUDIENCE_GROUPS, LEADERSHIP_GROUP } from "./lib/eventAudienceRules";
 import { isMentorCapable } from "./lib/mentorMeetings";
 import { syncSubteamMembership } from "./lib/subteamEnrollment";
@@ -18,7 +18,7 @@ export const setStudentSecondaryAndLeadership = mutation({
     const season = await activeSeason(ctx);
     await requireSeasonFinanceReady(ctx, season._id);
     const user = await viewer(ctx);
-    if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can change a student's secondary subteam or Leadership.");
+    if (!isCoachOrTravelLead(user)) throw new ConvexError("Only a Coach or Travel Lead can change a student's secondary subteam or Leadership.");
     const student = await ctx.db.get(args.studentId);
     if (!student || student.seasonId !== season._id) throw new ConvexError("This student is not on the current season's roster. Reload to see the current roster.");
     await requireSeasonProfileWritable(ctx, season._id);
@@ -62,7 +62,7 @@ export const listMentorsForInvite = query({
   handler: async ctx => {
     const user = await viewer(ctx); // active accounts only; a Parent's selected Travel Lead role resolves to a Mentor here
     // Coach, Travel Lead (as before), or a Mentor (a Mentor account, or a Parent with Mentor staff access).
-    if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead) && !isMentorCapable(await ctx.db.get(user._id))) throw new ConvexError("Only a Coach or Mentor can invite Mentors.");
+    if (!isCoachOrTravelLead(user) && !isMentorCapable(await ctx.db.get(user._id))) throw new ConvexError("Only a Coach or Mentor can invite Mentors.");
     const lists = [
       await ctx.db.query("appUsers").withIndex("by_role", q => q.eq("role", "mentor")).take(MAX_MENTOR_LIST + 1),
       await ctx.db.query("appUsers").withIndex("by_parentStaffAccess", q => q.eq("parentStaffAccess", "mentor")).take(MAX_MENTOR_LIST + 1),

@@ -3,7 +3,7 @@ import { internalMutation, mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { makeFunctionReference } from "convex/server";
-import { activeSeason, audit, viewer, type AppUser } from "./lib/access";
+import { activeSeason, audit, isCoachOrTravelLead, viewer, type AppUser } from "./lib/access";
 import { notifyUsers, parentUserIdsForStudents, studentUserIds } from "./lib/notify";
 
 /** Student Home shows at most this many pinned messages; pinning one more is refused. */
@@ -42,9 +42,8 @@ const staffAnnouncement = v.object({
 
 /** A Coach, or a Mentor with Travel Lead access (including a Parent who selected Travel Lead for this session). */
 function managerRole(user: AppUser): AuthorRole | null {
-  if (user.role === "coach") return "coach";
-  if (user.role === "mentor" && user.travelLead) return "travelLead";
-  return null;
+  if (!isCoachOrTravelLead(user)) return null;
+  return user.role === "coach" ? "coach" : "travelLead";
 }
 
 /** Urgent is Coach-only to send, so only a Coach may change, pin, unpin or remove an urgent announcement. */

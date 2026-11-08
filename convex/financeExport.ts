@@ -3,7 +3,7 @@ import { makeFunctionReference, paginationOptsValidator, paginationResultValidat
 import { ConvexError, v } from "convex/values";
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { activeSeason, viewer } from "./lib/access";
+import { activeSeason, viewer, isCoachOrTravelLead } from "./lib/access";
 import { chargeAppliedSources, readyFinancialAccount } from "./lib/financialSources";
 import { effectiveChargeCents } from "./lib/chargeObligation";
 import { seasonFinanceControl } from "./lib/seasonFinance";
@@ -21,7 +21,7 @@ export function csvCell(value: string | number) {
   return `"${safe.replaceAll('"', '""')}"`;
 }
 async function digest(text: string) { const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)); return [...new Uint8Array(bytes)].map(byte => byte.toString(16).padStart(2, "0")).join(""); }
-async function exportViewer(ctx: QueryCtx | MutationCtx) { const actor = await viewer(ctx); if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new Error("Financial export access is not enabled for this account."); return actor; }
+async function exportViewer(ctx: QueryCtx | MutationCtx) { const actor = await viewer(ctx); if (!isCoachOrTravelLead(actor)) throw new Error("Financial export access is not enabled for this account."); return actor; }
 async function financialScopeReady(ctx: QueryCtx | MutationCtx, seasonId: Id<"seasons">) { const maintenance = await seasonFinanceControl(ctx, seasonId); if (maintenance && maintenance.state !== "ready") throw new Error("Finish shared fee maintenance before collecting financial exports."); }
 async function authorize(ctx: QueryCtx | MutationCtx, jobId: Id<"financeExportJobs">, ready = true) {
   const actor = await exportViewer(ctx); const season = await activeSeason(ctx); const job = await ctx.db.get(jobId);
@@ -63,7 +63,7 @@ export const processPage = internalMutation({
   handler: async (ctx, args) => {
     const job = await ctx.db.get(args.jobId); if (!job || job.state !== "preparing" || job.cursor !== args.cursor) return null;
     const actor = await ctx.db.get(job.createdBy); const season = await activeSeason(ctx);
-    if (!actor?.active || actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead) || season._id !== job.seasonId || job.expiresAt <= Date.now()) throw new Error("Export preparation authorization or expiry changed.");
+    if (!actor?.active || !isCoachOrTravelLead(actor) || season._id !== job.seasonId || job.expiresAt <= Date.now()) throw new Error("Export preparation authorization or expiry changed.");
     await financialScopeReady(ctx, job.seasonId); const opts = { cursor: job.cursor, numItems: 20, maximumRowsRead: 21 };
     let cursor: string; let done: boolean; let members: Doc<"financeExportMembers">[];
     if (job.scope === "selected") { const page = await ctx.db.query("financeExportMembers").withIndex("by_jobId", q => q.eq("jobId", job._id)).paginate(opts); members = page.page; cursor = page.continueCursor; done = page.isDone; }

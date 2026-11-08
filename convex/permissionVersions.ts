@@ -1,6 +1,6 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { activeSeason, audit, viewer } from "./lib/access";
+import { activeSeason, audit, viewer, isCoachOrTravelLead } from "./lib/access";
 import { publicVersion, versionValidator } from "./lib/consentSnapshot";
 import { fieldTripApproved } from "../src/lib/field-trip-approved";
 import { permissionSigningMode } from "./lib/permissionSigningMode";
@@ -9,7 +9,7 @@ export const current = query({
   args: {}, returns: v.union(v.object({...versionValidator.fields, formFormat: v.union(v.literal(1), v.literal(2))}), v.null()),
   handler: async ctx => {
     const actor = await viewer(ctx);
-    if (actor.role !== "parent" && actor.role !== "coach" && !actor.travelLead) throw new ConvexError("Permission forms are open to Parents, Coaches and Travel Leads. Ask a Coach if you need access.");
+    if (actor.role !== "parent" && !isCoachOrTravelLead(actor)) throw new ConvexError("Permission forms are open to Parents, Coaches and Travel Leads. Ask a Coach if you need access.");
     const season = await activeSeason(ctx);
     const version = season.activePermissionVersionId ? await ctx.db.get(season.activePermissionVersionId) : null;
     return version && version.seasonId === season._id ? {...publicVersion(version), formFormat: version.formFormat === 2 ? 2 as const : 1 as const} : null;

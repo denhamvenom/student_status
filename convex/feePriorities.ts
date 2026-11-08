@@ -3,7 +3,7 @@ import { makeFunctionReference, paginationOptsValidator, paginationResultValidat
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import schema from "./schema";
-import { activeSeason, viewer } from "./lib/access";
+import { activeSeason, viewer, isCoachOrTravelLead } from "./lib/access";
 import { tokenHash } from "./lib/invitationIdentity";
 import { requireNoUnfinishedFeeScopes, requireSeasonFinanceReady } from "./lib/seasonFinance";
 
@@ -12,7 +12,7 @@ export const maintenance = query({
   returns: v.object({ control: v.union(schema.doc("seasonFinanceControls"), v.null()), mappingState: v.union(v.literal("uninitialized"), v.literal("reviewRequired"), v.literal("ready")), hasUnmapped: v.union(v.boolean(), v.null()), canManageFees: v.boolean(), canMove: v.boolean(), canMap: v.boolean() }),
   handler: async ctx => {
     const actor = await viewer(ctx);
-    if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can see team money.");
+    if (!isCoachOrTravelLead(actor)) throw new ConvexError("Only a Coach or Travel Lead can see team money.");
     const season = await activeSeason(ctx);
     const control = await ctx.db.query("seasonFinanceControls").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).unique();
     const initialized = control?.mappingInitialized === true;
@@ -29,7 +29,7 @@ export const status = query({
   args: { jobId: v.id("feePriorityJobs") }, returns: v.object({ job: schema.doc("feePriorityJobs"), originalActorName: v.string(), processingActorName: v.string(), canRetry: v.boolean() }),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx);
-    if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can see team money.");
+    if (!isCoachOrTravelLead(actor)) throw new ConvexError("Only a Coach or Travel Lead can see team money.");
     const season = await activeSeason(ctx); const job = await ctx.db.get(args.jobId);
     if (!job || job.seasonId !== season._id) throw new ConvexError("This fee update isn't in the current season. Reload to see the latest.");
     const original = await ctx.db.get(job.originalActorId); const processor = await ctx.db.get(job.actorId);
@@ -80,7 +80,7 @@ export const list = query({
   args: { paginationOpts: paginationOptsValidator }, returns: paginationResultValidator(item),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx);
-    if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can see team money.");
+    if (!isCoachOrTravelLead(actor)) throw new ConvexError("Only a Coach or Travel Lead can see team money.");
     const season = await activeSeason(ctx);
     const opts = args.paginationOpts;
     if (!Number.isSafeInteger(opts.numItems) || opts.numItems < 1 || opts.numItems > 20) throw new ConvexError("Request between 1 and 20 fees.");

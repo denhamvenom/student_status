@@ -2,7 +2,7 @@ import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { mutation, query } from "./_generated/server";
-import { activeSeason, audit, viewer } from "./lib/access";
+import { activeSeason, audit, viewer, isCoachOrTravelLead } from "./lib/access";
 import { MAX_MENTOR_INVITES } from "./lib/createEventCore";
 import {
   acceptMeeting, isMentorCapable, mentorInviteRows, mentorQuestions, recordSeriesSkip, requireAnswers, requireInvitableMeetingMentors, signUpForSeries, signupChoice,
@@ -55,7 +55,7 @@ export const respond = mutation({
  */
 async function requireInviter(ctx: MutationCtx | QueryCtx) {
   const user = await viewer(ctx);
-  if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can manage Mentor invitations.");
+  if (!isCoachOrTravelLead(user)) throw new ConvexError("Only a Coach or Travel Lead can manage Mentor invitations.");
   return user;
 }
 

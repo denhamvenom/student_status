@@ -4,7 +4,7 @@ import { mutation, query } from "./_generated/server";
 import { invalidateAttendanceSession } from "./lib/attendanceReports";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { activeSeason, audit, viewer } from "./lib/access";
+import { activeSeason, audit, viewer, isCoachOrTravelLead } from "./lib/access";
 import { addCharge } from "./lib/money";
 import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
 import { activeQuestions, activeShifts, clearShifts } from "./lib/eventSignupExtras";
@@ -12,7 +12,7 @@ import { notifySignupDecision } from "./lib/notificationTriggers";
 import { activeApprovedWithdrawal, recentWithdrawals } from "./lib/withdrawalState";
 
 function requireOperations(user: Doc<"appUsers">) {
-  if (user.role !== "coach" && !user.travelLead) throw new ConvexError("Only a Coach or Travel Lead can manage events.");
+  if (!isCoachOrTravelLead(user)) throw new ConvexError("Only a Coach or Travel Lead can manage events.");
 }
 
 async function currentEvent(ctx: QueryCtx | MutationCtx, eventId: Id<"events">) {

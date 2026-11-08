@@ -1,6 +1,6 @@
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { grantedBackgroundActor } from "./access";
+import { grantedBackgroundActor, isCoachOrTravelLead } from "./access";
 import { chicagoDate, chicagoMidnight } from "./calendarDates";
 import { createEventCore, type MentorInvite, type NewEventFields } from "./createEventCore";
 import { studentInAudience } from "./eventAudienceRules";
@@ -120,7 +120,7 @@ export async function seriesGenerationActor(ctx: MutationCtx, series: Series): P
   // resolves it; a Parent with a Mentor grant acts as a plain Mentor.
   const actor = !stored ? null : stored.role === "parent" && stored.parentStaffAccess === "mentor" && isMentorCapable(stored) ? mentorActor(stored) : grantedBackgroundActor(stored);
   const groupMandatory = series.template.mandatory === true && (series.template.audienceKind === "everyone" || series.template.audienceKind === "subteams");
-  const staff = !!actor && (actor.role === "coach" || (actor.role === "mentor" && actor.travelLead)) && (!groupMandatory || actor.role === "coach");
+  const staff = !!actor && (isCoachOrTravelLead(actor)) && (!groupMandatory || actor.role === "coach");
   const plainMentor = !!actor && actor.role === "mentor" && !actor.travelLead && mentorMeetingLimitError(series.template) === null && series.template.assignmentScope === undefined;
   const allowed = !!actor && actor.active && actor.archivedAt === undefined && (staff || plainMentor);
   if (allowed) return actor;

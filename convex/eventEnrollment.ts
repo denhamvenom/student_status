@@ -5,7 +5,7 @@ import type { MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { activeSeason, audit, viewer } from "./lib/access";
+import { activeSeason, audit, viewer, isCoachOrTravelLead } from "./lib/access";
 import { assignWholeTeamMember } from "./lib/wholeTeam";
 import { assignSubteamMember, isSubteamMandatory } from "./lib/subteamEnrollment";
 import { notifyEventAssigned } from "./lib/notificationTriggers";
@@ -15,7 +15,7 @@ export const status = query({
   returns: v.union(v.null(), v.object({ state: v.union(v.literal("running"), v.literal("failed"), v.literal("complete"), v.literal("cancelled")), processed: v.number(), assigned: v.number(), canRetry: v.boolean(), lastError: v.union(v.string(), v.null()) })),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx);
-    if (actor.role !== "coach" && !actor.travelLead) throw new ConvexError("Only a Coach or Travel Lead can see Whole Team signup progress.");
+    if (!isCoachOrTravelLead(actor)) throw new ConvexError("Only a Coach or Travel Lead can see Whole Team signup progress.");
     const event = await ctx.db.get(args.eventId); const season = await activeSeason(ctx);
     if (!event || event.seasonId !== season._id) throw new ConvexError("This event is no longer available. Reload to see the latest.");
     const job = await ctx.db.query("eventEnrollmentJobs").withIndex("by_eventId", q => q.eq("eventId", event._id)).unique();

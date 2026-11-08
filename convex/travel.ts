@@ -5,7 +5,7 @@ import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { mutation, query } from "./_generated/server";
-import { activeSeason, audit, studentAccess, viewer } from "./lib/access";
+import { activeSeason, audit, studentAccess, viewer, isCoachOrTravelLead } from "./lib/access";
 import { queueTravelDigest } from "./lib/digest";
 
 type Ctx = QueryCtx | MutationCtx;
@@ -13,7 +13,7 @@ const MAX_DRIVERS = 200;
 const MAX_PARTICIPANTS = 500;
 
 function operator(user: Doc<"appUsers">) {
-  if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can manage transport.");
+  if (!isCoachOrTravelLead(user)) throw new ConvexError("Only a Coach or Travel Lead can manage transport.");
 }
 
 function whole(value: number, label: string, max = 500) {

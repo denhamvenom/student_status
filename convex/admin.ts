@@ -2,7 +2,7 @@ import { onsiteLocation, teamTransportEnabled } from "./lib/transportation";
 import { requireSeasonFinanceReady } from "./lib/seasonFinance";
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { activeSeason, audit, requireRole, viewer } from "./lib/access";
+import { activeSeason, audit, requireRole, viewer, isCoachOrTravelLead } from "./lib/access";
 import { refreshStudentFinance } from "./lib/financeSummaries";
 import { markRoomCategoryReview } from "./lib/profileCorrections";
 import { syncWholeTeamMembership } from "./lib/wholeTeam";
@@ -20,7 +20,7 @@ export const listJoinRequests = query({
   args: {}, returns: v.any(),
   handler: async ctx => {
     const user = await viewer(ctx);
-    if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can review Join requests.");
+    if (!isCoachOrTravelLead(user)) throw new ConvexError("Only a Coach or Travel Lead can review Join requests.");
     return await ctx.db.query("joinRequests").withIndex("by_status", q => q.eq("status", "pending")).take(100);
   },
 });
@@ -65,7 +65,7 @@ export const approveJoin = mutation({
   handler: async (ctx, args) => {
     await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const actor = await viewer(ctx);
-    if (actor.role !== "coach" && !(actor.role === "mentor" && actor.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can review Join requests.");
+    if (!isCoachOrTravelLead(actor)) throw new ConvexError("Only a Coach or Travel Lead can review Join requests.");
     const request = await ctx.db.get(args.requestId); const season = await activeSeason(ctx);
     if (!request || request.seasonId !== season._id || request.status !== "pending") throw new ConvexError("This join request was already reviewed or is from an earlier season. Reload Join requests.");
     if (!args.approve) {
@@ -114,7 +114,7 @@ export const createEvent = mutation({
     for (const question of raw.questions ?? []) checkListSizes({ options: question.options });
     await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const user = await viewer(ctx);
-    if (user.role !== "coach" && !(user.role === "mentor" && user.travelLead)) throw new ConvexError("Only a Coach or Travel Lead can create events.");
+    if (!isCoachOrTravelLead(user)) throw new ConvexError("Only a Coach or Travel Lead can create events.");
     const season = await activeSeason(ctx);
     const prepared = await prepareEventAudience(ctx, user, season, raw);
     const args = prepared.args;
