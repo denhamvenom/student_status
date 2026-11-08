@@ -56,6 +56,11 @@ export async function identity(ctx: Ctx) {
 }
 
 export async function viewer(ctx: Ctx): Promise<AppUser> {
+  return effectiveViewer(ctx, await storedViewer(ctx));
+}
+
+/** The signed-in, active stored account after sign-in marker checks, before any session role selection. */
+async function storedViewer(ctx: Ctx): Promise<AppUser> {
   const who = await identity(ctx);
   const user = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique();
   if (!user || !user.active) throw new ConvexError("Your account is waiting for approval or is inactive. Ask a Coach if you need access.");
@@ -63,10 +68,15 @@ export async function viewer(ctx: Ctx): Promise<AppUser> {
   if (parentEmailIdentity && (user.role !== "parent" || parentEmailIdentity.email !== user.email.trim().toLowerCase())) throw new ConvexError("This email sign-in works only for its Parent account. Sign out, then sign in with the right account.");
   const adultMarker = await ctx.db.query("adultEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", who.authUserId)).unique();
   if (adultMarker && (!["coach", "mentor"].includes(user.role) || adultMarker.email !== user.email.trim().toLowerCase())) throw new ConvexError("This email sign-in works only for its Coach or Mentor account. Sign out, then sign in with the right account.");
-  return effectiveViewer(ctx, user);
+  return user;
 }
 
 export async function maybeViewer(ctx: Ctx): Promise<AppUser | null> {
+  const user = await maybeStoredViewer(ctx);
+  return user ? effectiveViewer(ctx, user) : null;
+}
+
+async function maybeStoredViewer(ctx: Ctx): Promise<AppUser | null> {
   const authUserId = await getAuthUserId(ctx);
   if (!authUserId) return null;
   const user = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", authUserId as Id<"users">)).unique();
@@ -76,7 +86,33 @@ export async function maybeViewer(ctx: Ctx): Promise<AppUser | null> {
   if (marker && (user.role !== "parent" || marker.email !== user.email.trim().toLowerCase())) return null;
   const adultMarker = user && await ctx.db.query("adultEmailIdentities").withIndex("by_authUserId", q => q.eq("authUserId", authUserId as Id<"users">)).unique();
   if (adultMarker && (!["coach", "mentor"].includes(user.role) || adultMarker.email !== user.email.trim().toLowerCase())) return null;
-  return user?.active ? effectiveViewer(ctx, user) : null;
+  return user?.active ? user : null;
+}
+
+/**
+ * Timeclock operators are Coaches, Mentors and Travel Leads, whether they signed in with Google or by email.
+ * Timeclock runs in its own auth session with no Student Status role picker, so a Parent account is resolved
+ * from its current Coach grant (parentStaffAccess) rather than a per-session selection: a Mentor or Travel
+ * Lead grant acts as a Mentor here (no Money edit or health export). Parents without a grant and Students
+ * are refused. Coach sessions keep Coach privileges.
+ */
+export function timeclockOperatorActor(user: AppUser): AppUser | null {
+  if (!user.active) return null;
+  if (user.role === "coach" || user.role === "mentor") return user;
+  const roles = availableRoles(user);
+  if (!roles.includes("mentor")) return null;
+  return { ...user, role: "mentor", travelLead: roles.includes("travelLead"), financialEdit: false, healthExport: false };
+}
+
+export async function timeclockOperator(ctx: Ctx): Promise<AppUser> {
+  const actor = timeclockOperatorActor(await storedViewer(ctx));
+  if (!actor) throw new ConvexError("You do not have permission for this action. Ask a Coach if you need access.");
+  return actor;
+}
+
+export async function maybeTimeclockOperator(ctx: Ctx): Promise<AppUser | null> {
+  const user = await maybeStoredViewer(ctx);
+  return user ? timeclockOperatorActor(user) : null;
 }
 
 export function requireRole(user: AppUser, ...roles: AppUser["role"][]) {

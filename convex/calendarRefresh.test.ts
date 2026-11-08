@@ -103,7 +103,7 @@ describe("Calendar refresh", () => {
     expect(await coach.action(api.calendar.refreshNow, {})).toEqual({ status: "failed" });
     for (const role of ["student", "parent"] as const) {
       await f.t.run(ctx => ctx.db.patch(f.ids.coach, { role }));
-      await expect(coach.action(api.calendar.refreshNow, {})).rejects.toThrow("Access denied");
+      await expect(coach.action(api.calendar.refreshNow, {})).rejects.toThrow("permission");
     }
     await f.t.run(ctx => ctx.db.patch(f.ids.coach, { role: "mentor", active: false }));
     await expect(coach.action(api.calendar.refreshNow, {})).rejects.toThrow();

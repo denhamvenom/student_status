@@ -12,6 +12,7 @@ November 8, 2026 | main `18ffc06`
 
 - Clocking, PIN controls, automatic closing, fixed event roster and historical import are implemented; rollout reached 100%. Calendar checks run at 6 AM/3 PM Central plus manual refresh.
 - Early clock-out and PIN group clock-in were released November 4 (PR #69); group clock-in needs `TIMECLOCK_OPERATOR_PIN` on production (VERIFY).
+- Timeclock now accepts Coaches, Mentors and Travel Leads (Google or email) and asks for the PIN when entering Group clock-in. [Receipt](docs/releases/RELEASE_2026-11-08_TIMECLOCK_ACCESS_GROUP_PIN.md)
 
 ## In progress
 

@@ -1,13 +1,13 @@
 import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
-import { activeSeason, audit, maybeViewer, viewer } from "./lib/access";
+import { activeSeason, audit, maybeTimeclockOperator, timeclockOperator, viewer } from "./lib/access";
 
 export const operatorStatus = query({
   args: {},
   returns: v.object({ allowed: v.boolean(), role: v.union(v.literal("coach"), v.literal("mentor"), v.null()) }),
   handler: async ctx => {
-    const user = await maybeViewer(ctx);
+    const user = await maybeTimeclockOperator(ctx);
     const role = user?.role === "coach" || user?.role === "mentor" ? user.role : null;
     return { allowed: role !== null, role };
   },
@@ -17,8 +17,7 @@ export const list = query({
   args: {},
   returns: v.object({ students: v.array(v.object({ studentId: v.id("students"), displayName: v.string(), subteam: v.union(v.string(), v.null()), collision: v.boolean() })), unreviewedCount: v.number() }),
   handler: async ctx => {
-    const user = await viewer(ctx);
-    if (user.role !== "coach" && user.role !== "mentor") throw new ConvexError("Timeclock operator access required.");
+    await timeclockOperator(ctx);
     const season = await activeSeason(ctx);
     const all = await ctx.db.query("students").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).take(501);
     if (all.length > 500) throw new ConvexError("Roster exceeds the supported 500-record season; narrow the roster before operating.");
@@ -57,8 +56,7 @@ export const clockStatus = query({
     })),
   }),
   handler: async (ctx, args) => {
-    const user = await viewer(ctx);
-    if (user.role !== "coach" && user.role !== "mentor") throw new ConvexError("Timeclock operator access required.");
+    await timeclockOperator(ctx);
     const season = await activeSeason(ctx);
     const session = await ctx.db.get(args.sessionId);
     if (!session || session.seasonId !== season._id) throw new ConvexError("Timeclock session unavailable in active season.");

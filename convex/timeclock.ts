@@ -2,7 +2,7 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { ConvexError, v, type Infer } from "convex/values";
-import { activeSeason, requireRole, viewer, type AppUser } from "./lib/access";
+import { activeSeason, requireRole, timeclockOperator, viewer, type AppUser } from "./lib/access";
 import { assertIdempotencyKey, assertNoOverlap, assertProfileId, chicagoDateKey, chicagoDayBounds, classifiedTime, HALF_HOUR_MS, MAX_EXTENSION_MS, MAX_GROUP_SIZE } from "./lib/timeclock";
 import { verifyTimeclockPin } from "./lib/timeclockPin";
 import { requireTimeclockSeasonWritable, timeclockTransitionLocked } from "./lib/timeclockTransition";
@@ -19,10 +19,40 @@ type ResultDetails = Omit<Result, "ok" | "code">;
 const fail = (code: string, extra: ResultDetails = {}): Result => ({ ok: false, code, ...extra });
 const good = (extra: ResultDetails = {}): Result => ({ ok: true, ...extra });
 
+// Coaches, Mentors and Travel Leads (Google or email sign-in), resolved on the server; see timeclockOperatorActor.
 async function operator(ctx: QueryCtx | MutationCtx) {
-  const actor = await viewer(ctx);
-  requireRole(actor, "coach", "mentor");
-  return actor;
+  return await timeclockOperator(ctx);
+}
+
+const pinFailure = (reason: "invalid" | "rate_limited" | "unconfigured") => fail(reason === "unconfigured" ? "PIN_UNCONFIGURED" : reason === "rate_limited" ? "PIN_RATE_LIMITED" : "PIN_INVALID");
+
+/** Every Group unlock row for a session fits in one bounded delete; unlockGroupClock refuses more. */
+export const MAX_GROUP_UNLOCKS_PER_SESSION = 100;
+
+/**
+ * A Group clock-in unlock counts only for the operator who entered the PIN, on the console profile where it was
+ * entered, for the session that console still selects, while that session is open and before its effective end
+ * (`asOf`: mutation time, or the caller-supplied time in a query). A grant older than the console's current
+ * selection (console.updatedAt) never counts, so a row missed by cleanup cannot revive when the console returns to
+ * an earlier meeting.
+ */
+async function groupUnlocked(ctx: QueryCtx | MutationCtx, actor: AppUser, session: Doc<"timeclockSessions">, profileId: string, asOf: number) {
+  if (session.state !== "open" || !(asOf < session.effectiveEnd)) return false;
+  const grant = await ctx.db.query("timeclockGroupUnlocks").withIndex("by_actorId_and_sessionId_and_profileId", q => q.eq("actorId", actor._id).eq("sessionId", session._id).eq("profileId", profileId)).unique();
+  if (!grant) return false;
+  const console = await ctx.db.query("timeclockConsoles").withIndex("by_profileId", q => q.eq("profileId", profileId)).unique();
+  return console?.selectedSessionId === session._id && grant.grantedAt >= console.updatedAt;
+}
+
+// unlockGroupClock keeps every session at or below MAX_GROUP_UNLOCKS_PER_SESSION rows, and a console's rows all
+// belong to its selected session, so each bounded delete below is complete. Should a row ever survive, it stays
+// inert: its session is closed for good (session cleanup) or its grant predates the console selection (above).
+async function dropSessionUnlocks(ctx: MutationCtx, id: Id<"timeclockSessions">) {
+  for (const row of await ctx.db.query("timeclockGroupUnlocks").withIndex("by_sessionId", q => q.eq("sessionId", id)).take(MAX_GROUP_UNLOCKS_PER_SESSION)) await ctx.db.delete(row._id);
+}
+
+async function dropConsoleUnlocks(ctx: MutationCtx, profileId: string) {
+  for (const row of await ctx.db.query("timeclockGroupUnlocks").withIndex("by_profileId", q => q.eq("profileId", profileId)).take(MAX_GROUP_UNLOCKS_PER_SESSION)) await ctx.db.delete(row._id);
 }
 
 async function reviewedStudent(ctx: MutationCtx, id: Id<"students">, seasonId: Id<"seasons">) {
@@ -72,6 +102,7 @@ async function closeSession(ctx: MutationCtx, session: Doc<"timeclockSessions">,
   if (open.length > MAX_GROUP_SIZE) throw new Error("Too many open intervals to close atomically; contact a Coach.");
   for (const interval of open) await closeInterval(ctx, interval, at, reason);
   await ctx.db.patch(session._id, { state: cancelled ? "cancelled" : "closed", closedAt: at, closeReason: reason, revision: session.revision + 1, needsReview: session.needsReview || reason === "calendar_end_moved_into_past" || cancelled });
+  await dropSessionUnlocks(ctx, session._id);
   await invalidateAttendanceSession(ctx, session._id);
 }
 
@@ -240,7 +271,7 @@ export const selectConsole = mutation({
       if (current?.state === "open") {
         if (!args.pin) return fail("PIN_REQUIRED");
         const verified = await verifyTimeclockPin(ctx, actor, args.pin);
-        if (!verified.ok) return fail(verified.reason === "unconfigured" ? "PIN_UNCONFIGURED" : verified.reason === "rate_limited" ? "PIN_RATE_LIMITED" : "PIN_INVALID");
+        if (!verified.ok) return pinFailure(verified.reason);
       }
     }
     if (args.selectedSessionId) {
@@ -248,7 +279,11 @@ export const selectConsole = mutation({
       if (!selected.session) return fail(selected.expired ? "EXPIRED" : "FINISHED");
     }
     const next = revision + 1;
-    if (old) await ctx.db.patch(old._id, { selectedSessionId: args.selectedSessionId, revision: next, updatedAt: Date.now() });
+    // Changing the console's selected meeting ends every Group clock-in unlock on this console. updatedAt marks
+    // when the current selection began (groupUnlocked ignores older grants), so re-selecting the same meeting keeps it.
+    const changed = (old?.selectedSessionId ?? null) !== (args.selectedSessionId ?? null);
+    if (changed) await dropConsoleUnlocks(ctx, args.profileId);
+    if (old) await ctx.db.patch(old._id, { selectedSessionId: args.selectedSessionId, revision: next, ...(changed ? { updatedAt: Date.now() } : {}) });
     else await ctx.db.insert("timeclockConsoles", { profileId: args.profileId, selectedSessionId: args.selectedSessionId, revision: next, updatedAt: Date.now() });
     return good({ revision: next, selectedSessionId: args.selectedSessionId ?? null });
   },
@@ -292,6 +327,38 @@ export const todayEvents = query({
   },
 });
 
+/** Unlock the Group clock-in view for this operator, console and meeting. A wrong PIN counts toward the PIN rate limit. */
+export const unlockGroupClock = mutation({
+  args: { profileId: v.string(), sessionId, pin: v.string() }, returns: commandResult,
+  handler: async (ctx, args): Promise<Result> => {
+    const actor = await operator(ctx); assertProfileId(args.profileId);
+    const console = await ctx.db.query("timeclockConsoles").withIndex("by_profileId", q => q.eq("profileId", args.profileId)).unique();
+    if (console?.selectedSessionId !== args.sessionId) return fail("STALE_CONSOLE", { revision: console?.revision ?? 0, selectedSessionId: console?.selectedSessionId ?? null });
+    const checked = await liveSession(ctx, args.sessionId, Date.now());
+    if (!checked.session) return fail(checked.expired ? "EXPIRED" : "FINISHED");
+    if (!args.pin) return fail("PIN_REQUIRED");
+    const existing = await ctx.db.query("timeclockGroupUnlocks").withIndex("by_actorId_and_sessionId_and_profileId", q => q.eq("actorId", actor._id).eq("sessionId", args.sessionId).eq("profileId", args.profileId)).unique();
+    // Keep each session's unlock rows within one bounded cleanup (dropSessionUnlocks).
+    if (!existing && (await ctx.db.query("timeclockGroupUnlocks").withIndex("by_sessionId", q => q.eq("sessionId", args.sessionId)).take(MAX_GROUP_UNLOCKS_PER_SESSION)).length >= MAX_GROUP_UNLOCKS_PER_SESSION) return fail("GROUP_UNLOCK_LIMIT", { limit: MAX_GROUP_UNLOCKS_PER_SESSION });
+    const verified = await verifyTimeclockPin(ctx, actor, args.pin);
+    if (!verified.ok) return pinFailure(verified.reason);
+    if (existing) await ctx.db.patch(existing._id, { grantedAt: Date.now() });
+    else await ctx.db.insert("timeclockGroupUnlocks", { actorId: actor._id, sessionId: args.sessionId, profileId: args.profileId, grantedAt: Date.now() });
+    return good({ sessionId: args.sessionId });
+  },
+});
+
+/** `asOf` is the caller's current time (queries do not read the clock); at or past the effective end the view is locked. */
+export const groupClockStatus = query({
+  args: { profileId: v.string(), sessionId, asOf: v.number() }, returns: v.object({ unlocked: v.boolean() }),
+  handler: async (ctx, args) => {
+    const actor = await operator(ctx); assertProfileId(args.profileId);
+    const session = await ctx.db.get(args.sessionId);
+    if (!session || session.seasonId !== (await activeSeason(ctx))._id) return { unlocked: false };
+    return { unlocked: await groupUnlocked(ctx, actor, session, args.profileId, args.asOf) };
+  },
+});
+
 const expected = v.object({ studentId, intervalId: v.optional(v.union(v.id("timeclockIntervals"), v.null())), sessionId: v.optional(v.union(sessionId, v.null())) });
 export const previewGroup = query({
   args: { sessionId, studentIds: v.array(studentId) }, returns: v.union(v.object({ ok: v.literal(false), code: v.string() }), v.object({ ok: v.literal(true), sessionRevision: v.number(), expected: v.array(v.object({ studentId, intervalId: v.union(v.id("timeclockIntervals"), v.null()), sessionId: v.union(sessionId, v.null()) })), conflicts: v.array(v.object({ studentId, sessionId, intervalId: v.optional(v.id("timeclockIntervals")) })) })),
@@ -306,9 +373,10 @@ export const previewGroup = query({
 });
 
 export const clockGroup = mutation({
-  args: { sessionId, mode: v.union(v.literal("in"), v.literal("out"), v.literal("transfer")), expectedRevision: v.number(), expected: v.array(expected), pin: v.optional(v.string()), key: v.string() }, returns: commandResult,
+  args: { sessionId, mode: v.union(v.literal("in"), v.literal("out"), v.literal("transfer")), expectedRevision: v.number(), expected: v.array(expected), pin: v.optional(v.string()), profileId: v.optional(v.string()), key: v.string() }, returns: commandResult,
   handler: async (ctx, args): Promise<Result> => {
     const actor = await operator(ctx); const now = Date.now();
+    if (args.profileId !== undefined) assertProfileId(args.profileId);
     if (args.mode !== "out" && await timeclockTransitionLocked(ctx, (await activeSeason(ctx))._id)) return fail("SEASON_TRANSITION");
     if (args.expected.length < 1 || args.expected.length > MAX_GROUP_SIZE || new Set(args.expected.map(x => x.studentId)).size !== args.expected.length) return fail("INVALID_GROUP");
     const fingerprint = JSON.stringify(["group", args.sessionId, args.mode, args.expectedRevision, args.expected]);
@@ -338,15 +406,17 @@ export const clockGroup = mutation({
         if (args.mode === "out" && locks[i]?.sessionId !== session._id) return fail("NOT_IN_EVENT", { studentId: args.expected[i].studentId });
         if (args.mode === "transfer" && locks[i]?.sessionId === session._id) return fail("TRANSFER_CONFLICT", { studentId: args.expected[i].studentId });
       }
-      // Transfers and group clock-ins (more than one student) need the operator PIN.
-      // A one-student clock-in is the individual tap and stays PIN-free; a supplied
-      // PIN is still verified so the Group control cannot pass with a wrong PIN.
-      const pinGated = args.mode === "transfer" || (args.mode === "in" && args.expected.length > 1);
-      if (pinGated || args.pin !== undefined) {
+      // Transfers need the operator PIN on every request. Group clock-ins (more than one
+      // student) need a PIN on the request or this operator's Group unlock for this console
+      // and meeting (unlockGroupClock). A one-student clock-in is the individual tap and
+      // stays PIN-free. A supplied PIN is always verified, so a wrong PIN is rejected even
+      // when an unlock exists.
+      const groupIn = args.mode === "in" && args.expected.length > 1;
+      if (args.mode === "transfer" || args.pin !== undefined) {
         if (!args.pin) return fail("PIN_REQUIRED");
         const verified = await verifyTimeclockPin(ctx, actor, args.pin);
-        if (!verified.ok) return fail(verified.reason === "unconfigured" ? "PIN_UNCONFIGURED" : verified.reason === "rate_limited" ? "PIN_RATE_LIMITED" : "PIN_INVALID");
-      }
+        if (!verified.ok) return pinFailure(verified.reason);
+      } else if (groupIn && (args.profileId === undefined || !await groupUnlocked(ctx, actor, session, args.profileId, now))) return fail("PIN_REQUIRED");
       if (args.mode !== "out") {
         const alreadyOpen = await ctx.db.query("timeclockIntervals").withIndex("by_sessionId_and_outAt", q => q.eq("sessionId", session._id).eq("outAt", undefined)).take(MAX_GROUP_SIZE + 1);
         if (alreadyOpen.length + args.expected.length > MAX_GROUP_SIZE) return fail("EVENT_CAPACITY", { limit: MAX_GROUP_SIZE });
@@ -402,7 +472,7 @@ export const extend = mutation({
       const addedMs = args.halfHours * HALF_HOUR_MS;
       if (!Number.isInteger(args.halfHours) || args.halfHours < 1 || session.extensionMs + addedMs > MAX_EXTENSION_MS) return fail("EXTENSION_LIMIT");
       const verified = await verifyTimeclockPin(ctx, actor, args.pin);
-      if (!verified.ok) return fail(verified.reason === "unconfigured" ? "PIN_UNCONFIGURED" : verified.reason === "rate_limited" ? "PIN_RATE_LIMITED" : "PIN_INVALID");
+      if (!verified.ok) return pinFailure(verified.reason);
       const end = session.effectiveEnd + addedMs; const revision = session.revision + 1;
       await ctx.db.patch(session._id, { extensionMs: session.extensionMs + addedMs, effectiveEnd: end, revision });
       await invalidateAttendanceSession(ctx, session._id);
