@@ -99,9 +99,9 @@ Clocking, PIN controls, automatic closing, fixed event roster and historical imp
 
 ## Next
 
-- Tighten about 20 pre-existing loose Travel Lead checks (`role === "coach" || travelLead`, which trusts a stored flag on any role) to the canonical rule `coach || (mentor && travelLead)` used by `mentorInvites.requireInviter` (`viewer()` resolves a Parent's selected Travel Lead role to that shape). Lines as of main `99515ed`, in `convex/`:
-  - Coach-or-Travel-Lead gates: `app.ts:52,196`; `eventEnrollment.ts:18`; `eventOperations.ts:14`; `lib/eventSignupExtras.ts:22`; `participation.ts:107,167`; `permissionVersions.ts:12`; `rooms.ts:78,219,260,276,306`; `studentHome.ts:289`; `workflowSummaries.ts:9`.
-  - Mentor-blocking checks (`mentor && !travelLead`): `app.ts:51,101,126,252`; `announcements.ts:141`; `dashboardReports.ts:39`; `financeDetails.ts:39`.
+- Tighten about 20 pre-existing loose Travel Lead checks (`role === "coach" || travelLead`, which trusts a stored flag on any role) to the canonical rule `coach || (mentor && travelLead)` used by `mentorInvites.requireInviter` (`viewer()` resolves a Parent's selected Travel Lead role to that shape). Lines as of main `1e9768b`, in `convex/`:
+  - Coach-or-Travel-Lead gates: `app.ts:54,207`; `eventEnrollment.ts:18`; `eventOperations.ts:15`; `lib/eventSignupExtras.ts:22`; `participation.ts:111,171`; `permissionVersions.ts:12`; `rooms.ts:78,219,260,276,306`; `studentHome.ts:290`; `workflowSummaries.ts:9`.
+  - Mentor-blocking checks (`mentor && !travelLead`): `app.ts:53,109,137,263`; `announcements.ts:141`; `dashboardReports.ts:39`; `financeDetails.ts:39`.
 - Roster bulk edit, and assigning CAD/Leadership from the roster subteam dropdown.
 - Student Home wording: the Highlights carousel, FIRST registration and Consent & Release jargon, and the doubled "optional" label on open signups.
 - Owner decision: whether a Travel Lead may keep adding/removing Mentor invitations on Coach-only required events (current policy allows it).
