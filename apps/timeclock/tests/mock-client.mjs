@@ -10,7 +10,7 @@ const students = [
   { studentId: 'student-c', displayName: 'Casey C.', subteam: 'Build', collision: true },
 ];
 const event = { occurrenceId: 'occurrence-a', title: 'Synthetic build meeting', allDay: false, scheduledStart: now - 3600000, scheduledEnd: now + 3600000, effectiveEnd: now + 3600000, sessionId: 'session-a', state: 'open', available: true, revision: 1, needsReview: false };
-const state = { authenticated: true, allowed: true, selected: null, revision: 0, statuses: {}, calls: [], failNext: false, stale: false, closed: false, conflict: false };
+const state = { authenticated: true, allowed: true, selected: null, revision: 0, statuses: {}, calls: [], failNext: false, stale: false, closed: false, conflict: false, groupUnlocked: false };
 function emit() { version++; listeners.forEach(f => f()); }
 function subscribe(f) { listeners.add(f); return () => listeners.delete(f); }
 function watch() { useSyncExternalStore(subscribe, () => version); }
@@ -18,6 +18,7 @@ function name(ref) { return ref[Symbol.for('functionName')]; }
 function read(ref, args) {
   switch (name(ref)) {
     case 'timeclock:previewGroup': return { ok: true, sessionRevision: event.revision, expected: args.studentIds.map(studentId => ({ studentId, intervalId: state.conflict ? 'other-interval' : state.statuses[studentId] === 'in' ? `interval-${studentId}` : null, sessionId: state.conflict ? 'other-session' : state.statuses[studentId] === 'in' ? 'session-a' : null })), conflicts: state.conflict ? args.studentIds.map(studentId => ({ studentId, sessionId: 'other-session', intervalId: 'other-interval' })) : [] };
+    case 'timeclock:groupClockStatus': return { unlocked: state.groupUnlocked && state.selected === args.sessionId };
     case 'timeclockRoster:operatorStatus': return { allowed: state.allowed, role: state.allowed ? 'mentor' : null };
     case 'timeclockRoster:list': return { students, unreviewedCount: 1 };
     case 'calendarState:status': return { configured: true, lastSuccessAt: now, lastAttemptAt: now, stale: state.stale, error: null };
@@ -37,12 +38,14 @@ async function mutate(ref, args) {
   switch (method) {
     case 'timeclock:openOccurrence': result = { ok: true, sessionId: 'session-a' }; break;
     case 'timeclock:createUnscheduled': result = { ok: true, sessionId: 'session-a', occurrenceId: 'occurrence-a' }; break;
-    case 'timeclock:selectConsole': state.selected = args.selectedSessionId || null; state.revision++; result = { ok: true, revision: state.revision, selectedSessionId: state.selected }; break;
+    case 'timeclock:selectConsole': if ((args.selectedSessionId || null) !== state.selected) state.groupUnlocked = false; state.selected = args.selectedSessionId || null; state.revision++; result = { ok: true, revision: state.revision, selectedSessionId: state.selected }; break;
     case 'timeclock:previewGroup': result = { ok: true, sessionRevision: event.revision, expected: args.studentIds.map(studentId => ({ studentId, intervalId: state.statuses[studentId] === 'in' ? `interval-${studentId}` : null, sessionId: state.statuses[studentId] === 'in' ? 'session-a' : null })), conflicts: [] }; break;
-    case 'timeclock:clockGroup': args.expected.forEach(s => { state.statuses[s.studentId] = args.mode === 'out' ? 'out' : 'in'; }); state.conflict = false; result = { ok: true, count: args.expected.length, at: Date.now() }; break;
+    case 'timeclock:unlockGroupClock': state.groupUnlocked = true; result = { ok: true, sessionId: args.sessionId }; break;
+    case 'timeclock:clockGroup': if (args.mode === 'in' && args.expected.length > 1 && args.pin === undefined && !state.groupUnlocked) { result = { ok: false, code: 'PIN_REQUIRED' }; break; } args.expected.forEach(s => { state.statuses[s.studentId] = args.mode === 'out' ? 'out' : 'in'; }); state.conflict = false; result = { ok: true, count: args.expected.length, at: Date.now() }; break;
     case 'timeclock:clockOutAll': students.forEach(s => { if (state.statuses[s.studentId] === 'in') state.statuses[s.studentId] = 'out'; }); result = { ok: true, count: 1, at: Date.now() }; break;
     case 'timeclock:extend': event.effectiveEnd += args.halfHours * 1800000; event.revision++; result = { ok: true, effectiveEnd: event.effectiveEnd, extensionMs: event.effectiveEnd - event.scheduledEnd, revision: event.revision }; break;
     case 'timeclockPinControl:authorizeSignOutControl': result = { ok: true }; break;
+    case 'parentEmailAuth:requestCode': result = { sent: true }; break;
     default: throw new Error(`Unmocked mutation ${method}`);
   }
   if (args.key) remembered.set(args.key, result);
@@ -53,10 +56,12 @@ async function mutate(ref, args) {
 export function useQuery(ref, args) { watch(); return args === 'skip' ? undefined : read(ref, args); }
 export function useMutation(ref) { return React.useCallback(args => mutate(ref, args), [name(ref)]); }
 export function useAction(ref) { return useMutation(ref); }
-export function useConvex() { return { query: async (ref, args) => read(ref, args), mutation: mutate }; }
+// One stable client, like ConvexReactClient; a new object per render would rebuild memoized stores every render.
+const client = { query: async (ref, args) => read(ref, args), mutation: mutate };
+export function useConvex() { return client; }
 export function useConvexAuth() { watch(); return { isAuthenticated: state.authenticated, isLoading: false }; }
 export function useConvexConnectionState() { watch(); return { isWebSocketConnected: !state.offline, hasInflightRequests: false }; }
 export class ConvexReactClient {}
 export function ConvexAuthProvider({ children }) { return children; }
-export function useAuthActions() { return { signIn: async () => { state.authenticated = true; emit(); }, signOut: async () => { state.authenticated = false; emit(); } }; }
+export function useAuthActions() { return { signIn: async (provider, params) => { state.calls.push({ method: `signIn:${provider}`, args: { kind: params?.kind } }); state.authenticated = true; emit(); return { signingIn: true }; }, signOut: async () => { state.authenticated = false; emit(); } }; }
 window.__clockTest = { state, emit, close: () => { state.closed = true; emit(); } };

@@ -53,6 +53,9 @@ try {
   results.push('Keyboard dialog entry, Tab containment, Escape and focus return');
   await u.getByRole('article').filter({ hasText: 'Synthetic build meeting' }).getByRole('button').click();
   await u.getByRole('button', { name: 'Group', exact: true }).click();
+  await modal.getByLabel('Operator PIN').fill('test-pin');
+  await modal.getByRole('button', { name: 'Unlock Group clock-in', exact: true }).click();
+  await expect(modal).toHaveCount(0);
   const checkbox = u.getByRole('checkbox', { name: 'Select Alex A.', exact: true });
   await checkbox.focus();
   await u.keyboard.press('Space');
@@ -104,6 +107,8 @@ try {
       await expect(alex.getByRole('button', { name: 'Clock out', exact: true })).toBeVisible();
       await page.evaluate(() => { window.__clockTest.state.failNext = true; });
       await alex.getByRole('button', { name: 'Clock out', exact: true }).click();
+      // Clocking out before the scheduled end asks first.
+      await dialog.getByRole('button', { name: 'Yes, clock me out', exact: true }).click();
       await expect(page.getByRole('button', { name: 'Retry same clock-out request', exact: true })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Change event', exact: true })).toBeDisabled();
       await page.getByRole('button', { name: 'Retry same clock-out request', exact: true }).click();
@@ -112,13 +117,33 @@ try {
       expect(keys).toHaveLength(2);
       expect(keys[0]).toBe(keys[1]);
       results.push(`Individual clocking and uncertain response same-key retry ${width}/${theme}`);
+      // The PIN is asked when opening Group clock-in, not when submitting it.
       await page.getByRole('button', { name: 'Group', exact: true }).click();
+      await expect(dialog).toBeVisible();
+      await expect(page.getByRole('checkbox', { name: 'Select Alex A.', exact: true })).toHaveCount(0);
+      await dialog.getByLabel('Operator PIN').fill('wrong');
+      await dialog.getByRole('button', { name: 'Unlock Group clock-in', exact: true }).click();
+      await expect(dialog.getByRole('alert')).toContainText('not accepted');
+      // A wrong PIN is reported once, inside the dialog, not again as a page banner.
+      await expect(page.getByText('That PIN was not accepted.', { exact: true })).toHaveCount(1);
+      await dialog.getByLabel('Operator PIN').fill('test-pin');
+      await dialog.getByRole('button', { name: 'Unlock Group clock-in', exact: true }).click();
+      await expect(dialog).toHaveCount(0);
       await page.getByRole('checkbox', { name: 'Select Alex A.', exact: true }).check();
       await page.getByRole('checkbox', { name: 'Select Blair B.', exact: true }).check();
       await page.getByRole('button', { name: 'Clock in selected (2)', exact: true }).click();
       await expect(page.getByText('2 clocked in', { exact: true })).toBeVisible();
-      results.push(`Group clock-in ${width}/${theme}`);
+      expect(await page.evaluate(() => window.__clockTest.state.calls.filter(c => c.method === 'timeclock:clockGroup' && c.args.mode === 'in' && c.args.expected.length === 2).every(c => c.args.pin === undefined && typeof c.args.profileId === 'string'))).toBe(true);
+      // Group clock-in stays unlocked for the rest of this event.
+      await page.getByRole('button', { name: 'Individual', exact: true }).click();
+      await page.getByRole('button', { name: 'Group', exact: true }).click();
+      await expect(dialog).toHaveCount(0);
+      await expect(page.getByRole('checkbox', { name: 'Select Alex A.', exact: true })).toBeVisible();
+      results.push(`Group clock-in PIN on entry, stays unlocked ${width}/${theme}`);
+      await expect(page.getByText('Clock-in completed.', { exact: true })).toBeVisible();
       await page.getByRole('button', { name: 'Extend event', exact: true }).click();
+      // Opening a PIN dialog clears the stale success banner.
+      await expect(page.getByText('Clock-in completed.', { exact: true })).toHaveCount(0);
       await dialog.getByLabel('Operator PIN').fill('wrong');
       await dialog.getByRole('button', { name: 'Extend event', exact: true }).click();
       await expect(dialog.getByRole('alert')).toContainText('not accepted');
@@ -180,6 +205,14 @@ try {
   await dialog.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();
   results.push('Sign-out PIN rejection and success');
+  await page.getByRole('button', { name: 'Sign in with email', exact: true }).click();
+  await page.getByLabel('Email address').fill('synthetic-mentor@example.test');
+  await page.getByRole('button', { name: 'Email me a code', exact: true }).click();
+  await page.getByLabel('Sign-in code').fill('123456');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page.getByRole('heading', { name: "Today's events" })).toBeVisible();
+  expect(await page.evaluate(() => window.__clockTest.state.calls.some(c => c.method === 'signIn:parentEmail' && c.args.kind === 'otp'))).toBe(true);
+  results.push('Email code sign-in reaches the console');
   await page.evaluate(() => { window.__clockTest.state.authenticated = true; window.__clockTest.state.allowed = false; window.__clockTest.emit(); });
   await expect(page.getByRole('heading', { name: 'Access unavailable' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Clock students' })).toHaveCount(0);

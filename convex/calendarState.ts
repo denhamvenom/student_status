@@ -1,8 +1,8 @@
 import { publicErrorMessage } from './lib/publicErrors';
 import { savedPublicError, publicErrorResult } from './lib/publicErrors';
 import { env, internalMutation, internalQuery, query } from "./_generated/server";
-import { ConvexError, v } from "convex/values";
-import { activeSeason, viewer } from "./lib/access";
+import { v } from "convex/values";
+import { activeSeason, timeclockOperator } from "./lib/access";
 import { timeclockTransitionLocked } from "./lib/timeclockTransition";
 
 import { calendarSyncStale } from "./lib/calendarSchedule";
@@ -10,8 +10,7 @@ import { calendarSyncStale } from "./lib/calendarSchedule";
 export const requireOperator = internalQuery({
   args: {}, returns: v.null(),
   handler: async ctx => {
-    const actor = await viewer(ctx);
-    if (actor.role !== "coach" && actor.role !== "mentor") throw new ConvexError("Access denied");
+    await timeclockOperator(ctx);
     return null;
   },
 });
@@ -55,8 +54,7 @@ export const status = query({
   args: { now: v.number() },
   returns: v.object({ configured: v.boolean(), lastSuccessAt: v.union(v.number(), v.null()), lastAttemptAt: v.union(v.number(), v.null()), stale: v.boolean(), error: v.union(v.string(), v.null()) }),
   handler: async (ctx, args) => {
-    const actor = await viewer(ctx);
-    if (actor.role !== "coach" && actor.role !== "mentor") throw new ConvexError("Access denied");
+    await timeclockOperator(ctx);
     const row = await ctx.db.query("timeclockCalendarSync").withIndex("by_key", q => q.eq("key", "team")).unique();
     const configured = !!(env.TIMECLOCK_CALENDAR_ID && env.TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_EMAIL && env.TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_PRIVATE_KEY);
     return publicErrorResult({ configured, lastSuccessAt: row?.lastSuccessAt ?? null, lastAttemptAt: row?.lastAttemptAt ?? null, stale: calendarSyncStale({ now: args.now, configured, lastSuccessAt: row?.lastSuccessAt, error: row?.lastError }), error:publicErrorMessage(row?.lastError) ?? null });

@@ -46,6 +46,36 @@ describe("operator PIN", () => {
     expect((await f.t.run(ctx => ctx.db.get(f.ids.sessionId)))?.extensionMs).toBe(0);
   });
 
+  it("limits wrong PINs team-wide across operator accounts on every PIN path", async () => {
+    process.env.TIMECLOCK_OPERATOR_PIN = syntheticPin;
+    const f = await fixture();
+    const operator = async (n: number) => {
+      const authUserId = await f.t.run(async ctx => {
+        const email = `operator-${n}@example.invalid`;
+        const id = await ctx.db.insert("users", { email, name: `Synthetic Operator ${n}` });
+        await ctx.db.insert("appUsers", { authUserId: id, email, name: `Synthetic Operator ${n}`, role: "mentor", active: true, travelLead: false, financialEdit: false });
+        return id;
+      });
+      return f.t.withIdentity({ subject: `${authUserId}|synthetic` });
+    };
+    // Six accounts each stay within the per-account limit (5) and together reach the team limit (30).
+    for (let n = 0; n < 6; n++) {
+      const client = await operator(n);
+      for (let i = 0; i < 5; i++) expect(await client.mutation(api.timeclockPinControl.authorizeSignOutControl, { pin: "000000" })).toEqual({ ok: false, code: "PIN_INVALID" });
+    }
+    const fresh = await operator(99);
+    const profileId = "synthetic-team-limit-profile";
+    expect((await fresh.mutation(api.timeclock.selectConsole, { profileId, expectedRevision: 0, selectedSessionId: f.ids.sessionId })).ok).toBe(true);
+    const paths = [
+      ["sign-out control", () => fresh.mutation(api.timeclockPinControl.authorizeSignOutControl, { pin: syntheticPin })],
+      ["extension", () => fresh.mutation(api.timeclock.extend, { sessionId: f.ids.sessionId, halfHours: 1, expectedRevision: 1, pin: syntheticPin, key: "team-limit-extend" })],
+      ["group unlock", () => fresh.mutation(api.timeclock.unlockGroupClock, { profileId, sessionId: f.ids.sessionId, pin: syntheticPin })],
+      ["event switch", () => fresh.mutation(api.timeclock.selectConsole, { profileId, expectedRevision: 1, pin: syntheticPin })],
+    ] as const;
+    for (const [label, call] of paths) expect(await call(), label).toMatchObject({ ok: false, code: "PIN_RATE_LIMITED" });
+    expect((await f.t.run(ctx => ctx.db.get(f.ids.sessionId)))?.extensionMs).toBe(0);
+  });
+
   it("validates the in-app sign-out control without revoking auth itself", async () => {
     process.env.TIMECLOCK_OPERATOR_PIN = syntheticPin;
     const f = await fixture();

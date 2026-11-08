@@ -27,8 +27,8 @@ const errors: Record<string, string> = {
   EXPIRED: "This event has ended. Choose another event.", FINISHED: "This event has finished.", UNAVAILABLE: "This event is unavailable.",
   STALE_SESSION: "The event changed. Review its current status and try again.", STALE_STUDENT: "A student's clock status changed. Review the roster and try again.", STALE_CONSOLE: "Another tab changed the selected event. Review it and try again.",
   TRANSFER_REQUIRED: "A student is clocked into another event. Review and confirm a transfer.", TRANSFER_CONFLICT: "A selected student is already in this event.", ALREADY_IN: "A selected student is already clocked in.", NOT_IN_EVENT: "A selected student is not in this event.",
-  PIN_REQUIRED: "Enter the operator PIN.", PIN_INVALID: "That PIN was not accepted.", PIN_RATE_LIMITED: "Too many PIN attempts. Wait before trying again.", PIN_UNCONFIGURED: "The operator PIN has not been set up. Contact the Coach.",
-  EVENT_CAPACITY: "This event has reached its clock-in capacity.", GROUP_TOO_LARGE: "Select fewer students.", INVALID_GROUP: "Review the selected students.", EXTENSION_LIMIT: "The extension exceeds the limit.", INVALID_WINDOW: "Choose a valid time or duration.", KEY_REUSED: "This request changed. Start a new action."
+  PIN_REQUIRED: "Enter the operator PIN.", GROUP_LOCKED: "Group clock-in is locked for this event. Choose Group and enter the operator PIN to unlock it.", PIN_INVALID: "That PIN was not accepted.", PIN_RATE_LIMITED: "Too many PIN attempts. Wait before trying again.", PIN_UNCONFIGURED: "The operator PIN has not been set up. Contact the Coach.",
+  EVENT_CAPACITY: "This event has reached its clock-in capacity.", GROUP_TOO_LARGE: "Select fewer students.", INVALID_GROUP: "Review the selected students.", EXTENSION_LIMIT: "The extension exceeds the limit.", INVALID_WINDOW: "Choose a valid time or duration.", KEY_REUSED: "This request changed. Start a new action.", GROUP_UNLOCK_LIMIT: "Group clock-in cannot be unlocked for more operators at this event. Use individual clock-in."
 };
 const errorText = (code?: string) => errors[code ?? ""] ?? `The action could not finish (${code ?? "unknown"}). Review the current state and try again.`;
 
@@ -86,15 +86,52 @@ function Dialog({ title, children, close, feedback }: { title: string; children:
 function Pin({ value, change }: { value: string; change: (value: string) => void }) {
   return <label className="tc-label">Operator PIN<input className="tc-input" type="password" inputMode="numeric" autoComplete="off" value={value} onChange={e => change(e.target.value)} /></label>;
 }
+// Reuses the Student Status email-code sign-in (parentEmail provider). The server decides which accounts receive a
+// code and whether the signed-in account may operate Timeclock; this form only collects the email and code.
+function EmailSignIn({ back }: { back: () => void }) {
+  const requestCode = useAction(api.parentEmailAuth.requestCode);
+  const { signIn } = useAuthActions();
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [sent, setSent] = useState(false);
+  const [resendAt, setResendAt] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const normalized = email.trim().toLowerCase();
+  const send = async () => {
+    if (busy || !normalized || Date.now() < resendAt) return;
+    setBusy(true); setError("");
+    try { await requestCode({ email: normalized }); setCode(""); setSent(true); setResendAt(Date.now() + 60_000); }
+    catch { setError("The code could not be sent. Check the connection and try again."); }
+    finally { setBusy(false); }
+  };
+  const verify = async () => {
+    if (busy || !/^\d{6}$/.test(code)) return;
+    setBusy(true); setError("");
+    try { const result = await signIn("parentEmail", { kind: "otp", email: normalized, code }); if (!result?.signingIn) setError("That code could not be verified. Request a new code and try again."); }
+    catch { setError("That code could not be verified. Request a new code and try again."); }
+    finally { setBusy(false); }
+  };
+  return <>{sent ? <form onSubmit={event => { event.preventDefault(); void verify(); }}>
+    <p>If {normalized} belongs to an approved Coach, Mentor, or Travel Lead account, a 6-digit code is on its way. It expires in 10 minutes.</p>
+    <label className="tc-label">Sign-in code<input className="tc-input" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={e => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} /></label>
+    <div className="tc-actions"><button type="submit" className="tc-button tc-button-primary" disabled={busy || code.length !== 6}>{busy ? "Checking code…" : "Sign in"}</button><Button disabled={busy || Date.now() < resendAt} onClick={() => void send()}>Send a new code</Button><Button disabled={busy} onClick={() => { setSent(false); setCode(""); setError(""); }}>Use a different email</Button></div>
+  </form> : <form onSubmit={event => { event.preventDefault(); void send(); }}>
+    <p>Use the email address connected to your Coach, Mentor, or Travel Lead account. We will email you a one-time sign-in code.</p>
+    <label className="tc-label">Email address<input className="tc-input" type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} /></label>
+    <div className="tc-actions"><button type="submit" className="tc-button tc-button-primary" disabled={busy || !normalized}>{busy ? "Sending code…" : "Email me a code"}</button><Button disabled={busy} onClick={back}>Back</Button></div>
+  </form>}{error && <p role="alert" className="tc-banner">{error}</p>}</>;
+}
 function Access() {
   const { isAuthenticated, isLoading } = useConvexAuth();
-  const { signIn } = useAuthActions();
+  const { signIn, signOut } = useAuthActions();
   const status = useQuery(api.timeclockRoster.operatorStatus, isAuthenticated ? {} : "skip");
   const [error, setError] = useState("");
+  const [byEmail, setByEmail] = useState(false);
   if (isLoading) return <section className="tc-panel">Checking sign-in…</section>;
-  if (!isAuthenticated) return <section className="tc-panel"><h2>Operator sign-in</h2><p>Sign in with an approved Coach or Mentor Google account.</p><Button primary onClick={() => { setError(""); void signIn("google", { redirectTo: `${location.origin}/` }).catch(() => setError("Sign-in could not start. Please try again.")); }}>Sign in with Google</Button>{error && <p role="alert" className="tc-banner">{error}</p>}</section>;
+  if (!isAuthenticated) return <section className="tc-panel"><h2>Operator sign-in</h2>{byEmail ? <EmailSignIn back={() => setByEmail(false)} /> : <><p>Sign in with an approved Coach, Mentor, or Travel Lead account, using Google or your email address.</p><div className="tc-actions"><Button primary onClick={() => { setError(""); void signIn("google", { redirectTo: `${location.origin}/` }).catch(() => setError("Sign-in could not start. Please try again.")); }}>Sign in with Google</Button><Button onClick={() => { setError(""); setByEmail(true); }}>Sign in with email</Button></div>{error && <p role="alert" className="tc-banner">{error}</p>}</>}</section>;
   if (status === undefined) return <section className="tc-panel">Checking access…</section>;
-  if (!status.allowed) return <section className="tc-panel"><h2>Access unavailable</h2><p role="alert">Timeclock is available only to approved Coaches and Mentors. Contact the Coach if you need access.</p></section>;
+  if (!status.allowed) return <section className="tc-panel"><h2>Access unavailable</h2><p role="alert">Timeclock is available only to approved Coaches, Mentors, and Travel Leads. Contact the Coach if you need access.</p><Button onClick={() => { setByEmail(false); void signOut(); }}>Sign out and use another account</Button></section>;
   return <Timeclock role={status.role!} />;
 }
 function Timeclock({ role }: { role: "coach" | "mentor" }) {
@@ -141,16 +178,16 @@ function Timeclock({ role }: { role: "coach" | "mentor" }) {
   const createMutation = useMutation(api.timeclock.createUnscheduled);
   const selectMutation = useMutation(api.timeclock.selectConsole);
   const groupMutation = useMutation(api.timeclock.clockGroup);
+  const unlockGroupMutation = useMutation(api.timeclock.unlockGroupClock);
   const outAllMutation = useMutation(api.timeclock.clockOutAll);
   const extendMutation = useMutation(api.timeclock.extend);
   const signOutAuthorization = useMutation(api.timeclockPinControl.authorizeSignOutControl);
   const [checked, setChecked] = useState<Set<StudentId>>(new Set());
   const [rosterMode, setRosterMode] = useState<"individual" | "group">("individual");
-  const [dialog, setDialog] = useState<"allDay" | "unscheduled" | "switch" | "extend" | "outAll" | "signOut" | null>(null);
+  const [dialog, setDialog] = useState<"allDay" | "unscheduled" | "switch" | "extend" | "outAll" | "signOut" | "groupUnlock" | null>(null);
   const [opening, setOpening] = useState<EventRow | null>(null);
   const [target, setTarget] = useState<SessionId | null>(null);
   const [transfer, setTransfer] = useState<ClockRequest | null>(null);
-  const [groupIn, setGroupIn] = useState<ClockRequest | null>(null);
   const [earlyOut, setEarlyOut] = useState<{ studentId: StudentId; name: string; scheduledEnd: number } | null>(null);
   const [pin, setPin] = useState("");
   const [allDayEnd, setAllDayEnd] = useState("");
@@ -172,9 +209,33 @@ function Timeclock({ role }: { role: "coach" | "mentor" }) {
   const selectedEvent = events?.find(event => event.sessionId === sessionId);
   const statuses = useMemo(() => new Map(clock?.students.map(s => [s.studentId, s]) ?? []), [clock]);
   const inCount = clock?.students.filter(s => s.status === "in").length ?? 0;
-  useEffect(() => { setChecked(new Set()); setTransfer(null); setGroupIn(null); setEarlyOut(null); setDialog(null); setPin(""); }, [sessionId]);
-  useEffect(() => { if (elapsed) { setDialog(null); setTransfer(null); setGroupIn(null); setEarlyOut(null); setPin(""); } }, [elapsed]);
-  const close = () => { setDialog(null); setTransfer(null); setGroupIn(null); setEarlyOut(null); setPin(""); setError(""); };
+  // Group clock-in opens only after the operator PIN unlocks it on the server for this console and event. The
+  // unlock lasts until the event ends or the console changes events; the server enforces it on every group clock-in.
+  // The status time stays fixed per selected event so the subscription does not restart on every clock tick; the
+  // elapsed check below leaves Group mode at the effective end, and the server closes the event at that time.
+  const [groupAsOf, setGroupAsOf] = useState(() => Date.now());
+  const groupStatus = useQuery(api.timeclock.groupClockStatus, profileId && sessionId && active ? { profileId, sessionId, asOf: groupAsOf } : "skip");
+  const groupUnlocked = active && groupStatus?.unlocked === true;
+  useEffect(() => { setChecked(new Set()); setTransfer(null); setEarlyOut(null); setDialog(null); setPin(""); setRosterMode("individual"); setGroupAsOf(Date.now()); }, [sessionId]);
+  // An ended event is locked: close dialogs and leave Group mode even before the server closes the session.
+  useEffect(() => { if (elapsed) { setDialog(null); setTransfer(null); setEarlyOut(null); setPin(""); setRosterMode("individual"); setChecked(previous => previous.size ? new Set() : previous); } }, [elapsed]);
+  const dialogOpen = dialog !== null || transfer !== null || earlyOut !== null;
+  // Opening a dialog clears a stale success banner; while it is open, errors show only inside the dialog.
+  useEffect(() => { if (dialogOpen) setNotice(""); }, [dialogOpen]);
+  const groupLocked = groupStatus !== undefined && !groupStatus.unlocked;
+  // A lost unlock (event ended, console switched elsewhere) returns the roster to individual clocking.
+  useEffect(() => { if (groupLocked) { setRosterMode(mode => mode === "group" ? "individual" : mode); setChecked(previous => previous.size ? new Set() : previous); } }, [groupLocked]);
+  const close = () => { setDialog(null); setTransfer(null); setEarlyOut(null); setPin(""); setError(""); };
+  const openGroup = () => {
+    setError("");
+    if (groupUnlocked) { setRosterMode("group"); return; }
+    setPin(""); setDialog("groupUnlock");
+  };
+  const unlockGroup = () => {
+    if (!profileId || !sessionId || !pin) return;
+    const args = { profileId, sessionId, pin };
+    void run("Group clock-in unlock", () => unlockGroupMutation(args), () => { close(); setRosterMode("group"); });
+  };
   const run = async <T extends { ok: boolean; code?: string }>(label: string, command: () => Promise<T>, success?: (result: T) => void | Promise<void>, retrying = false) => {
     if (uncertainRef.current && !retrying) return;
     setBusy(true); setError(""); setRetry(null);
@@ -219,10 +280,12 @@ function Timeclock({ role }: { role: "coach" | "mentor" }) {
   const submitClock = async (request: ClockRequest, enteredPin?: string) => {
     if (!active || sessionRef.current !== request.sessionId) { setError("The selected event changed. Preview the students again."); return; }
     const commandKey = newKey();
-    const args = { sessionId: request.sessionId, mode: request.transfer ? "transfer" as const : request.mode, expectedRevision: request.preview.sessionRevision, expected: request.preview.expected, pin: enteredPin, key: commandKey };
-    await run(request.mode === "in" ? "Clock-in" : "Clock-out", () => groupMutation(args), () => { setChecked(new Set()); setTransfer(null); setGroupIn(null); setPin(""); });
+    const args = { sessionId: request.sessionId, mode: request.transfer ? "transfer" as const : request.mode, expectedRevision: request.preview.sessionRevision, expected: request.preview.expected, pin: enteredPin, profileId: profileId ?? undefined, key: commandKey };
+    // Without a PIN on the request, a group clock-in relies on the Group unlock; report a lost unlock plainly.
+    const command = () => groupMutation(args).then(result => !result.ok && result.code === "PIN_REQUIRED" && args.mode === "in" && args.pin === undefined ? { ...result, code: "GROUP_LOCKED" } : result);
+    await run(request.mode === "in" ? "Clock-in" : "Clock-out", command, () => { setChecked(new Set()); setTransfer(null); setPin(""); });
   };
-  const preview = async (mode: "in" | "out", ids: StudentId[], group = false) => {
+  const preview = async (mode: "in" | "out", ids: StudentId[]) => {
     if (!sessionId || !active || !ids.length || uncertainRef.current) return;
     const previewSession = sessionId;
     setBusy(true); setError(""); setRetry(null);
@@ -232,8 +295,6 @@ function Timeclock({ role }: { role: "coach" | "mentor" }) {
       if (!result.ok) { setError(errorText(result.code)); return; }
       const request = { sessionId: previewSession, mode, preview: result, transfer: mode === "in" && result.conflicts.length > 0 };
       if (request.transfer) { setPin(""); setTransfer(request); }
-      // Group clock-in is PIN-gated on the server; collect the PIN before submitting.
-      else if (group && mode === "in") { setPin(""); setGroupIn(request); }
       else await submitClock(request);
     } catch { setError("Could not preview current clock status. Check the connection and try again."); }
     finally { setBusy(false); }
@@ -258,20 +319,20 @@ function Timeclock({ role }: { role: "coach" | "mentor" }) {
     {warning && <p className="tc-banner" role="alert">{warning}</p>}
     {!connection.isWebSocketConnected && <p className="tc-banner" role="status">Connection interrupted. Clocking is paused until the connection returns. Any submitted request may still be completing.</p>}
     {calendar && (!calendar.configured || calendar.stale || calendar.error) && <p className="tc-banner" role="status">Calendar {calendar.configured ? "updates are delayed" : "is not configured"}. {calendar.lastSuccessAt ? `Last updated ${dateTime(calendar.lastSuccessAt)}.` : "No successful update yet."} Open events may use the last confirmed schedule.</p>}
-    {error && <p className="tc-banner" role="alert">{error}</p>}{notice && <p className="tc-banner" role="status">{notice}</p>}
-    {retry && <div className="tc-banner">The last request may have reached the server. <Button disabled={busy || !connection.isWebSocketConnected} onClick={() => void retry.execute()}>Retry same {retry.label.toLowerCase()} request</Button></div>}
+    {error && !dialogOpen && <p className="tc-banner" role="alert">{error}</p>}{notice && <p className="tc-banner" role="status">{notice}</p>}
+    {retry && !dialogOpen && <div className="tc-banner">The last request may have reached the server. <Button disabled={busy || !connection.isWebSocketConnected} onClick={() => void retry.execute()}>Retry same {retry.label.toLowerCase()} request</Button></div>}
     {!profileId || !consoleState ? <section className="tc-panel"><p>Loading your event selection…</p></section> : !active ? <section className="tc-panel"><div className="tc-title"><div><p className="eyebrow">Event selection</p><h2>Today's events</h2></div><Button primary disabled={commandLocked} onClick={() => { setTitle(""); setDuration(60); setDialog("unscheduled"); }}>Create unscheduled event</Button></div>
       {elapsed && <p className="tc-banner" role="status">The selected event has ended. Select another event to continue.</p>}
       {events === undefined ? <p>Loading events…</p> : events.length === 0 ? <p>No events are listed for today. You can create an unscheduled event.</p> : <div className="tc-card-grid">{events.map(item => <article className="tc-card" key={item.occurrenceId}><p className="eyebrow">{item.allDay ? "All day" : "Scheduled"} · {item.state}</p><h3>{item.title}</h3><p className="tc-meta">{item.allDay && item.scheduledStart === null ? "Set an end time when opening" : `${time(item.scheduledStart)} – ${time(item.effectiveEnd ?? item.scheduledEnd)}`}</p>{item.needsReview && <p className="tc-banner">Calendar change needs review</p>}<Button primary disabled={!item.available || commandLocked} onClick={() => open(item)}>{item.sessionId && item.state === "open" ? "Select event" : "Open event"}</Button></article>)}</div>}
     </section> : <><section className="tc-panel tc-event-panel"><div className="tc-title"><div><h2>{selectedEvent?.title ?? "Selected event"}</h2><p className="tc-meta">Scheduled {time(consoleState.session?.scheduledStart ?? null)} – {time(consoleState.session?.scheduledEnd ?? null)} · Closes {time(consoleState.session?.effectiveEnd ?? null)} (Chicago time)</p></div><div className="tc-event-tools"><span className="tc-status">{inCount} clocked in</span>{themeSwitch}</div></div><div className="tc-actions"><Button disabled={commandLocked} onClick={() => choose()}>Change event</Button><Button disabled={commandLocked} onClick={() => { setPin(""); setHalfHours(1); setDialog("extend"); }}>Extend event</Button><Button danger disabled={commandLocked || inCount === 0} onClick={() => setDialog("outAll")}>Clock out all</Button></div></section>
-      <section className="tc-panel tc-roster-panel"><div className="tc-title tc-roster-title"><div><h2>Clock students</h2></div><span className="tc-meta">{rosterMode === "group" ? `${checked.size} selected` : "Individual"}</span></div>{roster?.unreviewedCount ? <p className="tc-banner">{roster.unreviewedCount} student name{roster.unreviewedCount === 1 ? " needs" : "s need"} Coach review before clocking. Contact the Coach for name review.</p> : null}<div className="tc-actions" role="group" aria-label="Clocking mode"><Button primary={rosterMode === "individual"} pressed={rosterMode === "individual"} onClick={() => { setRosterMode("individual"); setChecked(new Set()); }}>Individual</Button><Button primary={rosterMode === "group"} pressed={rosterMode === "group"} onClick={() => setRosterMode("group")}>Group</Button></div>{rosterMode === "group" && <div className="tc-actions"><Button primary disabled={commandLocked || !!retry || selectedOut.length === 0} onClick={() => void preview("in", selectedOut, true)}>Clock in selected ({selectedOut.length})</Button><Button disabled={commandLocked || !!retry || selectedIn.length === 0} onClick={() => void preview("out", selectedIn)}>Clock out selected ({selectedIn.length})</Button><Button disabled={checked.size === 0} onClick={() => setChecked(new Set())}>Clear selection</Button></div>}
+      <section className="tc-panel tc-roster-panel"><div className="tc-title tc-roster-title"><div><h2>Clock students</h2></div><span className="tc-meta">{rosterMode === "group" ? `${checked.size} selected` : "Individual"}</span></div>{roster?.unreviewedCount ? <p className="tc-banner">{roster.unreviewedCount} student name{roster.unreviewedCount === 1 ? " needs" : "s need"} Coach review before clocking. Contact the Coach for name review.</p> : null}<div className="tc-actions" role="group" aria-label="Clocking mode"><Button primary={rosterMode === "individual"} pressed={rosterMode === "individual"} onClick={() => { setRosterMode("individual"); setChecked(new Set()); }}>Individual</Button><Button primary={rosterMode === "group"} pressed={rosterMode === "group"} disabled={commandLocked && rosterMode !== "group"} onClick={openGroup}>Group</Button></div>{rosterMode === "group" && <div className="tc-actions"><Button primary disabled={commandLocked || !!retry || selectedOut.length === 0} onClick={() => void preview("in", selectedOut)}>Clock in selected ({selectedOut.length})</Button><Button disabled={commandLocked || !!retry || selectedIn.length === 0} onClick={() => void preview("out", selectedIn)}>Clock out selected ({selectedIn.length})</Button><Button disabled={checked.size === 0} onClick={() => setChecked(new Set())}>Clear selection</Button></div>}
         {roster === undefined || clock === undefined ? <p>Loading live roster…</p> : roster.students.length === 0 ? <p>No reviewed students are available for clocking.</p> : <div className="tc-roster">{roster.students.map(student => { const state = statuses.get(student.studentId); const isIn = state?.status === "in"; return <div className="tc-roster-row" key={student.studentId}>{rosterMode === "group" ? <label className="tc-check"><input type="checkbox" disabled={student.collision} checked={checked.has(student.studentId)} onChange={() => setChecked(previous => { const next = new Set(previous); if (next.has(student.studentId)) next.delete(student.studentId); else next.add(student.studentId); return next; })} aria-label={`Select ${student.displayName}${student.subteam ? ` · ${student.subteam}` : ""}`} /><span><strong>{student.displayName}</strong>{student.subteam && <small> · {student.subteam}</small>}{student.collision && <small> · Name collision needs review</small>}</span></label> : <span><strong>{student.displayName}</strong>{student.subteam && <small> · {student.subteam}</small>}{student.collision && <small> · Name collision needs review</small>}</span>}<span className="tc-status">{isIn ? "In" : state?.status === "out" ? "Out" : "No activity"}{state?.hasConflict ? " · In another event" : ""}</span>{rosterMode === "individual" && <Button disabled={commandLocked || !!retry || !state || student.collision} onClick={() => clockIndividual(student.studentId, student.displayName, isIn)}>{isIn ? "Clock out" : state?.hasConflict ? "Transfer in" : "Clock in"}</Button>}</div>; })}</div>}
       </section></>}
     {dialog === "allDay" && opening && <Dialog title="Open all-day event" close={close} feedback={dialogFeedback}><p>{opening.title} starts when you confirm. Choose an end time in Chicago time.</p><label className="tc-label">Event end (Chicago)<input className="tc-input" type="datetime-local" value={allDayEnd} onChange={e => setAllDayEnd(e.target.value)} /></label><div className="tc-dialog-actions"><Button onClick={close}>Cancel</Button><Button primary disabled={commandLocked || !allDayEnd} onClick={() => { const end = chicagoInputToEpoch(allDayEnd); if (end === null || end <= Date.now()) { setError("Choose a future Chicago end time."); return; } const commandKey = newKey(); void run("Event opening", () => openMutation({ occurrenceId: opening.occurrenceId, allDayEnd: end, key: commandKey }), async result => { close(); if (result.sessionId) await select(result.sessionId); }); }}>Open event</Button></div></Dialog>}
     {dialog === "unscheduled" && <Dialog title="Create unscheduled event" close={close} feedback={dialogFeedback}><label className="tc-label">Event name<input className="tc-input" maxLength={160} value={title} onChange={e => setTitle(e.target.value)} /></label><label className="tc-label">Duration in minutes<input className="tc-input" type="number" min={1} step={1} value={duration} onChange={e => setDuration(Number(e.target.value))} /></label><div className="tc-dialog-actions"><Button onClick={close}>Cancel</Button><Button primary disabled={commandLocked || !title.trim() || duration <= 0} onClick={create}>Create event</Button></div></Dialog>}
     {dialog === "switch" && <Dialog title="Change selected event" close={close} feedback={dialogFeedback}><p>Enter the operator PIN to leave this active event. This changes the selected event in all tabs of this browser.</p><Pin value={pin} change={setPin} /><div className="tc-dialog-actions"><Button onClick={close}>Cancel</Button><Button primary disabled={commandLocked || !pin} onClick={() => void select(target ?? undefined, pin)}>Confirm change</Button></div></Dialog>}
     {transfer && <Dialog title="Confirm student transfer" close={close} feedback={dialogFeedback}><p>The following students are clocked into another event. Confirming clocks them out there and into this event. Selected students who are not already clocked in will also be clocked in.</p><ul>{transfer.preview.conflicts.map(conflict => { const student = roster?.students.find(row => row.studentId === conflict.studentId); return <li key={conflict.studentId}>{student ? `${student.displayName}${student.subteam ? ` · ${student.subteam}` : ""}` : "Selected student"}</li>; })}</ul><Pin value={pin} change={setPin} /><div className="tc-dialog-actions"><Button onClick={close}>Cancel</Button><Button danger disabled={commandLocked || !!retry || !pin || !active} onClick={() => void submitClock(transfer, pin)}>Confirm transfer</Button></div></Dialog>}
-    {groupIn && <Dialog title="Confirm group clock-in" close={close} feedback={dialogFeedback}><p>Enter the operator PIN to clock in {groupIn.preview.expected.length} selected student{groupIn.preview.expected.length === 1 ? "" : "s"}.</p><Pin value={pin} change={setPin} /><div className="tc-dialog-actions"><Button onClick={close}>Cancel</Button><Button primary disabled={commandLocked || !!retry || !pin || !active} onClick={() => void submitClock(groupIn, pin)}>Clock in selected</Button></div></Dialog>}
+    {dialog === "groupUnlock" && <Dialog title="Unlock Group clock-in" close={close} feedback={dialogFeedback}><p>Enter the operator PIN to open Group clock-in. It stays unlocked for you on this device until this event ends or the selected event changes.</p><Pin value={pin} change={setPin} /><div className="tc-dialog-actions"><Button onClick={close}>Cancel</Button><Button primary disabled={commandLocked || !!retry || !pin || !active} onClick={unlockGroup}>Unlock Group clock-in</Button></div></Dialog>}
     {earlyOut && <Dialog title="Clock out early?" close={close} feedback={dialogFeedback}><p><strong>{earlyOut.name}</strong>, the meeting is scheduled until {time(earlyOut.scheduledEnd)}. Clock out early?</p><div className="tc-dialog-actions tc-dialog-actions-large"><Button primary onClick={close}>No, stay clocked in</Button><Button danger disabled={commandLocked || !!retry || !active} onClick={() => { const id = earlyOut.studentId; setEarlyOut(null); void preview("out", [id]); }}>Yes, clock me out</Button></div></Dialog>}
     {dialog === "extend" && <Dialog title="Extend event" close={close} feedback={dialogFeedback}><p>Add time in half-hour increments. The total extension limit is four hours.</p><label className="tc-label">Half-hour increments<select className="tc-select" value={halfHours} onChange={e => setHalfHours(Number(e.target.value))}>{Array.from({ length: 8 }, (_, i) => <option key={i + 1} value={i + 1}>{(i + 1) * 30} minutes</option>)}</select></label><Pin value={pin} change={setPin} /><div className="tc-dialog-actions"><Button onClick={close}>Cancel</Button><Button primary disabled={commandLocked || !pin || !active} onClick={() => { if (!sessionId || !consoleState?.session) return; const commandKey = newKey(); const revision = consoleState.session.revision; const args = { sessionId, halfHours, expectedRevision: revision, pin, key: commandKey }; void run("Extension", () => extendMutation(args), close); }}>Extend event</Button></div></Dialog>}
     {dialog === "outAll" && <Dialog title="Clock out all students" close={close} feedback={dialogFeedback}><p>Clock out everyone currently in this event?</p><div className="tc-dialog-actions"><Button onClick={close}>Cancel</Button><Button danger disabled={commandLocked || !active} onClick={() => { if (!sessionId || !consoleState?.session) return; const commandKey = newKey(); const revision = consoleState.session.revision; void run("Clock-out all", () => outAllMutation({ sessionId, expectedRevision: revision, key: commandKey }), close); }}>Clock out all</Button></div></Dialog>}

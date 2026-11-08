@@ -393,3 +393,179 @@ describe("archived attendance correction", () => {
     await expect(f.coach.mutation(api.historicalCorrections.correctAttendance, { ...args, key: "historical-correction-test-02" })).rejects.toThrow("ended");
   });
 });
+
+describe("timeclock operator access", () => {
+  it("admits Coaches, Mentors and Travel Leads through Google or email sign-in and refuses Parents and Students", async () => {
+    const f = await fixture();
+    const people = await f.t.run(async ctx => {
+      const person = async (email: string, user: { role: "mentor" | "parent"; parentStaffAccess?: "mentor" | "travelLead"; travelLead?: boolean }, marker?: "adult" | "parent") => {
+        const authUserId = await ctx.db.insert("users", { email, name: email, emailVerificationTime: 1 });
+        await ctx.db.insert("appUsers", { authUserId, email, name: email, role: user.role, parentStaffAccess: user.parentStaffAccess, travelLead: user.travelLead ?? false, financialEdit: false, active: true });
+        if (marker === "adult") await ctx.db.insert("adultEmailIdentities", { authUserId, email, createdAt: 1 });
+        if (marker === "parent") await ctx.db.insert("parentEmailIdentities", { authUserId, email, createdAt: 1 });
+        return authUserId;
+      };
+      return {
+        emailMentor: await person("synthetic-email-mentor@example.org", { role: "mentor" }, "adult"),
+        travelLeadMentor: await person("synthetic-travel-mentor@example.org", { role: "mentor", travelLead: true }),
+        parentMentorEmail: await person("synthetic-parent-mentor@example.org", { role: "parent", parentStaffAccess: "mentor" }, "parent"),
+        parentTravelLeadGoogle: await person("synthetic-parent-travel@example.org", { role: "parent", parentStaffAccess: "travelLead" }),
+        plainParentEmail: await person("synthetic-parent@example.org", { role: "parent" }, "parent"),
+        plainParentGoogle: await person("synthetic-parent-google@example.org", { role: "parent" }),
+      };
+    });
+    const as = (id: Id<"users">) => f.t.withIdentity({ subject: `${id}|test` });
+    const allowed = [
+      ["Coach (Google)", f.coach, "coach"],
+      ["Mentor (Google)", f.mentor, "mentor"],
+      ["Mentor (email)", as(people.emailMentor), "mentor"],
+      ["Travel Lead Mentor account", as(people.travelLeadMentor), "mentor"],
+      ["Parent with Mentor grant (email)", as(people.parentMentorEmail), "mentor"],
+      ["Parent with Travel Lead grant (Google)", as(people.parentTravelLeadGoogle), "mentor"],
+    ] as const;
+    for (const [label, client, role] of allowed) {
+      expect(await client.query(api.timeclockRoster.operatorStatus, {}), label).toEqual({ allowed: true, role });
+      expect((await client.query(api.timeclockRoster.list, {})).students, label).toHaveLength(2);
+      expect((await client.query(api.calendarState.status, { now: Date.now() })).configured, label).toBeTypeOf("boolean");
+      // The mutation guard passes; the command then fails on state, not permission.
+      expect(await client.mutation(api.timeclock.clockGroup, { sessionId: f.ids.sessionA, mode: "out", expectedRevision: 1, expected: [{ studentId: f.ids.student, intervalId: null }], key: `access-guard-${label.replace(/\W+/g, "-")}` }), label).toMatchObject({ ok: false, code: "NOT_IN_EVENT" });
+    }
+    const denied = [["Student", f.student], ["Parent (email)", as(people.plainParentEmail)], ["Parent (Google)", as(people.plainParentGoogle)]] as const;
+    for (const [label, client] of denied) {
+      expect(await client.query(api.timeclockRoster.operatorStatus, {}), label).toEqual({ allowed: false, role: null });
+      await expect(client.query(api.timeclockRoster.list, {}), label).rejects.toThrow("permission");
+      await expect(client.query(api.calendarState.status, { now: Date.now() }), label).rejects.toThrow("permission");
+      await expect(client.mutation(api.timeclock.clockGroup, { sessionId: f.ids.sessionA, mode: "in", expectedRevision: 1, expected: [{ studentId: f.ids.student, intervalId: null }], key: "access-denied-0001" }), label).rejects.toThrow("permission");
+      await expect(client.mutation(api.timeclockPinControl.authorizeSignOutControl, { pin: "000000" }), label).rejects.toThrow("permission");
+    }
+    // Revoking the Coach grant removes Timeclock access at once.
+    await f.t.run(async ctx => {
+      const user = await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", people.parentMentorEmail)).unique();
+      await ctx.db.patch(user!._id, { parentStaffAccess: undefined });
+    });
+    expect(await as(people.parentMentorEmail).query(api.timeclockRoster.operatorStatus, {})).toEqual({ allowed: false, role: null });
+  });
+});
+
+describe("group clock-in unlock", () => {
+  const pin = "synthetic-test-pin-3190";
+  const profile = "synthetic-console-profile-01";
+  async function unlockFixture() {
+    const f = await fixture();
+    const group = (sessionId: Id<"timeclockSessions">, extra: { pin?: string; profileId?: string } = {}, key = crypto.randomUUID()) =>
+      ({ sessionId, mode: "in" as const, expectedRevision: 1, expected: [{ studentId: f.ids.student, intervalId: null }, { studentId: f.ids.student2, intervalId: null }], key, ...extra });
+    const grants = () => f.t.run(ctx => ctx.db.query("timeclockGroupUnlocks").withIndex("by_profileId", q => q.eq("profileId", profile)).take(10));
+    expect((await f.mentor.mutation(api.timeclock.selectConsole, { profileId: profile, expectedRevision: 0, selectedSessionId: f.ids.sessionA })).ok).toBe(true);
+    return { ...f, group, grants };
+  }
+  const withPin = async (run: () => Promise<void>) => {
+    const oldPin = process.env.TIMECLOCK_OPERATOR_PIN;
+    process.env.TIMECLOCK_OPERATOR_PIN = pin;
+    try { await run(); } finally { if (oldPin === undefined) delete process.env.TIMECLOCK_OPERATOR_PIN; else process.env.TIMECLOCK_OPERATOR_PIN = oldPin; }
+  };
+
+  it("unlocks only for the operator, console and selected meeting that entered the PIN", () => withPin(async () => {
+    const f = await unlockFixture();
+    const status = (client = f.mentor, sessionId = f.ids.sessionA) => client.query(api.timeclock.groupClockStatus, { profileId: profile, sessionId, asOf: Date.now() });
+    expect(await status()).toEqual({ unlocked: false });
+    expect(await f.mentor.mutation(api.timeclock.clockGroup, f.group(f.ids.sessionA, { profileId: profile }))).toMatchObject({ ok: false, code: "PIN_REQUIRED" });
+    expect(await f.mentor.mutation(api.timeclock.unlockGroupClock, { profileId: profile, sessionId: f.ids.sessionA, pin: "000000" })).toMatchObject({ ok: false, code: "PIN_INVALID" });
+    expect(await f.mentor.mutation(api.timeclock.unlockGroupClock, { profileId: profile, sessionId: f.ids.sessionB, pin })).toMatchObject({ ok: false, code: "STALE_CONSOLE" });
+    await expect(f.student.mutation(api.timeclock.unlockGroupClock, { profileId: profile, sessionId: f.ids.sessionA, pin })).rejects.toThrow("permission");
+    await expect(f.student.query(api.timeclock.groupClockStatus, { profileId: profile, sessionId: f.ids.sessionA, asOf: Date.now() })).rejects.toThrow("permission");
+    expect(await status()).toEqual({ unlocked: false });
+    expect(await f.grants()).toHaveLength(0);
+
+    expect(await f.mentor.mutation(api.timeclock.unlockGroupClock, { profileId: profile, sessionId: f.ids.sessionA, pin })).toMatchObject({ ok: true });
+    expect(await status()).toEqual({ unlocked: true });
+    // Another operator on the same console, the same operator on another console or meeting: still locked.
+    expect(await status(f.coach)).toEqual({ unlocked: false });
+    expect(await status(f.mentor, f.ids.sessionB)).toEqual({ unlocked: false });
+    expect(await f.coach.mutation(api.timeclock.clockGroup, f.group(f.ids.sessionA, { profileId: profile }))).toMatchObject({ ok: false, code: "PIN_REQUIRED" });
+    expect(await f.mentor.mutation(api.timeclock.clockGroup, f.group(f.ids.sessionA, { profileId: "synthetic-console-profile-02" }))).toMatchObject({ ok: false, code: "PIN_REQUIRED" });
+    expect(await f.mentor.mutation(api.timeclock.clockGroup, f.group(f.ids.sessionB, { profileId: profile }))).toMatchObject({ ok: false, code: "PIN_REQUIRED" });
+    expect(await f.mentor.mutation(api.timeclock.clockGroup, f.group(f.ids.sessionA))).toMatchObject({ ok: false, code: "PIN_REQUIRED" });
+    // A supplied wrong PIN is still rejected while unlocked.
+    expect(await f.mentor.mutation(api.timeclock.clockGroup, f.group(f.ids.sessionA, { profileId: profile, pin: "000000" }))).toMatchObject({ ok: false, code: "PIN_INVALID" });
+    // The unlock covers repeated group clock-ins for this meeting without a PIN.
+    expect(await f.mentor.mutation(api.timeclock.clockGroup, f.group(f.ids.sessionA, { profileId: profile }))).toMatchObject({ ok: true, count: 2 });
+    // Transfers keep their per-request PIN.
+    const preview = await f.mentor.query(api.timeclock.previewGroup, { sessionId: f.ids.sessionB, studentIds: [f.ids.student, f.ids.student2] });
+    if (!preview.ok) throw new Error("Expected preview");
+    expect(await f.mentor.mutation(api.timeclock.clockGroup, { sessionId: f.ids.sessionB, mode: "transfer", expectedRevision: 1, expected: preview.expected, profileId: profile, key: "unlock-transfer-nopin" })).toMatchObject({ ok: false, code: "PIN_REQUIRED" });
+  }));
+
+  it("ends the unlock when the console changes meeting or the meeting ends", () => withPin(async () => {
+    const f = await unlockFixture();
+    const unlock = () => f.mentor.mutation(api.timeclock.unlockGroupClock, { profileId: profile, sessionId: f.ids.sessionA, pin });
+    const status = () => f.mentor.query(api.timeclock.groupClockStatus, { profileId: profile, sessionId: f.ids.sessionA, asOf: Date.now() });
+    expect((await unlock()).ok).toBe(true);
+    // Switching the console away and back requires a new unlock.
+    expect((await f.mentor.mutation(api.timeclock.selectConsole, { profileId: profile, expectedRevision: 1, selectedSessionId: f.ids.sessionB, pin })).ok).toBe(true);
+    expect(await f.grants()).toHaveLength(0);
+    expect((await f.mentor.mutation(api.timeclock.selectConsole, { profileId: profile, expectedRevision: 2, selectedSessionId: f.ids.sessionA, pin })).ok).toBe(true);
+    expect(await status()).toEqual({ unlocked: false });
+    expect(await f.mentor.mutation(api.timeclock.clockGroup, f.group(f.ids.sessionA, { profileId: profile }))).toMatchObject({ ok: false, code: "PIN_REQUIRED" });
+    // Past the effective end the meeting closes and the unlock is removed.
+    expect((await unlock()).ok).toBe(true);
+    await f.t.run(ctx => ctx.db.patch(f.ids.sessionA, { effectiveEnd: Date.now() - 1000 }));
+    expect(await f.mentor.mutation(api.timeclock.clockGroup, f.group(f.ids.sessionA, { profileId: profile }))).toMatchObject({ ok: false, code: "EXPIRED" });
+    expect(await f.grants()).toHaveLength(0);
+    expect(await status()).toEqual({ unlocked: false });
+    expect(await unlock()).toMatchObject({ ok: false, code: "FINISHED" });
+  }));
+
+  it("counts wrong unlock PINs toward the operator PIN rate limit", () => withPin(async () => {
+    const f = await unlockFixture();
+    for (let i = 0; i < 5; i++) expect(await f.mentor.mutation(api.timeclock.unlockGroupClock, { profileId: profile, sessionId: f.ids.sessionA, pin: "000000" })).toMatchObject({ ok: false, code: "PIN_INVALID" });
+    expect(await f.mentor.mutation(api.timeclock.unlockGroupClock, { profileId: profile, sessionId: f.ids.sessionA, pin })).toMatchObject({ ok: false, code: "PIN_RATE_LIMITED" });
+    expect(await f.grants()).toHaveLength(0);
+  }));
+
+  it("treats the meeting as locked from its effective end even before the close job runs", () => withPin(async () => {
+    const f = await unlockFixture();
+    expect((await f.mentor.mutation(api.timeclock.unlockGroupClock, { profileId: profile, sessionId: f.ids.sessionA, pin })).ok).toBe(true);
+    const end = (await f.t.run(ctx => ctx.db.get(f.ids.sessionA)))!.effectiveEnd;
+    for (const [asOf, unlocked] of [[end - 1, true], [end, false], [end + 60_000, false]] as const) {
+      expect(await f.mentor.query(api.timeclock.groupClockStatus, { profileId: profile, sessionId: f.ids.sessionA, asOf }), `asOf end${asOf - end >= 0 ? "+" : ""}${asOf - end}`).toEqual({ unlocked });
+    }
+    // The session row is still open; the grant check itself refuses an elapsed meeting.
+    expect((await f.t.run(ctx => ctx.db.get(f.ids.sessionA)))?.state).toBe("open");
+  }));
+
+  it("ignores a grant older than the console's current selection and keeps the unlock when the same meeting is re-selected", () => withPin(async () => {
+    const f = await unlockFixture();
+    const status = () => f.mentor.query(api.timeclock.groupClockStatus, { profileId: profile, sessionId: f.ids.sessionA, asOf: Date.now() });
+    expect((await f.mentor.mutation(api.timeclock.unlockGroupClock, { profileId: profile, sessionId: f.ids.sessionA, pin })).ok).toBe(true);
+    // Re-selecting the selected meeting is not a change of meeting.
+    expect((await f.mentor.mutation(api.timeclock.selectConsole, { profileId: profile, expectedRevision: 1, selectedSessionId: f.ids.sessionA })).ok).toBe(true);
+    expect(await status()).toEqual({ unlocked: true });
+    // A row that survived cleanup from before the current selection never counts.
+    await f.t.run(async ctx => {
+      const console = await ctx.db.query("timeclockConsoles").withIndex("by_profileId", q => q.eq("profileId", profile)).unique();
+      const [grant] = await ctx.db.query("timeclockGroupUnlocks").withIndex("by_profileId", q => q.eq("profileId", profile)).take(1);
+      await ctx.db.patch(grant._id, { grantedAt: console!.updatedAt - 1 });
+    });
+    expect(await status()).toEqual({ unlocked: false });
+    expect(await f.mentor.mutation(api.timeclock.clockGroup, f.group(f.ids.sessionA, { profileId: profile }))).toMatchObject({ ok: false, code: "PIN_REQUIRED" });
+    // Entering the PIN again renews it.
+    expect((await f.mentor.mutation(api.timeclock.unlockGroupClock, { profileId: profile, sessionId: f.ids.sessionA, pin })).ok).toBe(true);
+    expect(await status()).toEqual({ unlocked: true });
+  }));
+
+  it("caps unlock rows per meeting so closing the meeting removes all of them", () => withPin(async () => {
+    const f = await unlockFixture();
+    await f.t.run(async ctx => {
+      const coach = (await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", f.ids.authCoach)).unique())!;
+      for (let i = 0; i < 100; i++) await ctx.db.insert("timeclockGroupUnlocks", { actorId: coach._id, sessionId: f.ids.sessionA, profileId: `synthetic-filler-profile-${String(i).padStart(3, "0")}`, grantedAt: Date.now() });
+    });
+    const full = await f.mentor.mutation(api.timeclock.unlockGroupClock, { profileId: profile, sessionId: f.ids.sessionA, pin: "000000" });
+    // Refused before the PIN is checked, so the attempt does not count toward the PIN limit.
+    expect(full).toMatchObject({ ok: false, code: "GROUP_UNLOCK_LIMIT", limit: 100 });
+    const sessionRows = () => f.t.run(async ctx => (await ctx.db.query("timeclockGroupUnlocks").withIndex("by_sessionId", q => q.eq("sessionId", f.ids.sessionA)).take(101)).length);
+    expect(await sessionRows()).toBe(100);
+    await f.t.run(ctx => ctx.db.patch(f.ids.sessionA, { effectiveEnd: Date.now() - 1000 }));
+    expect(await f.mentor.mutation(api.timeclock.clockGroup, f.group(f.ids.sessionA, { profileId: profile }))).toMatchObject({ ok: false, code: "EXPIRED" });
+    expect(await sessionRows()).toBe(0);
+  }));
+});
