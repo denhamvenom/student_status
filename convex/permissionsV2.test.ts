@@ -75,7 +75,6 @@ it("requires student setup and explicit parent confirmation before a populated P
   const student = await f.t.run(ctx => ctx.db.get(f.ids.student));
   expect(student?.allergies.text).toBe("Original free-text allergy");
   expect(privateStudent(student!).allergies).toMatchObject({state: "reported", text: expect.stringContaining("Synthetic pollen")});
-  await expect(f.parent.mutation(api.permissions.prepare, {studentId: f.ids.student, eventIds: [f.ids.event]})).rejects.toThrow("uses the new permission form");
 });
 
 it("rejects incomplete insurance and ungranted paper preparation without changing old health evidence", async () => {
@@ -116,7 +115,7 @@ it("seals reviewed and signed PDFs, preserves the reviewed pages, and retries on
   const reviewed = await f.parent.action(api.permissionsV2Pdf.pdf, {submissionId, rendition: "reviewed"});
   const signed = await f.parent.action(api.permissionsV2Pdf.pdf, {submissionId, rendition: "signed"});
   expect(await PDFDocument.load(signed.bytes).then(document => document.getPageCount())).toBe((await PDFDocument.load(reviewed.bytes)).getPageCount());
-  const summary = await f.coach.query(api.permissions.listSubmissions, {studentId: f.ids.student});
+  const summary = (await f.coach.query(api.permissions.workspace, {studentId: f.ids.student})).receipts;
   expect(summary[0]).toMatchObject({submissionId, format: 2, legacy: false});
   await f.coach.mutation(api.permissions.review, {submissionId, status: "accepted", expectedLatestReviewId: null, expectedCoverage: summary[0].controlledCoverage, idempotencyKey: "fictional-review-1"});
   await expect(f.parent.action(api.permissionsV2Pdf.submit, {draftId: prepared.draftId, typedName: "Different Name", acknowledged: true})).rejects.toThrow("already signed differently");
@@ -129,7 +128,6 @@ it("selects one immutable approved version and keeps prior V2 snapshot parsing",
   const f = await fixture();
   const first = await f.coach.mutation(api.permissionVersions.selectApprovedFieldTripTemplate, {});
   expect(await f.coach.mutation(api.permissionVersions.selectApprovedFieldTripTemplate, {})).toBe(first);
-  await expect(f.coach.mutation(api.permissionVersions.createVersionV2, {version: "other", title: "Other", wording: "minor first aid", acknowledgmentText: "Other"})).rejects.toThrow("wording can't be edited");
   await f.t.run(ctx => ctx.db.patch(f.ids.student, {profileCompletedAt: 1}));
   await f.parent.mutation(api.permissionsV2.saveProfile, {studentId: f.ids.student, expectedRevision: 0, value: profile});
   const draft = await f.parent.mutation(internal.permissionsV2.createDraft, {studentId: f.ids.student, eventIds: [f.ids.event], source: "electronic"});
@@ -168,7 +166,7 @@ it("fails closed until real signing is explicitly bound to this non-development 
   const submissionId = await f.parent.action(api.permissionsV2Pdf.submit, {draftId: prepared.draftId, typedName: "Fictional Parent", acknowledged: true});
   const receipt = await f.parent.query(api.permissionsV2.receipt, {submissionId});
   expect(receipt.snapshot.synthetic).toBe(false);
-  const summary = await f.coach.query(api.permissions.listSubmissions, {studentId: f.ids.student});
+  const summary = (await f.coach.query(api.permissions.workspace, {studentId: f.ids.student})).receipts;
   expect(summary[0].synthetic).toBe(false);
   expect(await f.t.run(ctx => permissionAccepted(ctx, f.ids.student, f.ids.event))).toBe(false);
   await f.coach.mutation(api.permissions.review, {submissionId, status: "accepted", expectedLatestReviewId: null, expectedCoverage: summary[0].controlledCoverage, idempotencyKey: "real-review-1"});

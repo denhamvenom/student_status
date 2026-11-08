@@ -53,9 +53,4 @@ export const permissionWorkflowCopy = {
   collectionSemantics: 'If records change while you download, run the export again for the latest version.', exportProgress: (count:number)=>`${count} records collected. The file downloads only after collection finishes.`, cancelExport: 'Cancel export', exportCancelled: 'Export canceled. No partial file was downloaded.', exportScopeChanged: 'Records changed during the download. Nothing was saved; start the download again.', exportCursorFailed: 'The download stopped partway. Nothing was saved; start the download again.',
   earlierFormVersion: 'Earlier form version', chooseEventFirst: 'Choose an event to download a list.', reviewAccessRequired: 'Permission review access is required for this action.',
   chooseEvent: 'Choose an event', healthGrantRequired: 'Downloading health information needs Health export access. Ask a Coach for it.',
-  wordingVersions: 'Permission wording versions', createVersion: 'Create a new draft version', creatingVersion: 'Creating version…', versionSaved: 'Immutable draft version created and selected for future forms.', versionFailed: 'Unable to create the wording version.', formTitle: 'Form title',
-  versionGate: 'Draft authoring does not approve real consent. This creates unapproved wording for the synthetic development workflow; real signing remains closed.',
-  immutableVersion: 'Use a new version name. The saved body cannot be edited. The new version applies to future preparation; existing signed forms keep their original wording.',
-  minorFirstAid: 'The wording must name the organizations shown and include permission for minor first aid. Final wording still requires Coach approval.',
-  schoolLabel: 'School', teamLabel: 'Team', schoolName: 'Denham Springs High School', teamName: 'FIRST Team 8044, Denham Venom', medicationCategories: { pain: 'Pain Medication', allergy: 'Allergy Medication', cold: 'Cold Medication' },
 } as const
