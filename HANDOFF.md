@@ -23,12 +23,16 @@ November 8, 2026 | main `18ffc06`
 
 ## Top open risks
 
-- Unconfirmed production checks (VERIFY): Worker version IDs for recent releases; Node actions (push, email) still run after the reported Node.js action version change; Mentor Home indexes finished backfilling; recurring-meetings cron ran `eventSeries:tick`. Details in the [Mentor Home](docs/releases/RELEASE_2026-11-07_MENTOR_HOME.md) and [event audiences](docs/releases/RELEASE_2026-11-04_EVENT_AUDIENCES.md) receipts.
+- Worker version IDs for recent releases are not recorded (VERIFY). [Audit receipt](docs/releases/RELEASE_2026-11-08_AUDIT_CLEANUP.md)
+- Node actions (push, email) are not confirmed running after the reported Node.js action version change (VERIFY). [Audit receipt](docs/releases/RELEASE_2026-11-08_AUDIT_CLEANUP.md)
+- Mentor Home indexes are not confirmed finished backfilling (VERIFY). [Mentor Home receipt](docs/releases/RELEASE_2026-11-07_MENTOR_HOME.md)
+- The recurring-meetings cron's first `eventSeries:tick` run is not confirmed (VERIFY). [Event audiences receipt](docs/releases/RELEASE_2026-11-04_EVENT_AUDIENCES.md)
 - App install and push have not been tried on a real iPhone or Android phone against production. [PWA receipt](docs/releases/RELEASE_2026-11-02_PWA_PUSH_NOTIFICATIONS.md)
 - Recalculate attendance (Coach-only) must run before kickoff (January 9, 2027) and after any kickoff change. [Backlog](docs/BACKLOG.md#product)
-- Real PDF signing stays deferred by the owner; backup/restore proof, security reviews and the development transportation walkthrough remain open. [Backlog](docs/BACKLOG.md#testing)
+- Real PDF signing stays deferred by the owner. [Backlog](docs/BACKLOG.md#securityrecovery)
+- Backup/restore has not been proven. [Backlog](docs/BACKLOG.md#securityrecovery)
+- The history secret scan and dependency vulnerability inventory have not been done. [Backlog](docs/BACKLOG.md#securityrecovery)
 - Full-suite load timeouts (`feeBulk` and others) are an accepted known issue; never present targeted reruns as a clean suite. [Backlog](docs/BACKLOG.md#testing)
-- Coach Season overflows at 390px (deferred to its redesign). [Known gaps](docs/KNOWN_GAPS.md)
 
 ## Next
 
