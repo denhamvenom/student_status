@@ -9,7 +9,7 @@ export const DEVELOPER_EMAIL_DOMAIN = "developer.example.invalid";
 const MIN_KEY_LENGTH = 32;
 
 export type DeveloperPersona = {
-  id: "coach" | "mentor" | "travelLead" | "parent" | "parentStaff" | "student";
+  id: "coach" | "mentor" | "travelLead" | "travelLeadMoney" | "parent" | "parentStaff" | "student";
   label: string;
   name: string;
   description: string;
@@ -21,12 +21,13 @@ export type DeveloperPersona = {
 };
 
 export const DEVELOPER_PERSONAS: readonly DeveloperPersona[] = [
-  { id: "coach", label: "Coach", name: "Dev Coach", description: "Full Coach access, including money and health exports.", role: "coach", travelLead: false, financialEdit: true, healthExport: true },
-  { id: "mentor", label: "Mentor", name: "Dev Mentor", description: "Mentor without travel or money grants.", role: "mentor", travelLead: false, financialEdit: false, healthExport: false },
-  { id: "travelLead", label: "Travel Lead", name: "Dev Travel Lead", description: "Mentor with Travel Lead access; no money-edit grant.", role: "mentor", travelLead: true, financialEdit: false, healthExport: false },
-  { id: "parent", label: "Parent", name: "Dev Parent", description: "Parent linked to Dev Student.", role: "parent", travelLead: false, financialEdit: false, healthExport: false },
-  { id: "parentStaff", label: "Parent with staff access", name: "Dev Parent Staff", description: "Parent linked to Dev Student who can switch to Mentor or Travel Lead.", role: "parent", travelLead: false, financialEdit: false, healthExport: false, parentStaffAccess: "travelLead" },
-  { id: "student", label: "Student", name: "Dev Student", description: "Student in the active season, linked to both Dev Parents.", role: "student", travelLead: false, financialEdit: false, healthExport: false },
+  { id: "coach", label: "Coach", name: "Dev Coach", description: "Full Coach access, including Money editing and Health export access. Use it to see everything a Coach sees.", role: "coach", travelLead: false, financialEdit: true, healthExport: true },
+  { id: "mentor", label: "Mentor", name: "Dev Mentor", description: "Mentor without Travel Lead or Money editing access. Use it to test what a Mentor sees.", role: "mentor", travelLead: false, financialEdit: false, healthExport: false },
+  { id: "travelLead", label: "Travel Lead", name: "Dev Travel Lead", description: "Mentor with Travel Lead access, but no Money editing or Health export access. Use it to check that fee and payment entry is blocked.", role: "mentor", travelLead: true, financialEdit: false, healthExport: false },
+  { id: "travelLeadMoney", label: "Travel Lead with Money editing access", name: "Dev Travel Lead Money", description: "Mentor with Travel Lead access and Money editing access, but no Health export access. Use it to test fee and payment entry.", role: "mentor", travelLead: true, financialEdit: true, healthExport: false },
+  { id: "parent", label: "Parent", name: "Dev Parent", description: "Parent linked to Dev Student. Use it to test what a Parent sees.", role: "parent", travelLead: false, financialEdit: false, healthExport: false },
+  { id: "parentStaff", label: "Parent with staff access", name: "Dev Parent Staff", description: "Parent linked to Dev Student who can switch to Mentor or Travel Lead. Use it to test switching between Parent and staff access.", role: "parent", travelLead: false, financialEdit: false, healthExport: false, parentStaffAccess: "travelLead" },
+  { id: "student", label: "Student", name: "Dev Student", description: "Student in the active season, linked to both Dev Parents. Use it to test what a Student sees.", role: "student", travelLead: false, financialEdit: false, healthExport: false },
 ];
 
 export const developerEmail = (persona: DeveloperPersona["id"]) => `${persona.toLowerCase()}@${DEVELOPER_EMAIL_DOMAIN}`;

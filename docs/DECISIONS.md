@@ -14,7 +14,8 @@ Read this before changing parent linking, consent/PDF, finance, rooms/waitlists 
 
 ## Developer sign-in
 
-- October 25 owner decision: the development deployment (`third-bandicoot-18`) offers a developer sign-in so the owner and Claude can test every role without Google. It signs in only to fixed fictional accounts on the reserved `developer.example.invalid` domain: Coach, Mentor, Travel Lead, Parent, Parent with staff access, and Student. It never signs in, creates, links or changes a real account.
+- October 25 owner decision: the development deployment (`third-bandicoot-18`) offers a developer sign-in so the owner and Claude can test every role without Google. It signs in only to fixed fictional accounts on the reserved `developer.example.invalid` domain: Coach, Mentor, Travel Lead, Parent, Parent with staff access, and Student (a seventh, Travel Lead with Money editing access, was added November 9). It never signs in, creates, links or changes a real account.
+- November 9, 2026 owner decision: a seventh fictional account, Travel Lead with Money editing access, is added for testing fees and payments. It is development only and has the same guards as the others; it has no Health export access.
 - It works only when all of these hold: the backend is the hard-coded development URL, the server switch `DEVELOPER_SIGN_IN_ENABLED=true` is set, and the request carries the server-held `DEVELOPER_SIGN_IN_KEY`. Reserved-domain sessions are refused whenever those conditions stop holding. The sign-in panel exists only in local development builds; the production build fails if any of it is bundled.
 - Never set the switch or key on production. Fictional accounts and their family links hold synthetic data only. Real Google and parent-email sign-in still need a human check before releases that touch authentication.
 
@@ -102,6 +103,7 @@ November 6–7, 2026 owner decisions (release candidate `feat/mentor-home`, not 
 - **Separate "Meetings and events" notification category** (November 6). New events a Mentor can sign up for (M4) and activity on meetings a Mentor created (M5) use their own Mentor-only category, on by default, in the 5 PM summary; the Staff setting no longer controls them.
 - **Competitions & trips** (November 7). On the Mentor Join list this group holds competitions and overnight trips only; Fundraisers, Outreach and Team meetings stay under Meetings & events even when they involve travel. Competitions and trips are for the whole team, never marked "for your subteam".
 - **Team meetings default to one-time and optional** (November 7). `+ Team meeting` starts as a one-time, optional meeting; a Coach can still choose Required or Repeat (a repeating meeting still defaults to end May 31).
+- **The `+ Team meeting` sheet stays a single screen** (November 9). Owner decision: it is an approved exception to the step-by-step wizard rule because it is a fast path, and More options opens the full New event wizard.
 - **Simplified Mentor Home** (November 7), per the approved mockup: the next event, Who's here now (students of the Mentor's subteams clocked in now) and what needs an answer. Full lists live on the Schedule page (Going, Join, Created by me). Coaches and Travel Leads see who created an event and a "Mentor meeting" tag.
 
 ## Attendance breakdown

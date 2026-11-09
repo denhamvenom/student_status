@@ -53,7 +53,7 @@ describe("developer sign-in", () => {
     enable(overrides);
     expect(await f.t.query(api.developerSignIn.available, {})).toBeNull();
     await expect(f.t.mutation(internal.developerSignIn.ensurePersonas, {})).rejects.toThrow("disabled");
-    expect(await f.t.mutation(internal.developerSignIn.consume, { persona: "coach", key: KEY })).toBeNull();
+    for (const persona of DEVELOPER_PERSONAS) expect(await f.t.mutation(internal.developerSignIn.consume, { persona: persona.id, key: KEY })).toBeNull();
     expect(await f.t.run(ctx => ctx.db.query("appUsers").take(10))).toHaveLength(1);
   });
 
@@ -117,6 +117,37 @@ describe("developer sign-in", () => {
     expect(view).toMatchObject({ status: "active", user: { role, email: developerEmail(persona) } });
     if (persona === "parentStaff") expect(view.availableRoles).toEqual(["parent", "mentor", "travelLead"]);
     if (persona === "student") expect(view.students).toHaveLength(1);
+  });
+
+  it("signs in as the Travel Lead with Money editing access, with no health export", async () => {
+    const f = await fixture(); enable();
+    await f.t.mutation(internal.developerSignIn.ensurePersonas, {});
+    expect((await signInAs(f.t, "travelLeadMoney")).tokens?.token).toBeTruthy();
+    const view = await f.t.withIdentity({ subject: await sessionFor(f.t, "travelLeadMoney") }).query(api.app.viewer, {});
+    expect(view).toMatchObject({ status: "active", user: { role: "mentor", travelLead: true, financialEdit: true, healthExport: false, email: developerEmail("travelLeadMoney") } });
+    await signInAs(f.t, "travelLead");
+    const plain = await f.t.withIdentity({ subject: await sessionFor(f.t, "travelLead") }).query(api.app.viewer, {});
+    expect(plain).toMatchObject({ user: { travelLead: true, financialEdit: false } });
+    expect((await f.t.query(api.developerSignIn.available, {}))?.map(p => p.label)).toContain("Travel Lead with Money editing access");
+  });
+
+  it("lets the Travel Lead with Money editing access record a payment, and refuses the plain Travel Lead", async () => {
+    const f = await fixture(); enable();
+    await f.t.mutation(internal.developerSignIn.ensurePersonas, {});
+    await signInAs(f.t, "travelLeadMoney"); await signInAs(f.t, "travelLead");
+    const studentId = await f.t.run(async ctx => {
+      const student = await ctx.db.query("students").first();
+      if (!student) throw new Error("Dev Student missing");
+      return student._id;
+    });
+    const money = f.t.withIdentity({ subject: await sessionFor(f.t, "travelLeadMoney") });
+    const plain = f.t.withIdentity({ subject: await sessionFor(f.t, "travelLead") });
+    const payment = { studentId, kind: "payment" as const, amountCents: 2500, reason: "Synthetic fee payment", idempotencyKey: "dev-money-payment-1" };
+    await expect(plain.mutation(api.finance.recordFunds, payment)).rejects.toThrow("Money editing access");
+    await money.mutation(api.finance.recordFunds, payment);
+    const entries = await f.t.run(ctx => ctx.db.query("ledgerEntries").collect());
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ studentId, kind: "payment", amountCents: 2500 });
   });
 
   it.each([
