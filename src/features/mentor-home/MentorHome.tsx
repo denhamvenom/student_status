@@ -89,11 +89,11 @@ export function PinnedBanner({ userId }: { userId: string }) {
 }
 
 /** Mentor Home: the Home query (mentorHome.mentorHome), Who's here now (mentorClockedIn.mySubteamClockedIn) and the pinned banner. */
-export function MentorHome({ name, userId }: { name: string; userId: string }) {
+export function MentorHome({ name, userId, email }: { name: string; userId: string; email?: string }) {
   const now = useNow()
   const { data, handlers } = useMentorHomeData(now)
   const here = useClockedIn(now)
-  return <MentorHomeView name={name} now={now} data={data} handlers={handlers} here={here} banner={<PinnedBanner key={userId} userId={userId} />} />
+  return <MentorHomeView name={name} now={now} data={data} handlers={handlers} here={here} email={email} banner={<PinnedBanner key={userId} userId={userId} />} />
 }
 
 /**

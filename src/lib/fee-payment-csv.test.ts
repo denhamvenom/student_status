@@ -26,6 +26,12 @@ describe('fee payment CSV', () => {
     expect(parsed.exportId).toBe(exportId)
     expect(parsed.payments).toEqual([{ rowKey, studentId: 'student01234567890', chargeId: 'charge01234567890', amountCents: 1234, expectedChargeRevision: 2, expectedFinancialGeneration: 1, expectedFinancialRevision: 3 }])
   })
+  it('still imports a file downloaded before the headers were renamed', () => {
+    const [header, ...rest] = withAmount('12.34').split('\r\n')
+    const old = header.replace('Download ID', 'Export batch').replace('Row ID', 'Row key').replace('Fee Record ID', 'Charge ID').replace('Fee Amount', 'Charged').replace('Paid so far', 'Already applied').replace('Balance due', 'Owed')
+    expect(old).not.toBe(header)
+    expect(parseFeePaymentCsv([old, ...rest].join('\r\n'))).toEqual(parseFeePaymentCsv(withAmount('12.34')))
+  })
   it('skips blank amounts and rejects a file with nothing to pay', () => {
     expect(() => parseFeePaymentCsv(fixture())).toThrow('Enter at least one')
   })
@@ -33,14 +39,14 @@ describe('fee payment CSV', () => {
     for (const amount of ['1.999', '0', '50.01', '=1+2']) expect(() => parseFeePaymentCsv(withAmount(amount))).toThrow('positive payment')
   })
   it('rejects duplicate headers, duplicate row keys, and changed identifiers', () => {
-    expect(() => parseFeePaymentCsv(withAmount('1').replace('Row key', 'Export batch'))).toThrow('columns changed')
+    expect(() => parseFeePaymentCsv(withAmount('1').replace('Row ID', 'Download ID'))).toThrow('columns changed')
     const first = withAmount('1')
     const duplicate = first + first.split('\r\n')[1] + '\r\n'
-    expect(() => parseFeePaymentCsv(duplicate)).toThrow('repeats a row key')
+    expect(() => parseFeePaymentCsv(duplicate)).toThrow('repeats a row')
     expect(() => parseFeePaymentCsv(first.replace(feeId, 'broken'))).toThrow('invalid export')
   })
   it('rejects malformed columns and inconsistent visible balances', () => {
     expect(() => parseFeePaymentCsv(withAmount('1').replace(',"1"\r\n', '\r\n'))).toThrow('wrong number of columns')
-    expect(() => parseFeePaymentCsv(withAmount('1').replace('"50.00"', '"49.99"'))).toThrow('invalid charged')
+    expect(() => parseFeePaymentCsv(withAmount('1').replace('"50.00"', '"49.99"'))).toThrow('invalid fee, paid so far')
   })
 })

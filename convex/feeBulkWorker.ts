@@ -94,7 +94,7 @@ export const processPage = internalMutation({
         const fence = await ctx.db.query("feeBulkStudentFences").withIndex("by_jobId_and_studentId", q => q.eq("jobId", job._id).eq("studentId", row.studentId)).unique();
         if (row.state === "waiting") {
           const child = row.correctionJobId ? await ctx.db.get(row.correctionJobId) : row.allocationJobId ? await ctx.db.get(row.allocationJobId) : null;
-          if (child?.state === "failed" || account?.state === "failed") throw new Error("An existing row money child failed. Retry that child before resuming its prepared fee operation.");
+          if (child?.state === "failed" || account?.state === "failed") throw new Error("One student’s money change failed. Try that student again before resuming the fee change.");
           if (child && child.state !== "complete" || account?.state === "allocating" || account?.state === "posting") {
             await ctx.scheduler.runAfter(1000, runRef, { jobId: job._id }); return null;
           }

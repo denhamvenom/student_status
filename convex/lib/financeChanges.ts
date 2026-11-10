@@ -29,7 +29,7 @@ export async function recordLedgerChange(ctx: MutationCtx, entry: Doc<"ledgerEnt
   const delta = before !== null && after !== null ? BigInt(after) - BigInt(before) : null;
   await recordFinanceChange(ctx, { seasonId, studentId: entry.studentId, chargeId: entry.chargeId, actorId: entry.recordedBy, sourceKind, occurredAt: entry.recordedAt, kind,
     state: ["deallocation", "payout", "transferOut", "awardReversal"].includes(entry.kind) ? "progress" : "committed", meaning,
-    beforeCents: before, afterCents: after, deltaCents: delta === null ? null : Number(delta), reason: entry.reason ?? "Recorded financial movement",
+    beforeCents: before, afterCents: after, deltaCents: delta === null ? null : Number(delta), reason: entry.reason ?? "Money change recorded",
     sourceType: "ledger", sourceId: entry._id, sourceKey: `ledger:${entry._id}`, historical });
 }
 
@@ -59,4 +59,15 @@ export async function recordPriorityJobChange(ctx: MutationCtx, job: Doc<"feePri
     feeDefinitionId, seasonId: job.seasonId, actorId: job.actorId, occurredAt: job.updatedAt, kind: "feePriority", state: "committed", meaning: "priority", beforeCents: before, afterCents: after, deltaCents: Number(BigInt(after) - BigInt(before)), reason: job.reason,
     sourceType: "feePriorityJob", sourceId: job._id, sourceKey: `feePriorityJob:${job._id}:${key}`, historical,
   });
+}
+
+type PaymentSide = { studentId: Id<"students">; amountCents: number; method: "cash" | "check" | "other" | null; reference: string | null };
+const methodWords = { cash: "Cash", check: "Check", other: "Other" } as const;
+/** Plain words for what a payment edit changed besides the amount (the amount is shown from before and after). Null when only the amount changed. */
+export function paymentEditDetail(before: PaymentSide, after: PaymentSide, studentName: (id: Id<"students">) => string): string | null {
+  const parts: string[] = [];
+  if (before.studentId !== after.studentId) parts.push(`Moved to ${studentName(after.studentId)}`);
+  if (before.method !== after.method) parts.push(`Method: ${before.method ? methodWords[before.method] : "None"} → ${after.method ? methodWords[after.method] : "None"}`);
+  if ((before.reference ?? "") !== (after.reference ?? "")) parts.push(after.reference ? "Reference changed" : "Reference removed");
+  return parts.length ? parts.join(" · ") : null;
 }

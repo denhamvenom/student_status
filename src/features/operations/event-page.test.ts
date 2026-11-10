@@ -41,7 +41,8 @@ describe('Team Calendar chip', () => {
     { status: { state: 'pending', calendarEventId: 'g1' }, label: 'On Team Calendar', canRetry: false },
     { status: { state: 'pending' }, label: 'Adding to Team Calendar…', canRetry: false },
     { status: { state: 'unlinked' }, label: 'Not on Team Calendar', canRetry: false },
-    { status: { state: 'disabled' }, label: 'Not on Team Calendar', canRetry: false },
+    // Requested at creation but Calendar updates are off: not the same as never asked.
+    { status: { state: 'disabled' }, label: 'Not added to Team Calendar', canRetry: false },
     { status: { state: 'failed' }, label: 'Needs attention', canRetry: true },
     { status: { state: 'conflict' }, label: 'Needs attention', canRetry: true },
   ])('$status.state → $label', ({ status, label, canRetry }) => {

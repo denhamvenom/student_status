@@ -150,21 +150,62 @@ describe('event readiness list and columns', () => {
     expect(rows).toHaveLength(2)
   })
 
-  it('shows shift sign-ups as information only and never counts them toward ready', async () => {
+  // November 10 owner decision (reverses November 9): shifts below the event minimum keep a student from being ready.
+  it('counts shifts below the minimum as open and shows N of M minimum', async () => {
     const f = await fixture()
-    await f.t.run(async ctx => {
+    const shift = await f.t.run(async ctx => {
       await ctx.db.patch(f.ids.event, { type: 'Outreach', overnight: false, roomingEnabled: false, shiftsEnabled: true, minShiftsPerStudent: 1, firstRequired: false, feeCents: 0, permissionRequired: false })
       await ctx.db.insert('participants', { eventId: f.ids.event, studentId: f.ids.student, status: 'confirmed', createdAt: 1, updatedAt: 1 })
-      await ctx.db.insert('eventShifts', { eventId: f.ids.event, startsAt: 1000, endsAt: 1500, archived: false })
+      const first = await ctx.db.insert('eventShifts', { eventId: f.ids.event, startsAt: 1000, endsAt: 1200 })
+      for (const startsAt of [1200, 1400]) await ctx.db.insert('eventShifts', { eventId: f.ids.event, startsAt, endsAt: startsAt + 200 })
+      return first
+    })
+    type Row = { cells: { key: string; state: string; text: string }[]; open: string[]; state: string }
+    const shiftsCell = (result: { students: unknown }) => (result.students as Row[])[0].cells.find(c => c.key === 'shifts')
+    const before = await f.coach.query(api.app.eventReadiness, { eventId: f.ids.event })
+    expect(before.columns).toContainEqual({ key: 'shifts', label: 'Shifts' })
+    expect(before.shifts).toEqual({ minimum: 1, total: 3 })
+    expect(shiftsCell(before)).toEqual({ key: 'shifts', state: 'open', text: '0 of 1 minimum' })
+    expect((before.students as Row[])[0].open).toContain('Shifts')
+    const listed = (await f.coach.query(api.app.readinessEvents, { asOf: 0 })) as { name: string; requirements: string[] }[]
+    expect(listed.find(e => e.name === 'Regional')?.requirements).toContain('Shifts')
+    await f.t.run(ctx => ctx.db.insert('shiftSignups', { eventId: f.ids.event, shiftId: shift, studentId: f.ids.student, createdAt: 1 }))
+    const after = await f.coach.query(api.app.eventReadiness, { eventId: f.ids.event })
+    expect(shiftsCell(after)).toEqual({ key: 'shifts', state: 'done', text: '1 of 1 minimum' })
+    expect((after.students as Row[])[0].open).not.toContain('Shifts')
+  })
+
+  it('never makes a column, open item or listed event of a Something to know requirement', async () => {
+    const f = await fixture()
+    await f.t.run(async ctx => {
+      await ctx.db.patch(f.ids.event, { type: 'Team', overnight: false, roomingEnabled: false })
+      await ctx.db.insert('participants', { eventId: f.ids.event, studentId: f.ids.student, status: 'confirmed', createdAt: 1, updatedAt: 1 })
+      await ctx.db.insert('requirements', { eventId: f.ids.event, key: 'shirt', label: 'Wear team shirt', kind: 'info' })
+      await ctx.db.insert('requirements', { eventId: f.ids.event, key: 'waiver', label: 'Team waiver', kind: 'checkoff' })
     })
     const result = await f.coach.query(api.app.eventReadiness, { eventId: f.ids.event })
-    expect(result.columns).not.toContainEqual(expect.objectContaining({ key: 'shifts' }))
-    expect(result.shifts).toEqual({ minimum: 1 })
-    const row = (result.students as { cells: unknown[]; open: string[]; state: string; shiftCount: number }[])[0]
-    expect(row.shiftCount).toBe(0)
-    expect(row.open).not.toContain('Shifts')
-    // The fixture student's only open item is an unrelated finance review; the missing shift adds nothing to it.
-    expect(row.open).toEqual(['Needs review'])
-    expect(result.counts).toMatchObject({ openItems: 1 })
+    const labels = (result.columns as { label: string }[]).map(c => c.label)
+    expect(labels).toContain('Team waiver')
+    expect(labels).not.toContain('Wear team shirt')
+    expect(JSON.stringify(result.students)).not.toContain('Wear team shirt')
+    expect(result.notes).toEqual([{ key: 'shirt', label: 'Wear team shirt', instructions: null, url: null }])
+    // With only a note left the event has nothing to complete, so Event readiness does not list it.
+    await f.t.run(async ctx => { const waiver = (await ctx.db.query('requirements').collect()).find(r => r.key === 'waiver')!; await ctx.db.delete(waiver._id) })
+    expect(((await f.coach.query(api.app.readinessEvents, { asOf: 0 })) as { name: string }[]).map(e => e.name)).not.toContain('Regional')
+  })
+
+  it('says Signed · needs review when a parent signed but a Coach has not accepted, and keeps the student open', async () => {
+    const f = await fixture()
+    const season = (await f.t.run(ctx => ctx.db.get(f.ids.student)))!.seasonId
+    await f.t.run(async ctx => {
+      await ctx.db.patch(season, { permissionSigningPaused: false })
+      await ctx.db.patch(f.ids.event, { permissionRequired: true, overnight: false, roomingEnabled: false })
+      await ctx.db.insert('participants', { eventId: f.ids.event, studentId: f.ids.student, status: 'confirmed', createdAt: 1, updatedAt: 1 })
+    })
+    type Row = { cells: { key: string; state: string; text: string }[]; state: string }
+    const cell = async () => ((await f.coach.query(api.app.eventReadiness, { eventId: f.ids.event })).students as Row[])[0].cells.find(c => c.key === 'permission')
+    expect(await cell()).toMatchObject({ state: 'open', text: 'Not signed yet' })
+    await f.t.run(ctx => ctx.db.insert('permissionCoverage', { seasonId: season, studentId: f.ids.student, eventId: f.ids.event, state: 'pending', revision: 1, updatedAt: 1, updatedBy: f.ids.coach }))
+    expect(await cell()).toMatchObject({ state: 'open', text: 'Signed · needs review' })
   })
 })

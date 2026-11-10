@@ -8,6 +8,7 @@ import { Input } from './ui/input'
  * Props:
  * - `events`  the choices. `_id` and `name` are required; `startsAt` is a millisecond timestamp. `detail` is an optional
  *             short line under the name (for example "2 open"). Order does not matter; the picker sorts them.
+ * - `allowedIds` optional. When given, only events with these ids are offered (for example, the events a student is signed up for).
  * - `value`   the chosen event id, or null when nothing is chosen.
  * - `onChange` called with the chosen event id.
  * - `asOf`    the current time in milliseconds (pass a clock that ticks, never read the clock in a Convex query).
@@ -63,8 +64,17 @@ export function filterEvents<E extends PickerEvent>(events: readonly E[], query:
   })
 }
 
-export function EventPicker({ events, value, onChange, asOf, label, emptyText = eventPickerCopy.empty }: {
+/** Keeps only the events whose id is allowed. `undefined` means no restriction. */
+export function restrictEvents<E extends PickerEvent>(events: readonly E[], allowedIds: readonly string[] | undefined): E[] {
+  if (!allowedIds) return [...events]
+  const allowed = new Set(allowedIds)
+  return events.filter(event => allowed.has(event._id))
+}
+
+export function EventPicker({ events: allEvents, allowedIds, value, onChange, asOf, label, emptyText = eventPickerCopy.empty }: {
   events: readonly PickerEvent[]
+  /** Optional: only these event ids can be chosen. Others are not shown. */
+  allowedIds?: readonly string[]
   value: string | null
   onChange: (eventId: string) => void
   asOf: number
@@ -73,6 +83,7 @@ export function EventPicker({ events, value, onChange, asOf, label, emptyText = 
 }) {
   const [query, setQuery] = useState('')
   const inputId = useId()
+  const events = useMemo(() => restrictEvents(allEvents, allowedIds), [allEvents, allowedIds])
   const { upcoming, past } = useMemo(() => splitEvents(events, asOf), [events, asOf])
   const shownUpcoming = filterEvents(upcoming, query, events)
   const shownPast = filterEvents(past, query, events)

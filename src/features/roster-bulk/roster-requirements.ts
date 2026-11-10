@@ -1,6 +1,8 @@
 // What each Team roster student still needs, worked out once so the chips, their counts, the filter,
 // the Copy reminder text and Export list all agree. Pure functions; no server calls.
 
+import { gradeLabel } from '@/lib/rosterSort'
+
 export type RequirementKey = 'attention' | 'first' | 'permission' | 'balance' | 'missing'
 export type RosterQuick = 'all' | RequirementKey
 
@@ -10,7 +12,7 @@ export type RequirementRow = {
   active: boolean
   firstRegistrationState: 'needsCompletion' | 'awaitingVerification' | 'verified'
   balance: { state: string; dueCents: number | null }
-  nextEvent: { name: string; state: 'ready' | 'open' | 'unknown'; open: string[] } | null
+  nextEvent: { name: string; state: 'ready' | 'open' | 'unknown'; open: string[]; participation: 'confirmed' | 'pending' | 'waitlist' | 'withdrawn' | null } | null
   missingSummary: string[]
   permission: { state: 'closed' | 'noForm' | 'signed' | 'review' | 'notSigned'; eventName: string | null }
 }
@@ -28,14 +30,15 @@ export function missingProfileItems(row: Pick<RequirementRow, 'missingSummary'>)
 export const balanceDueCents = (row: Pick<RequirementRow, 'balance'>) => (row.balance.state === 'ready' && row.balance.dueCents !== null && row.balance.dueCents > 0 ? row.balance.dueCents : 0)
 
 /**
- * Needs attention: an active student who has an open item for their next event (signup not confirmed, a payment,
- * FIRST registration, room choice or another requirement), or whose permission form is not signed yet while
- * permission signing is open. Events that could not be fully checked, and balances on their own, do not count:
- * Balance due and Missing profile information have their own chips.
+ * Needs attention: an active student who is confirmed for their next event (upcoming, not canceled) and still has an
+ * open item on it: a payment, permission form, FIRST registration, shifts, room choice or another requirement.
+ * "Something to know" notes never count. Students who are only pending or waitlisted, events that could not be fully
+ * checked, and balances on their own do not count: Balance due, Permission form and Missing profile information
+ * have their own chips.
  */
 export function needsAttention(row: RequirementRow): boolean {
-  if (!row.active) return false
-  return row.nextEvent?.state === 'open' || row.permission.state === 'notSigned'
+  if (!row.active || row.nextEvent?.participation !== 'confirmed') return false
+  return row.nextEvent.state === 'open' && row.nextEvent.open.length > 0
 }
 
 const tests: Record<RequirementKey, (row: RequirementRow) => boolean> = {
@@ -107,8 +110,7 @@ export function reminderText(rows: readonly RequirementRow[], key: RequirementKe
       if (key === 'balance') return `${row.name}: balance due ${dollars(balanceDueCents(row))}.`
       if (key === 'missing') return `${row.name}: please add ${missingProfileItems(row).join(', ')}.`
       if (key === 'permission') return `${row.name}: please sign the permission form for ${row.permission.eventName ?? 'the next event'}.`
-      const items = [...(row.nextEvent?.state === 'open' ? row.nextEvent.open : []), ...(row.permission.state === 'notSigned' ? ['Permission form'] : [])]
-      return `${row.name}${row.nextEvent ? ` (${row.nextEvent.name})` : ''}: ${items.join('; ')}.`
+      return `${row.name} (${row.nextEvent?.name ?? 'the next event'}): ${row.nextEvent?.open.join('; ') ?? ''}.`
     }).join('\n')
   }
   return { text, included: chosen.length, left }
@@ -130,7 +132,7 @@ export function rosterExportCsv(rows: readonly RosterExportRow[]): string {
   const header = ['Student', 'Grade', 'Subteam', 'Travel Team', 'FIRST registration', 'Permission form', 'Balance due ($)', 'Next event', 'Event items left', 'Missing profile information']
   const first = { needsCompletion: 'Missing', awaitingVerification: 'Waiting for Coach', verified: 'Verified' } as const
   const lines = rows.map(row => [
-    row.name, row.grade ?? 'Not provided', row.subteam || 'No subteam', row.travelTeam ? 'Yes' : 'No',
+    row.name, gradeLabel(row.grade), row.subteam || 'No subteam', row.travelTeam ? 'Yes' : 'No',
     first[row.firstRegistrationState], permissionLabel(row),
     row.balance.state === 'ready' && row.balance.dueCents !== null ? (row.balance.dueCents / 100).toFixed(2) : 'Unavailable',
     row.nextEvent?.name ?? 'None', row.nextEvent?.open.join('; ') ?? '', missingProfileItems(row).join('; '),

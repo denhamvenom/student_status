@@ -26,26 +26,26 @@ export async function requireSeasonTransitionFinancialAccess(ctx: Ctx, seasonId:
   const plan = await ctx.db.query("seasonTransitionPlans").withIndex("by_sourceSeasonId_and_open", q => q.eq("sourceSeasonId", seasonId).eq("open", true)).unique();
   if (!plan || plan.state === "draft" || plan.state === "reviewing") return;
   if (continuation && plan.state === "draining") return;
-  throw new ConvexError("The season change is still in progress. Finish or retry it before changing money records.");
+  throw new ConvexError("The season change is still in progress. Finish it or try it again before changing money records.");
 }
 
 /** New commands cannot enter while shared definitions are being changed. */
 export async function requireSeasonFinanceReady(ctx: Ctx, seasonId: Id<"seasons">) {
   await requireSeasonTransitionFinancialAccess(ctx, seasonId);
   const control = await seasonFinanceControl(ctx, seasonId);
-  if (control && control.state !== "ready") throw new ConvexError("Season fees are updating. Wait for that to finish, or retry it, before making another money change.");
+  if (control && control.state !== "ready") throw new ConvexError("Season fees are updating. Wait for that to finish, or try it again, before making another money change.");
 }
 
 /** Indexed upstream checks and the control transition share one transaction/OCC fence. */
 export async function seasonFinancialDrain(ctx: Ctx, seasonId: Id<"seasons">) {
   for (const state of ["rebuilding", "allocating", "posting", "failed"] as const) {
     const account = await ctx.db.query("financialAccounts").withIndex("by_seasonId_and_state", q => q.eq("seasonId", seasonId).eq("state", state)).first();
-    if (account) return { ready: false, blocked: state === "failed", message: state === "failed" ? "A student's money update stopped. A Coach needs to retry it." : "A student's money is still updating." };
+    if (account) return { ready: false, blocked: state === "failed", message: state === "failed" ? "A student's money update stopped. A Coach needs to try again." : "A student's money is still updating." };
   }
   const enrollment = await ctx.db.query("events").withIndex("by_seasonId_and_enrollmentState", q => q.eq("seasonId", seasonId).eq("enrollmentState", "running")).first();
   if (enrollment) return { ready: false, blocked: false, message: "Whole Team signups are still updating." };
   const failedEnrollment = await ctx.db.query("events").withIndex("by_seasonId_and_enrollmentState", q => q.eq("seasonId", seasonId).eq("enrollmentState", "failed")).first();
-  if (failedEnrollment) return { ready: false, blocked: true, message: "Whole Team signups stopped before finishing. A Coach needs to retry them." };
+  if (failedEnrollment) return { ready: false, blocked: true, message: "Whole Team signups stopped before finishing. A Coach needs to try again." };
   const fundraiser = await ctx.db.query("fundraisers").withIndex("by_seasonId_and_state", q => q.eq("seasonId", seasonId).eq("state", "posting")).first();
   if (fundraiser) return { ready: false, blocked: false, message: "Fundraiser amounts are still posting." };
   const report = await ctx.db.query("financeSummaryBackfills").withIndex("by_seasonId", q => q.eq("seasonId", seasonId)).unique();
@@ -63,7 +63,7 @@ export async function historicalFinancialContinuation(ctx: Ctx, seasonId: Id<"se
   const actor = await ctx.db.get(origin.actorId);
   const season = await ctx.db.get(seasonId);
   const student = await ctx.db.get(origin.studentId);
-  if (!grant || grant.actorId !== actor?._id || grant.seasonId !== seasonId || grant.closedAt !== undefined || grant.expiresAt <= Date.now() || !actor?.active || actor.role !== "coach" || season?.status !== "archived" || student?.seasonId !== seasonId) throw new ConvexError("Your correction access ended. Open correction mode again, then retry.");
+  if (!grant || grant.actorId !== actor?._id || grant.seasonId !== seasonId || grant.closedAt !== undefined || grant.expiresAt <= Date.now() || !actor?.active || actor.role !== "coach" || season?.status !== "archived" || student?.seasonId !== seasonId) throw new ConvexError("Your correction access ended. Open correction mode again, then try again.");
   return true;
 }
 

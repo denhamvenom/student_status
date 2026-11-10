@@ -168,7 +168,7 @@ describe("financial operations", () => {
     await f.t.mutation(makeFunctionReference<"mutation">("financialOperationsWorker:run"), { jobId: operation.jobId });
     const before = await f.t.run(async ctx => ({ sender: await financialAccount(ctx, f.ids.student), recipient: await financialAccount(ctx, f.ids.recipient), job: await ctx.db.get(operation.jobId!) }));
     expect(before.job?.state).toBe("failed");
-    for (const studentId of [f.ids.student, f.ids.recipient]) await expect(f.coach.mutation(makeFunctionReference<"mutation">("financialSources:rebuild"), { studentId })).rejects.toThrow("existing financial job");
+    for (const studentId of [f.ids.student, f.ids.recipient]) await expect(f.coach.mutation(makeFunctionReference<"mutation">("financialSources:rebuild"), { studentId })).rejects.toThrow("stopped money update");
     expect(await f.t.run(async ctx => ({ sender: await financialAccount(ctx, f.ids.student), recipient: await financialAccount(ctx, f.ids.recipient), job: await ctx.db.get(operation.jobId!) }))).toEqual(before);
     await f.coach.mutation(makeFunctionReference<"mutation">("financialOperationsWorker:retry"), { jobId: operation.jobId, reason: "Coach authorized continuation" });
     for (let i = 0; i < 10; i++) {

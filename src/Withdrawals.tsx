@@ -1,7 +1,7 @@
 import { userFacingError } from '@/lib/error-message'
 import { operationsCopy, operationsText } from './lib/operations-copy'
 import { useRef, useState, type FormEvent } from 'react'
-import { useMutation, useQuery } from 'convex/react'
+import { useConvex, useMutation, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { api } from '../convex/_generated/api'
 import type { Id } from '../convex/_generated/dataModel'
@@ -117,14 +117,16 @@ export function ChargeEditor({studentId}:{studentId:Id<'students'>}) {
   const text=chargeAdministrationCopy.addFee
   const events=useQuery(api.app.listEvents,{})
   const create=useMutation(api.finance.createCharge)
+  const client=useConvex()
+  const signedUp=useQuery(api.finance.signedUpEventIds,{studentId})
   const [stepIndex,setStepIndex]=useState(0)
   const [backToReview,setBackToReview]=useState(false)
   const [pickingEvent,setPickingEvent]=useState(false)
   const [eventId,setEventId]=useState<string|null>(null)
-  const [category,setCategory]=useState<'main'|'extra'>('extra')
+  const [category,setCategory]=useState<'main'|'extra'|null>(null)
+  const [paidCents,setPaidCents]=useState(0)
   const [label,setLabel]=useState('')
   const [amount,setAmount]=useState('')
-  const [priority,setPriority]=useState('')
   const [dueDate,setDueDate]=useState('')
   const [busy,setBusy]=useState(false)
   const [error,setError]=useState('')
@@ -136,28 +138,28 @@ export function ChargeEditor({studentId}:{studentId:Id<'students'>}) {
   const last=stepIndex===feeSteps.length-1
   const money=parseMoneyInput(amount)
   const cents=money.ok?money.cents:null
-  const priorityNumber=priority.trim()===''?undefined:Number(priority)
-  const priorityInvalid=priorityNumber!==undefined&&!Number.isSafeInteger(priorityNumber)
   const dueAt=dueAtFromInput(dueDate)
   const dueInvalid=Number.isNaN(dueAt)
   const pickerEvents=(events??[]).map(row=>({_id:row.event._id as string,name:row.event.name,startsAt:row.event.startsAt,endsAt:row.event.endsAt}))
   const eventName=pickerEvents.find(event=>event._id===eventId)?.name
   const ready:Record<FeeStep,boolean>={
-    what:label.trim().length>0&&!(pickingEvent&&!eventId),
-    amount:cents!==null&&!priorityInvalid&&!dueInvalid,
-    review:label.trim().length>0&&cents!==null&&!priorityInvalid&&!dueInvalid&&!(pickingEvent&&!eventId),
+    what:label.trim().length>0&&!(pickingEvent&&!eventId)&&!(eventId&&!category),
+    amount:cents!==null&&!dueInvalid,
+    review:label.trim().length>0&&cents!==null&&!dueInvalid&&!(pickingEvent&&!eventId)&&!(eventId&&!category),
   }
   const submit=async()=>{
     if(!ready.review||cents===null||pending.current.busy)return
     const idempotencyKey=pending.current.key??key()
     pending.current.key=idempotencyKey;pending.current.busy=true;setBusy(true);setError('')
     try{
-      await create({studentId,...(eventId?{eventId:eventId as Id<'events'>,category}:{}),label:label.trim(),amountCents:cents,...(priorityNumber!==undefined?{priority:priorityNumber}:{}),...(dueAt!==null?{dueAt}:{}),idempotencyKey})
-      pending.current.key=null;setSaved(true)
+      const chargeId=await create({studentId,...(eventId&&category?{eventId:eventId as Id<'events'>,category}:{}),label:label.trim(),amountCents:cents,...(dueAt!==null?{dueAt}:{}),idempotencyKey})
+      let paid=0
+      if(chargeId){try{paid=await client.query(api.finance.feePaidSoFar,{chargeId})}catch{paid=0}}
+      pending.current.key=null;setPaidCents(paid);setSaved(true)
     }catch(e){setError(message(e))}
     finally{pending.current.busy=false;setBusy(false)}
   }
-  const reset=()=>{pending.current.key=null;setSaved(false);setStepIndex(0);setBackToReview(false);setPickingEvent(false);setEventId(null);setCategory('extra');setLabel('');setAmount('');setPriority('');setDueDate('');setError('')}
+  const reset=()=>{pending.current.key=null;setSaved(false);setStepIndex(0);setBackToReview(false);setPickingEvent(false);setEventId(null);setCategory(null);setPaidCents(0);setLabel('');setAmount('');setDueDate('');setError('')}
   const goTo=(target:FeeStep)=>{setError('');setBackToReview(true);setStepIndex(feeSteps.indexOf(target))}
   const next=()=>{
     if(last){void submit();return}
@@ -167,20 +169,21 @@ export function ChargeEditor({studentId}:{studentId:Id<'students'>}) {
   }
   const back=stepIndex>0?()=>{setError('');setBackToReview(false);setStepIndex(stepIndex-1)}:undefined
   const amountProblem=amount.trim()!==''&&!money.ok?money.message:null
-  if(saved)return <section className={`${styles.root} card`} aria-labelledby="charge-editor-title"><h2 id="charge-editor-title">{text.title}</h2><p role="status">{text.added}</p><Button type="button" variant="outline" onClick={reset}>{text.another}</Button></section>
+  if(saved)return <section className={`${styles.root} card`} aria-labelledby="charge-editor-title"><h2 id="charge-editor-title">{text.title}</h2><p role="status">{paidCents>0?text.addedPaid(usd(paidCents)):text.added}</p><Button type="button" variant="outline" onClick={reset}>{text.another}</Button></section>
   const content=(()=>{
     switch(step){
       case 'what':return <>
         <div role="group" aria-label={text.event} className="flex flex-wrap gap-2">
-          <Button type="button" variant={!pickingEvent?'default':'outline'} aria-pressed={!pickingEvent} disabled={busy} onClick={()=>{changed();setPickingEvent(false);setEventId(null)}}>{text.notForEvent}</Button>
+          <Button type="button" variant={!pickingEvent?'default':'outline'} aria-pressed={!pickingEvent} disabled={busy} onClick={()=>{changed();setPickingEvent(false);setEventId(null);setCategory(null)}}>{text.notForEvent}</Button>
           <Button type="button" variant={pickingEvent?'default':'outline'} aria-pressed={pickingEvent} disabled={busy} onClick={()=>{changed();setPickingEvent(true)}}>{text.forEvent}</Button>
         </div>
-        {pickingEvent&&(events===undefined?<p role="status">{chargeAdministrationCopy.addFee.loadingEvents}</p>:<EventPicker events={pickerEvents} value={eventId} onChange={id=>{changed();setEventId(id)}} asOf={clock} label={text.chooseEvent}/>)}
-        {pickingEvent&&!eventId&&<p className="muted">{text.chooseEventFirst}</p>}
+        {pickingEvent&&(events===undefined||signedUp===undefined?<p role="status">{text.loadingEvents}</p>:<EventPicker events={pickerEvents} allowedIds={signedUp} emptyText={text.noSignedUpEvents} value={eventId} onChange={id=>{changed();setEventId(id)}} asOf={clock} label={text.chooseEvent}/>)}
+        {pickingEvent&&!eventId&&signedUp!==undefined&&signedUp.length>0&&<p className="muted">{text.chooseEventFirst}</p>}
         {eventId&&<div role="group" aria-label={text.kind} className="flex flex-wrap gap-2">
           <Button type="button" variant={category==='main'?'default':'outline'} aria-pressed={category==='main'} disabled={busy} onClick={()=>{changed();setCategory('main')}}>{text.main}</Button>
           <Button type="button" variant={category==='extra'?'default':'outline'} aria-pressed={category==='extra'} disabled={busy} onClick={()=>{changed();setCategory('extra')}}>{text.extra}</Button>
         </div>}
+        {eventId&&!category&&<p className="muted">{text.chooseKind}</p>}
         <label>{text.name} <Input value={label} disabled={busy} maxLength={150} onChange={e=>{changed();setLabel(e.target.value)}} required placeholder={text.namePlaceholder}/></label>
       </>
       case 'amount':return <>
@@ -188,15 +191,10 @@ export function ChargeEditor({studentId}:{studentId:Id<'students'>}) {
         <p id="add-fee-amount-hint" role={amountProblem?'alert':undefined} className={amountProblem?undefined:'muted'}>{amountProblem??text.amountExample}</p>
         <label>{dueDateCopy.label} <Input type="date" value={dueDate} disabled={busy} aria-invalid={dueInvalid} onChange={e=>{changed();setDueDate(e.target.value)}}/></label>
         {dueInvalid&&<p role="alert">{dueDateCopy.invalid}</p>}
-        <details><summary className="min-h-11 cursor-pointer font-bold">{text.order}</summary>
-          <label>{text.order} <Input type="number" step="1" value={priority} disabled={busy} aria-invalid={priorityInvalid} aria-describedby="add-fee-order-help" onChange={e=>{changed();setPriority(e.target.value)}}/></label>
-          <p id="add-fee-order-help" className="muted">{text.orderHelp}</p>
-          {priorityInvalid&&<p role="alert">{text.orderInvalid}</p>}
-        </details>
       </>
       case 'review':return <dl className="m-0 grid">
         <ReviewRow label={text.event} value={eventName??text.standalone} onEdit={()=>goTo('what')} disabled={busy}/>
-        {eventId&&<ReviewRow label={text.kind} value={category==='main'?text.main:text.extra} onEdit={()=>goTo('what')} disabled={busy}/>}
+        {eventId&&category&&<ReviewRow label={text.kind} value={category==='main'?text.main:text.extra} onEdit={()=>goTo('what')} disabled={busy}/>}
         <ReviewRow label={text.name} value={label.trim()} onEdit={()=>goTo('what')} disabled={busy}/>
         <ReviewRow label={text.amount} value={cents===null?'—':usd(cents)} onEdit={()=>goTo('amount')} disabled={busy}/>
         <ReviewRow label={dueDateCopy.heading} value={dueAt!==null&&!dueInvalid?dueDateCopy.full(dueAt):text.noDue} onEdit={()=>goTo('amount')} disabled={busy}/>

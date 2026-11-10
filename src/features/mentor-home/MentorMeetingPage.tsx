@@ -12,6 +12,7 @@ import { TileSkeleton } from '@/components/dashboard/TileSkeleton'
 import { dashboardButtonVariants, eyebrow, focusRing, inset } from '@/components/dashboard/styles'
 import { mentorHomeCopy } from '@/copy/mentor-home-copy'
 import { userFacingError } from '@/lib/error-message'
+import { liveCopy } from '@/lib/live-copy'
 import { eventSchedule } from '@/lib/event-schedule'
 import { subteamDisplay } from '@/lib/subteams'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../components/ui/dialog'
@@ -116,7 +117,7 @@ function pageAction(meeting: MentorMeeting): RowAction {
  * meetings in this series (a series) or I can't go anymore (one time). Skipped: Join this one again. Invited: I'll be there /
  * I can't go. Open to them: Sign up. Hidden for meetings they created and when nothing applies.
  */
-export function YourPlans({ meeting }: { meeting: MentorMeeting }) {
+export function YourPlans({ meeting, signUpNote }: { meeting: MentorMeeting; signUpNote?: string }) {
   const id = useId()
   const actions = useMentorActions()
   const [error, setError] = useState('')
@@ -124,6 +125,7 @@ export function YourPlans({ meeting }: { meeting: MentorMeeting }) {
   if (action === 'none') return null
   return <DashboardTile aria-labelledby={id} className="gap-2.5">
     <h2 id={id} className={blockHeading}>{copy.page.plans}</h2>
+    {signUpNote && action === 'join' && <p className="m-0 text-[13px] text-vs-muted">{signUpNote}</p>}
     <div className="flex flex-col gap-2 empty:hidden sm:flex-row sm:flex-wrap [&>button]:w-full sm:[&>button]:w-auto" role="group" aria-labelledby={id}><MeetingActions meeting={meeting} action={action} actions={actions} size="md" onError={setError} /></div>
     {error && <p role="alert" className="m-0 text-[13px] text-vs-urgent">{error}</p>}
   </DashboardTile>
@@ -139,7 +141,7 @@ export function MentorPlans({ eventId }: { eventId: string }) {
   const results = useQueries(useMemo(() => ({ view: { query: api.mentorMeetings.view, args: { eventId: eventId as Id<'events'>, asOf } } }), [eventId, asOf]))
   const detail = results.view as MentorMeetingDetail | Error | undefined
   if (detail === undefined || detail instanceof Error) return null
-  return <div className="mb-4 md:max-w-[720px]"><YourPlans meeting={detail.meeting} /></div>
+  return <div className="mb-4 md:max-w-[720px]"><YourPlans meeting={detail.meeting} signUpNote={liveCopy.events.staffSignupNote} /></div>
 }
 
 /** Edit (title, time, place) and Cancel for a meeting the Mentor created; both change this meeting only. */

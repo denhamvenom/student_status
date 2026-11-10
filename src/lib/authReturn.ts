@@ -91,6 +91,16 @@ export function recordSignInScreenChange(storage: IntentStorage, from: string, n
   if (from === 'email' && next !== 'email') clearEmailCodeStep(storage)
 }
 
+/**
+ * Signs out, then starts Google unless the sign-out was forced: a forced sign-out has already begun reloading the app at '/',
+ * so starting a second navigation would race it. Resolves 'forced' (nothing started) or 'started'.
+ */
+export async function signOutThenStart(signOut: () => Promise<'signedOut' | 'forced' | void>, start: () => Promise<unknown>): Promise<'forced' | 'started'> {
+  if ((await signOut()) === 'forced') return 'forced'
+  await start()
+  return 'started'
+}
+
 export const SIGN_IN_NOTICE_KEY = 'student-status.sign-in-notice'
 export const SIGN_IN_NOTICE_TTL_MS = 5 * 60 * 1000
 

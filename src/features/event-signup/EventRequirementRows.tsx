@@ -7,7 +7,7 @@ import { cn } from 'cn'
 import { focusRing } from '@/components/dashboard/styles'
 import type { WhatsLeftItem } from '../student-home/contract'
 import { chicagoDateKey } from '../student-home/format'
-import { guideForItem, itemForOpenRow, taskCopy, type TaskViewer } from '../student-home/tasks'
+import { guideForItem, itemForOpenRow, openRowKind, taskCopy, type TaskViewer } from '../student-home/tasks'
 import { TaskSheet } from '../student-home/tiles/TaskSheet'
 import { useNow } from '../student-home/useNow'
 
@@ -27,7 +27,8 @@ function Row({ label, item, props, all }: { label: string; item: WhatsLeftItem; 
   const guide = guideForItem(item, { viewer: props.reader, all, studentName: props.studentName, studentId: props.studentId ?? undefined })
   return <>
     <button type="button" onClick={() => setSheet(true)} aria-haspopup="dialog" className={cn('split-line min-h-11 w-full cursor-pointer items-center border-0 bg-transparent p-0 text-left font-sans text-inherit', focusRing)}>
-      <span>{label}</span>
+      {/* The row says who it waits on ("Waiting for your parent", "Waiting for a Coach to review the form"), not only that it is open. */}
+      <span className="flex min-w-0 flex-col"><span>{openRowKind(label) === 'staffReview' ? label : guide.title}</span><span className="text-[13px] text-vs-muted">{guide.headline}</span></span>
       <span className="flex items-center gap-1"><span className="badge badge-open">{props.openLabel}</span><ChevronRight size={16} aria-hidden="true" className="text-vs-muted" /></span>
     </button>
     <TaskSheet guide={guide} open={sheet} onOpenChange={setSheet} remindLabel={props.reader === 'parent' ? taskCopy.remindStudent(props.studentName ?? 'your student') : taskCopy.remindParent} />

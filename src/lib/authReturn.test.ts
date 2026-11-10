@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { authReturnPhase, recordSignInScreenChange, clearEmailCodeStep, clearSignInIntent, EMAIL_STEP_KEY, EMAIL_STEP_TTL_MS, readEmailCodeStep, SIGN_IN_NOTICE_KEY, SIGN_IN_NOTICE_TTL_MS, takeSignInNotice, writeEmailCodeStep, writeSignInNotice, isGoogleIntent, keepSignInStorage, readSignInIntent, SIGN_IN_INTENT_KEY, SIGN_IN_INTENT_TTL_MS, withoutOAuthCode, writeSignInIntent } from './authReturn'
+import { describe, expect, it, vi } from 'vitest'
+import { authReturnPhase, signOutThenStart, recordSignInScreenChange, clearEmailCodeStep, clearSignInIntent, EMAIL_STEP_KEY, EMAIL_STEP_TTL_MS, readEmailCodeStep, SIGN_IN_NOTICE_KEY, SIGN_IN_NOTICE_TTL_MS, takeSignInNotice, writeEmailCodeStep, writeSignInNotice, isGoogleIntent, keepSignInStorage, readSignInIntent, SIGN_IN_INTENT_KEY, SIGN_IN_INTENT_TTL_MS, withoutOAuthCode, writeSignInIntent } from './authReturn'
 
 function memoryStorage(initial: Record<string, string> = {}) {
   const data = new Map(Object.entries(initial))
@@ -156,5 +156,18 @@ describe('leaving the email sign-in', () => {
     recordSignInScreenChange(storage, 'adult', 'email', NOW)
     expect(readSignInIntent(storage, NOW)).toBe('email')
     expect(readEmailCodeStep(storage, NOW)).toEqual(step)
+  })
+})
+
+describe('signOutThenStart', () => {
+  it('does not start Google when sign-out was forced', async () => {
+    const start = vi.fn(async () => {})
+    await expect(signOutThenStart(async () => 'forced', start)).resolves.toBe('forced')
+    expect(start).not.toHaveBeenCalled()
+  })
+  it('starts Google after a normal sign-out', async () => {
+    const start = vi.fn(async () => {})
+    await expect(signOutThenStart(async () => 'signedOut', start)).resolves.toBe('started')
+    expect(start).toHaveBeenCalledTimes(1)
   })
 })

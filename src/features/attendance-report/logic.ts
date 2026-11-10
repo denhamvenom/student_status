@@ -38,9 +38,9 @@ export const formatTime = (epoch: number) => time.format(epoch)
 /** "6:00 – 8:00 PM"-style range; both ends are written out so the meaning is never ambiguous. */
 export const formatTimeRange = (start: number, end: number) => `${formatTime(start)} – ${formatTime(end)}`
 
-/** By default the report shows Required and Build meetings; the toggle adds Outreach and Other. */
+/** By default the report shows Required, Build and Other (optional) meetings; the toggle adds Outreach events. */
 export function visibleEvents(events: readonly ReportEvent[], showAll: boolean) {
-  return showAll ? [...events] : events.filter(event => event.kind === 'required' || event.kind === 'build')
+  return showAll ? [...events] : events.filter(event => event.kind !== 'outreach')
 }
 
 /** The word on a row: the status, or for gray rows the reason (Upcoming vs Not held needs the browser clock). */

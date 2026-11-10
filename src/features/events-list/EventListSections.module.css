@@ -29,3 +29,13 @@
   .series p{font-size:14px}
   .sectionHead{margin:20px 0 10px}
 }
+
+.titleLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.titleLink:hover,
+.titleLink:focus-visible {
+  text-decoration: underline;
+}

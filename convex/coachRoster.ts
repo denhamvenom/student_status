@@ -94,7 +94,8 @@ type Upcoming = { events: Doc<"events">[]; truncated: boolean; signingOpen: bool
 async function upcomingEvents(ctx: QueryCtx, season: Doc<"seasons">, asOf: number): Promise<Upcoming> {
   const seasonId = season._id;
   const page = await ctx.db.query("events").withIndex("by_seasonId_and_startsAt", q => q.eq("seasonId", seasonId).gte("startsAt", asOf)).take(11);
-  return { events: page.slice(0, 10).filter(event => !event.archived), truncated: page.length > 10, signingOpen: season.permissionSigningPaused === false };
+  return { // Canceled and archived events are never a student's next event and never feed a reminder.
+  events: page.slice(0, 10).filter(event => !event.archived && !event.cancelled), truncated: page.length > 10, signingOpen: season.permissionSigningPaused === false };
 }
 
 type ParticipantLookup = (eventId: Doc<"events">["_id"]) => Promise<Doc<"participants"> | null>;

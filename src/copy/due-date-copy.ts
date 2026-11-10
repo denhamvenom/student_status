@@ -35,7 +35,7 @@ export const dueDateCopy = {
   saved: 'Due date saved.',
   cleared: 'Due date cleared.',
   failed: 'The due date could not be saved. Try again.',
-  savedWithoutDueDate: 'The fee change was saved, but its due date was not. Select the button again to retry the due date.',
+  savedWithoutDueDate: 'The fee change was saved, but its due date was not. Select the button again to try the due date again.',
   short: (dueAt: number) => `Due ${shortDate.format(dueAt)}`,
   full: (dueAt: number) => fullDate.format(dueAt),
 } as const

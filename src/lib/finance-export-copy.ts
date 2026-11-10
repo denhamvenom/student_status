@@ -1,6 +1,6 @@
 export const financeExportCopy = {
   title: 'Export finances',
-  description: "Download fees and payments for the students you choose. The file lists personal payments and fundraising credit apart. Each fee row repeats the student's available balance, so do not add those up.",
+  description: "Download fees and payments for the students you choose. The file lists payments and Fundraising credit apart. Each fee row repeats the student's available balance, so do not add those up.",
   scope: 'Students to include', allActive: 'All active students', selected: 'Selected student', prepare: 'Prepare export', preparing: 'Preparing student list…', ready: 'Export prepared', retry: 'Try preparing again', fresh: 'Prepare a new export', csv: 'Download fee details (CSV)', manifest: 'Download student list and collection details (JSON)', collecting: 'Collecting and verifying all records…', cancel: 'Cancel collection',
   metadata: 'Also download the JSON file. It lists every student included, even those with no fees, and when the data was gathered.',
   range: 'The data is gathered over a short time, not at one exact moment.',

@@ -3,7 +3,7 @@ import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
-import { activeSeason, audit, ownStudent, viewer, isCoachOrTravelLead } from "./lib/access";
+import { activeSeason, audit, ownStudent, viewer, isCoachOrTravelLead, studentAccess } from "./lib/access";
 import { notifyRoomUpdate } from "./lib/notificationTriggers";
 
 const INVITE_PUSHES_PER_HOUR = 10;
@@ -48,6 +48,39 @@ export const mine = query({
       return { _id: x._id, groupId: x.groupId, groupName: invitedGroup?.name ?? "Room group", invitedBy: inviter?.legalName || inviter?.preferredName || "Teammate" };
     }));
     return { roomDeadline: event.roomDeadline ?? null, group: group ? { _id: group._id, name: group.name, finalized: group.finalized, members: names } : null, requestedAssignment: !!request, invites: received, sentInvites: sent.filter(x => x.status === "pending" && x.invitedBy === student._id).map(x => ({ _id: x._id, studentId: x.studentId })) };
+  },
+});
+
+/** View-only room status for a Parent's linked student: no ids, only preferred first names of roommates. */
+export const parentRoomStatus = query({
+  args: { eventId: v.id("events"), studentId: v.id("students") },
+  returns: v.object({
+    roomChoiceOpen: v.boolean(), deadline: v.union(v.number(), v.null()), roomType: v.union(v.literal("Boys"), v.literal("Girls"), v.null()),
+    status: v.union(v.literal("notChosen"), v.literal("requested"), v.literal("inGroup"), v.literal("assigned"), v.literal("finalized")),
+    roommates: v.array(v.string()),
+  }),
+  handler: async (ctx, args) => {
+    const user = await viewer(ctx);
+    if (user.role !== "parent") throw new ConvexError("Only a Parent can see a student's room status here.");
+    const student = await studentAccess(ctx, user, args.studentId); // active student in the current season with an active family link
+    const season = await activeSeason(ctx); const event = await ctx.db.get(args.eventId);
+    if (!event || event.archived || event.seasonId !== season._id || !event.overnight || !event.roomingEnabled || event.cancelled) throw new ConvexError("This event doesn't use rooms. Rooms apply only to current overnight events set up with room choice.");
+    const participant = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
+    if (!participant || participant.status === "withdrawn") throw new ConvexError("This event doesn't use rooms for this student. Rooms apply only to students signed up for the event.");
+    const membership = await ctx.db.query("roomMemberships").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
+    const request = membership ? null : await ctx.db.query("roomRequests").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
+    const group = membership ? await ctx.db.get(membership.groupId) : null;
+    const creator = group ? await ctx.db.get(group.createdBy) : null;
+    const members = membership ? await ctx.db.query("roomMemberships").withIndex("by_groupId", q => q.eq("groupId", membership.groupId)).take(6) : [];
+    const roommates: string[] = [];
+    for (const m of members) {
+      if (m.studentId === student._id) continue;
+      const other = await ctx.db.get(m.studentId);
+      if (other?.active && other.seasonId === season._id) roommates.push((other.preferredName || other.legalName).trim().split(/\s+/)[0] || "Teammate");
+    }
+    const status: "notChosen" | "requested" | "inGroup" | "assigned" | "finalized" = group?.finalized ? "finalized" : group ? (creator && creator.role !== "student" ? "assigned" : "inGroup") : request ? "requested" : "notChosen";
+    const open = participant.status === "confirmed" && !!student.roomCategory && (event.roomDeadline === undefined || Date.now() <= event.roomDeadline);
+    return { roomChoiceOpen: open, deadline: event.roomDeadline ?? null, roomType: student.roomCategory ?? null, status, roommates: roommates.sort() };
   },
 });
 

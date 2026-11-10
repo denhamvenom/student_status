@@ -4,7 +4,7 @@ import { at } from '../student-home/fixtures'
 import { eventEditValues, draftFrom } from '../operations/event-edit'
 import { clockedIn, homeData, joinEntry, meeting, NOW } from './fixtures'
 import type { Id } from '../../../convex/_generated/dataModel'
-import { clockLabel, COMING_UP_LIMIT, comingUpTags, createdList, editableMeeting, eventTags, goingList, hereGroups, homeView, joinEntryLines, joinInScope, joinSections, meetingPlace, myPartLabel, needsAnswer, pinKey, seriesStatus, showsSubteamTag, subteamsLine, tabFromHash, typeLabel, unreadPinned } from './logic'
+import { audienceTag, clockLabel, joinScopeLine, COMING_UP_LIMIT, comingUpTags, createdList, editableMeeting, eventTags, goingList, hereGroups, homeView, joinEntryLines, joinInScope, joinSections, meetingPlace, myPartLabel, needsAnswer, pinKey, seriesStatus, subteamsLine, tabFromHash, typeLabel, unreadPinned } from './logic'
 
 const HOUR = 3_600_000
 const titles = (rows: readonly { title: string }[]) => rows.map(row => row.title)
@@ -159,12 +159,27 @@ describe('Schedule › Join', () => {
   })
 
   it.each([
-    ['a meeting for the Mentor’s subteam', 'meetings', true, true],
-    ['a meeting for Everyone', 'meetings', false, false],
-    // Never on a Competition or trip, even if the server marked it.
-    ['a competition', 'competitionsAndTrips', true, false],
-  ] as const)('shows the Your subteam tag on %s: %s', (_, category, forYourSubteam, shown) => {
-    expect(showsSubteamTag({ category, forYourSubteam })).toBe(shown)
+    ['everyone', { kind: 'everyone', subteams: [] }, 'Whole team'],
+    ['one subteam, legacy name', { kind: 'subteams', subteams: ['Mechanical'] }, 'Build'],
+    ['two subteams', { kind: 'subteams', subteams: ['Programming', 'CAD'] }, 'Programming, CAD'],
+    ['chosen students', { kind: 'students', subteams: [] }, 'Chosen students'],
+    ['Mentors only', { kind: 'mentorsOnly', subteams: [] }, 'Mentors only'],
+  ] as const)('tags a row for %s', (_, audience, tag) => {
+    expect(audienceTag(audience)).toBe(tag)
+  })
+
+  it('treats a legacy subteam name as the same subteam the server does', () => {
+    const entry = joinEntry(meeting('build night', NOW + HOUR, { canSignUp: true, audience: { kind: 'subteams', subteams: ['Mechanical'], required: false, text: 'Build' } }))
+    expect(joinInScope(entry, ['Build'])).toBe(true)
+    expect(joinInScope(entry, ['Programming'])).toBe(false)
+  })
+
+  it.each([
+    [['Programming', 'CAD'], false, 'Showing: Programming, CAD and whole-team items'],
+    [[], false, 'Showing: whole-team items'],
+    [['Programming'], true, 'Showing: all subteams'],
+  ] as const)('scope line for %j (widened %s)', (subteams, showAll, line) => {
+    expect(joinScopeLine(subteams, showAll)).toBe(line)
   })
 
   it('describes a repeating series once, with its schedule, how often and how many are coming up', () => {

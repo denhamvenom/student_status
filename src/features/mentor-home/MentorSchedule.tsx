@@ -11,7 +11,7 @@ import type { MentorHomeData } from './contract'
 import { useMentorHomeData } from './MentorHome'
 import { NeedsAnswer, type MentorHomeHandlers } from './MentorHomeView'
 import { JoinSectionsList } from './MentorJoinRow'
-import { createdList, goingList, joinSections, meetingLine, needsAnswer, SCHEDULE_TABS, seriesLine, subteamsList, tabFromHash, type ScheduleTab } from './logic'
+import { createdList, goingList, audienceTag, joinScopeLine, joinSections, meetingLine, needsAnswer, SCHEDULE_TABS, seriesLine, tabFromHash, type ScheduleTab } from './logic'
 import { blockHeading, EventLinkRow, RowList, Tags } from './rows'
 
 const copy = mentorHomeCopy
@@ -22,7 +22,7 @@ function Going({ data, now, handlers }: { data: MentorHomeData; now: number; han
     <NeedsAnswer items={needsAnswer(data, now)} actions={handlers} />
     {rows.length
       ? <RowList label={copy.schedule.tabs.going}>{rows.map(({ meeting, skipping }) => <EventLinkRow key={meeting.eventId} to={`/events/${meeting.eventId}`} title={meeting.title}
-        sub={skipping ? `${formatWhen(meeting.startsAt, meeting.endsAt)} · ${copy.schedule.skipping}` : meetingLine(meeting)} />)}</RowList>
+        sub={skipping ? `${formatWhen(meeting.startsAt, meeting.endsAt)} · ${copy.schedule.skipping}` : meetingLine(meeting)} tags={<Tags tags={[audienceTag(meeting.audience)]} />} />)}</RowList>
       : <p className="m-0 text-[14px] text-vs-muted">{copy.schedule.goingNone}</p>}
   </>
 }
@@ -42,17 +42,16 @@ function Created({ data, now, createHint }: { data: MentorHomeData; now: number;
   </>
 }
 
-/** Join: the Mentor's subteams and whole-team items; "Show all subteams" widens it. The line only appears when something is hidden. */
+/** Join: the Mentor's subteams and whole-team items; "Show all subteams" widens it. The scope line is always shown so it is clear the list is limited. */
 function JoinPanel({ data, now, handlers }: { data: MentorHomeData; now: number; handlers: MentorHomeHandlers }) {
   const [showAll, setShowAll] = useState(false)
   const sections = joinSections(data.joinable, now, data.subteams, showAll)
-  const list = subteamsList(data.subteams)
   return <>
     <p className="m-0 text-[14px] text-vs-text-2">{copy.schedule.joinHint}</p>
-    {(sections.hidden > 0 || showAll) && <p className="m-0 flex flex-wrap items-center gap-x-2 text-[13px] text-vs-muted">
-      <span>{showAll ? copy.scope.showingAll : copy.scope.showing(list)}</span>
+    <p className="m-0 flex flex-wrap items-center gap-x-2 text-[13px] text-vs-muted">
+      <span>{joinScopeLine(data.subteams, showAll)}</span>
       <button type="button" aria-pressed={showAll} onClick={() => setShowAll(value => !value)} className={cn('min-h-11 cursor-pointer border-0 bg-transparent p-0 text-[13px] font-semibold text-vs-accent-text underline', focusRing)}>{showAll ? copy.scope.mine : copy.scope.all}</button>
-    </p>}
+    </p>
     <JoinSectionsList sections={sections} actions={handlers} />
   </>
 }

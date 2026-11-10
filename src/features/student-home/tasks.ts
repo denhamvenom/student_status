@@ -87,7 +87,7 @@ const explanations: Record<WhatsLeftKind, string> = {
 }
 
 const reminderLabel = (item: Pick<WhatsLeftItem, 'kind' | 'label'>, studentName?: string) =>
-  item.kind === 'healthProfile' ? `Health information in ${studentName ? `${studentName}'s` : 'my'} profile` : item.kind === 'requirement' ? item.label ?? titles.requirement : titles[item.kind]
+  item.kind === 'healthProfile' ? `Health information in ${studentName ? `${studentName}'s` : 'my'} profile` : item.kind === 'requirement' && item.label === 'Pick your shifts' ? 'picking shifts' : item.kind === 'requirement' ? item.label ?? titles.requirement : titles[item.kind]
 
 /** The short text someone copies and pastes into a text message. Nothing is sent from the app. */
 export function reminderMessage(item: Pick<WhatsLeftItem, 'kind' | 'label' | 'eventName' | 'dueAt' | 'dateKind'>, to?: string, studentName?: string) {
@@ -95,6 +95,19 @@ export function reminderMessage(item: Pick<WhatsLeftItem, 'kind' | 'label' | 'ev
   const forEvent = item.eventName ? ` for ${item.eventName}` : ''
   return `Hi${to ? ` ${to}` : ''}! Can you finish ${reminderLabel(item, studentName)}${forEvent} in Venom Status?${due} Thank you!`
 }
+
+/** Built-in readiness labels from convex/lib/readModels.ts (READINESS_PERMISSION, READINESS_SHIFTS). */
+export const PERMISSION_ROW = 'Permission form'
+export const SHIFTS_ROW = 'Shifts'
+
+/** Pick your shifts: the server sends it as an event requirement keyed shifts:<event>, pointing at the event's signup section. */
+export const isShiftsItem = (item: Pick<WhatsLeftItem, 'kind' | 'key'>) => item.kind === 'requirement' && item.key.startsWith('shifts:')
+const shiftsCopy = {
+  title: 'Pick your shifts',
+  explain: 'This event needs you to sign up for a minimum number of shifts. Pick them on the event page.',
+  action: 'Pick your shifts',
+  childExplain: (name: string) => `${name} picks shifts on the event page in Venom Status. You can see the shifts but cannot pick them for them.`,
+} as const
 
 /** The event requirement "FIRST registration" is the season-wide FIRST step; it follows that step's owner. */
 const isEventFirst = (item: WhatsLeftItem) => item.kind === 'requirement' && item.label === 'FIRST registration'
@@ -126,16 +139,17 @@ export function guideForItem(item: WhatsLeftItem, context: TaskContext): TaskGui
   const owner = effectiveOwner(item, context.all)
   const { viewer } = context
   const studentName = context.studentName ?? 'your student'
-  const title = item.kind === 'requirement' && !isEventFirst(item) ? item.label ?? titles.requirement : titles[kind]
+  const shifts = isShiftsItem(item)
+  const title = shifts ? shiftsCopy.title : item.kind === 'requirement' && !isEventFirst(item) ? item.label ?? titles.requirement : titles[kind]
   const base = { title, eventName: item.eventName }
-  const explain = item.kind === 'requirement' && !isEventFirst(item) ? 'A Coach added this requirement for the event. Ask a Coach what to do if you are not sure.' : explanations[kind]
+  const explain = shifts ? shiftsCopy.explain : item.kind === 'requirement' && !isEventFirst(item) ? 'A Coach added this requirement for the event. A Coach or Travel Lead checks it off. Ask a Coach what to do if you are not sure.' : explanations[kind]
 
   if (owner === 'coach') return { ...base, actor: 'coach', headline: coachHeadline(kind), explain: `${explain} ${taskCopy.coachWorking}`, action: null, remind: null }
 
   const readerActs = owner === viewer
   if (readerActs) {
     const to = viewer === 'parent' ? parentItemHref({ ...item, kind }, context.studentId) : item.href ?? (kind === 'firstRegistration' ? '/setup' : null)
-    const label = (viewer === 'parent' ? parentActions : studentActions)[kind]
+    const label = shifts && viewer === 'student' ? shiftsCopy.action : (viewer === 'parent' ? parentActions : studentActions)[kind]
     // A custom requirement has no page of its own; the event page lists it, so the sheet stays an explanation.
     return { ...base, actor: 'reader', headline: taskCopy.yourTurn, explain, action: to && label ? { label, to } : null, remind: null }
   }
@@ -146,7 +160,7 @@ export function guideForItem(item: WhatsLeftItem, context: TaskContext): TaskGui
     return { ...base, actor: 'other', headline: taskCopy.waitingForParent, explain, action, remind: reminderMessage({ ...item, kind }, undefined, context.studentName) }
   }
   // A Parent waiting on the Student: Parents see the Student's choices but never make them.
-  const childExplain = kind === 'roomChoice' ? `${studentName} picks roommates or asks to be assigned a room in Venom Status. You will see the group here once it is chosen.` : `${studentName} does this in Venom Status. You can see it here but cannot do it for them.`
+  const childExplain = shifts ? shiftsCopy.childExplain(studentName) : kind === 'roomChoice' ? `${studentName} picks roommates or asks to be assigned a room in Venom Status. You will see the group here once it is chosen.` : `${studentName} does this in Venom Status. You can see it here but cannot do it for them.`
   return { ...base, actor: 'other', headline: taskCopy.waitingForStudent(studentName), explain: childExplain, action: null, remind: reminderMessage({ ...item, kind }, studentName, studentName) }
 }
 
@@ -158,7 +172,7 @@ export function guideForItem(item: WhatsLeftItem, context: TaskContext): TaskGui
  */
 export function openRowKind(label: string): WhatsLeftKind {
   if (label === 'Required payment') return 'requiredPayment'
-  if (label === 'Permission accepted') return 'permissionForm'
+  if (label === PERMISSION_ROW) return 'permissionForm'
   if (label === 'FIRST registration and Consent & Release' || label === 'FIRST registration') return 'firstRegistration'
   if (label === 'Room selection') return 'roomChoice'
   if (/^(Season fee maintenance|Financial records|Event financial records|Event requirements require|This event is canceled|Whole Team enrollment)/.test(label)) return 'staffReview'
@@ -178,6 +192,10 @@ const sameFamily: Partial<Record<WhatsLeftKind, readonly WhatsLeftKind[]>> = {
  * (still loading, or Home does not list it) the row gets the usual owner for its kind.
  */
 export function itemForOpenRow(label: string, event: { id: Id<'events'> | string; name: string }, items: readonly WhatsLeftItem[]): WhatsLeftItem {
+  if (label === SHIFTS_ROW) {
+    const key = `shifts:${event.id}`
+    return items.find(item => item.key === key) ?? { key, kind: 'requirement', owner: 'student', eventId: event.id as Id<'events'>, eventName: event.name, label: shiftsCopy.title, dueAt: null, href: `/events/${event.id}#my-signup` }
+  }
   const kind = openRowKind(label)
   const family = sameFamily[kind]
   const candidates = items.filter(item => family ? family.includes(effectiveKind(item)) && (family.includes(item.kind) || isEventFirst(item)) : item.kind === 'requirement' && item.label === label)

@@ -7,7 +7,7 @@ export const announcementsCopy = {
   titleLabel: 'Title (optional)',
   messageLabel: 'Message',
   audienceLabel: 'Show to',
-  audiences: { students: 'Students', parents: 'Parents', both: 'Students and parents', staff: 'Mentors & staff', everyone: 'Everyone' },
+  audiences: { students: 'Students', parents: 'Parents', both: 'Students and Parents', staff: 'Mentors and Travel Leads', everyone: 'Everyone' },
   urgentLabel: 'Send as urgent (arrives even during school hours)',
   urgentHint: 'Use only when people need to know right away, like a canceled meeting.',
   staffHomeHeading: 'Team announcements',

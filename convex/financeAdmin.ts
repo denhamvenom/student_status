@@ -4,6 +4,7 @@ import { query } from "./_generated/server";
 import { activeSeason, viewer, isCoachOrTravelLead } from "./lib/access";
 import { feeMaintenanceProjection, feeMaintenanceValidator } from "./lib/seasonFinance";
 import { financeRow } from "./lib/financeRow";
+import { paymentEditDetail } from "./lib/financeChanges";
 
 const nullable = v.union(v.number(), v.null());
 const row = v.object({ studentId: v.id("students"), name: v.string(), active: v.boolean(), state: v.union(v.literal("ready"), v.literal("updating"), v.literal("failed"), v.literal("uninitialized")), chargedCents: nullable, personalAppliedCents: nullable, fundraisingAppliedCents: nullable, dueCents: nullable, fundraisingAvailableCents: nullable, personalAvailableCents: nullable, generation: nullable, financialRevision: nullable, updatedAt: nullable, canRecord: v.boolean(), canView: v.boolean(), canRebuild: v.boolean() });
@@ -25,7 +26,7 @@ export const students = query({
   },
 });
 
-const change = v.object({ feeDefinitionId: v.union(v.id("feeDefinitions"), v.null()), feeLabel: v.union(v.string(), v.null()), changeId: v.id("financeChangeEvents"), studentId: v.union(v.id("students"), v.null()), studentName: v.union(v.string(), v.null()), actorName: v.string(), occurredAt: v.number(), kind: v.string(), state: v.union(v.literal("committed"), v.literal("progress")), meaning: v.union(v.literal("receipt"), v.literal("obligation"), v.literal("applied"), v.literal("personalAvailable"), v.literal("fundraisingAvailable"), v.literal("grossRaised"), v.literal("priority")), beforeCents: nullable, afterCents: nullable, deltaCents: nullable, reason: v.string(), sourceKind: v.union(v.literal("payment"), v.literal("fundraiser"), v.null()), sourceType: v.string(), sourceId: v.string(), historical: v.boolean() });
+const change = v.object({ feeDefinitionId: v.union(v.id("feeDefinitions"), v.null()), feeLabel: v.union(v.string(), v.null()), changeId: v.id("financeChangeEvents"), studentId: v.union(v.id("students"), v.null()), studentName: v.union(v.string(), v.null()), actorName: v.string(), occurredAt: v.number(), kind: v.string(), state: v.union(v.literal("committed"), v.literal("progress")), meaning: v.union(v.literal("receipt"), v.literal("obligation"), v.literal("applied"), v.literal("personalAvailable"), v.literal("fundraisingAvailable"), v.literal("grossRaised"), v.literal("priority")), beforeCents: nullable, afterCents: nullable, deltaCents: nullable, reason: v.string(), sourceKind: v.union(v.literal("payment"), v.literal("fundraiser"), v.null()), sourceType: v.string(), sourceId: v.string(), historical: v.boolean(), detail: v.optional(v.union(v.string(), v.null())) });
 export const recentChanges = query({
   args: { paginationOpts: paginationOptsValidator }, returns: paginationResultValidator(change).extend({ seasonId: v.id("seasons"), coverage: v.object({ state: v.union(v.literal("updating"), v.literal("ready"), v.literal("failed")), startedAt: nullable, completedAt: nullable }) }),
   handler: async (ctx, args) => {
@@ -35,7 +36,14 @@ export const recentChanges = query({
     const coverage = await ctx.db.query("financeChangeBackfills").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).unique();
     const page = await Promise.all(result.page.map(async item => {
       const [student, actor, fee] = await Promise.all([item.studentId ? ctx.db.get(item.studentId) : null, ctx.db.get(item.actorId), item.feeDefinitionId ? ctx.db.get(item.feeDefinitionId) : null]);
-      return { feeDefinitionId: item.feeDefinitionId ?? null, feeLabel: item.feeDefinitionId ? fee?.label ?? "Fee definition unavailable" : null, changeId: item._id, studentId: item.studentId ?? null, studentName: student?.legalName || student?.preferredName || (item.studentId ? "Archived student" : null), actorName: actor?.name ?? "Archived account", occurredAt: item.occurredAt, kind: item.kind, state: item.state, meaning: item.meaning, beforeCents: item.beforeCents, afterCents: item.afterCents, deltaCents: item.deltaCents, reason: item.reason, sourceKind: item.sourceKind ?? null, sourceType: item.sourceType, sourceId: item.sourceId, historical: item.historical };
+      let detail: string | null = null;
+      const editId = item.kind === "paymentEdit" && item.sourceKey.startsWith("paymentEdit:") ? ctx.db.normalizeId("paymentEdits", item.sourceKey.slice("paymentEdit:".length)) : null;
+      const edit = editId ? await ctx.db.get(editId) : null;
+      if (edit) {
+        const moved = edit.before.studentId !== edit.after.studentId ? await ctx.db.get(edit.after.studentId) : null;
+        detail = paymentEditDetail(edit.before, edit.after, () => moved?.legalName || moved?.preferredName || "another student");
+      }
+      return { detail, feeDefinitionId: item.feeDefinitionId ?? null, feeLabel: item.feeDefinitionId ? fee?.label ?? "Fee definition unavailable" : null, changeId: item._id, studentId: item.studentId ?? null, studentName: student?.legalName || student?.preferredName || (item.studentId ? "Archived student" : null), actorName: actor?.name ?? "Archived account", occurredAt: item.occurredAt, kind: item.kind, state: item.state, meaning: item.meaning, beforeCents: item.beforeCents, afterCents: item.afterCents, deltaCents: item.deltaCents, reason: item.reason, sourceKind: item.sourceKind ?? null, sourceType: item.sourceType, sourceId: item.sourceId, historical: item.historical };
     }));
     return { ...result, page, seasonId: season._id, coverage: { state: coverage?.state === "complete" ? "ready" as const : coverage?.state === "failed" ? "failed" as const : "updating" as const, startedAt: coverage?.startedAt ?? null, completedAt: coverage?.completedAt ?? null } };
   },

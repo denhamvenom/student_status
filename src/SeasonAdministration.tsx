@@ -6,7 +6,7 @@ import type { Id } from '../convex/_generated/dataModel'
 import { ConfirmAction } from './ConfirmAction'
 import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
-import { seasonAdminCopy as copy } from './lib/season-admin-copy'
+import { seasonAdminCopy as copy, subteamLabel } from './lib/season-admin-copy'
 import styles from './SeasonAdministration.module.css'
 import { SeasonReviewSteps, SeasonTransitionProgress, SeasonHistory } from './SeasonReviewSteps'
 
@@ -110,8 +110,9 @@ function RosterReview({ plan }: { plan: Plan }) {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [savedId, setSavedId] = useState<string | null>(null)
+  const [bulkBusy, setBulkBusy] = useState(false)
   const pick = async (row: typeof rows.results[number], choice: 'return' | 'depart' | null) => {
-    if (busyId) return
+    if (busyId || bulkBusy) return
     setBusyId(row.studentId); setError(''); setSavedId(null)
     try {
       await save({ planId: plan.id, studentId: row.studentId, choice, expectedPlanRevision: plan.revision,
@@ -119,15 +120,35 @@ function RosterReview({ plan }: { plan: Plan }) {
       setSavedId(row.studentId)
     } catch (cause) { setError(message(cause)) } finally { setBusyId(null) }
   }
+  const [bulk, setBulk] = useState('')
+  const markAll = async () => {
+    if (busyId || bulkBusy) return
+    const targets = rows.results.filter(row => row.choice !== 'return')
+    if (targets.length === 0) { setBulk(copy.markAllNone); return }
+    setBulkBusy(true); setError(''); setSavedId(null)
+    let revision = plan.revision
+    let done = 0
+    try {
+      for (const row of targets) {
+        setBulk(copy.markAllProgress(done + 1, targets.length))
+        const result = await save({ planId: plan.id, studentId: row.studentId, choice: 'return', expectedPlanRevision: revision,
+          expectedStudentFingerprint: row.studentFingerprint, expectedDecisionRevision: row.decisionRevision })
+        revision = result.planRevision; done += 1
+      }
+      setBulk(copy.markAllDone(done))
+    } catch (cause) { setBulk(''); setError(copy.markAllStopped(done, targets.length, message(cause))) } finally { setBulkBusy(false) }
+  }
   return <section className={styles.section} aria-labelledby="season-returning-title">
     <h2 id="season-returning-title">{copy.returningStudents}</h2><p className={styles.muted}>{copy.rosterDescription} {copy.choicesSaveAsYouGo}</p>
     {rows.status === 'LoadingFirstPage' && <p role="status">{copy.loadingRoster}</p>}
+    {rows.results.length > 0 && <div className={styles.choices}><Button type="button" variant="outline" disabled={busyId !== null || bulkBusy} onClick={() => void markAll()}>{copy.markAllReturning}</Button><p className={styles.muted}>{copy.markAllHelp}</p></div>}
+    {bulk && <p role="status">{bulk}</p>}
     {rows.results.length > 0 && <div className={styles.roster}>{rows.results.map(row => <article className={styles.student} key={row.studentId}>
-      <div><strong>{row.legalName || row.preferredName}</strong><small>{row.subteam}</small>{row.decisionStale && <small className={styles.error}>{copy.staleDecision}</small>}</div>
+      <div><strong>{row.legalName || row.preferredName}</strong><small>{subteamLabel(row.subteam)}</small>{row.decisionStale && <small className={styles.error}>{copy.staleDecision}</small>}</div>
       <div className={styles.choices} role="group" aria-label={`${row.legalName || row.preferredName} season decision`}>
-        <Button type="button" variant={row.choice === 'return' ? 'default' : 'outline'} aria-pressed={row.choice === 'return'} disabled={busyId !== null} onClick={() => void pick(row, 'return')}>{copy.returning}</Button>
-        <Button type="button" variant={row.choice === 'depart' ? 'default' : 'outline'} aria-pressed={row.choice === 'depart'} disabled={busyId !== null} onClick={() => void pick(row, 'depart')}>{copy.departing}</Button>
-        <Button type="button" variant={row.choice === null ? 'default' : 'outline'} aria-pressed={row.choice === null} disabled={busyId !== null} onClick={() => void pick(row, null)}>{copy.undecided}</Button>
+        <Button type="button" variant={row.choice === 'return' ? 'default' : 'outline'} aria-pressed={row.choice === 'return'} disabled={busyId !== null || bulkBusy} onClick={() => void pick(row, 'return')}>{copy.returning}</Button>
+        <Button type="button" variant={row.choice === 'depart' ? 'default' : 'outline'} aria-pressed={row.choice === 'depart'} disabled={busyId !== null || bulkBusy} onClick={() => void pick(row, 'depart')}>{copy.departing}</Button>
+        <Button type="button" variant={row.choice === null ? 'default' : 'outline'} aria-pressed={row.choice === null} disabled={busyId !== null || bulkBusy} onClick={() => void pick(row, null)}>{copy.undecided}</Button>
       </div>{savedId === row.studentId && <small role="status">{copy.saved}</small>}
     </article>)}</div>}
     {rows.status === 'Exhausted' && rows.results.length === 0 && <p>{copy.noStudents}</p>}
@@ -140,13 +161,14 @@ function RosterReview({ plan }: { plan: Plan }) {
 export function SeasonAdministration() {
   const [step, setStep] = useState(0)
   const [furthest, setFurthest] = useState(0)
+  const [focus, setFocus] = useState<Id<'students'> | null>(null)
   const completedSource = useRef<string | null>(null)
   const view = useQuery(api.seasonAdmin.overview, {})
   if (view === undefined) return <p role="status">{copy.loading}</p>
   const plan = view.plan as Plan | null
   if (plan && plan.state !== "draft") completedSource.current = view.source.id
   const completed = completedSource.current !== null && completedSource.current !== view.source.id
-  const goTo = (next: number) => { setStep(next); setFurthest(current => Math.max(current, next)) }
+  const goTo = (next: number, studentId?: Id<'students'>) => { setFocus(studentId ?? null); setStep(next); setFurthest(current => Math.max(current, next)) }
   const isDraft = plan?.state === 'draft'
   const finished = steps.map((label, index) => ({ label, index })).filter(item => item.index < furthest && item.index !== step)
   return <div className={styles.page}>
@@ -164,7 +186,7 @@ export function SeasonAdministration() {
     {view.kickoff?.state === 'verified' && <p>{copy.verifiedKickoff(view.kickoff.kickoffDate)}</p>}
     {view.kickoff?.state === 'unavailable' && <p className={styles.notice}>{copy.unverifiedKickoff}</p>}
     {isDraft && step === 1 && <RosterReview plan={plan} />}
-    {isDraft && step >= 2 && <SeasonReviewSteps plan={plan} step={step} onContinue={() => goTo(step + 1)} />}
+    {isDraft && step >= 2 && <SeasonReviewSteps key={`${step}:${focus ?? ''}`} plan={plan} step={step} focusStudentId={focus} onFix={goTo} onContinue={() => goTo(step + 1)} />}
     {isDraft && step >= 1 && <div className={styles.wizardNav}>
       <Button type="button" variant="outline" onClick={() => goTo(step - 1)}>{copy.back}</Button>
       {step <= 3 && <Button type="button" onClick={() => goTo(step + 1)}>{copy.continue}</Button>}

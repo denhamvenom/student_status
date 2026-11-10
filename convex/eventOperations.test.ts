@@ -160,3 +160,41 @@ describe("event operations", () => {
     expect(await f.t.run(ctx => ctx.db.get(request))).not.toBeNull();
   });
 });
+
+// November 10 owner decisions: requirements are Something to know or checked off; the short name is made from what it says.
+describe("custom requirements", () => {
+  it("makes a unique short name per event from what it says, and keeps it when edited", async () => {
+    const f = await fixture();
+    const other = await f.t.run(async ctx => { const e = (await ctx.db.get(f.ids.event))!; const { _id, _creationTime, ...fields } = e; return ctx.db.insert("events", { ...fields, name: "Other trip" }); });
+    const add = (eventId: typeof other, label: string) => f.coach.mutation(api.eventOperations.saveRequirement, { eventId, label });
+    const keys = [];
+    for (const label of ["Lunch order", "lunch order!", "Lunch-Order", "Pay", "???"]) keys.push((await add(f.ids.event, label)).key);
+    expect(keys).toEqual(["lunch-order", "lunch-order-2", "lunch-order-3", "requirement", "requirement-2"]);
+    // Another event starts its own names.
+    expect((await add(other, "Lunch order")).key).toBe("lunch-order");
+    expect((await f.coach.mutation(api.eventOperations.saveRequirement, { eventId: f.ids.event, key: "lunch-order", label: "Lunch order form" })).key).toBe("lunch-order");
+    const rows = await f.t.run(ctx => ctx.db.query("requirements").withIndex("by_eventId", q => q.eq("eventId", f.ids.event)).collect());
+    expect(rows).toHaveLength(5);
+    expect(rows.find(r => r.key === "lunch-order")).toMatchObject({ label: "Lunch order form", kind: "checkoff" });
+  });
+
+  it("saves Something to know without a due date, and never lets anyone check it off", async () => {
+    const f = await fixture();
+    const { key } = await f.coach.mutation(api.eventOperations.saveRequirement, { eventId: f.ids.event, label: "Wear team shirt", kind: "info", dueAt: Date.now() + 86400_000 });
+    const row = await f.t.run(ctx => ctx.db.query("requirements").withIndex("by_eventId_and_key", q => q.eq("eventId", f.ids.event).eq("key", key)).unique());
+    expect(row).toMatchObject({ kind: "info", label: "Wear team shirt" });
+    expect(row?.dueAt).toBeUndefined();
+    await expect(f.coach.mutation(api.participation.recordRequirement, { eventId: f.ids.event, studentId: f.ids.students[0], key, complete: true })).rejects.toThrow("nothing to check off");
+    await expect(f.lead.mutation(api.eventOperations.saveRequirement, { eventId: f.ids.event, label: "Bring water" })).rejects.toThrow("Only a Coach");
+  });
+
+  it("refuses to turn a requirement into Something to know once a student has it checked off", async () => {
+    const f = await fixture();
+    const { key } = await f.coach.mutation(api.eventOperations.saveRequirement, { eventId: f.ids.event, label: "Bring lunch money" });
+    await f.t.run(async ctx => {
+      const coach = (await ctx.db.query("appUsers").collect()).find(u => u.role === "coach")!;
+      await ctx.db.insert("requirementCompletions", { eventId: f.ids.event, studentId: f.ids.students[0], key, completedBy: coach._id, completedAt: 1 });
+    });
+    await expect(f.coach.mutation(api.eventOperations.saveRequirement, { eventId: f.ids.event, key, label: "Bring lunch money", kind: "info" })).rejects.toThrow("already have this checked off");
+  });
+});

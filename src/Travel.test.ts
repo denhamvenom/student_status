@@ -33,15 +33,19 @@ describe('transportation controls', () => {
 })
 
 describe('driver wizard steps', () => {
-  const ok = { name: 'Sam Driver', email: 'sam@example.org', phone: '555-0100', vehicleName: '', seats: '6', approved: false, towCapable: false, active: true }
+  const vehicleMessage = 'Enter the vehicle, like “Gray minivan”, so a Coach or Travel Lead can tell it apart.'
+  const seatsMessage = 'Enter passenger seats as a whole number from 1 to 100. A driver who carries no students does not need to be added.'
+  const ok = { name: 'Sam Driver', email: 'sam@example.org', phone: '555-0100', vehicleName: 'Gray minivan', seats: '6', approved: false, towCapable: false, active: true }
   it.each([
     [0, { name: ' ' }, 'Enter the driver’s name.'],
     [0, { email: 'sam' }, 'Enter a full email address, like name@example.org.'],
     [0, { phone: '' }, 'Enter a phone number.'],
-    [1, { seats: '' }, 'Enter passenger seats as a whole number from 0 to 100.'],
-    [1, { seats: '101' }, 'Enter passenger seats as a whole number from 0 to 100.'],
-    [1, { seats: '2.5' }, 'Enter passenger seats as a whole number from 0 to 100.'],
-    [1, { seats: '0' }, ''],
+    [1, { vehicleName: '  ' }, vehicleMessage],
+    [1, { seats: '' }, seatsMessage],
+    [1, { seats: '0' }, seatsMessage],
+    [1, { seats: '101' }, seatsMessage],
+    [1, { seats: '2.5' }, seatsMessage],
+    [1, { vehicleName: 'Gray minivan', seats: '1' }, ''],
     [2, {}, ''],
   ])('step %i with %o -> %s', (step, change, expected) => {
     expect(driverStepIssue(step, { ...ok, ...change })).toBe(expected)

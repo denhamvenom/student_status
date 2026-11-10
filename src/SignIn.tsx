@@ -5,8 +5,8 @@ import { Button } from './components/ui/button'
 import { ParentEmailSignIn } from './ParentInvites'
 import { liveCopy } from './lib/live-copy'
 import { uiCopy } from './lib/ui-copy'
-import { useSignOut } from './notifications/useSignOut'
-import { browserIntentStorage as intentStorage, clearSignInIntent, isGoogleIntent, readSignInIntent, recordSignInScreenChange, takeSignInNotice, writeSignInIntent, writeSignInNotice, type GoogleSignInIntent, type SignInIntent } from './lib/authReturn'
+import { useSignOutResult } from './notifications/useSignOut'
+import { browserIntentStorage as intentStorage, clearSignInIntent, isGoogleIntent, readSignInIntent, recordSignInScreenChange, signOutThenStart, takeSignInNotice, writeSignInIntent, writeSignInNotice, type GoogleSignInIntent, type SignInIntent } from './lib/authReturn'
 
 // Vite replaces import.meta.env.DEV with false in production builds, so this chunk is never emitted there.
 const DeveloperSignIn = import.meta.env.DEV ? lazy(() => import('./DeveloperSignIn')) : null
@@ -73,7 +73,7 @@ export function UseDifferentGoogleAccount({ intent, className, redirectPath = '/
   cleanup?: () => void
 }) {
   const { signIn } = useAuthActions()
-  const signOut = useSignOut(cleanup)
+  const signOut = useSignOutResult(cleanup)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const start = async () => {
@@ -87,9 +87,12 @@ export function UseDifferentGoogleAccount({ intent, className, redirectPath = '/
       return
     }
     try {
-      await signOut()
-      if (storage && intent) writeSignInIntent(storage, intent, Date.now())
-      await signIn('google', { redirectTo: `${window.location.origin}${redirectPath}` })
+      const outcome = await signOutThenStart(signOut, async () => {
+        if (storage && intent) writeSignInIntent(storage, intent, Date.now())
+        await signIn('google', { redirectTo: `${window.location.origin}${redirectPath}` })
+      })
+      // Forced: the app is already reloading at '/', and `cleanup` already ran there. Stay busy; do not start a second navigation.
+      if (outcome === 'forced') return
     } catch (cause) {
       cleanup?.()
       const text = userFacingError(cause, uiCopy.errors.signIn)

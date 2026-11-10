@@ -1,6 +1,6 @@
 import { ConvexError } from 'convex/values';
 const prefix = 'User message: ';
-const recovery = 'Processing stopped. Ask a Coach to review the current status before retrying.';
+const recovery = 'Processing stopped. Ask a Coach to review the current status before trying again.';
 /** Only explicitly public application errors may be saved as user-facing diagnostics. */
 export function savedPublicError(error: unknown, fallback = recovery): string {
   const data = error instanceof ConvexError ? error.data : null;

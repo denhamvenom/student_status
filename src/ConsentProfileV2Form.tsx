@@ -7,22 +7,26 @@ import type { Id } from '../convex/_generated/dataModel'
 import type { ConsentProfileV2 } from '../convex/lib/consentSnapshotV2'
 import { Input } from './components/ui/input'
 import { GradeSelect } from './GradeSelect'
-import { ContactsFields, MedicalFields, ReviewSections, WizardField, WizardFrame, contactRows, healthRows, reviewDate, shown, type HealthChosen } from './SetupWizard'
+import { ContactsFields, MedicalStep, ReviewSections, WizardField, WizardFrame, contactRows, healthRows, reviewDate, shown, type HealthChosen } from './SetupWizard'
+import { setupWizardCopy as copy } from './lib/setup-wizard-copy'
 import styles from './ConsentProfileV2Form.module.css'
 
 type Profile = FunctionReturnType<typeof api.permissionsV2.profile>
 const blank = (): ConsentProfileV2 => ({ grade: '', dateOfBirth: '', guardian: { name: '', relationship: '', phone: '', email: '' }, emergency: { name: '', relationship: '', phone: '' }, allergies: { state: 'none', entries: [] }, prescriptions: { state: 'none', entries: [] }, insurance: { state: 'unavailable', provider: null, policy: null }, physician: { state: 'unavailable', name: null, phone: null } })
-const steps = ['Student details', 'Contacts', 'Health information', 'Review'] as const
-const REVIEW = 3
+// One health topic per step, the same four steps the setup wizard uses.
+const steps = ['Student details', 'Contacts', copy.health.allergies.title, copy.health.prescriptions.title, copy.health.insurance.title, copy.health.physician.title, 'Review'] as const
+const TOPICS = ['allergies', 'prescriptions', 'insurance', 'physician'] as const
+const FIRST_HEALTH = 2
+const REVIEW = steps.length - 1
 
-/** `studentName` is the student's preferred name when the caller already has it; the contact questions say "your student" without it. */
-export function ConsentProfileV2Form({ studentId, studentName }: { studentId: Id<'students'>; studentName?: string }) {
+/** `studentName` is the student's preferred name when the caller already has it; the contact questions say "your student" without it. `accountEmail` is the signed-in account's email. */
+export function ConsentProfileV2Form({ studentId, studentName, accountEmail }: { studentId: Id<'students'>; studentName?: string; accountEmail?: string }) {
   const profile = useQuery(api.permissionsV2.profile, { studentId })
   if (!profile) return <p role="status">Loading health and contact information…</p>
-  return <ProfileEditor key={`${studentId}:${profile.revision}`} profile={profile} studentName={studentName?.trim() || 'your student'} />
+  return <ProfileEditor key={`${studentId}:${profile.revision}`} profile={profile} studentName={studentName?.trim() || 'your student'} accountEmail={accountEmail} />
 }
 
-function ProfileEditor({ profile, studentName }: { profile: Profile; studentName: string }) {
+function ProfileEditor({ profile, studentName, accountEmail }: { profile: Profile; studentName: string; accountEmail?: string }) {
   const save = useMutation(api.permissionsV2.saveProfile)
   const [value, setValue] = useState<ConsentProfileV2>(() => profile.value ?? blank())
   const [chosen, setChosen] = useState<HealthChosen>(() => ({ allergies: !!profile.value, prescriptions: !!profile.value, insurance: !!profile.value, physician: !!profile.value }))
@@ -30,11 +34,12 @@ function ProfileEditor({ profile, studentName }: { profile: Profile; studentName
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
+  const topic = step >= FIRST_HEALTH && step < REVIEW ? TOPICS[step - FIRST_HEALTH] : null
   const goTo = (next: number) => { setStep(next); setError(''); setSaved(false) }
   async function submit(event: FormEvent) {
     event.preventDefault()
     setError(''); setSaved(false)
-    if (step === 2 && !Object.values(chosen).every(Boolean)) { setError('Choose an answer for allergies, medications, insurance, and physician.'); return }
+    if (topic && !chosen[topic]) { setError(copy.healthChoose); return }
     if (step < REVIEW) { setStep(step + 1); return }
     setBusy(true)
     try { await save({ studentId: profile.studentId, expectedRevision: profile.revision, value }); setSaved(true) }
@@ -50,12 +55,12 @@ function ProfileEditor({ profile, studentName }: { profile: Profile; studentName
         <WizardField label="Grade"><GradeSelect value={value.grade} original={profile.value?.grade} onChange={grade => setValue(current => ({ ...current, grade }))}/></WizardField>
         <WizardField label="Date of birth"><Input required type="date" value={value.dateOfBirth} onChange={event => setValue(current => ({ ...current, dateOfBirth: event.target.value }))}/></WizardField>
       </div>
-      : step === 1 ? <ContactsFields studentName={studentName} value={{ guardian: value.guardian, emergency: value.emergency }} setValue={next => setValue(current => ({ ...current, ...next }))}/>
-      : step === 2 ? <MedicalFields value={value} setValue={next => setValue(current => ({ ...current, allergies: next.allergies, prescriptions: next.prescriptions, insurance: next.insurance, physician: next.physician }))} chosen={chosen} setChosen={setChosen}/>
+      : step === 1 ? <ContactsFields studentName={studentName} accountEmail={accountEmail} value={{ guardian: value.guardian, emergency: value.emergency }} setValue={next => setValue(current => ({ ...current, ...next }))}/>
+      : topic ? <MedicalStep topic={topic} studentName={studentName} value={value} setValue={next => setValue(current => ({ ...current, allergies: next.allergies, prescriptions: next.prescriptions, insurance: next.insurance, physician: next.physician }))} chosen={chosen} setChosen={setChosen}/>
       : <ReviewSections onEdit={goTo} sections={[
         { title: steps[0], step: 0, rows: [['Grade', shown(value.grade)], ['Date of birth', reviewDate(value.dateOfBirth)]] },
         { title: steps[1], step: 1, rows: contactRows({ guardian: value.guardian, emergency: value.emergency }) },
-        { title: steps[2], step: 2, rows: healthRows(value) },
+        { title: copy.healthSection, step: FIRST_HEALTH, rows: healthRows(value) },
       ]}/>}
     </WizardFrame>
     {saved && <p role="status" className={styles.ready}>Confirmed. You can now prepare a permission form for eligible events.</p>}

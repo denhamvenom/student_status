@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { api } from '../convex/_generated/api'
@@ -7,7 +7,7 @@ import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { NativeSelect, NativeSelectOption } from './components/ui/native-select'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './components/ui/dialog'
-import { ConfirmAction } from './ConfirmAction'
+import { ReviewRow, StepWizard } from './components/StepWizard'
 import { userFacingError } from './lib/error-message'
 import styles from './CoachProfileEdit.module.css'
 
@@ -47,29 +47,47 @@ function ReasonField({ value, onChange, disabled, emailChanged }: { value: strin
   return <label className={styles.field}>{emailChanged ? 'Reason for the email change' : 'Reason (optional)'}<Input value={value} required={emailChanged} maxLength={REASON_MAX} disabled={disabled} onChange={event => onChange(event.target.value)}/></label>
 }
 
-/**
- * Runs a confirmed save with the edit box locked (it cannot be dismissed mid-save) and any failure shown inside the
- * box as well as in the confirmation, so it is still there after the Coach closes the confirmation.
- */
-function confirmedSave(save: () => Promise<void>, setBusy: (busy: boolean) => void, onBusy: (busy: boolean) => void, setError: (error: string) => void) {
-  return async () => {
-    setBusy(true); onBusy(true); setError('')
-    try { await save() } catch (cause) { setError(userFacingError(cause, failed)); throw cause } finally { setBusy(false); onBusy(false) }
-  }
+export const profileWizardCopy = {
+  title: 'Edit profile',
+  steps: ['What to change', 'Reason', 'Review'],
+  next: 'Continue',
+  save: 'Save profile',
+  saving: 'Saving…',
+  stale: 'This profile changed since you opened it. Load the latest before saving.',
+  loadLatest: 'Load latest',
+  reasonHint: 'The reason is saved with the change so other Coaches can see why.',
+  changed: 'changed',
+  empty: 'Not provided',
+} as const
+
+type ReviewLine = { label: string; value: string; changed: boolean }
+
+/** Each field's value for the Review step, marked when it differs from what the Coach opened. */
+export function reviewLines(fields: { label: string; original: string; value: string }[]): ReviewLine[] {
+  return fields.map(({ label, original, value }) => ({ label, value: value.trim() || profileWizardCopy.empty, changed: value.trim() !== original.trim() }))
 }
 
-/** Save directly, or freeze the change behind ConfirmAction when the login email moves. */
-function SaveControls({ busy, stale, emailChanged, invalid, onCancel, onReload, run }: { busy: boolean; stale: boolean; emailChanged: boolean; invalid: boolean; onCancel: () => void; onReload: () => void; run: () => Promise<unknown> }) {
-  return <>
-    {stale && <p role="status" className={styles.warning}>This profile changed since you opened it. Load the latest before saving.</p>}
-    <div className={styles.actions}>
-      <Button type="button" variant="outline" disabled={busy} onClick={onCancel}>Cancel</Button>
-      {stale && <Button type="button" variant="outline" onClick={onReload}>Load latest</Button>}
-      {emailChanged
-        ? <ConfirmAction title="Change the sign-in email?" disabled={busy || stale || invalid} description={`Change the sign-in email? ${signInWarning}`} onConfirm={run}>Save profile</ConfirmAction>
-        : <Button type="submit" disabled={busy || stale || invalid}>{busy ? 'Saving…' : 'Save profile'}</Button>}
-    </div>
-  </>
+/**
+ * Edit profile as three steps: What to change, Reason, Review. Nothing is saved until Save profile on Review,
+ * and a changed sign-in email is called out there, so the Review step is the confirmation.
+ */
+function ProfileWizard({ stale, onReload, onCancel, busy, error, fieldsValid, emailChanged, emailNote, reason, onReason, lines, onSave, children }: { stale: boolean; onReload: () => void; onCancel: () => void; busy: boolean; error: string; fieldsValid: boolean; emailChanged: boolean; emailNote: string; reason: string; onReason: (value: string) => void; lines: ReviewLine[]; onSave: () => void; children: ReactNode }) {
+  const [step, setStep] = useState(0)
+  const reasonMissing = emailChanged && !reason.trim()
+  const ready = [fieldsValid, !reasonMissing, fieldsValid && !reasonMissing && !stale]
+  const last = step === profileWizardCopy.steps.length - 1
+  return <div className={styles.form}>
+    {stale && <p role="status" className={styles.warning}>{profileWizardCopy.stale} <Button type="button" variant="outline" onClick={onReload}>{profileWizardCopy.loadLatest}</Button></p>}
+    <StepWizard title={profileWizardCopy.title} step={step + 1} total={profileWizardCopy.steps.length} heading={profileWizardCopy.steps[step]!} nextLabel={last ? (busy ? profileWizardCopy.saving : profileWizardCopy.save) : profileWizardCopy.next} nextDisabled={!ready[step]} onNext={last ? onSave : () => setStep(step + 1)} onBack={step > 0 ? () => setStep(step - 1) : undefined} onCancel={onCancel} busy={busy} error={error} className={styles.form}>
+      {step === 0 && children}
+      {step === 1 && <><ReasonField value={reason} onChange={onReason} disabled={busy} emailChanged={emailChanged}/><p className={styles.muted}>{profileWizardCopy.reasonHint}</p></>}
+      {step === 2 && <>
+        <dl className="m-0">{lines.map(line => <ReviewRow key={line.label} label={line.label} value={<>{line.value}{line.changed && <span className={styles.muted}> · {profileWizardCopy.changed}</span>}</>} onEdit={() => setStep(0)} disabled={busy}/>)}
+          <ReviewRow label={profileWizardCopy.steps[1]!} value={reason.trim() || profileWizardCopy.empty} onEdit={() => setStep(1)} disabled={busy}/></dl>
+        {emailChanged && <p role="status" className={styles.warning}><strong>Sign-in email is changing.</strong> {emailNote}</p>}
+      </>}
+    </StepWizard>
+  </div>
 }
 
 function AdultFields({ profile, stale, onReload, onCancel, onSaved, onBusy }: { profile: AdultProfile; stale: boolean; onReload: () => void; onCancel: () => void; onSaved: (message: string) => void; onBusy: (busy: boolean) => void }) {
@@ -82,25 +100,21 @@ function AdultFields({ profile, stale, onReload, onCancel, onSaved, onBusy }: { 
   const [error, setError] = useState('')
   const emailChanged = emailKey(email) !== emailKey(profile.email)
   const save = async () => {
-    const result = await update({ userId: profile.userId, expectedProfileRevision: profile.profileRevision, name, email, phone, reason: reason.trim() || undefined })
-    onSaved(savedMessage(result, email))
-  }
-  const confirmed = confirmedSave(save, setBusy, onBusy, setError)
-  const submit = async (event: FormEvent) => {
-    event.preventDefault(); if (busy || stale || emailChanged) return
+    if (busy || stale) return
     setBusy(true); onBusy(true); setError('')
-    try { await save() } catch (cause) { setError(userFacingError(cause, failed)) } finally { setBusy(false); onBusy(false) }
+    try {
+      const result = await update({ userId: profile.userId, expectedProfileRevision: profile.profileRevision, name, email, phone, reason: reason.trim() || undefined })
+      onSaved(savedMessage(result, email))
+    } catch (cause) { setError(userFacingError(cause, failed)) } finally { setBusy(false); onBusy(false) }
   }
-  return <form className={styles.form} onSubmit={event => void submit(event)}>
+  return <ProfileWizard stale={stale} onReload={onReload} onCancel={onCancel} busy={busy} error={error} fieldsValid={!!name.trim() && !!email.trim()} emailChanged={emailChanged} emailNote={signInWarning} reason={reason} onReason={setReason} onSave={() => void save()}
+    lines={reviewLines([{ label: 'Name', original: profile.name, value: name }, { label: 'Sign-in email', original: profile.email, value: email }, { label: 'Phone', original: profile.phone, value: phone }])}>
     <p className={styles.muted}>{roleName[profile.role]}{profile.active ? '' : ' · Inactive account'}</p>
     <label className={styles.field}>Name<Input value={name} required maxLength={100} disabled={busy} onChange={event => setName(event.target.value)}/></label>
     <EmailField value={email} original={profile.email} onChange={setEmail} disabled={busy || profile.isSelf}/>
     {profile.isSelf && <p className={styles.muted}>Ask another Coach to change your own sign-in email.</p>}
     <label className={styles.field}>Phone<Input type="tel" autoComplete="off" maxLength={50} value={phone} disabled={busy} onChange={event => setPhone(event.target.value)}/></label>
-    <ReasonField value={reason} onChange={setReason} disabled={busy} emailChanged={emailChanged}/>
-    {error && <p role="alert" className="open-text">{error}</p>}
-    <SaveControls busy={busy} stale={stale} emailChanged={emailChanged} invalid={!name.trim() || !email.trim() || (emailChanged && !reason.trim())} onCancel={onCancel} onReload={onReload} run={confirmed}/>
-  </form>
+  </ProfileWizard>
 }
 
 function AdultEditor({ userId, onCancel, onSaved, onBusy }: { userId: Id<'appUsers'>; onCancel: () => void; onSaved: (message: string) => void; onBusy: (busy: boolean) => void }) {
@@ -161,29 +175,26 @@ function StudentFields({ profile, stale, onReload, onCancel, onSaved, onBusy }: 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const emailChanged = emailKey(email) !== emailKey(profile.email)
+  const linked = profile.signIn === 'linked'
   const save = async () => {
-    const result = await update({ studentId: profile.studentId, expectedRevision: profile.profileRevision, legalName, preferredName, email, shirtSize: shirtSize || null, reason: reason.trim() || undefined })
-    onSaved(profile.signIn === 'linked' ? savedMessage(result, email) : 'Profile saved.')
-  }
-  const confirmed = confirmedSave(save, setBusy, onBusy, setError)
-  const confirmEmail = emailChanged && profile.signIn === 'linked'
-  const submit = async (event: FormEvent) => {
-    event.preventDefault(); if (busy || stale || confirmEmail) return
+    if (busy || stale) return
     setBusy(true); onBusy(true); setError('')
-    try { await save() } catch (cause) { setError(userFacingError(cause, failed)) } finally { setBusy(false); onBusy(false) }
+    try {
+      const result = await update({ studentId: profile.studentId, expectedRevision: profile.profileRevision, legalName, preferredName, email, shirtSize: shirtSize || null, reason: reason.trim() || undefined })
+      onSaved(linked ? savedMessage(result, email) : 'Profile saved.')
+    } catch (cause) { setError(userFacingError(cause, failed)) } finally { setBusy(false); onBusy(false) }
   }
-  return <form className={styles.form} onSubmit={event => void submit(event)}>
+  const emailNote = linked ? signInWarning : 'No student sign-in is linked yet, so this changes the roster email only.'
+  return <ProfileWizard stale={stale} onReload={onReload} onCancel={onCancel} busy={busy} error={error} fieldsValid={!!legalName.trim() && !!preferredName.trim() && !!email.trim()} emailChanged={emailChanged} emailNote={emailNote} reason={reason} onReason={setReason} onSave={() => void save()}
+    lines={reviewLines([{ label: 'Legal name', original: profile.legalName, value: legalName }, { label: 'Preferred name', original: profile.preferredName, value: preferredName }, { label: 'Sign-in email', original: profile.email, value: email }, { label: 'Shirt size', original: profile.shirtSize ?? '', value: shirtSize }])}>
     <div className={styles.row}>
       <label className={styles.field}>Legal name<Input value={legalName} required maxLength={160} disabled={busy} onChange={event => setLegalName(event.target.value)}/></label>
       <label className={styles.field}>Preferred name<Input value={preferredName} required maxLength={80} disabled={busy} onChange={event => setPreferredName(event.target.value)}/></label>
     </div>
-    <EmailField value={email} original={profile.email} onChange={setEmail} disabled={busy} note={profile.signIn === 'linked' ? undefined : 'No student sign-in is linked yet, so this changes the roster email only.'}/>
+    <EmailField value={email} original={profile.email} onChange={setEmail} disabled={busy} note={linked ? undefined : emailNote}/>
     <label className={styles.field}>Shirt size<NativeSelect value={shirtSize} disabled={busy} onChange={event => setShirtSize(event.target.value as Size | '')}><NativeSelectOption value="" disabled={profile.shirtSize !== null}>Not provided</NativeSelectOption>{SIZES.map(size => <NativeSelectOption key={size} value={size}>{size}</NativeSelectOption>)}</NativeSelect></label>
     <p className={styles.muted}>Health, emergency and guardian details stay with the permission form.</p>
-    <ReasonField value={reason} onChange={setReason} disabled={busy} emailChanged={emailChanged}/>
-    {error && <p role="alert" className="open-text">{error}</p>}
-    <SaveControls busy={busy} stale={stale} emailChanged={confirmEmail} invalid={!legalName.trim() || !preferredName.trim() || !email.trim() || (emailChanged && !reason.trim())} onCancel={onCancel} onReload={onReload} run={confirmed}/>
-  </form>
+  </ProfileWizard>
 }
 
 function StudentEditor({ studentId, onCancel, onSaved, onBusy }: { studentId: Id<'students'>; onCancel: () => void; onSaved: (message: string) => void; onBusy: (busy: boolean) => void }) {

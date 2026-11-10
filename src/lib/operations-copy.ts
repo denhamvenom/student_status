@@ -65,7 +65,7 @@ export const operationsCopy = {
     "participationStatusAndAnyReservedRoomPlaceRemainUnchangedWhileThisRequestIsPendi": "Participation status and any reserved room place remain unchanged while this request is pending.",
     "charge": "Fee",
     "category": "Category",
-    "charged": "Charged",
+    "charged": "Fee amount",
     "originalCharge": "Original fee",
     "adjustment": "Adjustment",
     "cancelledObligation": "Canceled obligation",
@@ -374,6 +374,10 @@ export const operationsText = {
     requestWithdrawalTitle: 'Ask to withdraw?',
     requestWithdrawal: (eventName: string) => `Ask to withdraw from ${eventName}? A Coach or Travel Lead will review it. Your place and room stay the same until they decide.`,
   },
+  /** The event page's shift section (Event readiness links to it). */
+  shiftRoster: {
+    summary: (shifts: number, open: number, needing: number) => [`${shifts} ${shifts === 1 ? 'shift' : 'shifts'}`, `${open} open ${open === 1 ? 'spot' : 'spots'}`, ...(needing ? [`${needing} still ${needing === 1 ? 'needs' : 'need'} to pick`] : [])].join(' · '),
+  },
   event: {
     // Short status lines (design audit, November 2026); the rules prose sits behind a "?" (event.signupRules).
     signedUp: (count: number, capacity: number | undefined, available: number | null) => `${count}${capacity !== undefined ? ` of ${capacity}` : ''} signed up${available !== null ? ` · ${available} left` : ''}`,
@@ -427,4 +431,41 @@ export const operationsText = {
     occupancy: (count: number, state: string, review: string, fifth: string) => `${count} occupant${count === 1 ? '' : 's'} · ${state}${review}${fifth}`,
     removedFromRoom: (name: string) => `${name} removed from room.`,
   },
+} as const
+
+/**
+ * Event page requirement wizard (November 10 owner decision): a Coach chooses the kind first. "Something to know" is a note
+ * only; "Checked off by a Coach or Travel Lead" can have a due date. The short internal name is made automatically.
+ */
+export const requirementWizardCopy = {
+  add: 'Add requirement',
+  titleAdd: 'Add a requirement',
+  titleEdit: 'Edit requirement',
+  steps: { kind: 'What kind of requirement is it?', says: 'What it says', due: 'Due date', review: 'Review' },
+  kinds: {
+    info: 'Something to know',
+    infoHint: 'Information only, like "Wear your team shirt." Students and Parents see it as a note. Nothing to check off.',
+    checkoff: 'Checked off by a Coach or Travel Lead',
+    checkoffHint: 'A Coach or Travel Lead marks it done for each student. Until then the student is not ready. Students and Parents can\'t check it off.',
+  },
+  fields: {
+    label: 'What it says',
+    labelHint: 'Students and Parents see this. Up to 100 characters.',
+    instructions: 'Instructions (optional)',
+    link: 'Web link (optional, starts with https://)',
+    due: 'Due date (optional, Central Time)',
+    dueHint: 'Leave it blank if there is no due date.',
+  },
+  review: { kind: 'Kind', label: 'What it says', instructions: 'Instructions', link: 'Web link', due: 'Due date', none: 'None', noDue: 'No due date' },
+  continue: 'Continue',
+  save: 'Save requirement',
+  saving: 'Saving…',
+  errors: {
+    kind: 'Choose what kind of requirement it is.',
+    label: 'Enter what it says, up to 100 characters.',
+    instructions: 'Keep the instructions to 1,000 characters or fewer.',
+    link: 'The web link must start with https:// and be up to 500 characters. Fix it or leave it blank.',
+    due: 'Enter a valid due date, or leave it blank.',
+  },
+  infoTag: 'Something to know',
 } as const

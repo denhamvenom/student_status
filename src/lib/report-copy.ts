@@ -1,6 +1,6 @@
 export const reportCopy = {
   moreCharges: 'More fees', moreHistory: 'Show more transactions',
-  loading: 'Loading report…', unavailable: 'Unavailable', details: 'Details', updated: 'Updated',
+  loading: 'Loading report…', unavailable: 'Unavailable', raisedUnavailable: 'Not tracked for older credits', details: 'Details', updated: 'Updated',
   raised: 'Raised', travelShare: 'Fundraising credit earned', transfersReceived: 'Transfers received',
   funding: 'Fundraising', grossUnavailable: "Older fundraising credits don't include the full amount raised. Transfers and carried-over credit are not counted as money raised.",
   attendance: 'Attendance', 

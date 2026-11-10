@@ -37,7 +37,7 @@ export function FeePaymentImport() {
   const [date, setDate] = useState(today)
   const [reference, setReference] = useState('')
   const [review, setReview] = useState<Review | null>(null)
-  const [results, setResults] = useState<Record<string, 'saved' | 'retry'>>({})
+  const [results, setResults] = useState<Record<string, 'saved' | 'again'>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const guard = useRef(false)
@@ -78,7 +78,7 @@ export function FeePaymentImport() {
       for (const row of review.payments) {
         if (results[row.rowKey] === 'saved' || review.states.find(item => item.rowKey === row.rowKey)?.state === 'recorded') continue
         try { await recordRow({ batchId: batch.batchId, rowKey: row.rowKey }); setResults(previous => ({ ...previous, [row.rowKey]: 'saved' })) }
-        catch (failure) { setResults(previous => ({ ...previous, [row.rowKey]: 'retry' })); throw failure }
+        catch (failure) { setResults(previous => ({ ...previous, [row.rowKey]: 'again' })); throw failure }
       }
     } catch (failure) { setError(errorText(failure)) }
     finally { guard.current = false; setBusy(false) }
@@ -87,10 +87,10 @@ export function FeePaymentImport() {
   const blocked = review?.states.some(item => item.state === 'stale' || item.state === 'invalid') ?? false
   return <Card className={styles.card}>
     <CardTitle>Fee payments from CSV</CardTitle>
-    <p className={styles.muted}>Choose a fee, download its assessed students, fill only New payment amount, then upload the same file. Payments go directly to this fee. Blank amounts are skipped. Keep Export batch, Row key, IDs, balances, and versions unchanged.</p>
+    <p className={styles.muted}>Choose a fee, download its students, fill in only New payment amount, then upload the same spreadsheet. Payments go directly to this fee. Blank amounts are skipped. Leave every other column as downloaded.</p>
     <div className={styles.fields}>
       <label className={styles.field}>Fee<NativeSelect value={feeId} disabled={busy || !!review} onChange={event => { setFeeId(event.target.value); invalidate() }}><NativeSelectOption value="">Choose a fee</NativeSelectOption>{fees.results.filter(item => item.definition.state === 'active').map(item => <NativeSelectOption key={item.definition._id} value={item.definition._id}>{item.definition.label}</NativeSelectOption>)}</NativeSelect></label>
-      <label className={styles.field}>Students to export<NativeSelect value={filter} disabled={busy || !!review} onChange={event => { setFilter(event.target.value as Filter); invalidate() }}><NativeSelectOption value="all">All assessed students</NativeSelectOption><NativeSelectOption value="paid">Fully paid students</NativeSelectOption><NativeSelectOption value="unpaid">Students who still owe</NativeSelectOption></NativeSelect></label>
+      <label className={styles.field}>Students to export<NativeSelect value={filter} disabled={busy || !!review} onChange={event => { setFilter(event.target.value as Filter); invalidate() }}><NativeSelectOption value="all">All students</NativeSelectOption><NativeSelectOption value="paid">Fully paid students</NativeSelectOption><NativeSelectOption value="unpaid">Students who still owe</NativeSelectOption></NativeSelect></label>
     </div>
     {fees.status === 'CanLoadMore' && <Button variant="outline" disabled={busy} onClick={() => fees.loadMore(20)}>Show more fees</Button>}
     <p className={styles.muted}>These filters use this fee's balance, including money already applied from fundraising. A fully paid fee has no balance for a new payment.</p>
@@ -106,7 +106,7 @@ export function FeePaymentImport() {
     {review && <div className={styles.history}>
       <p role="status">{review.feeLabel}: {review.payments.length} payment rows totaling {chargeCurrency(review.payments.reduce((total, row) => total + row.amountCents, 0))}; {review.rows.length - review.payments.length} blank rows skipped; {saved} saved.</p>
       <p className={styles.muted}>Date: {new Date(review.occurredAt).toLocaleDateString('en-US', { timeZone: 'America/Chicago' })}. Method: {review.method}. Reference: {review.reference || 'None'}. The reviewed file and these details are locked until you start over.</p>
-      {review.rows.filter(row => row.amountCents !== null).map(row => { const state = review.states.find(item => item.rowKey === row.rowKey); return <div className={styles.historyRow} key={row.rowKey}><strong>{state?.studentName ?? 'Student unavailable'}: new payment {chargeCurrency(row.amountCents!)}</strong><span>Charged {state?.chargedCents === null || state?.chargedCents === undefined ? 'unavailable' : chargeCurrency(state.chargedCents)} · Paid so far {state?.appliedCents === null || state?.appliedCents === undefined ? 'unavailable' : chargeCurrency(state.appliedCents)} · Owed {state?.owedCents === null || state?.owedCents === undefined ? 'unavailable' : chargeCurrency(state.owedCents)}</span><span role={state?.state === 'invalid' || state?.state === 'stale' || results[row.rowKey] === 'retry' ? 'alert' : 'status'}>{results[row.rowKey] === 'saved' || state?.state === 'recorded' ? 'Saved' : results[row.rowKey] === 'retry' ? 'Needs retry' : state?.message ?? state?.state ?? 'Ready'}</span></div> })}
+      {review.rows.filter(row => row.amountCents !== null).map(row => { const state = review.states.find(item => item.rowKey === row.rowKey); return <div className={styles.historyRow} key={row.rowKey}><strong>{state?.studentName ?? 'Student unavailable'}: new payment {chargeCurrency(row.amountCents!)}</strong><span>Fee {state?.chargedCents === null || state?.chargedCents === undefined ? 'unavailable' : chargeCurrency(state.chargedCents)} · Paid so far {state?.appliedCents === null || state?.appliedCents === undefined ? 'unavailable' : chargeCurrency(state.appliedCents)} · Balance due {state?.owedCents === null || state?.owedCents === undefined ? 'unavailable' : chargeCurrency(state.owedCents)}</span><span role={state?.state === 'invalid' || state?.state === 'stale' || results[row.rowKey] === 'again' ? 'alert' : 'status'}>{results[row.rowKey] === 'saved' || state?.state === 'recorded' ? 'Saved' : results[row.rowKey] === 'again' ? 'Not saved. Try again' : state?.message ?? state?.state ?? 'Ready'}</span></div> })}
       {blocked && <p role="alert" className={styles.error}>Some rows changed or cannot receive this payment. Export a fresh file for those balances. Previously saved rows remain saved.</p>}
       <div className={styles.actions}><Button disabled={busy || blocked || saved === review.payments.length} onClick={() => void confirm()}>{saved ? 'Try remaining payments again' : 'Confirm payments'}</Button><Button variant="outline" disabled={busy} onClick={() => { setReview(null); setFile(''); setResults({}); setError('') }}>Start over</Button></div>
     </div>}

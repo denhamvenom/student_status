@@ -97,7 +97,7 @@ export const processPage = internalMutation({
 export const run = internalMutation({ args: { jobId: v.id("financialOperationJobs") }, returns: v.null(), handler: async (ctx, args) => {
   const job = await ctx.db.get(args.jobId); if (!job || !job.historicalCorrectionSessionId || job.state !== "running") return null;
   try { await ctx.runMutation(pageRef, { jobId: job._id, step: job.step }); }
-  catch (error) { await ctx.db.patch(job._id, { state: "failed", lastError: savedPublicError(error, "This past-season correction stopped. Review it, then retry."), updatedAt: Date.now() }); const account = await financialAccount(ctx, job.studentId); if (account?.operationJobId === job._id) await ctx.db.patch(account._id, { state: "failed", lastError: savedPublicError(null, "Correction access ended before this finished. Open correction mode again, then retry."), updatedAt: Date.now() }); }
+  catch (error) { await ctx.db.patch(job._id, { state: "failed", lastError: savedPublicError(error, "This past-season correction stopped. Review it, then try again."), updatedAt: Date.now() }); const account = await financialAccount(ctx, job.studentId); if (account?.operationJobId === job._id) await ctx.db.patch(account._id, { state: "failed", lastError: savedPublicError(null, "Correction access ended before this finished. Open correction mode again, then try again."), updatedAt: Date.now() }); }
   return null;
 } });
 export const status = query({
@@ -115,14 +115,14 @@ export const status = query({
 export const retry = mutation({
   args: { correctionSessionId: v.id("historicalCorrectionSessions"), jobId: v.id("financialOperationJobs"), reason: v.string() }, returns: v.null(),
   handler: async (ctx, args) => {
-    const { actor, grant } = await requireHistoricalCorrection(ctx, args.correctionSessionId); const reason = args.reason.trim(); if (reason.length < 8 || reason.length > 1000) throw new ConvexError("Provide a reason for retrying this historical correction.");
+    const { actor, grant } = await requireHistoricalCorrection(ctx, args.correctionSessionId); const reason = args.reason.trim(); if (reason.length < 8 || reason.length > 1000) throw new ConvexError("Give a reason for trying this past-season correction again.");
     const job = await ctx.db.get(args.jobId); const account = job ? await financialAccount(ctx, job.studentId) : null;
     if (!job?.historicalCorrectionSessionId || job.kind !== "chargeCorrection" || !account || account.seasonId !== grant.seasonId || account.generation !== job.generation) throw new ConvexError("This correction is for a different season. Reload to see the latest.");
     const hold = await linkageHold(ctx, job.studentId); if (hold) throw new Error(hold);
     const allocation = account.allocationJobId ? await ctx.db.get(account.allocationJobId) : null;
     if (job.state === "failed" && account.operationJobId === job._id) { await ctx.db.patch(job._id, { actorId: actor._id, historicalCorrectionSessionId: grant._id, state: "running", lastError: undefined, updatedAt: Date.now() }); await ctx.db.patch(account._id, { state: "posting", lastError: undefined, updatedAt: Date.now() }); await ctx.scheduler.runAfter(0, runRef, { jobId: job._id }); }
     else if (job.state === "complete" && account.state === "failed" && allocation?.state === "failed" && allocation.maintenanceOriginId === job._id) { await ctx.db.patch(job._id, { actorId: actor._id, historicalCorrectionSessionId: grant._id }); await ctx.db.patch(allocation._id, { actorId: actor._id, state: "running", lastError: undefined, updatedAt: Date.now() }); await ctx.db.patch(account._id, { state: "allocating", lastError: undefined, updatedAt: Date.now() }); await ctx.scheduler.runAfter(0, makeFunctionReference<"mutation">("financialAllocation:run"), { jobId: allocation._id }); }
-    else throw new ConvexError("There is nothing stopped to retry. Reload to see the latest.");
+    else throw new ConvexError("Nothing stopped is waiting to try again. Reload to see the latest.");
     await audit(ctx, actor, "financialOperationJobs", job._id, "retryHistoricalFinancialCorrection", { correctionSessionId: job.historicalCorrectionSessionId }, { correctionSessionId: grant._id }, reason); return null;
   },
 });

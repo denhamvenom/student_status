@@ -1,17 +1,39 @@
 import type { Id } from '../../../convex/_generated/dataModel'
 import type { WhatsLeftItem } from '../student-home/contract'
-import { agendaLine, formatWhen, statusLabel, thisWeek, type AgendaEvent } from '../student-home/agenda'
+import { agendaLine, formatWhen, statusLabel, type AgendaEvent } from '../student-home/agenda'
+import { eventDateBucket } from '../../lib/event-list'
 import type { ParentHomeSummary } from './contract'
 
-export function groupWork(items: WhatsLeftItem[]) {
+/**
+ * Sorts What's left by who acts. FIRST registration is the Parent's turn only while the Coach's FIRST invitation link is
+ * ready (`firstLinkReady` not false); until then it is `waiting` for the Coach and does not count as something to do.
+ */
+export function groupWork(items: WhatsLeftItem[], options: { firstLinkReady?: boolean | null } = {}) {
+  const linkMissing = options.firstLinkReady === false
+  const isWaitingForLink = (item: WhatsLeftItem) => linkMissing && item.owner === 'parent' && item.kind === 'firstRegistration'
   return {
-    parent: items.filter(item => item.owner === 'parent'),
+    waiting: items.filter(isWaitingForLink),
+    parent: items.filter(item => item.owner === 'parent' && !isWaitingForLink(item)),
     student: items.filter(item => item.owner === 'student'),
     coach: items.filter(item => item.owner === 'coach'),
   }
 }
 
-export const parentAllSet = (items: WhatsLeftItem[]) => groupWork(items).parent.length === 0
+export const parentAllSet = (items: WhatsLeftItem[], options: { firstLinkReady?: boolean | null } = {}) => groupWork(items, options).parent.length === 0
+
+// Setup on Home ------------------------------------------------------------
+
+/** setupWizard.summary nextItem: what the Parent's setup needs next for one student. */
+export type SetupNext = 'studentDetails' | 'contacts' | 'medical' | 'finishSetup' | 'first' | 'waitingCoach' | 'done'
+
+/** Setup is unfinished for the Parent (not done, and not only waiting on a Coach). */
+export const setupOpen = (next: SetupNext | null | undefined) => !!next && next !== 'waitingCoach' && next !== 'done'
+
+export const setupNextText = (next: SetupNext | null | undefined) => next === 'studentDetails' ? 'Next: Student details' : next === 'contacts' ? 'Next: Contacts' : next === 'medical' ? 'Next: Health information' : next === 'first' ? 'Next: FIRST registration' : next === 'finishSetup' ? 'Next: Review and finish' : ''
+
+/** What's left item that opens the setup flow instead of a page. */
+export const opensSetup = (item: WhatsLeftItem) => item.kind === 'healthProfile' || item.kind === 'firstRegistration'
+export const setupStepFor = (item: WhatsLeftItem) => item.kind === 'healthProfile' ? 'health' as const : item.kind === 'firstRegistration' ? 'first' as const : null
 
 export function upcomingEvent(summary: ParentHomeSummary, now: number) {
   return summary.nextEvent && summary.nextEvent.startsAt >= now ? summary.nextEvent : null
@@ -65,8 +87,11 @@ export function parentNext(summary: ParentHomeSummary, events: readonly AgendaEv
   return { eventId: going.eventId, name: going.name, line: agendaLine({ ...going, status }), required: going.required }
 }
 
-/** This week for Parents: the next seven days, without the event already shown as Next. */
-export const parentWeek = (events: readonly AgendaEvent[], next: ParentNext | null, now: number) => thisWeek(events, now, next?.eventId ?? null)
+/**
+ * This week for Parents: the same week the Events page calls This week (Central Time, through Sunday), so an event on
+ * Sunday is listed when Events counts it. Leaves out the event already shown as Next, and has no row limit.
+ */
+export const parentWeek = (events: readonly AgendaEvent[], next: ParentNext | null, now: number) => events.filter(event => event.eventId !== next?.eventId && eventDateBucket(event, now) === 'thisWeek')
 
 // Forms page summary --------------------------------------------------------
 
@@ -86,4 +111,24 @@ export function formsSummary(input: { events: readonly FormEvent[]; coverage: re
     : input.signingPaused ? 'Permission forms are not open yet. A Coach or Travel Lead will post a date.'
     : needForm.length === 1 ? '1 event needs a signed form.' : `${needForm.length} events need a signed form.`
   return { needForm, message }
+}
+
+// Room status (view-only) -------------------------------------------------
+
+export type ParentRoomStatus = { roomChoiceOpen: boolean; deadline: number | null; roomType: 'Boys' | 'Girls' | null; status: 'notChosen' | 'requested' | 'inGroup' | 'assigned' | 'finalized'; roommates: string[] }
+
+const joinNames = (names: string[]) => names.length <= 2 ? names.join(' and ') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+
+/** Plain-text lines for a Parent's view-only room status. `formatDeadline` renders "Fri, Jan 8 · 5 PM". */
+export function roomStatusLines(room: ParentRoomStatus, studentName: string, formatDeadline: (epoch: number) => string): string[] {
+  const lines: string[] = []
+  if (room.status === 'notChosen') lines.push(room.roomChoiceOpen ? `${studentName} picks roommates in Venom Status.${room.deadline === null ? '' : ` Room choice closes ${formatDeadline(room.deadline)}.`}` : 'Room choice is closed and no room is set yet. Ask a Coach or Travel Lead about a room.')
+  else if (room.status === 'requested') lines.push(`${studentName} asked a Coach or Travel Lead to assign a room.`)
+  else {
+    const who = room.roommates.length ? `with ${joinNames(room.roommates)}` : 'so far with no one else'
+    lines.push(room.status === 'finalized' ? `Room is final, ${who}.` : room.status === 'assigned' ? `A Coach or Travel Lead placed ${studentName} in a group ${who}.` : `In a group ${who}.`)
+    if (room.status !== 'finalized' && room.roomChoiceOpen && room.deadline !== null) lines.push(`Room choice closes ${formatDeadline(room.deadline)}.`)
+  }
+  if (room.roomType) lines.push(`Room type: ${room.roomType}.`)
+  return lines
 }

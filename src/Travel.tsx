@@ -2,7 +2,7 @@ import { transportationOptions } from '../convex/lib/transportation'
 import { transportationLabel } from './lib/event-place'
 import { userFacingError } from '@/lib/error-message'
 import { operationsCopy, operationsText } from './lib/operations-copy'
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
 import type { Id } from '../convex/_generated/dataModel'
@@ -10,6 +10,7 @@ import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { Checkbox } from './components/ui/checkbox'
 import { NativeSelect, NativeSelectOption } from './components/ui/native-select'
+import { StepWizard } from './components/StepWizard'
 import styles from './features/operations/Operations.module.css'
 
 const eventId = (id: string) => id as Id<'events'>
@@ -19,10 +20,15 @@ const issue = (error: unknown) => userFacingError(error)
 
 type Driver = { _id: Id<'drivers'>; name: string; email: string; phone: string; vehicleName?: string; seats: number; approved: boolean; towCapable?: boolean; active?: boolean }
 type DriverForm = { name: string; email: string; phone: string; vehicleName: string; seats: string; approved: boolean; towCapable: boolean; active: boolean }
-const blankDriver: DriverForm = { name: '', email: '', phone: '', vehicleName: '', seats: '0', approved: false, towCapable: false, active: true }
+const blankDriver: DriverForm = { name: '', email: '', phone: '', vehicleName: '', seats: '', approved: false, towCapable: false, active: true }
 
 
-const driverCopy = operationsText.driverForm
+// Wording for the two Vehicle-step rules lives here until operations-copy.ts can take it.
+const driverCopy = {
+  ...operationsText.driverForm,
+  vehicleRequired: 'Enter the vehicle, like “Gray minivan”, so a Coach or Travel Lead can tell it apart.',
+  seatsInvalid: 'Enter passenger seats as a whole number from 1 to 100. A driver who carries no students does not need to be added.',
+}
 
 export function driverStepIssue(step: number, form: DriverForm): string {
   if (step === 0) {
@@ -31,8 +37,9 @@ export function driverStepIssue(step: number, form: DriverForm): string {
     if (!form.phone.trim()) return driverCopy.phoneRequired
   }
   if (step === 1) {
+    if (!form.vehicleName.trim()) return driverCopy.vehicleRequired
     const seats = Number(form.seats)
-    if (form.seats.trim() === '' || !Number.isInteger(seats) || seats < 0 || seats > 100) return driverCopy.seatsInvalid
+    if (form.seats.trim() === '' || !Number.isInteger(seats) || seats < 1 || seats > 100) return driverCopy.seatsInvalid
   }
   return ''
 }
@@ -43,25 +50,21 @@ function DriverWizard({ editing, initial, busy, error, onSave, onCancel }: { edi
   const [issueText, setIssueText] = useState('')
   const last = driverCopy.steps.length - 1
   const title = editing ? operationsCopy.travel.editDriver : operationsCopy.travel.addDriver
-  const go = (e: FormEvent) => {
-    e.preventDefault()
-    if (step === last) { onSave(form); return }
+  const next = () => {
     const problem = driverStepIssue(step, form)
     setIssueText(problem)
-    if (!problem) setStep(step + 1)
+    if (problem) return
+    if (step === last) onSave(form)
+    else setStep(step + 1)
   }
   const back = () => { setIssueText(''); setStep(step - 1) }
   const row = (label: string, value: string) => <div><dt>{label}</dt><dd>{value}</dd></div>
-  return <section className="card" aria-label={title}><div className="card-head"><h2>{title}</h2></div>
-    <form className="form-grid" noValidate onSubmit={go}>
-      <h3 tabIndex={-1} ref={el => el?.focus()} key={step}><span className="muted">{driverCopy.stepOf(step + 1, driverCopy.steps.length)}<span className="sr-only">:</span></span> · {driverCopy.steps[step]}</h3>
+  return <StepWizard className="card" title={title} step={step + 1} total={driverCopy.steps.length} heading={driverCopy.steps[step]} nextLabel={step === last ? (busy ? operationsCopy.travel.saving : operationsCopy.travel.saveDriver) : driverCopy.next} onNext={next} onBack={step > 0 ? back : undefined} onCancel={onCancel} busy={busy} error={issueText || error}>
       {step === 0 && <><p className="muted">{driverCopy.personHint}</p><label>{operationsCopy.travel.driverName}<Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required maxLength={100}/></label><label>{operationsCopy.travel.email}<Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required/></label><label>{operationsCopy.travel.phone}<Input type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} required/></label></>}
-      {step === 1 && <><p className="muted">{driverCopy.vehicleHint}</p><label>{operationsCopy.travel.vehicleName}<Input value={form.vehicleName} onChange={e => setForm({ ...form, vehicleName: e.target.value })} placeholder={operationsCopy.travel.vanOrCarDescription} maxLength={100}/></label><label>{operationsCopy.travel.passengerSeatsExcludingDriver}<Input type="number" min="0" max="100" step="1" value={form.seats} onChange={e => setForm({ ...form, seats: e.target.value })} required/></label><label className="checkbox-label"><Checkbox checked={form.towCapable} onCheckedChange={checked => setForm({ ...form, towCapable: checked })}/> {operationsCopy.travel.towCapable}</label></>}
+      {step === 1 && <><p className="muted">{driverCopy.vehicleHint}</p><label>{operationsCopy.travel.vehicleName}<Input value={form.vehicleName} onChange={e => setForm({ ...form, vehicleName: e.target.value })} placeholder={operationsCopy.travel.vanOrCarDescription} required maxLength={100}/></label><label>{operationsCopy.travel.passengerSeatsExcludingDriver}<Input type="number" min="1" max="100" step="1" value={form.seats} onChange={e => setForm({ ...form, seats: e.target.value })} required/></label><label className="checkbox-label"><Checkbox checked={form.towCapable} onCheckedChange={checked => setForm({ ...form, towCapable: checked })}/> {operationsCopy.travel.towCapable}</label></>}
       {step === 2 && <><p className="muted">{driverCopy.approvalHint}</p><label className="checkbox-label"><Checkbox checked={form.approved} onCheckedChange={checked => setForm({ ...form, approved: checked })}/> {operationsCopy.travel.approvedToDrive}</label><label className="checkbox-label"><Checkbox checked={form.active} onCheckedChange={checked => setForm({ ...form, active: checked })}/> {operationsCopy.travel.activeLabel}</label></>}
-      {step === last && <dl className={styles.driverDetails}>{row(operationsCopy.travel.driverName, form.name.trim())}{row(operationsCopy.travel.email, form.email.trim())}{row(operationsCopy.travel.phone, form.phone.trim())}{row(operationsCopy.travel.vehicle, form.vehicleName.trim() || operationsCopy.travel.vehicleUnnamed)}{row(operationsCopy.travel.passengerSeats, form.seats)}{row(operationsCopy.travel.trailer, form.towCapable ? driverCopy.towYes : driverCopy.towNo)}{row('Approval', form.approved ? driverCopy.approvedYes : driverCopy.approvedNo)}{row('Season', form.active ? driverCopy.activeYes : driverCopy.activeNo)}</dl>}
-      {(issueText || error) && <p role="alert" className="open-text">{issueText || error}</p>}
-      <div className="action-row">{step > 0 && <Button type="button" variant="outline" disabled={busy} onClick={back}>{driverCopy.back}</Button>}<Button type="submit" disabled={busy}>{step === last ? (busy ? operationsCopy.travel.saving : operationsCopy.travel.saveDriver) : driverCopy.next}</Button><Button type="button" variant="outline" disabled={busy} onClick={onCancel}>{operationsCopy.travel.cancel}</Button></div>
-    </form></section>
+      {step === last && <dl className={styles.driverDetails}>{row(operationsCopy.travel.driverName, form.name.trim())}{row(operationsCopy.travel.email, form.email.trim())}{row(operationsCopy.travel.phone, form.phone.trim())}{row(operationsCopy.travel.vehicle, form.vehicleName.trim())}{row(operationsCopy.travel.passengerSeats, form.seats)}{row(operationsCopy.travel.trailer, form.towCapable ? driverCopy.towYes : driverCopy.towNo)}{row('Approval', form.approved ? driverCopy.approvedYes : driverCopy.approvedNo)}{row('Season', form.active ? driverCopy.activeYes : driverCopy.activeNo)}</dl>}
+  </StepWizard>
 }
 
 export function DriversPage() {

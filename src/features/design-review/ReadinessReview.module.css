@@ -184,3 +184,10 @@
 .eventLinks a{display:inline-flex;align-items:center;min-height:44px;font-size:14px;font-weight:700;text-decoration:underline}
 .filter{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 16px;cursor:pointer;font-size:14px;font-weight:600}
 .studentName a{color:inherit}
+.chosenEvent{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 16px;padding:12px 20px;background:var(--rr-card);border:1px solid var(--rr-border);border-radius:8px;font-size:14px}
+.chosenEvent span{min-width:0}
+.notes{margin:0;padding:10px 0 0;border-top:1px solid var(--rr-border);font-size:13px;color:var(--rr-muted)}
+.notes h3{margin:0 0 4px;font-size:13px;font-weight:700;color:var(--rr-text)}
+.notes ul{margin:0;padding-left:18px}
+.notes li{margin:2px 0}
+.allOpen{margin:0;padding:0 16px 10px;color:var(--rr-muted);font-size:13px}

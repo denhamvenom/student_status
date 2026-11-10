@@ -284,7 +284,8 @@ events: defineTable({ seasonId: v.id("seasons"), name: v.string(), type: v.union
   financeSummaryBackfills: defineTable({ actorId: v.optional(v.id("appUsers")), seasonId: v.id("seasons"), state: v.union(v.literal("running"), v.literal("failed"), v.literal("complete")), cursor: v.union(v.string(), v.null()), processed: v.number(), updatedAt: v.number(), lastError: v.optional(v.string()) }).index("by_seasonId", ["seasonId"]),
   participants: defineTable({ eventId: v.id("events"), studentId: v.id("students"), status: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("waitlist"), v.literal("withdrawn")), independentTravel: v.optional(v.boolean()), createdAt: v.number(), updatedAt: v.number() })
     .index("by_eventId", ["eventId"]).index("by_eventId_and_status", ["eventId", "status"]).index("by_studentId", ["studentId"]).index("by_eventId_and_studentId", ["eventId", "studentId"]),
-  requirements: defineTable({ eventId: v.id("events"), key: v.string(), label: v.string(), instructions: v.optional(v.string()), url: v.optional(v.string()), dueAt: v.optional(v.number()) })
+  // kind: "info" is a note only (never a task, never counts toward ready); missing or "checkoff" is checked off by a Coach or Travel Lead.
+  requirements: defineTable({ eventId: v.id("events"), key: v.string(), label: v.string(), instructions: v.optional(v.string()), url: v.optional(v.string()), dueAt: v.optional(v.number()), kind: v.optional(v.union(v.literal("info"), v.literal("checkoff"))) })
     .index("by_eventId", ["eventId"]).index("by_eventId_and_key", ["eventId", "key"]),
   requirementCompletions: defineTable({ eventId: v.id("events"), studentId: v.id("students"), key: v.string(), completedBy: v.id("appUsers"), completedAt: v.number() })
     .index("by_eventId_and_studentId", ["eventId", "studentId"]).index("by_eventId_and_studentId_and_key", ["eventId", "studentId", "key"]),

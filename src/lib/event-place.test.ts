@@ -11,7 +11,7 @@ describe('on-site event wording', () => {
 
   it.each([
     ['On site', 'No team ride – families drop off at DSHS STEM Center'],
-    ['Provide your Own', 'Provide your Own Ride'],
+    ['Provide your Own', 'Own transport'],
     ['Charter Bus', 'Charter Bus'],
   ])('shows stored travel %s as %s', (stored, shown) => expect(transportationLabel(stored)).toBe(shown))
 })

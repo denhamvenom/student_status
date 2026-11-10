@@ -2,7 +2,7 @@ export const accountCopy = {
   adults: {
     list: 'Team staff', mentorLead: 'Travel Lead', chooseRole: 'Show role',
     inactive: 'Access removed', activeStatus: 'Access active', coachAccess: 'Coach access includes team management, finance and health exports.',
-    grantNotice: 'Travel Leads can also be given two kinds of access. Money editing access lets them record and edit payments and fees. Health export lets them download health records and signed form copies.',
+    grantNotice: 'Travel Leads can also be given two kinds of access. Money editing access lets them record and edit payments and fees. Health export access lets them download health records and signed form copies.',
     noInvitations: 'No invitations yet.', pendingStatus: 'Pending', acceptedStatus: 'Accepted', revokedStatus: 'Revoked', replacedStatus: 'Replaced', expiredStatus: 'Expired',
     sendInvitation: 'Send invitation', sending: 'Sending…', emailInstructions: 'We email a private invitation to this address. The recipient signs in and accepts the invitation before getting access.',
     queuedFor: (email: string) => `Invitation queued for ${email}. Check its email status below.`, resendQueued: 'Invitation email queued again.',
@@ -16,7 +16,7 @@ export const accountCopy = {
     checking: 'Checking invitation…', landing: 'Mentor or Travel Lead invitation', returnHome: 'Return to Venom Status', signInDescription: 'Use the invited email address to sign in with Google or an email code.',
     acceptedDescription: 'Your account is ready. Continue to view the team.', inviteRole: 'Invited access',
     title: 'Users & Roles', description: 'Manage adult access and invitations.', coach: 'Coach', mentor: 'Mentor',
-    invite: 'Invite a Mentor or Travel Lead', email: 'Email address', role: 'Role', travel: 'Travel Lead', finance: 'Money editing access', health: 'Health export',
+    invite: 'Invite a Mentor or Travel Lead', email: 'Email address', role: 'Role', travel: 'Travel Lead', finance: 'Money editing access', health: 'Health export access',
     active: 'Active account', reason: 'Reason for change', save: 'Save access', saving: 'Saving…', name: 'Name', access: 'Access', edit: 'Edit access', cancel: 'Cancel',
     noAccounts: 'No accounts in this role.', loadMore: 'Show more accounts', loading: 'Loading accounts…',
     pending: 'Invitations', expires: 'Expires', revoke: 'Revoke',

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Id } from '../convex/_generated/dataModel'
-import { blankDraft, bulkNoteReason, bulkOverpayments, draftRows, editContextChanged, parsePaymentCsv, referenceAfterMethodChange } from './PaymentAdministration'
+import { blankDraft, bulkNoteReason, bulkOverpayments, draftRows, editContextChanged, parsePaymentCsv, recordedMessage, recordedRowLabel, referenceAfterMethodChange, visibleStepError } from './PaymentAdministration'
 import { moneyJobStateLabel, moneyReturnedCopy, paymentAdministrationCopy } from './lib/payment-admin-copy'
 import { overpaymentCents, overpaymentQuestion, parseMoneyInput } from './lib/charge-money'
 
@@ -135,5 +135,37 @@ describe('Edit payment method change', () => {
     ['cash', '1001', ''], ['check', '1001', '1001'], ['other', 'R-9', 'R-9'],
   ] as const)('changing the method to %s leaves the check or receipt number as %j', (method, before, after) => {
     expect(referenceAfterMethodChange(method, before)).toBe(after)
+  })
+})
+
+describe('recording for the right student', () => {
+  it('names the student on every line of the running list', () => {
+    expect(recordedRowLabel('Synthetic1019 South', 'check', '1042')).toBe('Synthetic1019 South · Check · 1042')
+    expect(recordedRowLabel('Synthetic1019 North', 'cash', '')).toBe('Synthetic1019 North · Cash')
+    expect(paymentAdministrationCopy.recordReview('$40.00', 'Synthetic1019 South')).toBe('Record $40.00 for Synthetic1019 South')
+    expect(paymentAdministrationCopy.recordingFor('Synthetic1019 South')).toContain('Synthetic1019 South')
+  })
+  it('starts with no method chosen, so each payment must pick one', () => {
+    expect(blankDraft().method).toBe('')
+    const { rows, problems } = draftRows([{ ...blankDraft(), studentId: 's1', amount: '40', date: '2026-10-14' }])
+    expect(rows).toEqual([])
+    expect(problems).toEqual(['Payment 1: Choose how it was paid.'])
+  })
+})
+
+describe('where a recorded payment went', () => {
+  it.each([
+    [4000, 10_000, 'Payment of $40.00 recorded and used toward fees.'],
+    [4000, 1500, 'Payment of $40.00 recorded. $15.00 went toward fees; $25.00 is in Unused payments.'],
+    [4000, 0, 'Payment of $40.00 recorded. All of it is in Unused payments because no fee is due.'],
+    [4000, null, 'Payment of $40.00 recorded.'],
+  ])('says so for %i cents against a Balance due of %s', (amount, due, message) => {
+    expect(recordedMessage(amount, due)).toBe(message)
+  })
+  it('shows an amount problem once, under the amount box', () => {
+    const bad = parseMoneyInput('abc'); const good = parseMoneyInput('25')
+    expect(bad.ok ? '' : visibleStepError(bad.message, bad)).toBe('')
+    expect(visibleStepError('Choose how it was paid.', bad)).toBe('Choose how it was paid.')
+    expect(visibleStepError('Enter a reason.', good)).toBe('Enter a reason.')
   })
 })

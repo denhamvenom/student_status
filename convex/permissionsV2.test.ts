@@ -169,9 +169,14 @@ it("fails closed until real signing is explicitly bound to this non-development 
   const summary = (await f.coach.query(api.permissions.workspace, {studentId: f.ids.student})).receipts;
   expect(summary[0].synthetic).toBe(false);
   expect(await f.t.run(ctx => permissionAccepted(ctx, f.ids.student, f.ids.event))).toBe(false);
+  // Before a Coach accepts the form, the parent's readiness list still asks for it.
+  expect((await f.parent.query(api.app.eventDetail, {eventId: f.ids.event, studentId: f.ids.student})).readiness?.open).toContain("Permission form");
   await f.coach.mutation(api.permissions.review, {submissionId, status: "accepted", expectedLatestReviewId: null, expectedCoverage: summary[0].controlledCoverage, idempotencyKey: "real-review-1"});
   expect(await f.t.run(ctx => permissionAccepted(ctx, f.ids.student, f.ids.event))).toBe(true);
-  expect((await f.parent.query(api.app.eventDetail, {eventId: f.ids.event, studentId: f.ids.student})).readiness?.open).not.toContain("Permission accepted");
+  const afterAccept = (await f.parent.query(api.app.eventDetail, {eventId: f.ids.event, studentId: f.ids.student})).readiness;
+  expect(afterAccept).not.toBeNull();
+  expect(afterAccept?.permissionStatus).not.toBe("missing");
+  expect(afterAccept?.open).not.toContain("Permission form");
   const paper = await f.coach.action(api.permissionsV2Pdf.preparePaper, {studentId: f.ids.student, eventIds: [f.ids.event], signerName: "Fictional Paper Guardian"});
   expect(paper.snapshot.synthetic).toBe(false);
   const paperId = await f.coach.action(api.permissionsV2Pdf.submitPaper, {draftId: paper.draftId, typedName: "Fictional Paper Guardian", acknowledged: true, paperReference: "paper-real-1", paperSignedAt: Date.now() - 1000});

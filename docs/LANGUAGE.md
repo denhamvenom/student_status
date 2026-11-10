@@ -70,6 +70,11 @@ Write every new or changed user-facing string to this page. Rewrite screen by sc
 | Calendar progress (November 9) | (not shown) | Adding to Team Calendar… | |
 | Wrong Google account (November 9) | Use a different Google account | Same | Use another account (for the generic sign-in switch only) |
 | View-only money screens (November 9) | (not shown) | "A Coach or a Travel Lead with Money editing access can record and edit payments." | grant, capability |
+| Custom event requirement kinds (November 10) | Something to know (information only) | Something to know; Checked off by a Coach or Travel Lead | task (for an information-only note), Info, Checkoff |
+| Unfinished Parent setup (November 10) | Finish setup (Home card, opens the setup wizard on Home) | Same | Complete setup, Continue setup |
+| Season transition (November 10) | (not shown) | Mark all as Returning | Set all Returning |
+| Fees on Money (November 10) | (not shown) | Add a fee (a fee on one student's account; replaces "Add a charge") | Add a charge |
+| Recording payments (November 10) | (not shown) | Record another; Choose how it was paid | |
 
 ## Student Home (October 27)
 

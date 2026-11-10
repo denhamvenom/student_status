@@ -32,3 +32,23 @@ describe("fee order when none is given", () => {
     expect(await priorityOf(other)).toBeGreaterThan(await priorityOf(third));
   });
 });
+
+describe("Add a fee helpers", () => {
+  it("lists only events the student is confirmed for, and reports what a new fee paid at once", async () => {
+    const f = await fixture();
+    const { eventIn, eventOut } = await f.t.run(async ctx => {
+      const season = (await ctx.db.query("seasons").first())!._id;
+      const make = async (name: string) => await ctx.db.insert("events", { seasonId: season, name, type: "Team", startsAt: 1, endsAt: 2, destination: "Synthetic", travel: "none", overnight: false, roomingEnabled: false, feeCents: 25, signupMode: "open", allowWithdrawal: true, permissionRequired: false, firstRequired: false, archived: false });
+      const eventIn = await make("Signed up"); const eventOut = await make("Waitlisted");
+      await ctx.db.insert("participants", { eventId: eventIn, studentId: f.ids.studentId, status: "confirmed", createdAt: 1, updatedAt: 1 } as never);
+      await ctx.db.insert("participants", { eventId: eventOut, studentId: f.ids.studentId, status: "waitlist", createdAt: 1, updatedAt: 1 } as never);
+      return { eventIn, eventOut };
+    });
+    const ids = await f.coach.query(api.finance.signedUpEventIds, { studentId: f.ids.studentId });
+    expect(ids).toContain(eventIn);
+    expect(ids).not.toContain(eventOut);
+    await f.coach.mutation(api.finance.recordFunds, { studentId: f.ids.studentId, kind: "payment", amountCents: 300, reason: "Synthetic", idempotencyKey: "helper-funds-1" });
+    const chargeId = await f.coach.mutation(api.finance.createCharge, { studentId: f.ids.studentId, label: "Paid at once", amountCents: 500, idempotencyKey: "helper-charge-1" });
+    expect(await f.coach.query(api.finance.feePaidSoFar, { chargeId: chargeId! })).toBe(300);
+  });
+});

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultEventId, eventPickerLabel, filterEvents, splitEvents, type PickerEvent } from './EventPicker'
+import { defaultEventId, eventPickerLabel, filterEvents, restrictEvents, splitEvents, type PickerEvent } from './EventPicker'
 
 const hour = 3_600_000
 // Noon Chicago time on the given 2026 date (November is CST, UTC-6).
@@ -39,5 +39,16 @@ describe('event picker', () => {
     expect(filterEvents(events, 'tuesday nov 17').map(e => e._id)).toEqual(['soon'])
     expect(filterEvents(events, 'nothing here')).toEqual([])
     expect(filterEvents(events, '  ')).toHaveLength(4)
+  })
+})
+
+describe('event picker allowed events', () => {
+  it.each([
+    ['no restriction offers every event', undefined, ['old', 'soon', 'mid', 'trip']],
+    ['only the allowed events are offered', ['trip', 'old'], ['old', 'trip']],
+    ['an unknown id offers nothing', ['missing'], []],
+    ['an empty list offers nothing', [], []],
+  ])('%s', (_name, allowed, expected) => {
+    expect(restrictEvents(events, allowed).map(e => e._id)).toEqual(expected)
   })
 })

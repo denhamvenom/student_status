@@ -43,15 +43,25 @@ describe('who must act on a What\'s left item', () => {
 
 describe('event page requirement rows', () => {
   it.each([
-    ['Required payment', 'requiredPayment'], ['Permission accepted', 'permissionForm'], ['FIRST registration and Consent & Release', 'firstRegistration'],
+    ['Required payment', 'requiredPayment'], ['Permission form', 'permissionForm'], ['FIRST registration and Consent & Release', 'firstRegistration'],
     ['FIRST registration', 'firstRegistration'], ['Room selection', 'roomChoice'], ['Financial records require review or are updating', 'staffReview'], ['Bring a lunch', 'requirement'],
   ])('%s is a %s', (label, kind) => expect(openRowKind(label)).toBe(kind))
 
   it('uses the Home item for the same event, else the usual owner', () => {
     const event = { id: 'e1', name: 'Regional' }
     const review = item('permissionReview', 'coach')
-    expect(itemForOpenRow('Permission accepted', event, [review])).toBe(review)
-    expect(itemForOpenRow('Permission accepted', event, [item('permissionForm', 'parent', { eventId: 'other' as Id<'events'> })])).toMatchObject({ owner: 'parent', kind: 'permissionForm', eventId: 'e1' })
+    expect(itemForOpenRow('Permission form', event, [review])).toBe(review)
+    expect(itemForOpenRow('Permission form', event, [item('permissionForm', 'parent', { eventId: 'other' as Id<'events'> })])).toMatchObject({ owner: 'parent', kind: 'permissionForm', eventId: 'e1' })
     expect(itemForOpenRow('Room selection', event, [])).toMatchObject({ owner: 'student', href: '/events/e1/rooming' })
+  })
+
+  it("a Shifts row is the Student's Pick your shifts task, linking to the event's signup", () => {
+    const event = { id: 'e1', name: 'Pancake breakfast' }
+    const fallback = itemForOpenRow('Shifts', event, [])
+    expect(fallback).toMatchObject({ key: 'shifts:e1', owner: 'student', href: '/events/e1#my-signup' })
+    expect(guideForItem(fallback, { viewer: 'student' })).toMatchObject({ title: 'Pick your shifts', headline: 'Your turn', action: { label: 'Pick your shifts', to: '/events/e1#my-signup' } })
+    expect(guideForItem(fallback, { viewer: 'parent', studentName: 'Alex' })).toMatchObject({ headline: 'Waiting for Alex', action: null })
+    const home = item('requirement', 'student', { key: 'shifts:e1', label: 'Pick your shifts', href: '/events/e1#my-signup' })
+    expect(itemForOpenRow('Shifts', event, [home])).toBe(home)
   })
 })

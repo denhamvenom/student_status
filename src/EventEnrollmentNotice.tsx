@@ -26,7 +26,7 @@ export function EventEnrollmentNotice({ eventId, staff, coach, failed }: { event
     <CardContent>
       <p>{copy.description}</p>
       {progress && <p>{copy.progress(progress.processed, progress.assigned)}</p>}
-      {staff && progress?.lastError && <p role="alert">{userFacingError(new Error(progress.lastError), 'Processing stopped. Check the current status before retrying, or ask a Coach for help.')}</p>}
+      {staff && progress?.lastError && <p role="alert">{userFacingError(new Error(progress.lastError), 'Processing stopped. Check the current status before trying again, or ask a Coach for help.')}</p>}
       {failed && coach && <Button type="button" disabled={busy || !progress?.canRetry} onClick={() => void retryEnrollment()}>{busy ? copy.retrying : copy.retry}</Button>}
       {error && <p role="alert">{error}</p>}
     </CardContent>

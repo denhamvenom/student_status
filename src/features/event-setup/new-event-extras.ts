@@ -11,7 +11,8 @@ const RESERVED_KEYS = ['pay', 'perm', 'first', 'room']
 export type QuestionKind = 'singleChoice' | 'multiChoice' | 'shortText' | 'longText' | 'yesNo' | 'number'
 export type DraftShift = { shiftId: string; label: string; startsAt: number; endsAt: number; capacity: number | null }
 export type DraftQuestion = { id: string; kind: QuestionKind; prompt: string; options: string[]; required: boolean }
-export type DraftRequirement = { id: string; label: string; instructions: string; url: string; dueAt: string }
+/** kind 'info' is Something to know (a note, no due date); omitted or 'checkoff' is checked off by a Coach or Travel Lead. */
+export type DraftRequirement = { id: string; label: string; instructions: string; url: string; dueAt: string; kind?: 'info' | 'checkoff' }
 export type ExtrasIssue = { step: 6 | 7 | 8; field: string; message: string; item?: number }
 
 let draftSerial = 0
@@ -57,7 +58,7 @@ export function requirementIssue(r: DraftRequirement): string | null {
   if (!label || label.length > 100) return copy.requirementLabel
   if (r.instructions.length > 1000) return copy.requirementInstructionsTooLong
   if (r.url.trim() && (!/^https:\/\//i.test(r.url.trim()) || r.url.trim().length > 500)) return copy.requirementUrl
-  if (r.dueAt && !Number.isFinite(parseChicagoInput(r.dueAt))) return copy.requirementDue
+  if (r.kind !== 'info' && r.dueAt && !Number.isFinite(parseChicagoInput(r.dueAt))) return copy.requirementDue
   return null
 }
 
@@ -69,7 +70,7 @@ export function requirementArgs(requirements: readonly DraftRequirement[]) {
     let key = slug && !RESERVED_KEYS.includes(slug) ? slug : `requirement-${index + 1}`
     for (let n = 2; used.has(key); n++) key = `${key.slice(0, 28)}-${n}`
     used.add(key)
-    return { key, label: r.label.trim(), ...(r.instructions.trim() ? { instructions: r.instructions.trim() } : {}), ...(r.url.trim() ? { url: r.url.trim() } : {}), ...(r.dueAt ? { dueAt: parseChicagoInput(r.dueAt) } : {}) }
+    return { key, label: r.label.trim(), ...(r.instructions.trim() ? { instructions: r.instructions.trim() } : {}), ...(r.url.trim() ? { url: r.url.trim() } : {}), ...(r.kind === 'info' ? { kind: 'info' as const } : r.dueAt ? { dueAt: parseChicagoInput(r.dueAt) } : {}) }
   })
 }
 
@@ -131,8 +132,8 @@ export function reviewDetails(draft: { shifts: readonly DraftShift[]; questions:
     return [q.prompt.trim() || '(no question text)', questionKindLabels[q.kind], q.required ? copy.required : copy.optional, ...(options.length ? [options.join(', ')] : [])].join(' · ')
   })
   const requirements = draft.requirements.map(r => {
-    const due = r.dueAt ? parseChicagoInput(r.dueAt) : NaN
-    return `${r.label.trim() || '(no name)'} · ${Number.isFinite(due) ? copy.dueOn(chicagoDisplayTime(due)) : copy.noDue}`
+    const due = r.kind !== 'info' && r.dueAt ? parseChicagoInput(r.dueAt) : NaN
+    return `${r.label.trim() || '(no name)'} · ${r.kind === 'info' ? copy.requirementKindInfo : Number.isFinite(due) ? copy.dueOn(chicagoDisplayTime(due)) : copy.noDue}`
   })
   return { slots, questions, requirements }
 }

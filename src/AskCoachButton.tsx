@@ -12,7 +12,7 @@ import styles from './AskCoachButton.module.css'
 
 // The server enforces the same limit; this only lets the Send button say so first.
 const MESSAGE_MAX = 1000
-const topics: Record<CoachContactTopic, string> = { eventsTravel: 'Events and travel', money: 'Money', forms: 'Forms', other: 'Something else' }
+const topics: Record<CoachContactTopic, string> = { eventsTravel: 'Events and travel', money: 'Money', forms: 'Permission forms', other: 'Something else' }
 const coachEmail = 'coach@team8044.org'
 const replyLine = (email?: string) => `A Coach will reply ${email ? `to ${email}` : 'by email'}.`
 const copy = {
@@ -55,7 +55,7 @@ export function AskCoachButton({ variant = 'outline', email }: { variant?: 'defa
   return <>
     <Button type="button" variant={variant} onClick={() => setOpen(true)}>{copy.button}</Button>
     <Dialog open={open} disablePointerDismissal onOpenChange={close}>
-      <DialogContent showCloseButton={!busy}>
+      <DialogContent showCloseButton={false}>
         <DialogHeader><DialogTitle>{copy.title}</DialogTitle><DialogDescription>{copy.intro(email)}</DialogDescription></DialogHeader>
         {result === 'queued'
           ? <>

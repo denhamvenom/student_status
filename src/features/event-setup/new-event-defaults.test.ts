@@ -115,10 +115,10 @@ describe('newEventStepOrder', () => {
     [{ shifts: false, noTravel: false, team: false, extras: false }, [0, 1, 2, 9, 4, 5]],
     [{ shifts: false, noTravel: true, team: false, extras: false }, [0, 1, 2, 9, 5]],
     [{ shifts: true, noTravel: true, team: false, extras: false }, [0, 1, 6, 2, 9, 5]],
-    // A Team meeting at our shop is Basics, Who's going, Review; Extras joins only when asked for.
-    [{ shifts: false, noTravel: true, team: true, extras: false }, [0, 1, 5]],
-    [{ shifts: false, noTravel: true, team: true, extras: true }, [0, 1, 9, 5]],
-    [{ shifts: false, noTravel: false, team: true, extras: false }, [0, 1, 4, 5]],
+    // A Team meeting at our shop is Basics, Who's going, Cost, Review; Extras joins only when asked for.
+    [{ shifts: false, noTravel: true, team: true, extras: false }, [0, 1, 2, 5]],
+    [{ shifts: false, noTravel: true, team: true, extras: true }, [0, 1, 2, 9, 5]],
+    [{ shifts: false, noTravel: false, team: true, extras: false }, [0, 1, 2, 4, 5]],
   ])('%o', (choices, order) => {
     expect(newEventStepOrder(choices)).toEqual(order)
   })
@@ -126,13 +126,12 @@ describe('newEventStepOrder', () => {
 
 describe('Extras step', () => {
   it.each([
-    [3, false, 9], [7, false, 9], [8, true, 9], [2, false, 2], [2, true, 9], [1, true, 1],
-  ])('a problem on step %i (Team %s) is shown on step %i', (step, team, shown) => {
-    expect(shownStep(step, team)).toBe(shown)
+    [3, 9], [7, 9], [8, 9], [2, 2], [1, 1],
+  ])('a problem on step %i is shown on step %i', (step, shown) => {
+    expect(shownStep(step)).toBe(shown)
   })
-  it('checks every step it holds, with the fee only for a Team meeting', () => {
-    expect(stepChecks(9, false)).toEqual([3, 7, 8])
-    expect(stepChecks(9, true)).toEqual([3, 7, 8, 2])
-    expect(stepChecks(4, true)).toEqual([4])
+  it('checks every step it holds', () => {
+    expect(stepChecks(9)).toEqual([3, 7, 8])
+    expect(stepChecks(4)).toEqual([4])
   })
 })

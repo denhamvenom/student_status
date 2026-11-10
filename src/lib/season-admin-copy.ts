@@ -1,3 +1,5 @@
+import { subteamOptions } from './subteams'
+
 export const seasonAdminCopy = {
   title: 'Season',
   description: "Set up next season. Check each student before you switch seasons.",
@@ -30,7 +32,7 @@ export const seasonAdminCopy = {
   writeOff: 'Write off',
   holdHistorical: 'Hold on historical record',
   moveToTeam: 'Move to team funds',
-  accountReviewMissing: 'Account review missing',
+  accountReviewMissing: 'Not reviewed yet',
   reviewChangedDecision: 'Review changed decision',
   decisionUnavailable: 'Decision unavailable',
   saveDecision: 'Save decision',
@@ -69,4 +71,43 @@ export const seasonAdminCopy = {
   fundsHeld: 'Available funds held',
   fundraisingCreditHeld: 'Fundraising credit held',
   balanceDue: 'Balance due',
+  markAllReturning: 'Mark all as Returning',
+  markAllHelp: 'Sets every student listed here who is not already Returning. You can change any student afterward.',
+  markAllProgress: (done: number, total: number) => `Saving ${done} of ${total}…`,
+  markAllDone: (count: number) => `${count} ${count === 1 ? 'student' : 'students'} marked as Returning.`,
+  markAllStopped: (done: number, total: number, reason: string) => `Stopped after ${done} of ${total} students. ${reason}`,
+  markAllNone: 'Every student listed here is already Returning.',
+  archiveEmpty: 'No students are marked Departing, so there is nothing to archive. Go back to Returning students if someone is leaving.',
+  archiveIntro: 'Choose a departing student to decide whether their sign-in account is archived. Archiving removes their sign-in but keeps their history.',
+  balancesIntro: 'Choose a student to decide what happens to each unpaid fee and any money left on their account.',
+  pickBack: 'Go back to Returning students',
+  returnsIntro: 'Review each returning student below. For each, choose what stays on their record for the new season.',
+  returnsResets: 'These start empty each season: health information, permission form signatures, event sign-ups, assignments, attendance and finished to-dos. Records from the old season stay with the old season.',
+  keepGuardian: 'Keep guardian contact',
+  keepSubteam: 'Keep subteam',
+  keepParentLinks: 'Keep linked Parents',
+  namesKept: 'Student names stay as you already reviewed them.',
+  copyWording: 'Copy the approved permission form wording into the new season',
+  reviewedResets: 'I checked what starts empty',
+  savedStudentReview: (action: string, guardian: boolean, subteam: boolean, parents: boolean) => `Saved: ${action}. Guardian contact ${guardian ? 'kept' : 'not kept'}, subteam ${subteam ? 'kept' : 'not kept'}, linked Parents ${parents ? 'kept' : 'not kept'}.`,
+  missingDecision: 'No choice saved yet.',
+  wordingCopied: 'Permission form wording: copied to the new season.',
+  wordingNotCopied: 'Permission form wording: starts empty in the new season.',
+  carryReviewSaved: 'What carries over: saved.',
+  carryReviewMissing: 'What carries over: not saved yet.',
+  fixIn: (place: string) => `Fix in ${place}`,
+  studentChoices: 'Student choices',
+  moneyLeft: 'Money left on accounts',
+  unpaidFees: 'Unpaid fees',
+  carryFee: 'Carry forward',
+  carryMoney: 'Carry forward',
+  noSavedChoices: 'No saved choices yet.',
+  stuckHere: 'Some choices are missing or out of date. Use the Fix links to go to the right step, then come back here.',
+  olderSubteam: (name: string) => `${name} (older name, not a current subteam)`,
 } as const;
+const currentSubteams: readonly string[] = subteamOptions
+/** Shows a stored subteam; flags names that are no longer in the roster's subteam list. */
+export const subteamLabel = (value: string): string => !value.trim() ? 'No subteam' : currentSubteams.includes(value) ? value : seasonAdminCopy.olderSubteam(value)
+/** Plain words for the server's per-student reset summary. */
+export const plainResetNote = (text: string): string => text.replace(/ · Guardian (retain|reset); Subteam (retain|reset); Parent links (retain|reset)/, (_m, g: string, t: string, l: string) => ` · Guardian contact ${g === 'retain' ? 'kept' : 'not kept'}, subteam ${t === 'retain' ? 'kept' : 'not kept'}, linked Parents ${l === 'retain' ? 'kept' : 'not kept'}`)
+

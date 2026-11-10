@@ -35,14 +35,13 @@ export const newEventWizardCopy = {
   moreDetail: 'Repeat, Team Calendar',
   moreCalendar: 'Team Calendar',
   extras: 'Extras (optional)',
-  /** Step counter on a Team meeting's Extras, which is not counted as a step. */
-  optionalStep: 'Optional step',
+  /** Step counter on a Team meeting's Extras: optional, and counted as part of Review (the same number as Review). */
+  optionalStep: (total: number) => `Step ${total} of ${total} · Optional extras`,
   addExtras: 'Add extras',
-  addExtrasDetail: 'A fee, signup questions, things students must do or forms',
+  addExtrasDetail: 'Signup questions, things students must do or forms',
   extrasQuestions: 'Signup questions',
   extrasRequirements: 'Things students must do',
   extrasForms: 'Forms and support',
-  extrasCost: 'Cost',
   allDetails: 'All details',
   media: 'Ask Media team to cover it',
   discardQuestion: 'Discard this new event? What you entered will be lost.',
@@ -132,25 +131,25 @@ export function serverProblemStep(message: string): ServerProblem | null {
   return null
 }
 
-/** The one optional Extras step: Requirements (3), Signup questions (7) and Things students must do (8), plus Costs (2) for a Team meeting. */
+/** The one optional Extras step: Requirements (3), Signup questions (7) and Things students must do (8), (Costs, step 2, is its own step for every event type). */
 export const EXTRAS_STEP = 9
 
 /** The step that shows a problem found on step `step` (questions, requirements and forms live on Extras). */
-export function shownStep(step: number, team: boolean): number {
-  return step === 3 || step === 7 || step === 8 || (team && step === 2) ? EXTRAS_STEP : step
+export function shownStep(step: number): number {
+  return step === 3 || step === 7 || step === 8 ? EXTRAS_STEP : step
 }
 
 /** The steps whose checks Continue runs on `step`: Extras checks each step it holds. */
-export function stepChecks(step: number, team: boolean): number[] {
-  return step === EXTRAS_STEP ? [3, 7, 8, ...(team ? [2] : [])] : [step]
+export function stepChecks(step: number): number[] {
+  return step === EXTRAS_STEP ? [3, 7, 8] : [step]
 }
 
 /**
- * Wizard step ids in the order shown. A Team meeting is Basics, Who's going and Review (Extras only once asked for, and
- * Time slots only when students pick shifts); other events add Costs, Extras and, only for "Somewhere else", Travel.
+ * Wizard step ids in the order shown. Every event is Basics, Who's going, Costs and Review, with Time slots only when students pick shifts and Travel only
+ * for "Somewhere else". Extras is counted for other events; a Team meeting's Extras is optional and only joins once asked for.
  */
 export function newEventStepOrder(choices: { shifts: boolean; noTravel: boolean; team: boolean; extras: boolean }): number[] {
   const slots = choices.shifts ? [6] : []
-  if (choices.team) return [0, 1, ...slots, ...(choices.extras ? [EXTRAS_STEP] : []), ...(choices.noTravel ? [] : [4]), 5]
+  if (choices.team) return [0, 1, ...slots, 2, ...(choices.extras ? [EXTRAS_STEP] : []), ...(choices.noTravel ? [] : [4]), 5]
   return [0, 1, ...slots, 2, EXTRAS_STEP, ...(choices.noTravel ? [] : [4]), 5]
 }

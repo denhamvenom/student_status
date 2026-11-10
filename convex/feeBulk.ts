@@ -157,7 +157,7 @@ export const retryBulk = mutation({
   args: { jobId: v.id("feeBulkJobs"), rows: v.array(v.object({ rowId: v.id("feeBulkRows"), expectedFinancialRevision: v.number(), expectedGeneration: v.number(), expectedChargeRevision: v.union(v.number(), v.null()) })), reason: v.string() }, returns: v.null(),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); requireRole(actor, "coach"); const season = await activeSeason(ctx); const job = await ctx.db.get(args.jobId);
-    if (!job || job.seasonId !== season._id || !["held", "failed"].includes(job.state) || args.rows.length > 20 || new Set(args.rows.map(row => row.rowId)).size !== args.rows.length || args.reason.trim().length < 8 || args.reason.length > 1000) throw new ConvexError("Review the students to retry and enter a reason, then try again.");
+    if (!job || job.seasonId !== season._id || !["held", "failed"].includes(job.state) || args.rows.length > 20 || new Set(args.rows.map(row => row.rowId)).size !== args.rows.length || args.reason.trim().length < 8 || args.reason.length > 1000) throw new ConvexError("Review the students to try again and enter a reason, then try again.");
     const definition = await ctx.db.get(job.feeDefinitionId); const control = await seasonFinanceControl(ctx, season._id);
     if (!definition || definition.latestJobId !== job._id || definition.revision !== job.expectedDefinitionRevision || !control || control.state !== "ready" && control.bulkJobId !== job._id) throw new ConvexError("This fee changed or another season update is running. Reload, then try again.");
     const waiting = await ctx.db.query("feeBulkRows").withIndex("by_jobId_and_state", q => q.eq("jobId", job._id).eq("state", "waiting")).first();

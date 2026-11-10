@@ -42,6 +42,8 @@ export const mentorHomeCopy = {
   },
   /** The Home tile that opens Schedule › Join. */
   helpTile: (count: number) => count === 1 ? '1 event you could help with' : `${count} events you could help with`,
+  /** Quiet spot at the bottom of Mentor Home. */
+  askCoach: 'Need something else?',
   schedule: {
     title: 'Schedule',
     tabs: { going: 'Going', join: 'Join', created: 'Created by me' } as Record<'going' | 'join' | 'created', string>,
@@ -60,6 +62,9 @@ export const mentorHomeCopy = {
     noCompetitions: 'No competitions or trips to join right now.',
     noMeetings: 'No meetings or events to join right now.',
     yourSubteam: 'Your subteam',
+    wholeTeam: 'Whole team',
+    someStudents: 'Chosen students',
+    mentorsOnly: 'Mentors only',
     /** "Mondays at 6:00 PM · Repeats weekly". */
     seriesLine: (schedule: string, repeat: string) => `${schedule} · ${repeat}`,
     upcoming: (count: number) => count === 1 ? '1 upcoming' : `${count} upcoming`,
@@ -68,6 +73,9 @@ export const mentorHomeCopy = {
     signUp: 'Sign up',
     signUpLabel: (title: string) => `Sign up for ${title}`,
     withdraw: 'I can’t go anymore',
+    withdrawTitle: (title: string) => `Leave ${title}?`,
+    withdrawDetail: (title: string) => `You’ll be taken off ${title}. You can sign up again from Schedule › Join if it’s still open.`,
+    withdrawConfirm: 'Yes, take me off',
     withdrew: (title: string) => `You’re off ${title}.`,
     withdrawFailed: 'You are still signed up. Please try again.',
   },
@@ -99,6 +107,7 @@ export const mentorHomeCopy = {
     all: 'Show all subteams',
     mine: 'Show only my subteams',
     showingAll: 'Showing: all subteams',
+    showingNone: 'Showing: whole-team items',
   },
   /** About you, in the Mentor's More menu. */
   about: {
@@ -269,7 +278,7 @@ export const mentorHomeCopy = {
     created: 'Meeting created.',
     seriesCreated: 'Repeating meeting created.',
     addToCalendar: 'Add to Team Calendar',
-    addToCalendarNote: 'Everyone on the team can see it on the shared Team Calendar.',
+    addToCalendarNote: 'Everyone on the team can see it.',
     repeatingOffCalendar: 'Repeating meetings aren’t added to Team Calendar.',
     onCalendar: 'Added to Team Calendar',
     offCalendar: 'Not added to Team Calendar',

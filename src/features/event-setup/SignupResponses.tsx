@@ -1,5 +1,6 @@
 import { statusLabel } from '@/lib/ui-copy'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation } from 'react-router'
 import { useQuery } from 'convex/react'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { api } from '../../../convex/_generated/api'
@@ -8,12 +9,19 @@ import { Button } from '../../components/ui/button'
 import { NativeSelect, NativeSelectOption } from '../../components/ui/native-select'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { eventSetupCopy } from '../../copy/event-setup-copy'
+import { operationsText } from '../../lib/operations-copy'
 import operationsStyles from '../operations/Operations.module.css'
 import styles from './EventSetup.module.css'
 import { byMostOpen, openSpots, shiftName, shiftTime } from './shift-plan'
 import { answerText, downloadCsv, questionHeading, responsesFilename, signupResponsesCsv } from './signup-csv'
 
-/** Coach / Travel Lead view of signup answers and the shift roster, with a CSV download of both. */
+/** The shift section's anchor: Event readiness links to /events/:id#shifts, which opens this section and scrolls to it. */
+export const SHIFTS_SECTION_ID = 'shifts'
+
+/**
+ * Coach / Travel Lead view of signup answers (with a CSV download of answers and shifts) and, in its own section, each shift
+ * with the names signed up, open spots and who still needs to pick shifts.
+ */
 export function SignupResponses({ eventId, eventName, usesShifts }: { eventId: Id<'events'>; eventName: string; usesShifts: boolean }) {
   const copy = eventSetupCopy.responses
   const data = useQuery(api.eventQuestions.responses, { eventId })
@@ -28,12 +36,24 @@ export function SignupResponses({ eventId, eventName, usesShifts }: { eventId: I
     return byStudent
   }, [usesShifts, roster])
 
+  // Opening /events/:id#shifts lands on the shift section once it has loaded.
+  const { hash } = useLocation()
+  const shiftsRef = useRef<HTMLDetailsElement>(null)
+  const landed = useRef(false)
+  useEffect(() => {
+    if (hash !== `#${SHIFTS_SECTION_ID}` || !roster || landed.current || !shiftsRef.current) return
+    landed.current = true
+    shiftsRef.current.open = true
+    shiftsRef.current.scrollIntoView({ block: 'start' })
+  }, [hash, roster])
+  const openTotal = roster?.shifts.reduce((sum, shift) => sum + (openSpots(shift) ?? 0), 0) ?? 0
+
   const download = () => {
     if (!data) return
     downloadCsv(responsesFilename(eventName), signupResponsesCsv(data.questions, data.rows, shiftsByStudent))
   }
 
-  return <details id="event-responses" className={operationsStyles.disclosure}><summary><strong>{copy.title}</strong><span>{data ? copy.summary(data.rows.length) : copy.loading}</span></summary><div className={operationsStyles.disclosureBody}><Card><CardHeader><CardTitle>{copy.title}</CardTitle></CardHeader><CardContent className={styles.stack}>
+  return <><details id="event-responses" className={operationsStyles.disclosure}><summary><strong>{copy.title}</strong><span>{data ? copy.summary(data.rows.length) : copy.loading}</span></summary><div className={operationsStyles.disclosureBody}><Card><CardHeader><CardTitle>{copy.title}</CardTitle></CardHeader><CardContent className={styles.stack}>
     <div className={styles.formActions}><Button variant="outline" disabled={loading} onClick={download}>{copy.download}</Button></div>
     {!data ? <p role="status">{copy.loading}</p> : <>
       <h3>{copy.answersTitle}</h3>
@@ -47,8 +67,8 @@ export function SignupResponses({ eventId, eventName, usesShifts }: { eventId: I
         </tr>)}</tbody>
       </table></div>}
     </>}
-    {usesShifts && <>
-      <h3>{copy.rosterTitle}</h3>
+  </CardContent></Card></div></details>
+    {usesShifts && <details id={SHIFTS_SECTION_ID} ref={shiftsRef} className={operationsStyles.disclosure}><summary><strong>{copy.rosterTitle}</strong><span>{roster ? operationsText.shiftRoster.summary(roster.shifts.length, openTotal, roster.needsShifts.length) : copy.loading}</span></summary><div className={operationsStyles.disclosureBody}><Card><CardHeader><CardTitle>{copy.rosterTitle}</CardTitle></CardHeader><CardContent className={styles.stack}>
       {!roster ? <p role="status">{copy.loading}</p> : <>
         {roster.shifts.length > 1 && <label className={styles.hint}>{copy.sortLabel} <NativeSelect value={sort} onChange={e => setSort(e.target.value === 'open' ? 'open' : 'time')}><NativeSelectOption value="time">{copy.sortTime}</NativeSelectOption><NativeSelectOption value="open">{copy.sortOpen}</NativeSelectOption></NativeSelect></label>}
         <div className={styles.rosterGrid}>{(sort === 'open' ? byMostOpen(roster.shifts) : roster.shifts).map(shift => <section className={styles.rosterCard} key={shift.shiftId} aria-label={shiftName(shift)}>
@@ -59,6 +79,6 @@ export function SignupResponses({ eventId, eventName, usesShifts }: { eventId: I
         <h3>{copy.needsTitle}</h3>
         {roster.needsShifts.length === 0 ? <p className="muted">{data && data.rows.length === 0 ? copy.nobodySignedUp : copy.needsNone}</p> : <ul>{roster.needsShifts.map(s => <li key={s.studentId}>{s.name} · {copy.needsCount(s.shiftCount)}</li>)}</ul>}
       </>}
-    </>}
-  </CardContent></Card></div></details>
+    </CardContent></Card></div></details>}
+  </>
 }

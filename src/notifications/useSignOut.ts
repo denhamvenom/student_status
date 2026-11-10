@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { useMutation } from 'convex/react'
 import { useAuthActions } from '@convex-dev/auth/react'
 import { api } from '../../convex/_generated/api'
+import { browserIntentStorage, clearEmailCodeStep } from '../lib/authReturn'
 import { getCurrentSubscription, unsubscribe } from './pushClient'
 
 export const CLEANUP_TIMEOUT_MS = 3000
@@ -93,9 +94,16 @@ export async function signOutSafely({ cleanup, retryCleanup, signOut, clearLocal
   return 'forced'
 }
 
+/** The saved "Code sent to <address>" step must not outlive the session, or the next person on a shared device sees it. */
+function clearSavedEmailStep() {
+  const storage = browserIntentStorage()
+  if (storage) clearEmailCodeStep(storage)
+}
+
 /** What runs once the server sign-out settles. When it was forced the page is about to reload to '/', so `onForced` (for example
  * discarding a saved invitation token) must run here: the caller's code after `await signOut()` will never run. */
-export function localClearer(forced: boolean, onForced?: () => void, clearAuth: () => void = clearAuthKeys, clearKey: () => void = removeDeveloperKey) {
+export function localClearer(forced: boolean, onForced?: () => void, clearAuth: () => void = clearAuthKeys, clearKey: () => void = removeDeveloperKey, clearStep: () => void = clearSavedEmailStep) {
+  clearStep()
   if (forced) { clearAuth(); try { onForced?.() } catch { /* best effort */ } }
   clearKey()
 }
@@ -103,10 +111,16 @@ export function localClearer(forced: boolean, onForced?: () => void, clearAuth: 
 /** Sign out, first turning off notifications on this device so the next person to use it does not get this account's pushes.
  * Use this for every Sign out control; it resolves within about CLEANUP_TIMEOUT_MS + SIGN_OUT_TIMEOUT_MS. */
 export function useSignOut(onForced?: () => void) {
+  const signOut = useSignOutResult(onForced)
+  return useCallback(async () => { await signOut() }, [signOut])
+}
+
+/** Same as useSignOut, but reports whether the sign-out was forced (the app is then already reloading at '/'). */
+export function useSignOutResult(onForced?: () => void) {
   const { signOut } = useAuthActions()
   const deleteSubscription = useMutation(api.push.deleteSubscription)
   return useCallback(async () => {
-    await signOutSafely({
+    return signOutSafely({
       cleanup: () => removeThisDevice(deleteSubscription),
       retryCleanup: unsubscribeLocally,
       signOut,

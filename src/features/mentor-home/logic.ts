@@ -2,7 +2,7 @@
 // Pure (no Convex or React) so the rules are tested directly; the backend decides what a Mentor may see and do.
 import { onsiteLocation } from '../../../convex/lib/transportation'
 import { mentorHomeCopy } from '@/copy/mentor-home-copy'
-import { subteamDisplay } from '@/lib/subteams'
+import { canonicalSubteam, subteamDisplay } from '@/lib/subteams'
 import { formatWhen } from '../student-home/agenda'
 import { repeatSummary } from '../event-setup/audience/repeat'
 import type { RepeatValue } from '../event-setup/audience/types'
@@ -88,7 +88,8 @@ export const COMING_UP_LIMIT = 3
 /** At most this many tags on a Coming up row. */
 export const MAX_TAGS = 2
 
-const sameSubteam = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+/** Same subteam under the server's rule: legacy names are canonicalized (Mechanical = Build), then compared without case. */
+const sameSubteam = (a: string, b: string) => canonicalSubteam(a).toLowerCase() === canonicalSubteam(b).toLowerCase()
 
 /** Coming up tags, at most two: Travel (it asks about driving or a hotel room), then Your subteam (for one of the Mentor's subteams). */
 export function comingUpTags(meeting: Pick<MentorMeeting, 'questions' | 'audience'>, subteams: readonly string[]): string[] {
@@ -164,8 +165,23 @@ export function joinSections(entries: readonly JoinEntry[], now: number, subteam
   }
 }
 
-/** "Your subteam" is only for meetings, never for a Competition or trip (those are for the whole team). */
-export const showsSubteamTag = (entry: Pick<JoinEntry, 'category' | 'forYourSubteam'>) => entry.category === 'meetings' && entry.forYourSubteam
+/** Who an event is for, as a small row tag: "Whole team", its subteams ("Programming, CAD"), or the narrower audiences. */
+export function audienceTag(audience: { kind: MentorMeeting['audience']['kind']; subteams: readonly string[] }): string {
+  if (audience.kind === 'subteams') {
+    const list = subteamsList(audience.subteams)
+    return list || copy.join.wholeTeam
+  }
+  if (audience.kind === 'students') return copy.join.someStudents
+  if (audience.kind === 'mentorsOnly') return copy.join.mentorsOnly
+  return copy.join.wholeTeam
+}
+
+/** The always-on scope line for Schedule › Join: "Showing: Programming and whole-team items" (or all subteams once widened). */
+export function joinScopeLine(subteams: readonly string[], showAll: boolean): string {
+  if (showAll) return copy.scope.showingAll
+  const list = subteamsList(subteams)
+  return list ? copy.scope.showing(list) : copy.scope.showingNone
+}
 
 /**
  * How a join entry is described. A series: "Mondays at 6:00 PM · Repeats weekly", then "4 upcoming · Next: Mon Nov 9,

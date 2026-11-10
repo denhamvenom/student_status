@@ -1,7 +1,7 @@
 import { requireSeasonFinanceReady } from "./lib/seasonFinance";
 import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
 import { ConvexError, v } from "convex/values";
-import { mutation, type MutationCtx } from "./_generated/server";
+import { mutation, query, type MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { queueMoneyDigest } from "./lib/digest";
 import { activeSeason, audit, viewer } from "./lib/access";
@@ -50,6 +50,32 @@ export const createCharge = mutation({
       if (args.amountCents > 0) await queueMoneyDigest(ctx, student._id, "charge");
     }
     return chargeId;
+  },
+});
+
+/** The events a student is signed up for, so Add a fee only offers events the server will accept. */
+export const signedUpEventIds = query({
+  args: { studentId: v.id("students") }, returns: v.array(v.id("events")),
+  handler: async (ctx, args) => {
+    const user = await viewer(ctx); financeEditor(user);
+    const season = await activeSeason(ctx);
+    const student = await ctx.db.get(args.studentId);
+    if (!student || student.seasonId !== season._id) throw new ConvexError("This student no longer exists. Reload to see the latest.");
+    const rows = await ctx.db.query("participants").withIndex("by_studentId", q => q.eq("studentId", student._id)).take(200);
+    return rows.filter(row => row.status === "confirmed").map(row => row.eventId);
+  },
+});
+
+/** How much of a just-added fee was paid at once from the student's Available funds. */
+export const feePaidSoFar = query({
+  args: { chargeId: v.id("charges") }, returns: v.number(),
+  handler: async (ctx, args) => {
+    const user = await viewer(ctx); financeEditor(user);
+    const season = await activeSeason(ctx);
+    const charge = await ctx.db.get(args.chargeId);
+    const student = charge ? await ctx.db.get(charge.studentId) : null;
+    if (!charge || !student || student.seasonId !== season._id) throw new ConvexError("This fee no longer exists. Reload to see the latest.");
+    return charge.appliedCents;
   },
 });
 

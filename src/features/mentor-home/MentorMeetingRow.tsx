@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { StatusBadge } from '@/components/dashboard/StatusBadge'
 import { dashboardButtonVariants } from '@/components/dashboard/styles'
 import { mentorHomeCopy } from '@/copy/mentor-home-copy'
+import { ConfirmAction } from '@/ConfirmAction'
 import { userFacingError } from '@/lib/error-message'
 import type { MentorMeeting } from './contract'
 import { eventTags, myPartLabel, seriesStatus, typeLabel } from './logic'
@@ -73,7 +74,8 @@ export function MeetingActions({ meeting, action, actions, size = 'sm', describe
         {button('soft', copy.series.skip, () => void run('no', () => actions.skip(meeting), copy.series.skippedToast(meeting.title), copy.series.skipFailed), 'no')}
         <LeaveSeriesButton meeting={meeting} actions={actions} disabled={!!busy} size={size} />
       </>
-      : button('urgent', copy.join.withdraw, () => void run('no', () => actions.withdraw(meeting), copy.join.withdrew(meeting.title), copy.join.withdrawFailed), 'no')}
+      : <ConfirmAction title={copy.join.withdrawTitle(meeting.title)} description={copy.join.withdrawDetail(meeting.title)} confirmLabel={copy.join.withdrawConfirm} disabled={!!busy}
+        onConfirm={async () => { await actions.withdraw(meeting); toast.success(copy.join.withdrew(meeting.title)) }}>{copy.join.withdraw}</ConfirmAction>}
   </>
   if (!buttons) return null
   return <>

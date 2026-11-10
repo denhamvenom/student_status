@@ -49,7 +49,7 @@ function useAsOf(){
   return asOf
 }
 
-function RosterRow({row,grade,selected,onSelect,showPermission}:{row:Row;grade:string|null;selected:boolean;onSelect:(checked:boolean)=>void;showPermission:boolean}){
+function RosterRow({row,grade,selected,onSelect,showPermission,showMore}:{row:Row;grade:string|null;selected:boolean;onSelect:(checked:boolean)=>void;showPermission:boolean;showMore:boolean}){
   const update=useMutation(api.admin.updateRoster),[busy,setBusy]=useState(false),[error,setError]=useState('')
   const change=async(fields:{subteam?:string;travelTeam?:boolean})=>{setBusy(true);setError('');try{await update({studentId:row.studentId,expectedRevision:row.profileRevision,...fields})}catch(e){setError(userFacingError(e, copy.failed))}finally{setBusy(false)}}
   const missingItems=missingProfileItems(row)
@@ -58,12 +58,12 @@ function RosterRow({row,grade,selected,onSelect,showPermission}:{row:Row;grade:s
     <td data-label={liveCopy.roster.student}><Link className={styles.name} to={`/team/${row.studentId}`}>{row.name}</Link>{error&&<p role="alert" className="open-text">{error}</p>}</td>
     <td data-label="Grade">{gradeLabel(grade)}</td>
     <td data-label={liveCopy.roster.subteam}><NativeSelect aria-label={`${row.name} ${liveCopy.roster.subteamSuffix}`} value={row.subteam} disabled={busy||!row.active} onChange={e=>void change({subteam:e.target.value})}><NativeSelectOption value="" disabled>Choose a subteam</NativeSelectOption>{row.subteam&&!subteamOptions.some(s=>s===row.subteam)&&<NativeSelectOption value={row.subteam} disabled>{subteamDisplay(row.subteam)} (earlier saved value)</NativeSelectOption>}{subteamOptions.map(value=><NativeSelectOption key={value} value={value}>{value}</NativeSelectOption>)}</NativeSelect></td>
-    <td data-label={liveCopy.roster.travelTeam}><label className="checkbox-label"><Checkbox aria-label={`${row.name} · Travel Team`} checked={row.travelTeam} disabled={busy||!row.active} onCheckedChange={checked=>void change({travelTeam:checked})}/> {liveCopy.roster.travelTeam}</label></td>
-    <td data-label={copy.status}><span className={`badge ${row.active?'badge-ready':'badge-pending'}`}>{row.active?copy.active:copy.archived}</span></td>
+    <td data-label={liveCopy.roster.travelTeam}><Checkbox aria-label={`${row.name} · Travel Team`} checked={row.travelTeam} disabled={busy||!row.active} onCheckedChange={checked=>void change({travelTeam:checked})}/></td>
+    {showMore&&<td data-label={copy.status}><span className={`badge ${row.active?'badge-ready':'badge-pending'}`}>{row.active?copy.active:copy.archived}</span></td>}
     <td data-label="FIRST registration"><FirstStudentStatus state={row.firstRegistrationState} compact /></td>
-    <td data-label="Student sign-in">{access(row)}</td>
+    {showMore&&<td data-label="Student sign-in">{access(row)}</td>}
     {showPermission&&<td data-label={copy.permissionColumn}><span>{permissionText(row)}</span>{row.permission.eventName&&<small>{row.permission.eventName}</small>}</td>}
-    <td data-label="Fundraiser Link">{row.fundraiserConnected?'Connected':'Disconnected'}</td>
+    {showMore&&<td data-label="Fundraiser Link">{row.fundraiserConnected?'Connected':'Disconnected'}</td>}
     <td data-label="Balance due"><span className={styles.money}>{row.balance.state==='ready'&&row.balance.dueCents!==null?chargeCurrency(row.balance.dueCents):balanceStatusLabel(row.balance.state)}</span></td>
     <td data-label="Next event readiness"><span className={row.nextEvent?.state==='ready'?styles.ready:styles.pending}>{row.nextEvent?.name??'—'}</span><small>{eventStatus(row)}</small></td>
     <td data-label="Missing profile information">{missingItems.length?missingItems.join(', '):'Nothing missing'}</td>
@@ -74,6 +74,7 @@ function RosterPage({active,asOf}:{active:boolean;asOf:number}){
   const [connection,setConnection]=useState<'all'|'connected'|'unconnected'>('all')
   const [search,setSearch]=useState(''),[subteam,setSubteam]=useState(''),[travelOnly,setTravelOnly]=useState(false),[quick,setQuick]=useState<RosterQuick>('all')
   const [sort,setSort]=useState<RosterSort>('lastName'),[direction,setDirection]=useState<Direction>('asc'),[pageIndex,setPageIndex]=useState(0)
+  const [showMore,setShowMore]=useState(false)
   const [selectedIds,setSelectedIds]=useState<ReadonlySet<string>>(()=>new Set())
   const directory=usePaginatedQuery(api.coachRoster.directory,{active},{initialNumItems:100})
   // The chips count the same rows the table shows, so every student's requirements load up front.
@@ -118,8 +119,8 @@ function RosterPage({active,asOf}:{active:boolean;asOf:number}){
     <p id="travel-team-help" className={styles.note}>{copy.travelTeamHelp}</p>
     <p className={styles.note}>{copy.selectHelp}</p>
     <p className={styles.note} role="status">{scopeText}</p>
-    <div className={styles.selectAllRow}><Button type="button" variant="outline" disabled={!complete||!ordered.length||allMatchingSelected} onClick={selectAllMatching}>{copy.selectAll(ordered.length)}</Button></div>
-    <Card><CardHeader><CardTitle>{active?copy.active:copy.archived} · {liveCopy.roster.heading}</CardTitle></CardHeader><CardContent><div className="table-wrap"><table className={styles.table}><thead><tr><th className={styles.selectCell}><Checkbox aria-label={copy.selectPage} checked={pageSelected} disabled={!rows.length} onCheckedChange={selectPage}/></th><th>{liveCopy.roster.student}</th><th>Grade</th><th>{liveCopy.roster.subteam}</th><th aria-describedby="travel-team-help">{liveCopy.roster.travelTeam}</th><th>{copy.status}</th><th>FIRST registration</th><th>Student sign-in</th>{signingOpen&&<th>{copy.permissionColumn}</th>}<th>Fundraiser Link</th><th>Balance due</th><th>Next event readiness</th><th>Missing profile information</th></tr></thead><tbody>{rows.length?rows.map(({item,row})=><RosterRow key={row.studentId} row={row} grade={item.grade} selected={selectedIds.has(row.studentId)} onSelect={checked=>toggle(row.studentId,checked)} showPermission={signingOpen}/>):<tr><td colSpan={signingOpen?13:12}>{!complete?'Loading roster…':ordered.length?'Loading students…':'No members match these filters.'}</td></tr>}</tbody></table></div></CardContent></Card>
+    <div className={styles.selectAllRow}><Button type="button" variant="outline" disabled={!complete||!ordered.length||allMatchingSelected} onClick={selectAllMatching}>{copy.selectAll(ordered.length)}</Button><Button type="button" variant="outline" aria-pressed={showMore} onClick={()=>setShowMore(!showMore)}>{showMore?copy.fewerColumns:copy.moreColumns}</Button></div>
+    <Card><CardHeader><CardTitle>{active?copy.active:copy.archived} · {liveCopy.roster.heading}</CardTitle></CardHeader><CardContent><div className="table-wrap"><table className={styles.table}><thead><tr><th className={styles.selectCell}><Checkbox aria-label={copy.selectPage} checked={pageSelected} disabled={!rows.length} onCheckedChange={selectPage}/></th><th>{liveCopy.roster.student}</th><th>Grade</th><th>{liveCopy.roster.subteam}</th><th aria-describedby="travel-team-help">{liveCopy.roster.travelTeam}</th>{showMore&&<th>{copy.status}</th>}<th>FIRST registration</th>{showMore&&<th>Student sign-in</th>}{signingOpen&&<th>{copy.permissionColumn}</th>}{showMore&&<th>Fundraiser Link</th>}<th>Balance due</th><th>Next event readiness</th><th>Missing profile information</th></tr></thead><tbody>{rows.length?rows.map(({item,row})=><RosterRow key={row.studentId} row={row} grade={item.grade} selected={selectedIds.has(row.studentId)} onSelect={checked=>toggle(row.studentId,checked)} showPermission={signingOpen} showMore={showMore}/>):<tr><td colSpan={9+(signingOpen?1:0)+(showMore?3:0)}>{!complete?'Loading roster…':ordered.length?'Loading students…':'No members match these filters.'}</td></tr>}</tbody></table></div></CardContent></Card>
     {complete&&effectivePageIndex>0&&<Button type="button" variant="outline" onClick={()=>setPageIndex(effectivePageIndex-1)}>Previous students</Button>}
     {complete&&ordered.length>(effectivePageIndex+1)*20&&<Button type="button" variant="outline" onClick={()=>setPageIndex(effectivePageIndex+1)}>Next students</Button>}
     {selectedRows.length>0&&<RosterBulkBar selected={selectedRows} matching={ordered.length} defaultItem={defaultItem} signingOpen={signingOpen} onSelectAll={selectAllMatching} onClear={()=>setSelectedIds(new Set())}/>}

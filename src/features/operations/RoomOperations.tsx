@@ -13,15 +13,14 @@ import { Input } from "../../components/ui/input";
 import { NativeSelect, NativeSelectOption } from "../../components/ui/native-select";
 import { Checkbox } from "../../components/ui/checkbox";
 import { ReviewRow, StepWizard } from "../../components/StepWizard";
+import { formatDeadline } from "../student-home/format";
+import { assignIssue, assignNeedsReason, finalizeIssue, roomTypeIssue } from "./roomRules";
 import styles from "./Operations.module.css";
 
 const roomHints = {
   groupNameRequired: 'Enter a group name.',
   roomNameRequired: 'Enter a room name.',
-  reasonWhen: 'Needed only to correct this room: after the deadline, to remove or move a student, to add a 5th student or to finalize a full room.',
-  chooseStudentFirst: 'Choose a student first.',
-  needReason: 'Enter a reason for this room to do this.',
-  roomFull: 'This room already has five students.',
+  reasonWhen: 'Needed to correct this room: after the deadline, to remove or move a student, to add a 5th student or to finalize a full room.',
 };
 const createRoomCopy = {
   open: 'Create room',
@@ -33,6 +32,7 @@ const createRoomCopy = {
   reasonHelp: 'Room selection is closed, so a reason is required. It is saved with the change.',
   roomLabel: 'Room name',
   typeLabel: 'Room type',
+  chooseType: 'Choose a room type',
   next: 'Continue',
   create: 'Create room',
   creating: 'Creating…',
@@ -68,7 +68,7 @@ function StudentRoom({ eventId }: { eventId: Id<"events"> }) {
   const closed = data.roomDeadline !== null && now > data.roomDeadline;
   return <section className={styles.root} aria-label={operationsCopy.rooms.yourRoomSelection}>
     <Card><CardHeader><CardTitle>{operationsCopy.rooms.yourRoom}</CardTitle></CardHeader><CardContent className="space-y-3">
-      {data.roomDeadline !== null && <p>{operationsText.rooms.selectionCloses(new Date(data.roomDeadline).toLocaleString("en-US", { timeZone: "America/Chicago", timeZoneName: "short" }))}</p>}
+      {data.roomDeadline !== null && <p>{operationsText.rooms.selectionCloses(formatDeadline(data.roomDeadline))}</p>}
       {closed && <p>{operationsCopy.rooms.studentRoomChangesClosedAtTheDeadlineAskACoachOrTravelLeadForACorrection}</p>}
       {group ? <><p><strong>{group.name}</strong>{group.finalized ? operationsCopy.rooms.finalizedSuffix : ""}</p><ul>{group.members.map((m: { studentId: string; legalName?: string; preferredName: string }) => <li key={m.studentId}>{m.legalName||m.preferredName}</li>)}</ul>{!group.finalized && !closed && <Button variant="outline" disabled={busy} onClick={() => void act(() => leave({ eventId }), operationsCopy.rooms.youLeftTheGroup)}>{operationsCopy.rooms.leaveGroup}</Button>}</> : data.requestedAssignment ? <><p>{operationsCopy.rooms.youAskedTheTravelTeamToAssignYouARoom}</p>{!closed && <Button variant="outline" disabled={busy} onClick={() => void act(() => cancelRequest({ eventId }), operationsCopy.rooms.assignmentRequestCanceled)}>{operationsCopy.rooms.cancelRequest}</Button>}</> : <><p>{operationsCopy.rooms.youHaveNotSelectedARoomYet}</p>{!closed && <><Button disabled={busy} onClick={() => void act(() => request({ eventId }), operationsCopy.rooms.assignmentRequested)}>{operationsCopy.rooms.askToBeAssigned}</Button><form className="form-grid" noValidate onSubmit={(e: FormEvent) => { e.preventDefault(); if (!name.trim()) { setMessage(""); setError(roomHints.groupNameRequired); return; } void act(() => create({ eventId, name: name.trim() }), operationsCopy.rooms.groupCreated); }}><label>{operationsCopy.rooms.groupName} <Input value={name} onChange={e => setName(e.target.value)} maxLength={80} required aria-invalid={error === roomHints.groupNameRequired || undefined} /></label><Button type="submit" disabled={busy}>{operationsCopy.rooms.createGroup}</Button></form></>}</>}
       {group && !group.finalized && !closed && group.members.length < 4 && <div className="form-grid"><label>{operationsCopy.rooms.inviteConfirmedTeammate} <NativeSelect value={peer} onChange={e => setPeer(e.target.value)}><NativeSelectOption value="">{operationsCopy.rooms.chooseATeammate}</NativeSelectOption>{peers.map(p => <NativeSelectOption value={p.studentId} key={p.studentId}>{p.legalName||p.preferredName}</NativeSelectOption>)}</NativeSelect></label><Button disabled={busy || !peer} onClick={() => void act(() => invite({ groupId: group._id, studentId: peer as Id<"students"> }), operationsCopy.rooms.invitationSent)}>{operationsCopy.rooms.invite}</Button></div>}
@@ -83,7 +83,7 @@ function CreateRoomWizard({ eventId, closed, onDone, onCancel }: { eventId: Id<"
   const create = useMutation(api.rooms.adultCreateGroup);
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
-  const [category, setCategory] = useState<"Boys" | "Girls">("Boys");
+  const [category, setCategory] = useState<"" | "Boys" | "Girls">("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState("");
@@ -91,24 +91,24 @@ function CreateRoomWizard({ eventId, closed, onDone, onCancel }: { eventId: Id<"
   const kind = kinds[step];
   const last = step === kinds.length - 1;
   const trimmedReason = reason.trim();
-  const issue = kind === "room" && !name.trim() ? roomHints.roomNameRequired : kind === "reason" && !trimmedReason ? createRoomCopy.reasonRequired : "";
+  const issue = kind === "room" && !name.trim() ? roomHints.roomNameRequired : kind === "room" && roomTypeIssue(category) ? roomTypeIssue(category) : kind === "reason" && !trimmedReason ? createRoomCopy.reasonRequired : "";
   const heading = kind === "room" ? createRoomCopy.stepRoom : kind === "reason" ? createRoomCopy.stepReason : createRoomCopy.stepCheck;
   async function next() {
     if (issue) { setProblem(issue); return; }
     setProblem("");
     if (!last) { setStep(step + 1); return; }
     setBusy(true);
-    try { await create({ eventId, name: name.trim(), category, reason: trimmedReason || undefined }); onDone(operationsCopy.rooms.roomCreated); onCancel(); } catch (e) { setProblem(userFacingError(e, createRoomCopy.failed)); } finally { setBusy(false); }
+    try { await create({ eventId, name: name.trim(), category: category as "Boys" | "Girls", reason: trimmedReason || undefined }); onDone(operationsCopy.rooms.roomCreated); onCancel(); } catch (e) { setProblem(userFacingError(e, createRoomCopy.failed)); } finally { setBusy(false); }
   }
   return <StepWizard title={createRoomCopy.title} step={step + 1} total={kinds.length} heading={heading} onNext={() => void next()} nextLabel={last ? (busy ? createRoomCopy.creating : createRoomCopy.create) : createRoomCopy.next} onBack={step > 0 ? () => { setProblem(""); setStep(step - 1); } : undefined} onCancel={onCancel} busy={busy} error={problem}>
     {kind === "room" && <>
       <label className="grid gap-2 font-semibold">{createRoomCopy.roomLabel} <Input value={name} onChange={e => setName(e.target.value)} required maxLength={80} aria-invalid={problem === roomHints.roomNameRequired || undefined} /></label>
-      <label className="grid gap-2 font-semibold">{createRoomCopy.typeLabel} <NativeSelect value={category} onChange={e => setCategory(e.target.value as "Boys" | "Girls")}><NativeSelectOption value="Boys">{operationsCopy.rooms.boys}</NativeSelectOption><NativeSelectOption value="Girls">{operationsCopy.rooms.girls}</NativeSelectOption></NativeSelect></label>
+      <label className="grid gap-2 font-semibold">{createRoomCopy.typeLabel} <NativeSelect value={category} onChange={e => setCategory(e.target.value as "" | "Boys" | "Girls")} aria-invalid={problem === roomTypeIssue("") || undefined}><NativeSelectOption value="">{createRoomCopy.chooseType}</NativeSelectOption><NativeSelectOption value="Boys">{operationsCopy.rooms.boys}</NativeSelectOption><NativeSelectOption value="Girls">{operationsCopy.rooms.girls}</NativeSelectOption></NativeSelect></label>
     </>}
     {kind === "reason" && <label className="grid gap-2 font-semibold">{createRoomCopy.reasonLabel} <Input value={reason} onChange={e => setReason(e.target.value)} maxLength={500} required aria-describedby="create-room-reason-help" aria-invalid={problem === createRoomCopy.reasonRequired || undefined} /><span id="create-room-reason-help" className="text-sm font-normal text-muted-foreground">{createRoomCopy.reasonHelp}</span></label>}
     {kind === "check" && <dl className="m-0">
       <ReviewRow label={createRoomCopy.roomLabel} value={name.trim()} onEdit={() => setStep(0)} disabled={busy} />
-      <ReviewRow label={createRoomCopy.typeLabel} value={category === "Boys" ? operationsCopy.rooms.boys : operationsCopy.rooms.girls} onEdit={() => setStep(0)} disabled={busy} />
+      <ReviewRow label={createRoomCopy.typeLabel} value={category === "Girls" ? operationsCopy.rooms.girls : operationsCopy.rooms.boys} onEdit={() => setStep(0)} disabled={busy} />
       {closed && <ReviewRow label={createRoomCopy.reasonLabel} value={trimmedReason} onEdit={() => setStep(1)} disabled={busy} />}
     </dl>}
   </StepWizard>;
@@ -124,6 +124,8 @@ function AdultRoom({ eventId }: { eventId: Id<"events"> }) {
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [fifths, setFifths] = useState<Record<string, boolean>>({});
   const [target, setTarget] = useState<Record<string, string>>({});
+  // A reason box appears only when the room needs one, or after Remove is pressed without a reason.
+  const [asked, setAsked] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [outcome, setOutcome] = useState<{ place: string; text: string; failed?: boolean } | null>(null);
@@ -140,12 +142,15 @@ function AdultRoom({ eventId }: { eventId: Id<"events"> }) {
     {groups.map(group => {
       const reason = (reasons[group._id] ?? "").trim();
       const fifth = fifths[group._id] ?? false;
-      const assignNeedsReason = (closed || group.finalized || group.members.length === 4) && !reason;
+      const state = { closed, finalized: group.finalized, memberCount: group.members.length };
+      const showReason = assignNeedsReason(state) || !!asked[group._id];
+      const assignProblem = assignIssue(state, !!target[group._id], reason);
+      const finalizeProblem = finalizeIssue(state, reason);
       return <Card key={group._id}><CardHeader><CardTitle>{group.name} · {group.category}</CardTitle></CardHeader><CardContent className="space-y-3"><p>{operationsText.rooms.occupancy(group.members.length, group.finalized ? operationsCopy.rooms.finalized : operationsCopy.rooms.open, group.needsReview ? operationsCopy.rooms.needsReviewSuffix : "", group.adultFifthException ? operationsCopy.rooms.fifthApprovedSuffix : "")}</p>
-        <div><label>{operationsCopy.rooms.correctionReason} <Input value={reasons[group._id] ?? ""} onChange={e => setReasons(r => ({ ...r, [group._id]: e.target.value }))} maxLength={500} aria-describedby={`room-reason-hint-${group._id}`} /></label><p id={`room-reason-hint-${group._id}`} className="muted">{roomHints.reasonWhen}</p></div>
-        <ul>{group.members.map(s => <li className={styles.sectionRow} key={s.studentId}><span>{s.name}</span><Button variant="outline" disabled={busy || !reason} title={!reason ? roomHints.needReason : undefined} onClick={() => void act(group._id, () => unassign({ eventId, studentId: s.studentId, reason }), operationsText.rooms.removedFromRoom(s.name))}>{operationsCopy.rooms.remove}</Button></li>)}</ul>
+        {showReason && <div><label>{operationsCopy.rooms.correctionReason} <Input value={reasons[group._id] ?? ""} onChange={e => setReasons(r => ({ ...r, [group._id]: e.target.value }))} maxLength={500} aria-describedby={`room-reason-hint-${group._id}`} /></label><p id={`room-reason-hint-${group._id}`} className="muted">{roomHints.reasonWhen}</p></div>}
+        <ul>{group.members.map(s => <li className={styles.sectionRow} key={s.studentId}><span>{s.name}</span><Button variant="outline" disabled={busy} onClick={() => { if (!reason) { setAsked(a => ({ ...a, [group._id]: true })); return } void act(group._id, () => unassign({ eventId, studentId: s.studentId, reason }), operationsText.rooms.removedFromRoom(s.name)) }}>{operationsCopy.rooms.remove}</Button></li>)}</ul>
         <details><summary>More options</summary><label className="checkbox-label"><Checkbox checked={fifth} onCheckedChange={checked => setFifths(f => ({ ...f, [group._id]: checked }))} /> {operationsCopy.rooms.authorizeFifth}</label></details>
-        <div className="flex flex-wrap items-end gap-2"><label>{operationsCopy.rooms.assignOrMove} <NativeSelect value={target[group._id] ?? ""} onChange={e => setTarget(t => ({ ...t, [group._id]: e.target.value }))}><NativeSelectOption value="">{operationsCopy.rooms.chooseStudent}</NativeSelectOption>{students.filter(s => s.category === group.category && s.groupId !== group._id).map(s => <NativeSelectOption value={s.studentId} key={s.studentId}>{s.name}{s.groupId ? operationsCopy.rooms.moveSuffix : s.requestedAssignment ? operationsCopy.rooms.requestedSuffix : ""}</NativeSelectOption>)}</NativeSelect></label><Button disabled={busy || !target[group._id] || group.members.length >= 5 || assignNeedsReason} aria-describedby={`assign-hint-${group._id}`} onClick={() => void act(group._id, () => assign({ groupId: group._id, studentId: target[group._id] as Id<"students">, allowFifth: fifth, reason: reason || undefined }), operationsCopy.rooms.roomAssignmentSaved)}>{operationsCopy.rooms.assign}</Button>{group.finalized && !group.needsReview ? <span className="badge badge-ready w-fit">{operationsCopy.rooms.finalized}</span> : <ConfirmAction title="Finalize this room?" confirmLabel="Finalize" disabled={busy || !group.members.length || (closed || group.members.length === 5) && !reason} description={`Finalize ${group.name} with ${studentCount(group.members.length)}: ${group.members.map(member => member.name).join(", ")}? Students cannot change a finalized room. Adult corrections remain available.${reason ? ` Reason: ${reason}` : ""}`} onConfirm={async () => { await finalize({ groupId: group._id, expectedMembers: group.members.map(member => member.studentId), allowFifth: fifth, reason: reason || undefined }); setOutcome({ place: group._id, text: operationsCopy.rooms.roomFinalized }) }}>{operationsCopy.rooms.reviewAndFinalize}</ConfirmAction>}</div><p id={`assign-hint-${group._id}`} className="muted">{!target[group._id] ? roomHints.chooseStudentFirst : group.members.length >= 5 ? roomHints.roomFull : assignNeedsReason ? roomHints.needReason : ""}</p>{shown(group._id)}</CardContent></Card>;
+        <div className="flex flex-wrap items-end gap-2"><label>{operationsCopy.rooms.assignOrMove} <NativeSelect value={target[group._id] ?? ""} onChange={e => setTarget(t => ({ ...t, [group._id]: e.target.value }))}><NativeSelectOption value="">{operationsCopy.rooms.chooseStudent}</NativeSelectOption>{students.filter(s => s.category === group.category && s.groupId !== group._id).map(s => <NativeSelectOption value={s.studentId} key={s.studentId}>{s.name}{s.groupId ? operationsCopy.rooms.moveSuffix : s.requestedAssignment ? operationsCopy.rooms.requestedSuffix : ""}</NativeSelectOption>)}</NativeSelect></label><Button disabled={busy || !target[group._id] || !!assignProblem} aria-describedby={`assign-hint-${group._id}`} onClick={() => void act(group._id, () => assign({ groupId: group._id, studentId: target[group._id] as Id<"students">, allowFifth: fifth, reason: reason || undefined }), operationsCopy.rooms.roomAssignmentSaved)}>{operationsCopy.rooms.assign}</Button>{group.finalized && !group.needsReview ? <span className="badge badge-ready w-fit">{operationsCopy.rooms.finalized}</span> : <ConfirmAction title="Finalize this room?" confirmLabel="Finalize" disabled={busy || !!finalizeProblem} description={`Finalize ${group.name} with ${studentCount(group.members.length)}: ${group.members.map(member => member.name).join(", ")}? Students cannot change a finalized room. Adult corrections remain available.${reason ? ` Reason: ${reason}` : ""}`} onConfirm={async () => { await finalize({ groupId: group._id, expectedMembers: group.members.map(member => member.studentId), allowFifth: fifth || group.adultFifthException, reason: reason || undefined }); setOutcome({ place: group._id, text: operationsCopy.rooms.roomFinalized }) }}>{operationsCopy.rooms.reviewAndFinalize}</ConfirmAction>}</div><p id={`assign-hint-${group._id}`} className="muted">{target[group._id] ? assignProblem : finalizeProblem}</p>{shown(group._id)}</CardContent></Card>;
     })}
     <Card><CardHeader><CardTitle>{operationsCopy.rooms.studentsAwaitingPlacement}</CardTitle></CardHeader><CardContent>{students.filter(s => !s.groupId).length ? <ul>{students.filter(s => !s.groupId).map(s => <li key={s.studentId}>{s.name} · {s.category ?? operationsCopy.rooms.categoryMissing}{s.requestedAssignment ? operationsCopy.rooms.requestedSuffix : ""}</li>)}</ul> : <p>{students.length?operationsCopy.rooms.allConfirmedStudentsArePlaced:'No students to place yet.'}</p>}</CardContent></Card>
     {error && <p role="alert" className="open-text">{error}</p>}

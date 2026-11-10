@@ -2,7 +2,7 @@ import { useId, useState } from 'react'
 import { DashboardTile } from '@/components/dashboard/DashboardTile'
 import { mentorHomeCopy } from '@/copy/mentor-home-copy'
 import type { JoinEntry } from './contract'
-import { joinEntryLines, MAX_TAGS, showsSubteamTag, type JoinSections } from './logic'
+import { audienceTag, joinEntryLines, MAX_TAGS, type JoinSections } from './logic'
 import { MeetingActions } from './MentorMeetingRow'
 import type { MentorActions } from './MentorSignupWizard'
 import { Tags } from './rows'
@@ -18,7 +18,7 @@ export function MentorJoinRow({ entry, actions }: { entry: JoinEntry; actions: M
   const headingId = `mentor-join-${entry.seriesId ?? entry.nextEventId}`
   const { line, detail } = joinEntryLines(entry)
   const meeting = entry.next
-  const tags = [...(showsSubteamTag(entry) ? [copy.join.yourSubteam] : []), ...(meeting.questions.askDrive || meeting.questions.askHotel ? [copy.tags.travel] : [])].slice(0, MAX_TAGS)
+  const tags = [audienceTag(meeting.audience), ...(meeting.questions.askDrive || meeting.questions.askHotel ? [copy.tags.travel] : [])].slice(0, MAX_TAGS)
   return <li className="flex flex-col gap-1 border-b border-vs-border-subtle px-2 py-2.5 last:border-b-0">
     <div className="flex items-center gap-3">
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">

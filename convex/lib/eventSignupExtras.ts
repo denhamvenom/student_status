@@ -191,6 +191,28 @@ export function checkRequirementFields(requirement: { label: string; instruction
   if (requirement.url && !/^https:\/\//i.test(requirement.url)) throw new ConvexError("Requirement links must start with https://.");
 }
 
+/** Short names the app keeps for its own requirement checks. */
+export const RESERVED_REQUIREMENT_KEYS = ["pay", "perm", "first", "room"];
+
+/**
+ * The internal short name for a new requirement, made from its display name ("Lunch order" -> "lunch-order") and unique
+ * among `used` (the event's other short names): "lunch-order-2" and so on. People never see or type it.
+ */
+export function requirementKey(label: string, used: Iterable<string>) {
+  const taken = new Set(used);
+  const slug = label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24).replace(/-+$/, "");
+  const base = slug && !RESERVED_REQUIREMENT_KEYS.includes(slug) ? slug : "requirement";
+  if (!taken.has(base)) return base;
+  for (let n = 2; ; n++) { const key = `${base}-${n}`; if (!taken.has(key)) return key; }
+}
+
+/** "Something to know" requirements are notes only: never a task, never open, never counted toward ready. Rows without a kind are checked off. */
+export const isInfoRequirement = (requirement: Pick<Doc<"requirements">, "kind">) => requirement.kind === "info";
+export const checkoffRequirements = <T extends Pick<Doc<"requirements">, "kind">>(requirements: readonly T[]) => requirements.filter(r => !isInfoRequirement(r));
+
+/** Fewest shifts a confirmed student must pick to be ready: the event's minimum (1 when unset), never more than the shifts offered; 0 without shifts. */
+export const shiftMinimum = (event: Pick<Doc<"events">, "shiftsEnabled" | "minShiftsPerStudent">, shiftsOffered: number) => event.shiftsEnabled ? Math.min(event.minShiftsPerStudent ?? 1, shiftsOffered) : 0;
+
 export const shiftName = (shift: Doc<"eventShifts">) => shift.label ? `The "${clip(shift.label)}" shift` : "A shift you chose";
 
 /**

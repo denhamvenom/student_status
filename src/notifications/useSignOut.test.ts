@@ -95,6 +95,13 @@ describe('localClearer', () => {
     localClearer(true, onForced, clearAuth, clearKey)
     expect(onForced).toHaveBeenCalledTimes(1); expect(clearAuth).toHaveBeenCalledTimes(1)
   })
+  it('forgets the saved email-code step on both normal and forced sign-out', () => {
+    for (const forced of [false, true]) {
+      const clearStep = vi.fn()
+      localClearer(forced, undefined, () => {}, () => {}, clearStep)
+      expect(clearStep).toHaveBeenCalledTimes(1)
+    }
+  })
   it('still clears everything when onForced throws', () => {
     const clearAuth = vi.fn(), clearKey = vi.fn()
     expect(() => localClearer(true, () => { throw new Error('x') }, clearAuth, clearKey)).not.toThrow()

@@ -10,7 +10,8 @@ import { activeApprovedWithdrawal, withdrawalHistory } from "./lib/withdrawalSta
 import { eventVisibleToStudents } from "./lib/eventAudience";
 import { coverageFor } from "./lib/permissionCoverage";
 import { permissionSigningPaused } from "./lib/permissionSigningMode";
-import { roomSelectionState, studentReadiness, type RoomSelectionState } from "./lib/readModels";
+import { READINESS_PERMISSION, READINESS_SHIFTS, roomSelectionState, studentReadiness, type RoomSelectionState } from "./lib/readModels";
+import { checkoffRequirements } from "./lib/eventSignupExtras";
 import { kickoffBoundaryForCompetitionYear } from "./lib/seasonCalendar";
 import { feeMaintenanceProjection } from "./lib/seasonFinance";
 import { effectiveChargeCents } from "./lib/chargeObligation";
@@ -197,7 +198,8 @@ async function buildSummary(ctx: QueryCtx, student: Doc<"students">, asOfDay: st
       const readiness = await studentReadiness(ctx, event, student, { participant, firstRegistrationState: first, ...shared, completions, requirements, room });
       if (readiness.state !== "open") continue;
       // Custom requirements come from the same rows readiness used, so each keeps its own key and due date.
-      const customOpen = (requirements ?? []).filter(requirement => !completions?.some(done => done.key === requirement.key));
+      // "Something to know" requirements are notes only, so they never become a What's left item.
+      const customOpen = checkoffRequirements(requirements ?? []).filter(requirement => !completions?.some(done => done.key === requirement.key));
       const builtIn = [...readiness.open];
       for (const requirement of customOpen) { const at = builtIn.lastIndexOf(requirement.label); if (at >= 0) builtIn.splice(at, 1); }
       let staffReview = false;
@@ -205,7 +207,9 @@ async function buildSummary(ctx: QueryCtx, student: Doc<"students">, asOfDay: st
         if (STAFF_ITEMS.has(item)) staffReview = true;
         else if (item === "Required payment") whatsLeft.push(await paymentItem(ctx, student, event));
         else if (item === "Room selection") whatsLeft.push(eventItem("room", "roomChoice", "student", event, { dueAt: event.roomDeadline ?? event.startsAt, href: `/events/${event._id}/rooming` }));
-        else if (item === "Permission accepted") {
+        // Fewer shifts than the event's minimum: the Student picks them in the event's signup section.
+        else if (item === READINESS_SHIFTS) whatsLeft.push(eventItem("shifts", "requirement", "student", event, { label: "Pick your shifts", href: `/events/${event._id}#my-signup`, dueAt: event.signupClosesAt !== undefined && event.signupClosesAt < event.startsAt ? event.signupClosesAt : event.startsAt }));
+        else if (item === READINESS_PERMISSION) {
           if (signingPaused) continue;
           const coverage = await coverageFor(ctx, student._id, event._id);
           const submitted = coverage?.state === "pending" && coverage.signatureRequestedAt === undefined;

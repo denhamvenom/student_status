@@ -1,5 +1,5 @@
 import { userFacingError } from '@/lib/error-message'
-import { Component, useId, useRef, useState, type ReactNode } from 'react'
+import { Component, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { useConvex, useMutation, usePaginatedQuery, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { api } from '../convex/_generated/api'
@@ -28,6 +28,21 @@ const today = () => chicagoDateString(Date.now())
 const validDate = (date: string) => /^\d{4}-\d{2}-\d{2}$/.test(date) && new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) === date
 const shortDate = (at: number) => new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', dateStyle: 'medium' }).format(at)
 const when = (at: number) => new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', dateStyle: 'medium', timeStyle: 'short' }).format(at)
+/** Where a new payment's money goes, estimated from the Balance due before it: fees first, the rest to Unused payments. */
+export function paymentOutcome(amountCents: number, balanceDueCents: number | null) {
+  if (balanceDueCents === null) return null
+  const toFees = Math.min(amountCents, Math.max(0, balanceDueCents))
+  return { toFeesCents: toFees, unusedCents: amountCents - toFees }
+}
+export function recordedMessage(amountCents: number, balanceDueCents: number | null) {
+  const outcome = paymentOutcome(amountCents, balanceDueCents)
+  if (!outcome) return copy.recordedOne(usd(amountCents))
+  return copy.recordedOne(usd(amountCents), outcome.toFeesCents ? usd(outcome.toFeesCents) : '', outcome.unusedCents ? usd(outcome.unusedCents) : '')
+}
+/** Every line in the running list names its student, so a payment is never read as belonging to the first one. */
+export function recordedRowLabel(studentName: string, method: PaymentMethod, number: string) { return [studentName, copy[method], number].filter(Boolean).join(' · ') }
+/** The amount problem is already shown under the amount box, so the step's alert doesn't repeat it. */
+export function visibleStepError(error: string, amount: ReturnType<typeof parseMoneyInput>) { return !amount.ok && error === amount.message ? '' : error }
 export function referenceLabel(method: PaymentMethod | '') { return method === 'check' ? copy.checkNumber : method === 'cash' ? copy.cashReference : copy.receiptNumber }
 /** Only cash may leave the check or receipt number empty (owner decision November 9, 2026). */
 export function referenceProblem(method: PaymentMethod, reference: string) { return method !== 'cash' && !reference.trim() ? (method === 'check' ? 'Enter the check number.' : 'Enter a receipt number or note for this payment.') : null }
@@ -46,8 +61,8 @@ export function MoneyInput({ label, value, onChange, disabled, allowZero, hint }
 function MethodFields({ method, reference, onMethod, onReference, disabled, allowUnset, hideCashReference }: { method: PaymentMethod | ''; reference: string; onMethod: (value: PaymentMethod) => void; onReference: (value: string) => void; disabled?: boolean; allowUnset?: boolean; hideCashReference?: boolean }) {
   const id = useId()
   return <>
-    <div className={styles.field}><label htmlFor={`${id}-method`}>{copy.method} <span className={styles.muted}>{copy.required}</span></label><NativeSelect id={`${id}-method`} value={method} disabled={disabled} onChange={event => onMethod(event.target.value as PaymentMethod)}>{allowUnset && <NativeSelectOption value="" disabled>Choose how it was paid</NativeSelectOption>}{methods.map(item => <NativeSelectOption key={item} value={item}>{copy[item]}</NativeSelectOption>)}</NativeSelect></div>
-    {!(hideCashReference && method === 'cash') && <div className={styles.field}><label htmlFor={`${id}-reference`}>{referenceLabel(method)} <span className={styles.muted}>{method === 'cash' ? copy.optional : copy.required}</span></label><Input id={`${id}-reference`} value={reference} maxLength={150} disabled={disabled} onChange={event => onReference(event.target.value)}/></div>}
+    <div className={styles.field}><label htmlFor={`${id}-method`}>{copy.method} <span className={styles.muted}>{copy.required}</span></label><NativeSelect id={`${id}-method`} value={method} disabled={disabled} onChange={event => onMethod(event.target.value as PaymentMethod)}>{(allowUnset || method === '') && <NativeSelectOption value="" disabled>{copy.chooseHow}</NativeSelectOption>}{methods.map(item => <NativeSelectOption key={item} value={item}>{copy[item]}</NativeSelectOption>)}</NativeSelect></div>
+    {method !== '' && !(hideCashReference && method === 'cash') && <div className={styles.field}><label htmlFor={`${id}-reference`}>{referenceLabel(method)} <span className={styles.muted}>{method === 'cash' ? copy.optional : copy.required}</span></label><Input id={`${id}-reference`} value={reference} maxLength={150} disabled={disabled} onChange={event => onReference(event.target.value)}/></div>}
   </>
 }
 function StudentSelect({ students, value, onChange, disabled, label }: { students: StudentOption[] | undefined; value: string; onChange: (value: Id<'students'>) => void; disabled?: boolean; label?: string }) {
@@ -94,17 +109,18 @@ export function parsePaymentCsv(text: string, students: StudentOption[] = []): L
   })
 }
 /** `id` is made when the row is added and kept through edits; it is the row's part of the save key. */
-export type Draft = { id: string; studentId: string; amount: string; method: PaymentMethod; reference: string; date: string }
+export type Draft = { id: string; studentId: string; amount: string; method: PaymentMethod | ''; reference: string; date: string }
 /** Typed payments become rows labeled "Payment N" so every message matches what is on screen. Returns every problem at once. */
 export function draftRows(drafts: Draft[]): { rows: LabeledRow[]; problems: string[] } {
   const rows: LabeledRow[] = []; const problems: string[] = []
   drafts.forEach((draft, index) => {
-    const label = copy.paymentRow(index + 1); const amount = parseMoneyInput(draft.amount); const reference = referenceProblem(draft.method, draft.reference)
+    const label = copy.paymentRow(index + 1); const amount = parseMoneyInput(draft.amount); const reference = draft.method ? referenceProblem(draft.method, draft.reference) : null
     if (!draft.studentId) problems.push(copy.missingStudent(label))
     if (!amount.ok) problems.push(copy.badAmount(label, amount.message))
+    if (!draft.method) problems.push(`${label}: ${copy.chooseMethod}`)
     if (reference) problems.push(`${label}: ${reference}`)
     if (!validDate(draft.date)) problems.push(`${label}: choose the date received.`)
-    if (draft.studentId && amount.ok && !reference && validDate(draft.date)) rows.push({ label, studentId: draft.studentId as Id<'students'>, amountCents: amount.cents, method: draft.method, reference: draft.reference.trim(), occurredAt: chicagoMidnight(draft.date), rowReference: draft.id })
+    if (draft.studentId && amount.ok && draft.method && !reference && validDate(draft.date)) rows.push({ label, studentId: draft.studentId as Id<'students'>, amountCents: amount.cents, method: draft.method, reference: draft.reference.trim(), occurredAt: chicagoMidnight(draft.date), rowReference: draft.id })
   })
   return { rows, problems }
 }
@@ -141,19 +157,20 @@ export function PaymentAdministration({ mode = 'bulk' }: { studentId?: Id<'stude
 }
 
 /** Record payment for one student: a short step-by-step flow that stays open after saving and lists what was recorded, with a total. */
-export function RecordPaymentForm({ studentId }: { studentId: Id<'students'> }) {
-  return <Recoverable><RecordPayment initialStudentId={studentId}/></Recoverable>
+export function RecordPaymentForm({ studentId, onClose }: { studentId: Id<'students'>; onClose?: () => void }) {
+  return <Recoverable><RecordPayment initialStudentId={studentId} onClose={onClose}/></Recoverable>
 }
 type RecordStep = keyof typeof copy.recordSteps
 const recordSteps: RecordStep[] = ['amount', 'how', 'note', 'review']
-function RecordPayment({ initialStudentId }: { initialStudentId: Id<'students'> }) {
+function RecordPayment({ initialStudentId, onClose }: { initialStudentId: Id<'students'>; onClose?: () => void }) {
   const [studentId, setStudentId] = useState(initialStudentId)
   const context = useQuery(api.paymentAdministration.recordContext, { studentId })
   const students = useQuery(api.paymentAdministration.studentOptions, {})
   const record = useMutation(api.paymentAdministration.recordPayment)
   const [step, setStep] = useState<RecordStep>('amount')
-  const [amount, setAmount] = useState(''); const [method, setMethod] = useState<PaymentMethod>('check'); const [reference, setReference] = useState(''); const [date, setDate] = useState(today); const [note, setNote] = useState('')
+  const [amount, setAmount] = useState(''); const [method, setMethod] = useState<PaymentMethod | ''>(''); const [reference, setReference] = useState(''); const [date, setDate] = useState(today); const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [saved, setSaved] = useState(''); const [confirming, setConfirming] = useState<number | null>(null)
+  const [choosing, setChoosing] = useState(false); const [discarding, setDiscarding] = useState(false)
   const [recorded, setRecorded] = useState<{ amountCents: number; label: string }[]>([])
   const key = useRef<string | null>(null); const noteId = useId(); const dateId = useId()
   const ready = context?.state === 'ready'
@@ -165,7 +182,7 @@ function RecordPayment({ initialStudentId }: { initialStudentId: Id<'students'> 
   const index = recordSteps.indexOf(step)
   function problem(at: RecordStep) {
     if (at === 'amount') return parsed.ok ? null : parsed.message
-    if (at === 'how') return referenceProblem(method, number) ?? (!validDate(date) ? copy.dateMissing : null)
+    if (at === 'how') return !method ? copy.chooseMethod : referenceProblem(method, number) ?? (!validDate(date) ? copy.dateMissing : null)
     if (at === 'review') return !ready ? copy.accountNotReady : null
     return null
   }
@@ -176,44 +193,59 @@ function RecordPayment({ initialStudentId }: { initialStudentId: Id<'students'> 
     void submit(false)
   }
   async function submit(confirmed: boolean) {
-    if (busy || !parsed.ok) return
+    if (busy || !parsed.ok || !method) return
     const extra = overpaymentCents(parsed.cents, context?.balanceDueCents ?? null)
     if (extra !== null && !confirmed) { setConfirming(extra); return }
     key.current ??= crypto.randomUUID(); setBusy(true); setError(''); setConfirming(null)
     try {
       await record({ studentId, amountCents: parsed.cents, method, reference: number, occurredAt: chicagoMidnight(date), note: note.trim(), idempotencyKey: key.current })
       key.current = null
-      const who = studentId !== initialStudentId ? `${studentName(studentId)} · ` : ''
-      setRecorded(previous => [...previous, { amountCents: parsed.cents, label: who + [copy[method], number].filter(Boolean).join(' · ') }])
-      setSaved(copy.recordedOne(usd(parsed.cents))); setAmount(''); setReference(''); setNote('')
+      setRecorded(previous => [...previous, { amountCents: parsed.cents, label: recordedRowLabel(studentName(studentId), method, number) }])
+      setSaved(recordedMessage(parsed.cents, context?.balanceDueCents ?? null)); setAmount(''); setReference(''); setNote('')
     } catch (failure) { setError(userFacingError(failure)) } finally { setBusy(false) }
   }
   // Method and date stay for the next payment, which is usually from the same meeting.
-  function again(next?: Id<'students'>) { if (next) setStudentId(next); key.current = null; setSaved(''); setError(''); setConfirming(null); setStep('amount') }
-  function cancel() { key.current = null; setAmount(''); setReference(''); setNote(''); setError(''); setConfirming(null); setStep('amount') }
+  function again(next?: Id<'students'>) { if (next) setStudentId(next); key.current = null; setSaved(''); setChoosing(false); setError(''); setConfirming(null); setStep('amount') }
+  // Cancel closes the window; it only asks first when something was typed.
+  const entered = !!(amount.trim() || reference.trim() || note.trim())
+  function cancel() {
+    if (entered && !discarding) { setDiscarding(true); return }
+    key.current = null; setDiscarding(false); setAmount(''); setReference(''); setNote(''); setError(''); setConfirming(null); setStep('amount')
+    onClose?.()
+  }
   const total = recorded.reduce((sum, item) => sum + item.amountCents, 0)
+  const name = studentName(studentId)
   return <div className={styles.form}>
     <p className={styles.muted}>{copy.recordPurpose}</p>
-    {studentId !== initialStudentId && <p className="m-0 font-semibold">{copy.student}: {studentName(studentId)}</p>}
+    <p className="m-0 text-lg font-bold">{copy.recordingFor(name)}</p>
     {context && !ready && <p role="status" className={styles.notice}>{copy.accountNotReady}</p>}
-    {saved ? <div className={styles.notice}>
+    {saved && !choosing ? <div className={styles.notice}>
       <p role="status" className="m-0">{saved}</p>
-      <div className={styles.actions}><Button type="button" autoFocus onClick={() => again()}>{copy.recordAnother}</Button></div>
-      <div className={styles.field}><StudentSelect students={students?.filter(item => item.studentId !== studentId)} value="" label={copy.anotherStudent} onChange={id => again(id)}/></div>
+      <div className={styles.actions}><Button type="button" autoFocus onClick={() => setChoosing(true)}>{copy.recordAnother}</Button>{onClose && <Button type="button" variant="outline" onClick={onClose}>{copy.done}</Button>}</div>
     </div>
-      : <StepWizard title={copy.recordTitle} step={index + 1} total={recordSteps.length} heading={copy.recordSteps[step]} nextLabel={step === 'review' ? (busy ? copy.recording : copy.recordButton) : copy.next} nextDisabled={step === 'review' && (confirming !== null || !ready)} onNext={next} onBack={index > 0 ? () => { setError(''); setConfirming(null); setStep(recordSteps[index - 1]) } : undefined} onCancel={cancel} busy={busy} error={error}>
+      : saved ? <div className={styles.notice}>
+        <p className="m-0 font-semibold">{copy.sameOrSomeone}</p>
+        <div className={styles.actions}><Button type="button" autoFocus onClick={() => again()}>{copy.sameStudent(name)}</Button></div>
+        <StudentSelect students={students?.filter(item => item.studentId !== studentId)} value="" label={copy.someoneElse} onChange={id => again(id)}/>
+      </div>
+      : <StepWizard title={copy.recordTitle} step={index + 1} total={recordSteps.length} heading={copy.recordSteps[step]} nextLabel={step === 'review' ? (busy ? copy.recording : copy.recordButton) : copy.next} nextDisabled={discarding || (step === 'review' && (confirming !== null || !ready))} onNext={next} onBack={index > 0 ? () => { setError(''); setConfirming(null); setDiscarding(false); setStep(recordSteps[index - 1]) } : undefined} onCancel={cancel} busy={busy} error={visibleStepError(error, parsed)}>
+        {discarding && <div className={styles.notice} role="alert"><p className="m-0 font-semibold">{copy.discardQuestion}</p><div className={styles.actions}><Button type="button" onClick={cancel}>{copy.discard}</Button><Button type="button" variant="outline" onClick={() => setDiscarding(false)}>{copy.keepEditing}</Button></div></div>}
         {step === 'amount' && <MoneyInput label={copy.amount} value={amount} onChange={change(setAmount)}/>}
         {step === 'how' && <div className={styles.fields}>
-          <MethodFields method={method} reference={reference} hideCashReference onMethod={change(setMethod)} onReference={change(setReference)}/>
+          <MethodFields method={method} reference={reference} allowUnset hideCashReference onMethod={change(setMethod)} onReference={change(setReference)}/>
           <div className={styles.field}><label htmlFor={dateId}>{copy.date} <span className={styles.muted}>{copy.required}</span></label><Input id={dateId} type="date" value={date} max={today()} onChange={event => change(setDate)(event.target.value)}/></div>
         </div>}
         {step === 'note' && <div className={styles.field}><label htmlFor={noteId}>{copy.note} <span className={styles.muted}>{copy.optional}</span></label><Input id={noteId} value={note} maxLength={1000} placeholder={copy.notePlaceholder} onChange={event => change(setNote)(event.target.value)}/></div>}
-        {step === 'review' && <dl className="m-0">
-          <ReviewRow label={copy.amount} value={parsed.ok ? usd(parsed.cents) : '—'} onEdit={() => setStep('amount')} disabled={busy}/>
-          <ReviewRow label={copy.method} value={[copy[method], number || null, validDate(date) ? shortDate(chicagoMidnight(date)) : null].filter(Boolean).join(' · ')} onEdit={() => setStep('how')} disabled={busy}/>
-          <ReviewRow label={copy.note} value={note.trim() || copy.noNote} onEdit={() => setStep('note')} disabled={busy}/>
-        </dl>}
-        {step === 'review' && confirming !== null && <div className={styles.notice} role="alert"><p>{overpaymentQuestion(confirming, studentName(studentId), 'record')}</p><div className={styles.actions}><Button type="button" disabled={busy} onClick={() => void submit(true)}>{copy.recordAnyway}</Button><Button type="button" variant="outline" disabled={busy} onClick={() => { setConfirming(null); setStep('amount') }}>{copy.changeAmount}</Button></div></div>}
+        {step === 'review' && <>
+          <p className="m-0 text-lg font-bold">{parsed.ok ? copy.recordReview(usd(parsed.cents), name) : copy.recordingFor(name)}</p>
+          <dl className="m-0">
+            <ReviewRow label={copy.student} value={name}/>
+            <ReviewRow label={copy.amount} value={parsed.ok ? usd(parsed.cents) : '—'} onEdit={() => setStep('amount')} disabled={busy}/>
+            <ReviewRow label={copy.method} value={[method ? copy[method] : null, number || null, validDate(date) ? shortDate(chicagoMidnight(date)) : null].filter(Boolean).join(' · ')} onEdit={() => setStep('how')} disabled={busy}/>
+            <ReviewRow label={copy.note} value={note.trim() || copy.noNote} onEdit={() => setStep('note')} disabled={busy}/>
+          </dl>
+        </>}
+        {step === 'review' && confirming !== null && <div className={styles.notice} role="alert"><p>{overpaymentQuestion(confirming, name, 'record')}</p><div className={styles.actions}><Button type="button" disabled={busy} onClick={() => void submit(true)}>{copy.recordAnyway}</Button><Button type="button" variant="outline" disabled={busy} onClick={() => { setConfirming(null); setStep('amount') }}>{copy.changeAmount}</Button></div></div>}
       </StepWizard>}
     {recorded.length > 0 && <section aria-label={copy.recordedThisVisit} className={styles.history}><strong>{copy.recordedThisVisit}</strong><ul className="m-0 grid gap-1 pl-5">{recorded.map((item, index) => <li key={index}>{usd(item.amountCents)} · {item.label}</li>)}</ul><p className="m-0 font-semibold">{copy.recordedTotal(recorded.length, usd(total))}</p></section>}
   </div>
@@ -222,7 +254,7 @@ function RecordPayment({ initialStudentId }: { initialStudentId: Id<'students'> 
 type BulkStep = keyof typeof copy.bulkSteps
 const bulkSteps: BulkStep[] = ['payments', 'note', 'review']
 /** A new typed row with its own lasting id; method and date carry over from the row before it. */
-export const blankDraft = (previous?: Draft): Draft => ({ id: crypto.randomUUID(), studentId: '', amount: '', method: previous?.method ?? 'check', reference: '', date: previous?.date ?? today() })
+export const blankDraft = (previous?: Draft): Draft => ({ id: crypto.randomUUID(), studentId: '', amount: '', method: previous?.method ?? '', reference: '', date: previous?.date ?? today() })
 /** Several payments at once: Payments (typed or from a spreadsheet) → Note → Review, then Record. */
 function BulkPayments({ initialMode }: { initialMode: 'bulk' | 'import' }) {
   const convex = useConvex(); const post = useMutation(api.paymentAdministration.recordPaymentRow); const students = useQuery(api.paymentAdministration.studentOptions, {})
@@ -309,7 +341,7 @@ function BulkPayments({ initialMode }: { initialMode: 'bulk' | 'import' }) {
           <fieldset className={styles.fields} disabled={isRecorded(row.id)}>
             <StudentSelect students={students} value={row.studentId} onChange={studentId => updateDraft(row.id, { studentId })}/>
             <MoneyInput label={copy.amount} value={row.amount} onChange={amount => updateDraft(row.id, { amount })}/>
-            <MethodFields method={row.method} reference={row.reference} onMethod={method => updateDraft(row.id, { method })} onReference={reference => updateDraft(row.id, { reference })}/>
+            <MethodFields method={row.method} reference={row.reference} allowUnset onMethod={method => updateDraft(row.id, { method })} onReference={reference => updateDraft(row.id, { reference })}/>
             <label className={styles.field}><span>{copy.date} <span className={styles.muted}>{copy.required}</span></span><Input type="date" value={row.date} max={today()} onChange={event => updateDraft(row.id, { date: event.target.value })}/></label>
           </fieldset>
           {drafts.length > 1 && <Button type="button" variant="outline" onClick={() => { setDrafts(previous => previous.filter(item => item.id !== row.id)); invalidate() }}>{copy.removeRow}</Button>}</fieldset>)}
@@ -334,6 +366,8 @@ export function EditPayments({ studentId }: { studentId: Id<'students'> }) {
 function PaymentList({ studentId }: { studentId: Id<'students'> }) {
   const page = usePaginatedQuery(api.paymentAdministration.receipts, { studentId }, { initialNumItems: 20 })
   const [selected, setSelected] = useState<Id<'ledgerEntries'> | null>(null); const [saved, setSaved] = useState('')
+  // The banner clears itself so it never lingers beside a payment that has since changed again.
+  useEffect(() => { if (!saved) return; const timer = setTimeout(() => setSaved(''), 8000); return () => clearTimeout(timer) }, [saved])
   return <Card className={styles.card}><CardTitle>{copy.paymentsTitle}</CardTitle><p className={styles.muted}>{copy.paymentsPurpose}</p>
     {saved && <p role="status" className={styles.notice}>{saved}</p>}
     <div className={styles.history}>{page.results.map(row => <div className={styles.historyRow} key={row.sourceEntryId}>
@@ -420,7 +454,7 @@ function EditFields({ sourceEntryId, initial, stale: changed, onReload, onDone, 
     try { await edit({ sourceEntryId, studentId, amountCents: parsed.cents, method, reference: reference.trim(), reason: reason.trim(), expectedSourceRevision: initial.expectedSourceRevision, expectedEditId: initial.expectedEditId, expectedBefore: { studentId: initial.studentId, amountCents: initial.amountCents, method: initial.method, reference: initial.reference }, idempotencyKey: key.current }); onDone(copy.edited) }
     catch (failure) { setSaving(false); setError(userFacingError(failure)) } finally { setBusy(false) }
   }
-  return <StepWizard title={copy.editTitle} step={index + 1} total={editSteps.length} heading={copy.editSteps[step]} nextLabel={step === 'review' ? (busy ? copy.saving : copy.saveEdit) : copy.next} nextDisabled={stale || (step === 'review' && confirming !== null)} onNext={next} onBack={index > 0 ? () => { setError(''); setConfirming(null); setStep(editSteps[index - 1]) } : undefined} onCancel={onCancel} busy={busy} error={error}>
+  return <StepWizard title={copy.editTitle} step={index + 1} total={editSteps.length} heading={copy.editSteps[step]} nextLabel={step === 'review' ? (busy ? copy.saving : copy.saveEdit) : copy.next} nextDisabled={stale || (step === 'review' && confirming !== null)} onNext={next} onBack={index > 0 ? () => { setError(''); setConfirming(null); setStep(editSteps[index - 1]) } : undefined} onCancel={onCancel} busy={busy} error={visibleStepError(error, parsed)}>
     {stale && <div className={styles.notice} role="alert"><p className="m-0">{copy.staleEdit}</p><Button type="button" variant="outline" onClick={onReload}>{copy.reload}</Button></div>}
     {step === 'what' && <>
       <div className={styles.fields}>

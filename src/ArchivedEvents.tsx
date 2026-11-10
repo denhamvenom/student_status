@@ -17,7 +17,7 @@ export class EventAccessBoundary extends Component<{ children: ReactNode; archiv
 
 function ArchiveList() {
   const { results, status, loadMore } = usePaginatedQuery(api.eventArchive.page, {}, { initialNumItems: 20 })
-  return <><div className="page-head"><div><h1>Past events</h1><p className="muted">Past events, including previous seasons. Students and parents cannot open these events. Unpaid fees remain in Money.</p></div></div><p><Link to="/events">Back to current events</Link></p>
+  return <><div className="page-head"><div><h1>Past events</h1><p className="muted">Past events, including previous seasons. Students and Parents cannot open these events. Unpaid fees remain in Money.</p></div></div><p><Link to="/events">Back to current events</Link></p>
     {status === 'LoadingFirstPage' ? <p role="status">Loading past events…</p> : results.length === 0 ? <div className="card"><p>No past events yet.</p></div> : <div className="event-grid">{results.map(event => <section className="card" key={event._id}><span className="eyebrow">{event.seasonName} · {event.type}</span><h2>{event.name}</h2><p>{eventSchedule(event)}</p><p className="muted">{eventLocation(event)}</p><Link className="button button-outline" to={`/events/archive/${event._id}`}>View past event</Link></section>)}</div>}
     {status !== 'Exhausted' && status !== 'LoadingFirstPage' && <Button variant="outline" disabled={status === 'LoadingMore'} onClick={() => loadMore(20)}>{status === 'LoadingMore' ? 'Loading…' : 'Show more past events'}</Button>}
   </>

@@ -56,10 +56,11 @@ export const calendarChipCopy = {
   on: 'On Team Calendar',
   off: 'Not on Team Calendar',
   adding: 'Adding to Team Calendar…',
+  notSent: 'Not added to Team Calendar',
   attention: 'Needs attention',
   failed: 'The last change did not reach Team Calendar.',
   conflict: 'The entry was changed in Team Calendar. Try again keeps the Team Calendar version.',
-  unavailable: 'Team Calendar is not connected for this app.',
+  unavailable: 'Team Calendar updates are turned off in this copy of Venom Status, so this event was not sent. Nothing is wrong with the event.',
   retry: 'Try again',
   retrying: 'Trying again…',
 } as const
@@ -78,7 +79,8 @@ export function calendarChip(status: { state: string; calendarEventId?: string |
       : { label: calendarChipCopy.adding, tone: 'neutral', reason: null, canRetry: false }
     case 'failed': return { label: calendarChipCopy.attention, tone: 'attention', reason: shortReason(status.error) ?? calendarChipCopy.failed, canRetry: true }
     case 'conflict': return { label: calendarChipCopy.attention, tone: 'attention', reason: calendarChipCopy.conflict, canRetry: true }
-    case 'disabled': return { label: calendarChipCopy.off, tone: 'neutral', reason: calendarChipCopy.unavailable, canRetry: false }
+    // A Coach or Travel Lead asked for this entry, but Calendar updates are off here: say it was not sent, not that it was never wanted.
+    case 'disabled': return { label: calendarChipCopy.notSent, tone: 'neutral', reason: calendarChipCopy.unavailable, canRetry: false }
     default: return { label: calendarChipCopy.off, tone: 'neutral', reason: null, canRetry: false }
   }
 }

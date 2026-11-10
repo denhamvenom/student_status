@@ -2,7 +2,7 @@ import { getFunctionName } from 'convex/server'
 import { createElement, type ChangeEvent, type ComponentProps } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { MentorStudentReport, TeamReports } from './TeamReports'
+import { MentorStudentReport, mentorHasAttendance, TeamReports } from './TeamReports'
 
 const mocks = vi.hoisted(() => ({
   useQuery: vi.fn(), usePaginatedQuery: vi.fn(), attendanceState: 'ready',
@@ -97,5 +97,21 @@ describe('Mentor student report cap', () => {
   it('says how many of the students are shown when the list is cut off', () => {
     expect(renderMentor(false)).toContain('Showing the first 40 of 52 students. Ask a Coach for the full list.')
     expect(renderMentor(true)).not.toContain('Showing the first 40')
+  })
+})
+describe('Mentor student report before kickoff', () => {
+  it('has attendance once any student has a counted percentage or a Thursday', () => {
+    expect(mentorHasAttendance([{ requiredPercent: null, thursdayAttended: 0 }, { requiredPercent: null, thursdayAttended: 0 }])).toBe(false)
+    expect(mentorHasAttendance([{ requiredPercent: null, thursdayAttended: 0 }, { requiredPercent: 0, thursdayAttended: 0 }])).toBe(true)
+    expect(mentorHasAttendance([{ requiredPercent: null, thursdayAttended: 2 }])).toBe(true)
+  })
+  it('hides the attendance columns and says when they appear when no one has any', () => {
+    mocks.stateCursor = 0
+    mocks.useQuery.mockReset().mockReturnValue({ subteams: ['Build'], scope: 'mine', totalStudents: 1, studentsComplete: true, rows: [{ studentId: 's1', name: 'Fictional Member', subteam: 'Build', travelTeam: false, requiredPercent: null, thursdayAttended: 0, events: [] }] })
+    const html = renderToStaticMarkup(createElement(MentorStudentReport))
+    expect(html).toContain('Fictional Member')
+    expect(html).not.toContain('Not counted yet')
+    expect(html).not.toContain('Required meetings (% attended)')
+    expect(html).toContain('Attendance appears after kickoff.')
   })
 })
