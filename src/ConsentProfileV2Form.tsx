@@ -5,59 +5,59 @@ import type { FunctionReturnType } from 'convex/server'
 import { api } from '../convex/_generated/api'
 import type { Id } from '../convex/_generated/dataModel'
 import type { ConsentProfileV2 } from '../convex/lib/consentSnapshotV2'
-import { Button } from './components/ui/button'
-import { Card, CardTitle } from './components/ui/card'
 import { Input } from './components/ui/input'
-import { Textarea } from './components/ui/textarea'
-import { NativeSelect, NativeSelectOption } from './components/ui/native-select'
 import { GradeSelect } from './GradeSelect'
+import { ContactsFields, MedicalFields, ReviewSections, WizardField, WizardFrame, contactRows, healthRows, reviewDate, shown, type HealthChosen } from './SetupWizard'
 import styles from './ConsentProfileV2Form.module.css'
 
 type Profile = FunctionReturnType<typeof api.permissionsV2.profile>
-type Allergy = ConsentProfileV2['allergies']['entries'][number]
-type Prescription = ConsentProfileV2['prescriptions']['entries'][number]
-const blankAllergy = (): Allergy => ({ allergen: '', severity: '', reaction: '', response: '' })
-const blankPrescription = (): Prescription => ({ name: '', dose: '', timing: '', reason: '', carriedBy: '' })
 const blank = (): ConsentProfileV2 => ({ grade: '', dateOfBirth: '', guardian: { name: '', relationship: '', phone: '', email: '' }, emergency: { name: '', relationship: '', phone: '' }, allergies: { state: 'none', entries: [] }, prescriptions: { state: 'none', entries: [] }, insurance: { state: 'unavailable', provider: null, policy: null }, physician: { state: 'unavailable', name: null, phone: null } })
+const steps = ['Student details', 'Contacts', 'Health information', 'Review'] as const
+const REVIEW = 3
 
-export function ConsentProfileV2Form({ studentId }: { studentId: Id<'students'> }) {
+/** `studentName` is the student's preferred name when the caller already has it; the contact questions say "your student" without it. */
+export function ConsentProfileV2Form({ studentId, studentName }: { studentId: Id<'students'>; studentName?: string }) {
   const profile = useQuery(api.permissionsV2.profile, { studentId })
-  if (!profile) return <p role="status">Loading the parent health and contact profile…</p>
-  return <ProfileEditor key={`${studentId}:${profile.revision}`} profile={profile} />
+  if (!profile) return <p role="status">Loading health and contact information…</p>
+  return <ProfileEditor key={`${studentId}:${profile.revision}`} profile={profile} studentName={studentName?.trim() || 'your student'} />
 }
 
-function ProfileEditor({ profile }: { profile: Profile }) {
+function ProfileEditor({ profile, studentName }: { profile: Profile; studentName: string }) {
   const save = useMutation(api.permissionsV2.saveProfile)
   const [value, setValue] = useState<ConsentProfileV2>(() => profile.value ?? blank())
-  const [chosen, setChosen] = useState(() => ({ allergies: !!profile.value, prescriptions: !!profile.value, insurance: !!profile.value, physician: !!profile.value }))
+  const [chosen, setChosen] = useState<HealthChosen>(() => ({ allergies: !!profile.value, prescriptions: !!profile.value, insurance: !!profile.value, physician: !!profile.value }))
+  const [step, setStep] = useState(profile.completed ? REVIEW : 0)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
-  const setGuardian = (key: keyof ConsentProfileV2['guardian'], next: string) => setValue(current => ({ ...current, guardian: { ...current.guardian, [key]: next } }))
-  const setEmergency = (key: keyof ConsentProfileV2['emergency'], next: string) => setValue(current => ({ ...current, emergency: { ...current.emergency, [key]: next } }))
-  const updateAllergy = (index: number, key: keyof Allergy, next: string) => setValue(current => ({ ...current, allergies: { ...current.allergies, entries: current.allergies.entries.map((row, at) => at === index ? { ...row, [key]: next } : row) } }))
-  const updatePrescription = (index: number, key: keyof Prescription, next: string) => setValue(current => ({ ...current, prescriptions: { ...current.prescriptions, entries: current.prescriptions.entries.map((row, at) => at === index ? { ...row, [key]: next } : row) } }))
-  const setInsuranceState = (state: ConsentProfileV2['insurance']['state']) => setValue(current => ({ ...current, insurance: { state, provider: state === 'provided' ? current.insurance.provider : null, policy: state === 'provided' ? current.insurance.policy : null } }))
-  const setPhysicianState = (state: ConsentProfileV2['physician']['state']) => setValue(current => ({ ...current, physician: { state, name: state === 'provided' ? current.physician.name : null, phone: state === 'provided' ? current.physician.phone : null } }))
+  const goTo = (next: number) => { setStep(next); setError(''); setSaved(false) }
   async function submit(event: FormEvent) {
     event.preventDefault()
     setError(''); setSaved(false)
-    if (!Object.values(chosen).every(Boolean)) { setError('Choose an explicit answer for allergies, prescriptions, insurance, and physician.'); return }
+    if (step === 2 && !Object.values(chosen).every(Boolean)) { setError('Choose an answer for allergies, medications, insurance, and physician.'); return }
+    if (step < REVIEW) { setStep(step + 1); return }
     setBusy(true)
     try { await save({ studentId: profile.studentId, expectedRevision: profile.revision, value }); setSaved(true) }
-    catch (cause) { setError(userFacingError(cause, 'The profile could not be saved. Review the fields and try again.')) }
+    catch (cause) { setError(userFacingError(cause, 'The information could not be saved. Review your answers and try again.')) }
     finally { setBusy(false) }
   }
-  return <Card className={styles.card}><CardTitle>Parent health and contact profile</CardTitle><p>Fill this in before you sign the permission form. If you change anything after preparing a form, prepare a new PDF and check it before you sign. Forms already signed keep their old information.</p>{!profile.setupComplete && <p role="status" className={styles.notice}>Your student needs to finish setup (shirt size and rooming category) before you can review the permission form.</p>}{profile.completed && <p role="status" className={styles.ready}>This profile is confirmed.</p>}
-    <form className={styles.form} onSubmit={event => void submit(event)}><p>All fields are required unless marked optional.</p><fieldset disabled={busy} className={styles.form}>
-      <section><h3>Student</h3><div className={styles.fields}><label>Grade<GradeSelect value={value.grade} original={profile.value?.grade} onChange={grade => setValue(current => ({ ...current, grade }))}/></label><label>Date of birth<Input required type="date" value={value.dateOfBirth} onChange={event => setValue(current => ({ ...current, dateOfBirth: event.target.value }))}/></label></div></section>
-      <section><h3>Parent or guardian</h3><div className={styles.fields}><label>Full name<Input required autoComplete="name" maxLength={160} value={value.guardian.name} onChange={event => setGuardian('name', event.target.value)}/></label><label>Relationship<Input required maxLength={80} value={value.guardian.relationship} onChange={event => setGuardian('relationship', event.target.value)}/></label><label>Phone<Input required type="tel" autoComplete="tel" maxLength={40} value={value.guardian.phone} onChange={event => setGuardian('phone', event.target.value)}/></label><label>Email<Input required type="email" autoComplete="email" maxLength={254} value={value.guardian.email} onChange={event => setGuardian('email', event.target.value)}/></label></div></section>
-      <section><h3>Alternate emergency contact</h3><div className={styles.fields}><label>Full name<Input required autoComplete="name" maxLength={160} value={value.emergency.name} onChange={event => setEmergency('name', event.target.value)}/></label><label>Relationship<Input required maxLength={80} value={value.emergency.relationship} onChange={event => setEmergency('relationship', event.target.value)}/></label><label>Phone<Input required type="tel" autoComplete="tel" maxLength={40} value={value.emergency.phone} onChange={event => setEmergency('phone', event.target.value)}/></label></div></section>
-      <section><h3>Health insurance</h3><label>What health insurance information can you provide?<NativeSelect required value={chosen.insurance ? value.insurance.state : ''} onChange={event => { setChosen(current => ({ ...current, insurance: true })); setInsuranceState(event.target.value as ConsentProfileV2['insurance']['state']) }}><NativeSelectOption value="">Choose an answer</NativeSelectOption><NativeSelectOption value="provided">Add details</NativeSelectOption><NativeSelectOption value="none">None reported</NativeSelectOption><NativeSelectOption value="unavailable">Information unavailable</NativeSelectOption></NativeSelect></label>{chosen.insurance && value.insurance.state === 'provided' && <div className={styles.fields}><label>Provider<Input required maxLength={254} value={value.insurance.provider ?? ''} onChange={event => setValue(current => ({ ...current, insurance: { ...current.insurance, provider: event.target.value } }))}/></label><label>Policy number<Input required maxLength={254} value={value.insurance.policy ?? ''} onChange={event => setValue(current => ({ ...current, insurance: { ...current.insurance, policy: event.target.value } }))}/></label></div>}</section>
-      <section><h3>Physician</h3><label>What physician information can you provide?<NativeSelect required value={chosen.physician ? value.physician.state : ''} onChange={event => { setChosen(current => ({ ...current, physician: true })); setPhysicianState(event.target.value as ConsentProfileV2['physician']['state']) }}><NativeSelectOption value="">Choose an answer</NativeSelectOption><NativeSelectOption value="provided">Add details</NativeSelectOption><NativeSelectOption value="none">None reported</NativeSelectOption><NativeSelectOption value="unavailable">Information unavailable</NativeSelectOption></NativeSelect></label>{chosen.physician && value.physician.state === 'provided' && <div className={styles.fields}><label>Name<Input required maxLength={254} value={value.physician.name ?? ''} onChange={event => setValue(current => ({ ...current, physician: { ...current.physician, name: event.target.value } }))}/></label><label>Phone<Input required type="tel" maxLength={254} value={value.physician.phone ?? ''} onChange={event => setValue(current => ({ ...current, physician: { ...current.physician, phone: event.target.value } }))}/></label></div>}</section>
-      <section><h3>Allergies</h3><label>Allergy information<NativeSelect required value={chosen.allergies ? value.allergies.state : ''} onChange={event => { const state = event.target.value as ConsentProfileV2['allergies']['state']; setChosen(current => ({ ...current, allergies: true })); setValue(current => ({ ...current, allergies: { state, entries: state === 'reported' ? current.allergies.entries.length ? current.allergies.entries : [blankAllergy()] : [] } })) }}><NativeSelectOption value="">Choose an answer</NativeSelectOption><NativeSelectOption value="none">None reported</NativeSelectOption><NativeSelectOption value="reported">Report allergies</NativeSelectOption></NativeSelect></label>{chosen.allergies && value.allergies.state === 'reported' && <>{value.allergies.entries.map((row, index) => <div className={styles.row} key={index}><h4>Allergy {index + 1}</h4><div className={styles.fields}><label>Allergen<Input required maxLength={160} value={row.allergen} onChange={event => updateAllergy(index, 'allergen', event.target.value)}/></label><label>Severity<Input required maxLength={120} value={row.severity} onChange={event => updateAllergy(index, 'severity', event.target.value)}/></label><label>Reaction<Textarea required maxLength={500} value={row.reaction} onChange={event => updateAllergy(index, 'reaction', event.target.value)}/></label><label>Response<Textarea required maxLength={500} value={row.response} onChange={event => updateAllergy(index, 'response', event.target.value)}/></label></div><Button type="button" variant="outline" disabled={value.allergies.entries.length === 1} onClick={() => setValue(current => ({ ...current, allergies: { ...current.allergies, entries: current.allergies.entries.filter((_, at) => at !== index) } }))}>Remove allergy</Button></div>)}<Button type="button" variant="outline" disabled={value.allergies.entries.length >= 20} onClick={() => setValue(current => ({ ...current, allergies: { ...current.allergies, entries: [...current.allergies.entries, blankAllergy()] } }))}>Add allergy</Button></>}</section>
-      <section><h3>Prescriptions</h3><label>Prescription information<NativeSelect required value={chosen.prescriptions ? value.prescriptions.state : ''} onChange={event => { const state = event.target.value as ConsentProfileV2['prescriptions']['state']; setChosen(current => ({ ...current, prescriptions: true })); setValue(current => ({ ...current, prescriptions: { state, entries: state === 'reported' ? current.prescriptions.entries.length ? current.prescriptions.entries : [blankPrescription()] : [] } })) }}><NativeSelectOption value="">Choose an answer</NativeSelectOption><NativeSelectOption value="none">None reported</NativeSelectOption><NativeSelectOption value="reported">Report prescriptions</NativeSelectOption></NativeSelect></label>{chosen.prescriptions && value.prescriptions.state === 'reported' && <>{value.prescriptions.entries.map((row, index) => <div className={styles.row} key={index}><h4>Prescription {index + 1}</h4><div className={styles.fields}><label>Name<Input required maxLength={160} value={row.name} onChange={event => updatePrescription(index, 'name', event.target.value)}/></label><label>Dose<Input required maxLength={120} value={row.dose} onChange={event => updatePrescription(index, 'dose', event.target.value)}/></label><label>Timing<Input required maxLength={160} value={row.timing} onChange={event => updatePrescription(index, 'timing', event.target.value)}/></label><label>Reason<Textarea required maxLength={500} value={row.reason} onChange={event => updatePrescription(index, 'reason', event.target.value)}/></label><label>Carried by<Input required maxLength={160} value={row.carriedBy} onChange={event => updatePrescription(index, 'carriedBy', event.target.value)}/></label></div><Button type="button" variant="outline" disabled={value.prescriptions.entries.length === 1} onClick={() => setValue(current => ({ ...current, prescriptions: { ...current.prescriptions, entries: current.prescriptions.entries.filter((_, at) => at !== index) } }))}>Remove prescription</Button></div>)}<Button type="button" variant="outline" disabled={value.prescriptions.entries.length >= 20} onClick={() => setValue(current => ({ ...current, prescriptions: { ...current.prescriptions, entries: [...current.prescriptions.entries, blankPrescription()] } }))}>Add prescription</Button></>}</section>
-      {error && <p role="alert" className={styles.error}>{error}</p>}{saved && <p role="status" className={styles.ready}>Parent profile confirmed. You can now prepare a permission PDF for eligible events.</p>}<Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save and confirm profile'}</Button>
-    </fieldset></form>
-  </Card>
+  return <div className={styles.card}>
+    <p>Fill this in before you sign the permission form. If you change anything after preparing a form, prepare a new form and check it before you sign. Forms already signed keep their old information.</p>
+    {!profile.setupComplete && <p role="status" className={styles.notice}>Your student needs to finish setup (shirt size and room type) before you can review the permission form.</p>}
+    {profile.completed && <p role="status" className={styles.ready}>This information is confirmed.</p>}
+    <WizardFrame embedded title="Health and contact information" step={step} total={steps.length} steps={steps} intro="Your answers are kept while you move between steps. Nothing is saved until you choose Save and confirm." onBack={() => goTo(step - 1)} busy={busy} submitLabel={step === REVIEW ? 'Save and confirm' : 'Continue'} onSubmit={event => void submit(event)} error={error} saved={false} stale={false} onReload={() => undefined}>
+      {step === 0 ? <div className={styles.fields}>
+        <WizardField label="Grade"><GradeSelect value={value.grade} original={profile.value?.grade} onChange={grade => setValue(current => ({ ...current, grade }))}/></WizardField>
+        <WizardField label="Date of birth"><Input required type="date" value={value.dateOfBirth} onChange={event => setValue(current => ({ ...current, dateOfBirth: event.target.value }))}/></WizardField>
+      </div>
+      : step === 1 ? <ContactsFields studentName={studentName} value={{ guardian: value.guardian, emergency: value.emergency }} setValue={next => setValue(current => ({ ...current, ...next }))}/>
+      : step === 2 ? <MedicalFields value={value} setValue={next => setValue(current => ({ ...current, allergies: next.allergies, prescriptions: next.prescriptions, insurance: next.insurance, physician: next.physician }))} chosen={chosen} setChosen={setChosen}/>
+      : <ReviewSections onEdit={goTo} sections={[
+        { title: steps[0], step: 0, rows: [['Grade', shown(value.grade)], ['Date of birth', reviewDate(value.dateOfBirth)]] },
+        { title: steps[1], step: 1, rows: contactRows({ guardian: value.guardian, emergency: value.emergency }) },
+        { title: steps[2], step: 2, rows: healthRows(value) },
+      ]}/>}
+    </WizardFrame>
+    {saved && <p role="status" className={styles.ready}>Confirmed. You can now prepare a permission form for eligible events.</p>}
+  </div>
 }

@@ -104,8 +104,8 @@ export function ShiftsEditor({ eventId, event, settings }: { eventId: Id<'events
         <span className={styles.itemActions}>
           <Button variant="outline" disabled={busy} onClick={() => { setError(''); setSuccess(''); setDraft({ shiftId: s.shiftId, start: chicagoInputTime(s.startsAt), end: chicagoInputTime(s.endsAt), suggested: false, label: s.label ?? '', capacity: s.capacity?.toString() ?? '', locked: s.taken > 0 }); document.getElementById(`${id}-label`)?.focus() }}>{copy.edit}</Button>
           {s.taken > 0
-            ? <ConfirmAction disabled={busy} description={copy.removeConfirm(shiftName(s), s.taken)} onConfirm={async () => { const result = await removeShift({ shiftId: s.shiftId, force: true }); if (draft.shiftId === s.shiftId) setDraft(newDraft()); setError(''); setSuccess(copy.removedWithPlaces(result.removedPlaces)) }}>{copy.remove}</ConfirmAction>
-            : <ConfirmAction disabled={busy} description={copy.removeEmptyConfirm(shiftName(s))} onConfirm={async () => { await removeShift({ shiftId: s.shiftId }); if (draft.shiftId === s.shiftId) setDraft(newDraft()); setError(''); setSuccess(copy.removed) }}>{copy.remove}</ConfirmAction>}
+            ? <ConfirmAction title="Remove this shift?" disabled={busy} description={copy.removeConfirm(shiftName(s), s.taken)} onConfirm={async () => { const result = await removeShift({ shiftId: s.shiftId, force: true }); if (draft.shiftId === s.shiftId) setDraft(newDraft()); setError(''); setSuccess(copy.removedWithPlaces(result.removedPlaces)) }}>{copy.remove}</ConfirmAction>
+            : <ConfirmAction title="Remove this shift?" disabled={busy} description={copy.removeEmptyConfirm(shiftName(s))} onConfirm={async () => { await removeShift({ shiftId: s.shiftId }); if (draft.shiftId === s.shiftId) setDraft(newDraft()); setError(''); setSuccess(copy.removed) }}>{copy.remove}</ConfirmAction>}
         </span>
       </li>)}</ul>}
       <form className={styles.panel} onSubmit={submitShift} aria-labelledby={`${id}-shift-title`}>

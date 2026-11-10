@@ -9,12 +9,13 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { NativeSelect, NativeSelectOption } from '../../components/ui/native-select'
 import styles from './FinanceOperations.module.css'
-import { chargeCurrency } from '../../lib/charge-money'
+import { chargeCurrency, parseMoneyInput } from '../../lib/charge-money'
+import { EditPayments, MoneyInput, referenceLabel, referenceProblem } from '../../PaymentAdministration'
+import { moneyJobStateLabel, moneyReturnedCopy as refundCopy, paymentAdministrationCopy as paymentCopy } from '../../lib/payment-admin-copy'
 import { chicagoDateString, chicagoMidnight } from '../../../shared/chicago-time'
 
 const usd = chargeCurrency
 const errorText = (error: unknown) => userFacingError(error)
-const processingStatus = (state: string) => state === 'complete' ? 'Complete' : state === 'failed' ? 'Needs Coach review' : 'In progress'
 type TeamPreview = FunctionReturnType<typeof api.financeOperations.previewTeamTransfer>
 export function teamTransferReviewReady(preview: TeamPreview | null, current: TeamPreview | undefined, amountCents: number | null) {
   return amountCents !== null && Number.isSafeInteger(amountCents) && amountCents > 0 && preview?.state === 'ready' && preview.expectedFinancialRevision !== null && preview.amountCents === amountCents && current?.state === 'ready' && current.amountCents === amountCents && current.expectedFinancialRevision === preview.expectedFinancialRevision
@@ -25,14 +26,12 @@ export function TeamTransferReview({ preview, current, amountCents, busy, reason
 }
 const chicagoDate = () => chicagoDateString(Date.now())
 function cents(value: string) {
-  if (!/^\d+(?:\.\d{1,2})?$/.test(value)) return null
-  const [dollars, fraction = ''] = value.split('.')
-  const result = BigInt(dollars) * 100n + BigInt(fraction.padEnd(2, '0'))
-  return result > 0n && result <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(result) : null
+  const parsed = parseMoneyInput(value)
+  return parsed.ok ? parsed.cents : null
 }
 
 export function FinanceOperations({ studentId }: { studentId: Id<'students'> }) {
-  return <FinanceOperationsForStudent key={studentId} studentId={studentId} />
+  return <><EditPayments key={`payments:${studentId}`} studentId={studentId} /><FinanceOperationsForStudent key={studentId} studentId={studentId} /></>
 }
 
 function FinanceOperationsForStudent({ studentId }: { studentId: Id<'students'> }) {
@@ -67,9 +66,11 @@ function FinanceOperationsForStudent({ studentId }: { studentId: Id<'students'> 
     event.preventDefault()
     if (busy || options?.state !== 'ready') return
     const amountCents = cents(amount)
-    if (amountCents === null) { setError(operationsCopy.finance.enterAPositiveAmountWithAtMostTwoDecimalPlaces); return }
-    if (!reason.trim()) { setError(operationsCopy.finance.enterAReason); return }
-    if (mode === 'payout' && (!reference.trim() || !occurredDate)) { setError(operationsCopy.finance.enterTheDateAndMethodReference); return }
+    if (amountCents === null) { const parsed = parseMoneyInput(amount); setError(parsed.ok ? paymentCopy.amountHelp : parsed.message); return }
+    if (!reason.trim()) { setError(refundCopy.enterReason); return }
+    if (mode === 'payout' && !occurredDate) { setError(refundCopy.enterDate); return }
+    const missingReference = mode === 'payout' ? referenceProblem(method, reference) : null
+    if (missingReference) { setError(missingReference); return }
     if (mode === 'transfer' && !recipient) { setError(operationsCopy.finance.chooseARecipientStudent); return }
     if (mode === 'teamTransfer' && (!teamReady || !teamPreview || teamPreview.expectedFinancialRevision === null || reason.trim().length < 8)) { setError('Review the transfer and enter a reason of at least eight characters.'); return }
     const idempotencyKey = pendingKey.current ?? crypto.randomUUID()
@@ -79,7 +80,7 @@ function FinanceOperationsForStudent({ studentId }: { studentId: Id<'students'> 
       if (mode === 'payout') {
         const occurredAt = chicagoMidnight(occurredDate)
         setOperationId(await payout({ studentId, amountCents, reason: reason.trim(), method, reference: reference.trim(), occurredAt, idempotencyKey }))
-        setSaved('Refund record submitted. Financial processing must finish before this account is available again.')
+        setSaved(refundCopy.refundSubmitted)
       } else if (mode === 'transfer') {
         setOperationId(await transfer({ studentId, recipientStudentId: recipient as Id<'students'>, amountCents, reason: reason.trim(), idempotencyKey }))
         setSaved('Transfer started. See below for money already moved and work still processing.')
@@ -97,28 +98,28 @@ function FinanceOperationsForStudent({ studentId }: { studentId: Id<'students'> 
     <h2>{operationsCopy.finance.moneyReturnedAndFundraisingTransfers}</h2>
     <p className={styles.note}>{operationsCopy.finance.recordMoneyAlreadyGivenToAFamilyThisAppRecordsTheRefundItDoesNotTransferMoneyFun}</p>
     {options === undefined ? <p>{operationsCopy.finance.loadingAvailableFunds}</p> : options.state === 'uninitialized' || options.personalAvailableCents === null || options.fundraisingAvailableCents === null ? <p role={options.state === 'failed' ? 'alert' : 'status'} className={styles.note}>{options.state === 'uninitialized' ? operationsCopy.finance.financialAccountUninitialized : options.state === 'failed' ? operationsCopy.finance.financialAccountPreparationFailed : operationsCopy.finance.financialAccountRebuilding}</p> : <>
-      {options.state !== 'ready' && <p role="status" className={styles.note}>{options.state === 'failed' ? 'Money processing stopped. A Coach must review and retry the remaining work.' : 'Money records are updating. These amounts are already saved, but this account is not ready for another change.'}</p>}
-      <div className={styles.balances}><span>{operationsCopy.finance.unallocatedPersonal} <strong>{usd(options.personalAvailableCents)}</strong></span><span>{operationsCopy.finance.availableFundraising} <strong>{usd(options.fundraisingAvailableCents)}</strong></span></div>
-      {operation?.job && <section aria-label="Financial processing status"><h3>{operation.job.kind === 'payout' ? 'Refund recording' : operation.job.kind === 'transfer' ? 'Travel credit transfer' : operation.job.kind === 'teamTransfer' ? operationsCopy.finance.transferFundraisingToTeam : operation.job.kind === 'chargeCorrection' ? operationsCopy.finance.chargeCorrectionProcessing : 'Withdrawal processing'} · {processingStatus(operation.job.state)}</h3><p role="status">{operation.job.kind === 'chargeCorrection' ? <>Money already returned to available funds: {usd(operation.job.committedCents)} of {usd(operation.job.releaseRequiredCents ?? operation.job.amountCents)}. {operation.job.state !== 'complete' && 'The new charge amount is not saved yet. The old amount stays on record until the extra money has been returned.'}</> : <>Amount already saved: {usd(operation.job.committedCents)} of {usd(operation.job.amountCents)}. {operation.job.state !== 'complete' && 'The rest is still waiting to finish.'}</>}</p>{operation.job.lastError && <p className={styles.error}>{userFacingError(new Error(operation.job.lastError), 'Processing stopped. Check the current status before retrying, or ask a Coach for help.')}</p>}{operation.canRetry && <form className={styles.form} onSubmit={async event => { event.preventDefault(); if (!operation.job || busy || retryReason.trim().length < 8) return; setBusy(true); setError(''); try { await retry({ jobId: operation.job._id, reason: retryReason.trim() }); setRetryReason('') } catch (cause) { setError(errorText(cause)) } finally { setBusy(false) } }}><label>Reason for retry (at least 8 characters)<Input value={retryReason} onChange={event => setRetryReason(event.target.value)} minLength={8} maxLength={1000} required disabled={busy} /></label><Button type="submit" disabled={busy || retryReason.trim().length < 8}>Retry remaining work</Button></form>}</section>}
+      {options.state !== 'ready' && <p role="status" className={styles.note}>{options.state === 'failed' ? 'Money processing stopped. A Coach must review it and try again.' : 'Money records are updating. These amounts are already saved, but this account is not ready for another change.'}</p>}
+      <div className={styles.balances}><span>{refundCopy.unusedPayments} <strong>{usd(options.personalAvailableCents)}</strong></span><span>{operationsCopy.finance.availableFundraising} <strong>{usd(options.fundraisingAvailableCents)}</strong></span></div>
+      {operation?.job && <section aria-label="Financial processing status"><h3>{operation.job.kind === 'payout' ? refundCopy.status.payout : operation.job.kind === 'transfer' ? refundCopy.status.transfer : operation.job.kind === 'teamTransfer' ? refundCopy.status.teamTransfer : operation.job.kind === 'chargeCorrection' ? refundCopy.status.chargeCorrection : operation.job.kind === 'paymentCorrection' ? refundCopy.status.paymentCorrection : refundCopy.status.withdrawal} · {moneyJobStateLabel(operation.job.kind, operation.job.state)}</h3>{operation.job.kind === 'paymentCorrection' && operation.job.state === 'failed' && <p className={styles.note}>{refundCopy.paymentCorrectionNext}</p>}<p role="status">{operation.job.kind === 'chargeCorrection' ? <>Money already returned to available funds: {usd(operation.job.committedCents)} of {usd(operation.job.releaseRequiredCents ?? operation.job.amountCents)}. {operation.job.state !== 'complete' && 'The new charge amount is not saved yet. The old amount stays on record until the extra money has been returned.'}</> : <>{refundCopy.progress(usd(operation.job.committedCents), usd(operation.job.amountCents))} {operation.job.state !== 'complete' && refundCopy.progressRest}</>}</p>{operation.job.lastError && <p className={styles.error}>{userFacingError(new Error(operation.job.lastError), 'Processing stopped. Check the current status before trying again, or ask a Coach for help.')}</p>}{operation.canRetry && operation.job.kind !== 'paymentCorrection' && <form className={styles.form} onSubmit={async event => { event.preventDefault(); if (!operation.job || busy || retryReason.trim().length < 8) return; setBusy(true); setError(''); try { await retry({ jobId: operation.job._id, reason: retryReason.trim() }); setRetryReason('') } catch (cause) { setError(errorText(cause)) } finally { setBusy(false) } }}><label>Reason for trying again (at least 8 characters)<Input value={retryReason} onChange={event => setRetryReason(event.target.value)} minLength={8} maxLength={1000} required disabled={busy} /></label><Button type="submit" disabled={busy || retryReason.trim().length < 8}>Try again</Button></form>}</section>}
       <div className={styles.switch} role="group" aria-label={operationsCopy.finance.chooseFinancialOperation}>
-        <Button type="button" disabled={busy} variant={mode === 'payout' ? 'default' : 'outline'} onClick={() => { setMode('payout'); setTeamPreview(null); pendingKey.current = null; setError(''); setSaved('') }}>{operationsCopy.finance.recordCashCheckRefund}</Button>
+        <Button type="button" disabled={busy} variant={mode === 'payout' ? 'default' : 'outline'} onClick={() => { setMode('payout'); setTeamPreview(null); pendingKey.current = null; setError(''); setSaved('') }}>{refundCopy.recordRefund}</Button>
         <Button type="button" disabled={busy} variant={mode === 'transfer' ? 'default' : 'outline'} onClick={() => { setMode('transfer'); setTeamPreview(null); pendingKey.current = null; setError(''); setSaved('') }}>{operationsCopy.finance.transferFundraisingCredit}</Button>
         <Button type="button" disabled={busy} variant={mode === 'teamTransfer' ? 'default' : 'outline'} onClick={() => { setMode('teamTransfer'); setTeamPreview(null); pendingKey.current = null; setError(''); setSaved('') }}>{operationsCopy.finance.transferFundraisingToTeam}</Button>
       </div>
-      <form className={styles.form} onSubmit={event => void submit(event)}>
+      <form className={styles.form} noValidate onSubmit={event => void submit(event)}>
         <fieldset className={styles.fields} disabled={busy || options.state !== 'ready'}>
-        <label>{operationsCopy.finance.amountUSD}<Input type="text" inputMode="decimal" value={amount} onChange={event => change(setAmount, event.target.value)} placeholder="0.00" required /></label>
+        <MoneyInput label={paymentCopy.amount} value={amount} onChange={value => change(setAmount, value)} />
         {mode === 'payout' ? <>
-          <label>{operationsCopy.finance.howWasMoneyReturned}<NativeSelect value={method} onChange={event => { setMethod(event.target.value as 'cash' | 'check' | 'other'); pendingKey.current = null }}><NativeSelectOption value="check">{operationsCopy.finance.check}</NativeSelectOption><NativeSelectOption value="cash">{operationsCopy.finance.cash}</NativeSelectOption><NativeSelectOption value="other">{operationsCopy.finance.otherExternalMethod}</NativeSelectOption></NativeSelect></label>
-          <label>{operationsCopy.finance.dateMoneyWasReturned}<Input type="date" value={occurredDate} max={chicagoDate()} onChange={event => change(setOccurredDate, event.target.value)} required /></label>
-          <label>{operationsCopy.finance.methodReference}<Input value={reference} maxLength={150} onChange={event => change(setReference, event.target.value)} placeholder={operationsCopy.finance.checkNumberOrReceiptReference} required /></label>
+          <label>{refundCopy.howReturned} <span className={styles.note}>{paymentCopy.required}</span><NativeSelect value={method} onChange={event => { setMethod(event.target.value as 'cash' | 'check' | 'other'); pendingKey.current = null }}><NativeSelectOption value="check">{operationsCopy.finance.check}</NativeSelectOption><NativeSelectOption value="cash">{operationsCopy.finance.cash}</NativeSelectOption><NativeSelectOption value="other">{operationsCopy.finance.otherExternalMethod}</NativeSelectOption></NativeSelect></label>
+          <label>{refundCopy.dateReturned} <span className={styles.note}>{paymentCopy.required}</span><Input type="date" value={occurredDate} max={chicagoDate()} onChange={event => change(setOccurredDate, event.target.value)} required /></label>
+          <label>{referenceLabel(method)} <span className={styles.note}>{method === 'cash' ? paymentCopy.optional : paymentCopy.required}</span><Input value={reference} maxLength={150} onChange={event => change(setReference, event.target.value)} /></label>
         </> : mode === 'transfer' ? <label>{operationsCopy.finance.recipientStudent}<NativeSelect value={recipient} onChange={event => change(setRecipient, event.target.value)} required><NativeSelectOption value="">{operationsCopy.finance.chooseAnActiveStudent}</NativeSelectOption>{options.recipients.map(student => <NativeSelectOption key={student._id} value={student._id}>{student.name}</NativeSelectOption>)}</NativeSelect></label> : <p className={styles.wide}>{operationsCopy.finance.teamTransferDestination}. {operationsCopy.finance.teamTransferNote}</p>}
-        <label className={styles.wide}>{operationsCopy.finance.reason}<Input value={reason} minLength={mode === 'teamTransfer' ? 8 : undefined} maxLength={mode === 'teamTransfer' ? 1000 : 500} onChange={event => change(setReason, event.target.value, false)} required /></label>
-        {mode === 'teamTransfer' ? <TeamTransferReview preview={teamPreview} current={liveTeamPreview} amountCents={parsedAmount} busy={busy} reasonValid={reason.trim().length >= 8} onReview={() => { setTeamPreview(liveTeamPreview ?? null); pendingKey.current = null }} /> : <Button type="submit" disabled={busy || (mode === 'payout' ? options.personalAvailableCents <= 0 : options.fundraisingAvailableCents <= 0)}>{busy ? operationsCopy.finance.recording : mode === 'payout' ? operationsCopy.finance.recordMoneyReturned : operationsCopy.finance.transferFundraisingCredit}</Button>}
+        <label className={styles.wide}>{refundCopy.reason} <span className={styles.note}>{paymentCopy.required}</span><Input value={reason} minLength={mode === 'teamTransfer' ? 8 : undefined} maxLength={mode === 'teamTransfer' ? 1000 : 500} onChange={event => change(setReason, event.target.value, false)} required /></label>
+        {mode === 'teamTransfer' ? <TeamTransferReview preview={teamPreview} current={liveTeamPreview} amountCents={parsedAmount} busy={busy} reasonValid={reason.trim().length >= 8} onReview={() => { setTeamPreview(liveTeamPreview ?? null); pendingKey.current = null }} /> : <Button type="submit" disabled={busy || (mode === 'payout' ? options.personalAvailableCents <= 0 : options.fundraisingAvailableCents <= 0)}>{busy ? operationsCopy.finance.recording : mode === 'payout' ? refundCopy.recordRefund : operationsCopy.finance.transferFundraisingCredit}</Button>}
         </fieldset>
       </form>
       {error && <p role="alert" className={styles.error}>{error}</p>}
-      {saved && <p role="status" className={styles.success}>{receipt?.operation && (receipt.operation.state ?? 'complete') === 'complete' ? receipt.operation.kind === 'payout' ? operationsCopy.finance.cashCheckRefundRecordedThisRecordDoesNotSendMoney : receipt.operation.kind === 'teamTransfer' ? operationsCopy.finance.teamTransferComplete : 'Travel credit transfer recorded. Recipient allocations may still be processing; check the recipient account for readiness.' : saved}</p>}
+      {saved && <p role="status" className={styles.success}>{receipt?.operation && (receipt.operation.state ?? 'complete') === 'complete' ? receipt.operation.kind === 'payout' ? refundCopy.refundDone : receipt.operation.kind === 'teamTransfer' ? operationsCopy.finance.teamTransferComplete : 'Travel credit transfer recorded. Recipient allocations may still be processing; check the recipient account for readiness.' : saved}</p>}
     </>}
   </section>
 }

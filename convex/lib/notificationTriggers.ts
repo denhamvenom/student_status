@@ -4,6 +4,7 @@ import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { MAX_DIGEST_USERS, queueDigestItem } from "./digest";
+import { resolveAudience } from "./eventAudienceRules";
 import { eventEligibleStudentIds, eventParticipantStudentIds } from "./eventAudience";
 import { eventCreatorId, isMentorCapable, listMeetingMentors, MAX_MEETING_MENTORS, mentorMeetingCreatorId, selfSignupEligible } from "./mentorMeetings";
 import { MEETING_ACTIVITY, queueMentorDigestItem, type MeetingActivity } from "./notificationDigestRules";
@@ -349,7 +350,9 @@ export async function queueMentorMeetingOpenDigestPage(ctx: MutationCtx, args: {
   if (creatorId) skip.add(creatorId);
   if (args.actorId) skip.add(args.actorId);
   for (const row of await ctx.db.query("eventMentorInvites").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(MAX_MEETING_MENTORS + 1)) skip.add(row.mentorUserId);
-  const eligible = (user: Doc<"appUsers">) => isMentorCapable(user) && !skip.has(user._id) && selfSignupEligible(user, event, now);
+  // Mentors hear about meetings for their subteams or the whole team, not for specific students (the Join list is unchanged).
+  const audienceKind = resolveAudience(event).kind;
+  const eligible = (user: Doc<"appUsers">) => isMentorCapable(user) && !skip.has(user._id) && selfSignupEligible(user, event, now) && audienceKind !== "students";
   const place = event.destination.trim();
   const queue = async (userIds: Id<"appUsers">[]) => {
     if (!userIds.length) return;

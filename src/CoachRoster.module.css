@@ -43,3 +43,23 @@
 
 /* Keep desktop controls readable and event text legible in both themes. */
 .table select{min-width:8rem}.ready{color:var(--text-body)}
+
+/* Requirements summary chips and the sticky bulk bar. */
+.summary{margin:0;color:var(--text-muted);font-size:var(--text-sm)}
+.chips button{min-height:44px}
+.selectCell{width:2.75rem}
+.bulkBar{position:sticky;bottom:var(--space-4);z-index:10;display:grid;gap:var(--space-2);padding:var(--space-3);border:1px solid var(--border-default);border-radius:var(--radius-md);background:var(--surface-card);box-shadow:0 4px 16px rgb(0 0 0 / .18)}
+.bulkRow{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2)}
+.bulkOptionsToggle{display:none}
+.bulkOptions{display:contents}
+@media(max-width:1023px){.bulkBar{bottom:calc(var(--bottom-nav-height,0px) + env(safe-area-inset-bottom) + var(--space-2))}}
+@media(max-width:430px){
+.bulkBar{padding:var(--space-2)}
+.bulkRow{gap:var(--space-1)}
+.bulkRow>strong{flex:1 0 100%}
+.bulkOptionsToggle{display:inline-flex}
+.bulkOptions{display:none;flex:1 0 100%;flex-direction:column;gap:var(--space-2)}
+.bulkOptions[data-open=true]{display:flex}
+}
+.manualCopy{width:100%;font:inherit;padding:var(--space-2);border:1px solid var(--border-default);border-radius:var(--radius-md);background:var(--surface-card);color:var(--text-body)}
+.selectAllRow{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2)}

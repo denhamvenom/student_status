@@ -68,6 +68,7 @@ export const eventSetupCopy = {
     requirementInstructionsTooLong: 'Keep instructions to 1,000 characters or fewer.',
     reviewNone: 'None added',
     skipConfirm: (count: number) => `Skip and remove ${count === 1 ? '1 unfinished item' : `${count} unfinished items`}? Finished items are kept.`,
+    skipConfirmTitle: 'Skip this step?',
     skipConfirmButton: 'Skip and remove',
     removeOptionDisabled: 'Choice questions need at least 2 options',
     minShiftsHint: '0 = optional',

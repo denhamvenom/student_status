@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import FeeAdministration, { BulkJobSummary, BulkRowEvidence, FeeDefinitionDraftForm, FeeMaintenanceNotice, LiveMappingReceipt, FeePriorityReceipt, FeePriorityRows, UnmappedFeeEvidence, bulkCommitArgs, bulkReviewComplete, bulkReviewUnchanged, shouldLoadPreparedRows, shouldLoadStudentChoices } from './FeeAdministration'
 import type { Doc, Id } from '../convex/_generated/dataModel'
+import { feeAdministrationCopy } from './lib/fee-administration-copy'
 
 const queryState = vi.hoisted(() => ({ loaded: true, queries: [] as { name: string; args: unknown }[], mapping: null as null | { job: { state: string; processed: number; mapped: number; unmapped: number; reason: string }; originalActorName: string; processingActorName: string; canRetry: boolean; canCancel: boolean } }))
 vi.mock('convex/react', () => ({
@@ -41,14 +42,14 @@ describe('shared fee presentation', () => {
     try {
       queryState.mapping = receipt
       const failed = renderToStaticMarkup(createElement(LiveMappingReceipt, { jobId: 'synthetic-mapping' as Id<'feeMappingJobs'> }))
-      expect(failed).toContain('Cancel mapping review')
-      expect(failed).toContain('Existing verified fee identities are preserved')
+      expect(failed).toContain('Cancel fee match review')
+      expect(failed).toContain('Fees already matched stay matched')
       expect(failed).toContain('type="button"')
       queryState.mapping = { ...receipt, canCancel: false }
-      expect(renderToStaticMarkup(createElement(LiveMappingReceipt, { jobId: 'synthetic-mapping' as Id<'feeMappingJobs'> }))).not.toContain('Cancel mapping review')
+      expect(renderToStaticMarkup(createElement(LiveMappingReceipt, { jobId: 'synthetic-mapping' as Id<'feeMappingJobs'> }))).not.toContain('Cancel fee match review')
       queryState.mapping = { ...receipt, job: { ...receipt.job, state: 'cancelled' }, canRetry: false, canCancel: false }
       const cancelled = renderToStaticMarkup(createElement(LiveMappingReceipt, { jobId: 'synthetic-mapping' as Id<'feeMappingJobs'> }))
-      expect(cancelled).toContain('This mapping review was canceled')
+      expect(cancelled).toContain('This review was canceled')
       expect(cancelled).not.toContain('<form')
     } finally { queryState.mapping = null }
   })
@@ -57,9 +58,14 @@ describe('shared fee presentation', () => {
     const html = renderToStaticMarkup(createElement(FeeAdministration, { isCoach: false }))
     const forbidden = new Set([getFunctionName(api.feeDefinitions.unmapped), getFunctionName(api.feeDefinitions.mappingStatus)])
     expect(queryState.queries.filter(query => forbidden.has(query.name) && query.args !== 'skip')).toEqual([])
-    expect(html).toContain('Some earlier charges still need a Coach to match them to shared fees')
+    expect(html).toContain('Some earlier fees still need a Coach to match them to shared fees')
     expect(html).not.toContain('<form')
     expect(html).not.toContain('Match earlier charges')
+  })
+  it('explains shared fees, matching and payment order with an example', () => {
+    expect(feeAdministrationCopy.description).toContain('A shared fee is one fee, like the Regional trip fee, that applies to many students.')
+    expect(feeAdministrationCopy.proofNote).toContain('For example')
+    expect(feeAdministrationCopy.recordedPriorityNote).toContain('whole number')
   })
   it('does not label an initially loading fee page as an empty season', () => {
     queryState.loaded = false
@@ -70,7 +76,7 @@ describe('shared fee presentation', () => {
   })
   it('labels custom charge preparation as zero-money review and requires explicit submit', () => {
     const html = renderToStaticMarkup(createElement(FeeDefinitionDraftForm, { scopeFields: null, scopeValid: false, disabled: false, onPrepare: async () => undefined }))
-    expect(html).toContain('Review which students and charges this change will affect. No amounts change until you confirm.')
+    expect(html).toContain('Review which students and fees this change will affect. No amounts change until you confirm.')
     expect(html).toContain('>Review</button>')
     expect(html).toContain('type="submit"')
     expect(html).toContain('disabled')
@@ -79,9 +85,9 @@ describe('shared fee presentation', () => {
   it('does not display an unfinished scope as zero members or a prepared target as committed', () => {
     const job: Doc<'feeBulkJobs'> = { _id: 'synthetic-bulk' as Id<'feeBulkJobs'>, _creationTime: 1, seasonId: 'synthetic-season' as Id<'seasons'>, feeDefinitionId: 'synthetic-fee' as Id<'feeDefinitions'>, originalActorId: 'synthetic-original' as Id<'appUsers'>, actorId: 'synthetic-processor' as Id<'appUsers'>, kind: 'create', scope: 'allActive', targetAmountCents: 10001, definitionBeforeJson: null, snapshotHash: 'synthetic-scope', snapshotCount: 0, snapshotComplete: false, expectedDefinitionRevision: 0, state: 'preparing', phase: 'snapshot', step: 1, cursor: null, processed: 0, committed: 0, held: 0, supersededRows: 0, idempotencyKey: 'synthetic-key', operationHash: 'synthetic-hash', reason: 'Synthetic bulk review', createdAt: 1, updatedAt: 2 }
     const preparing = renderToStaticMarkup(createElement(BulkJobSummary, { job, originalActorName: 'Original Coach', processingActorName: 'Processing Coach' }))
-    expect(preparing).toContain('Students included: Finding the students and charges')
+    expect(preparing).toContain('Students included: Finding the students and fees')
     expect(preparing).not.toContain('Students included: 0')
-    expect(preparing).toContain('Planned charge per student: $100.01')
+    expect(preparing).toContain('Planned fee per student: $100.01')
     const prepared = renderToStaticMarkup(createElement(BulkJobSummary, { job: { ...job, state: 'prepared', snapshotComplete: true, snapshotCount: 650 }, originalActorName: 'Original Coach', processingActorName: 'Processing Coach' }))
     expect(prepared).toContain('Students included: 650')
     expect(prepared).toContain('No money has changed yet')
@@ -91,19 +97,19 @@ describe('shared fee presentation', () => {
     expect(held).toContain('Students needing review: 2')
     expect(held).not.toContain('operation is complete')
     const replacement = renderToStaticMarkup(createElement(BulkJobSummary, { job: { ...job, kind: 'cancel', targetAmountCents: 0, state: 'prepared', snapshotComplete: true, snapshotCount: 648, priorHeldJobId: 'synthetic-prior' as Id<'feeBulkJobs'>, priorHeldRows: 2, supersededRows: 0 }, originalActorName: 'Original Coach', processingActorName: 'Processing Coach' }))
-    expect(replacement).toContain('Earlier rows on hold this cancellation may resolve: 2')
-    expect(replacement).toContain('Earlier rows on hold resolved by completed cancellation: 0')
-    expect(replacement).toContain('earlier rows stay on hold')
+    expect(replacement).toContain('Students on hold this cancellation may resolve: 2')
+    expect(replacement).toContain('Students on hold resolved by completed cancellation: 0')
+    expect(replacement).toContain('students on hold stay on hold')
   })
   it('separates committed partial source release from the still-current obligation and frozen target', () => {
     const row: Parameters<typeof BulkRowEvidence>[0]['row'] = { _id: 'synthetic-row' as Id<'feeBulkRows'>, _creationTime: 1, jobId: 'synthetic-bulk' as Id<'feeBulkJobs'>, studentId: 'synthetic-student' as Id<'students'>, chargeId: 'synthetic-charge' as Id<'charges'>, correctionJobId: 'synthetic-child' as Id<'financialOperationJobs'>, name: 'Synthetic student', targetAmountCents: 5000, beforeEffectiveCents: 10000, beforeAppliedCents: 10000, originalExpectedFinancialRevision: 4, originalExpectedChargeRevision: 2, state: 'waiting', financialState: 'failed', currentFinancialRevision: null, currentGeneration: null, currentChargeRevision: 2, currentEffectiveCents: 10000, currentAppliedCents: 7500, releaseRequiredCents: 2500, childState: 'failed', committedReleaseCents: 2500, totalReleaseCents: 5000, childError: 'Synthetic source failure', canRetryChild: true }
     const html = renderToStaticMarkup(createElement(BulkRowEvidence, { row }))
-    expect(html).toContain('Planned charge per student: $50.00')
-    expect(html).toContain('Current charge amount: $100.00')
-    expect(html).toContain('Money currently used on charge: $75.00')
-    expect(html).toContain('Money already returned to available funds: $25.00 / $50.00')
+    expect(html).toContain('Planned fee per student: $50.00')
+    expect(html).toContain('Current fee amount: $100.00')
+    expect(html).toContain('Money currently used on fee: $75.00')
+    expect(html).toContain('Money already returned to Available funds: $25.00 / $50.00')
     expect(html).not.toContain('Original account version')
-    expect(html).toContain('This student’s charge could not finish updating')
+    expect(html).toContain('This student’s fee could not finish updating')
     expect(html).not.toContain('Synthetic source failure')
     expect(html).not.toContain('Charge saved')
   })
@@ -112,17 +118,17 @@ describe('shared fee presentation', () => {
     const html = renderToStaticMarkup(createElement(BulkRowEvidence, { row }))
     expect(html).toContain('Not saved yet')
     expect(html).toContain('$75.00')
-    expect(html).toContain('Not charged yet')
+    expect(html).toContain('No fee recorded yet')
     expect(html).not.toContain('could not be loaded')
     expect(html).not.toContain('version')
     expect(html).not.toContain('$0.00')
     const held = renderToStaticMarkup(createElement(BulkRowEvidence, { row: { ...row, state: 'held', message: 'Review this student before continuing.' } }))
-    expect(held).toContain('No charge is linked to this review yet')
+    expect(held).toContain('No fee is linked to this review yet')
     expect(held).toContain('Review this student before continuing')
     expect(held).not.toContain('could not be found')
     const missing = renderToStaticMarkup(createElement(BulkRowEvidence, { row: { ...row, chargeId: 'synthetic-charge' as Id<'charges'>, originalExpectedChargeRevision: 1 } }))
-    expect(missing).toContain('This charge could not be found')
-    expect(missing).not.toContain('Not charged yet')
+    expect(missing).toContain('This fee could not be found')
+    expect(missing).not.toContain('No fee recorded yet')
   })
   it('shows display positions and exact cents without inventing actions for readonly roles', () => {
     const html = renderToStaticMarkup(createElement(FeePriorityRows, { disabled: false, rows: [{ key: 'synthetic', label: 'Synthetic shared fee', priority: 40, amountCents: Number.MAX_SAFE_INTEGER, cancelled: false }, { key: 'event', label: 'Event fee', priority: 1815660000000, amountCents: 0, cancelled: false }] }))
@@ -143,6 +149,15 @@ describe('shared fee presentation', () => {
     expect(html).toContain('Displayed fee order position 1')
     expect(html).toContain('Displayed fee order position 2')
   })
+  it('tells two fees with the same name, amount and date apart by when each was added', () => {
+    const at = (day: number) => Date.UTC(2026, 9, day, 18, 0)
+    const html = renderToStaticMarkup(createElement(FeePriorityRows, { disabled: false, rows: [
+      { key: 'first', label: 'Review charge', priority: 1, amountCents: 2500, dueAt: at(18), addedAt: at(1), cancelled: false },
+      { key: 'second', label: 'Review charge', priority: 2, amountCents: 2500, dueAt: at(18), addedAt: at(9), cancelled: false },
+    ] }))
+    expect(html).toContain('Added Oct 1, 1:00 PM')
+    expect(html).toContain('Added Oct 9, 1:00 PM')
+  })
   it('keeps priority actions as non-submit buttons and blocks them during maintenance', () => {
     const html = renderToStaticMarkup(createElement(FeePriorityRows, { disabled: true, rows: [{ key: 'synthetic', label: 'Synthetic shared fee', priority: 40, amountCents: 29, cancelled: false, actions: { up: () => undefined, down: () => undefined } }] }))
     const buttons = Array.from(html.matchAll(/<button\b[^>]*>/g), match => match[0])
@@ -153,14 +168,14 @@ describe('shared fee presentation', () => {
     const html = renderToStaticMarkup(createElement(FeePriorityRows, { disabled: true, rows: [{ key: 'synthetic', label: 'Synthetic shared fee', priority: 40, amountCents: 29, cancelled: false, actions: { view: () => undefined, edit: () => undefined } }] }))
     const buttons = Array.from(html.matchAll(/<button\b[^>]*>/g), match => match[0])
     expect(buttons).toHaveLength(2)
-    expect(buttons[0]).toContain('View charge details')
+    expect(buttons[0]).toContain('View fee details')
     expect(buttons[0]).not.toMatch(/\sdisabled(?:=|\s|>)/)
     expect(buttons[1]).toMatch(/\sdisabled(?:=|\s|>)/)
   })
   it('does not imply propagation finished while current operations are draining', () => {
     const html = renderToStaticMarkup(createElement(FeeMaintenanceNotice, { state: 'draining' }))
     expect(html).toContain('Waiting for current financial operations to finish')
-    expect(html).not.toContain('Records processed: 0')
+    expect(html).not.toContain('Fees checked: 0')
     expect(html).toContain('New financial changes are unavailable')
   })
   it('shows failed durable progress separately and uses an explicit retry submit', () => {
@@ -174,7 +189,7 @@ describe('shared fee presentation', () => {
       state: 'failed', phase: 'secondFee', step: 4, cursor: null, processed: 17, createdAt: 1, updatedAt: 2, lastError: 'Synthetic processing failure',
     }
     const html = renderToStaticMarkup(createElement(FeePriorityReceipt, { job, originalActorName: 'Original Coach', processingActorName: 'Retry Coach', canRetry: true, retryReason: 'Reviewed retry reason', onRetryReasonChange: () => undefined, onRetry: () => undefined, submitting: false }))
-    expect(html).toContain('Records processed: 17')
+    expect(html).toContain('Fees checked: 17')
     expect(html).toContain('Original Coach')
     expect(html).toContain('Retry Coach')
     expect(html).toContain('Synthetic processing failure')
@@ -190,9 +205,9 @@ describe('shared fee presentation', () => {
     expect(html).toContain('Recorded event unavailable')
     expect(html).not.toContain('Not connected to an event')
     expect(html).toContain('Original: $100.01')
-    expect(html).toContain('Current charge amount: $100.00')
-    expect(html).toContain('Applied: $75.00')
-    expect(html).toContain('Charge version: 4')
+    expect(html).toContain('Current fee amount: $100.00')
+    expect(html).toContain('Paid so far: $75.00')
+    expect(html).not.toContain('version')
   })
 })
 

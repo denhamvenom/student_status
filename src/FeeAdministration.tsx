@@ -9,7 +9,9 @@ import { Component, Fragment, useEffect, useRef, useState, type ReactNode } from
 import { useConvex, useMutation, usePaginatedQuery, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
 import type { FunctionArgs, FunctionReturnType } from 'convex/server'
-import { chargeCurrency, parseChargeTarget } from './lib/charge-money'
+import { chargeCurrency, parseMoneyInput } from './lib/charge-money'
+import { EventPicker, type PickerEvent } from './components/EventPicker'
+import { ReviewRow, StepWizard } from './components/StepWizard'
 import { feeAdministrationCopy as copy } from './lib/fee-administration-copy'
 import styles from './FeeAdministration.module.css'
 import { dueAtFromInput, dueDateCopy, dueDateInput } from './copy/due-date-copy'
@@ -72,7 +74,7 @@ function FeeWorkspace({ isCoach, canSetDueDates }: { isCoach: boolean; canSetDue
       {!maintenance || fees.status === 'LoadingFirstPage' ? <p role="status">{copy.loading}</p> : <>
         {maintenance.mappingState !== 'ready' && <p className={styles.notice}>{maintenance.mappingState === 'uninitialized' ? copy.mappingUnknown : copy.partialOrder}</p>}
         {fees.results.length === 0 && fees.status === 'Exhausted' && <p>{copy.noFees}</p>}
-        <FeePriorityRows disabled={pending || maintenance.control?.state !== 'ready'} rows={fees.results.map(row => ({ key: row.definition._id, label: row.definition.label, summary: row.eventName ? `${copy.connectedTo}: ${row.eventName}` : undefined, priority: row.definition.priority, amountCents: row.definition.defaultAmountCents, dueAt: row.definition.dueAt, cancelled: row.definition.state === 'cancelled',
+        <FeePriorityRows disabled={pending || maintenance.control?.state !== 'ready'} rows={fees.results.map(row => ({ key: row.definition._id, label: row.definition.label, summary: row.eventName ? `${copy.connectedTo}: ${row.eventName}` : undefined, priority: row.definition.priority, amountCents: row.definition.defaultAmountCents, dueAt: row.definition.dueAt, addedAt: row.definition._creationTime, cancelled: row.definition.state === 'cancelled',
           below: dueDateFeeId === row.definition._id && row.definition.state === 'active' ? <FeeDueDate key={row.definition._id} definition={row.definition} onClose={() => setDueDateFeeId(null)} /> : undefined,
           actions: {
           dueDate: canSetDueDates && row.definition.state === 'active' ? () => setDueDateFeeId(id => id === row.definition._id ? null : row.definition._id) : undefined,
@@ -108,6 +110,9 @@ export function shouldLoadStudentChoices(kind:'create'|'edit'|'cancel',scope:'al
   return kind!=='cancel'&&!existingScope&&scope==='selected'&&!eventId&&status==='CanLoadMore'
 }
 
+type FeeStep='fee'|'due'|'who'|'reason'|'review'
+const feeSteps=(kind:'create'|'edit'|'cancel'):FeeStep[]=>kind==='create'?['fee','due','who','reason','review']:kind==='edit'?['fee','due','reason','review']:['reason','review']
+
 function BulkPreparationForm({ kind, definition, disabled, onDismiss, onJob }: {
   kind:'create'|'edit'|'cancel'
   definition?:Doc<'feeDefinitions'>
@@ -115,6 +120,7 @@ function BulkPreparationForm({ kind, definition, disabled, onDismiss, onJob }: {
   onDismiss:()=>void
   onJob:(id:Id<'feeBulkJobs'>)=>void
 }) {
+  const wizard=copy.wizard
   const prepare=useMutation(api.feeDefinitions.prepareBulk)
   const setDueAt=useMutation(api.feeDefinitions.setDueAt)
   const client=useConvex()
@@ -130,20 +136,31 @@ function BulkPreparationForm({ kind, definition, disabled, onDismiss, onJob }: {
   // Set once the fee change is prepared, so a failed due-date save retries only the due date.
   const prepared=useRef<{jobId:Id<'feeBulkJobs'>;feeDefinitionId:Id<'feeDefinitions'>}|null>(null)
   const [scope,setScope]=useState<'allActive'|'selected'>('allActive')
-  const [existingScope,setExistingScope]=useState(kind!=='create')
+  const existingScope=kind!=='create'
   const [eventId,setEventId]=useState<Id<'events'>|null>(definition?.eventId??null)
+  const [pickingEvent,setPickingEvent]=useState(false)
   const [studentIds,setStudentIds]=useState<ReadonlyArray<Id<'students'>>>([])
   const [pending,setPending]=useState(false)
   const [error,setError]=useState<string|null>(null)
   const [reviewedPrior,setReviewedPrior]=useState<{jobId:Id<'feeBulkJobs'>;held:number}|null>(null)
+  const [stepIndex,setStepIndex]=useState(0)
+  const [backToReview,setBackToReview]=useState(false)
   const intent=useRef<{fingerprint:string;key:string}|null>(null)
-  const cents=kind==='cancel'?0:parseChargeTarget(amount)
+  const steps=feeSteps(kind)
+  const step=steps[stepIndex]
+  const money=kind==='cancel'?null:parseMoneyInput(amount,{allowZero:kind==='edit'})
+  const cents=kind==='cancel'?0:money?.ok?money.cents:null
   const effectiveScope=existingScope?'existingCharges':eventId?'confirmedEvent':scope
-  const scopeValid=effectiveScope!=='selected'||studentIds.length>0
+  const scopeValid=(effectiveScope!=='selected'||studentIds.length>0)&&!(pickingEvent&&!eventId)
   const priorReady=(!definition?.latestJobId||!!latest)&&(kind!=='cancel'||latest?.job.state!=='held'||reviewedPrior?.jobId===latest.job._id&&reviewedPrior.held===latest.job.held)
   useEffect(()=>{if(shouldLoadStudentChoices(kind,scope,existingScope,eventId,students.status))students.loadMore(20)},[kind,scope,existingScope,eventId,students.status,students.loadMore])
   const dueAt=kind==='cancel'?null:dueAtFromInput(dueDate)
   const dueInvalid=dueAt!==null&&Number.isNaN(dueAt)
+  const reasonValid=reason.trim().length>=8
+  const allValid=!!label.trim()&&cents!==null&&scopeValid&&priorReady&&reasonValid&&!dueInvalid
+  const stepReady:Record<FeeStep,boolean>={fee:!!label.trim()&&cents!==null,due:!dueInvalid,who:scopeValid,reason:reasonValid&&priorReady,review:allValid}
+  const [clock]=useState(()=>Date.now())
+  const pickerEvents=events.results.filter(event=>!event.archived).map(event=>({_id:event.eventId as string,name:event.name,startsAt:event.startsAt}))
   async function saveDueDateOnly(){
     if(!definition||pending||dueInvalid||dueDate===savedDueDate)return
     setPending(true);setError(null);setDueStatus('')
@@ -152,8 +169,7 @@ function BulkPreparationForm({ kind, definition, disabled, onDismiss, onJob }: {
     finally{setPending(false)}
   }
   async function submit(){
-    if(disabled||pending||!label.trim()||cents===null||!scopeValid||!priorReady||reason.trim().length<8)return
-    if(dueInvalid){setError(dueDateCopy.invalid);return}
+    if(disabled||pending||cents===null||!allValid)return
     setPending(true);setError(null)
     if(prepared.current){
       const done=prepared.current
@@ -177,21 +193,60 @@ function BulkPreparationForm({ kind, definition, disabled, onDismiss, onJob }: {
     }catch(failure){setError(userFacingError(failure,dueDateCopy.savedWithoutDueDate))}
     finally{setPending(false)}
   }
-  return <Card className={`${styles.card} ${styles.formCard}`}><CardTitle>{kind==='create'?copy.add:kind==='cancel'?copy.cancel:copy.edit}</CardTitle><p>{copy.prepareBulkNote} {copy.scopeNote}</p>
-    {kind==='cancel'&&latest?.job.state==='held'&&<PriorHeldScopeReview key={latest.job._id} jobId={latest.job._id} held={latest.job.held} disabled={disabled||pending} onReviewed={()=>setReviewedPrior({jobId:latest.job._id,held:latest.job.held})}/>}
-    <form className={styles.form} onSubmit={event=>{event.preventDefault();void submit()}}>
-      <label className={styles.field}>{copy.name}<Input value={label} required maxLength={150} disabled={disabled||pending||kind!=='create'} onChange={event=>setLabel(event.target.value)}/></label>
-      {kind!=='cancel'&&<label className={styles.field}>{copy.amount}<Input value={amount} required inputMode="decimal" disabled={disabled||pending} onChange={event=>setAmount(event.target.value)}/></label>}
-      {kind!=='cancel'&&<div className={styles.field}><label className={styles.field}>{dueDateCopy.label}<Input type="date" value={dueDate} disabled={disabled||pending} aria-invalid={dueInvalid} aria-describedby="fee-due-date-hint" onChange={event=>{setDueDate(event.target.value);setDueStatus('')}}/></label><span id="fee-due-date-hint" className={styles.muted}>{dueDateCopy.hint}</span>{definition&&<div className={styles.actions}><Button type="button" variant="outline" disabled={disabled||pending||dueInvalid||dueDate===savedDueDate} onClick={()=>void saveDueDateOnly()}>{dueDateCopy.save}</Button>{dueStatus&&<span role="status" className={styles.muted}>{dueStatus}</span>}</div>}</div>}
-      {kind==='cancel'?<p>{copy.cancelNote} {copy.cancelTarget}</p>:<>
-        {definition&&<div className={styles.scope}><Button type="button" variant={existingScope?'default':'outline'} disabled={disabled||pending} onClick={()=>setExistingScope(true)}>{copy.existingCharges}</Button><Button type="button" variant={!existingScope?'default':'outline'} disabled={disabled||pending} onClick={()=>setExistingScope(false)}>{copy.changeScope}</Button></div>}
-        {existingScope?<p>{copy.existingScopeNote}</p>:<FeeScopeFields eventSelectionDisabled={!!definition} eventId={eventId} events={events.results.filter(event=>!event.archived).map(event=>({id:event.eventId,name:event.name}))} onEventChange={setEventId} scope={scope} onScopeChange={setScope} students={students.results.map(student=>({id:student.studentId,name:student.name,checked:studentIds.includes(student.studentId),disabled:studentIds.length>=500&&!studentIds.includes(student.studentId)}))} onStudentChange={(id,checked)=>setStudentIds(previous=>checked?previous.includes(id)?previous:previous.length<500?[...previous,id]:previous:previous.filter(value=>value!==id))} disabled={disabled||pending} loadingStudents={students.status==='LoadingFirstPage'||students.status==='LoadingMore'} moreStudents={students.status!=='Exhausted'} autoLoadStudents={scope==='selected'&&!existingScope&&!eventId} loadStudents={()=>students.loadMore(20)} loadingEvents={events.status==='LoadingFirstPage'||events.status==='LoadingMore'} moreEvents={events.status!=='Exhausted'} loadEvents={()=>events.loadMore(20)}/>}
-      </>}
-      {effectiveScope==='selected'&&<p>{copy.studentsSelected}: {studentIds.length} / 500</p>}<label className={styles.field}>{copy.reasonInput}<Input value={reason} required maxLength={1000} disabled={disabled||pending} onChange={event=>setReason(event.target.value)}/></label>
-      <Button type="submit" disabled={disabled||pending||!label.trim()||cents===null||!scopeValid||!priorReady||reason.trim().length<8}>{pending?copy.submitting:copy.prepareBulk}</Button>
-      <Button type="button" variant="outline" disabled={pending} onClick={()=>{if(prepared.current)onJob(prepared.current.jobId);else onDismiss()}}>{copy.dismiss}</Button>
-      {error&&<p role="alert">{error}</p>}
-    </form>
+  const last=stepIndex===steps.length-1
+  /** Edit on the review screen: go to that step, and Continue returns straight to the review. */
+  const goTo=(target:FeeStep)=>{setError(null);setBackToReview(true);setStepIndex(steps.indexOf(target))}
+  const next=()=>{
+    if(last){void submit();return}
+    setError(null)
+    setStepIndex(backToReview?steps.length-1:stepIndex+1)
+    setBackToReview(false)
+  }
+  const back=stepIndex>0?()=>{setError(null);setBackToReview(false);setStepIndex(stepIndex-1)}:undefined
+  const eventName=pickerEvents.find(event=>event._id===eventId)?.name
+  const whoText=effectiveScope==='existingCharges'?wizard.existing:effectiveScope==='confirmedEvent'?wizard.eventStudents(eventName??'the chosen event'):effectiveScope==='selected'?wizard.selectedStudents(studentIds.length):wizard.allStudents
+  const title=kind==='create'?copy.add:kind==='cancel'?copy.cancel:copy.edit
+  const amountProblem=money&&amount.trim()!==''&&!money.ok?money.message:null
+  const content=(()=>{
+    switch(step){
+      case 'fee':return <>
+        <label className={styles.field}>{copy.name}<Input value={label} required maxLength={150} disabled={disabled||pending||kind!=='create'} onChange={event=>setLabel(event.target.value)}/></label>
+        {kind==='create'&&<span className={styles.muted}>{wizard.nameHint}</span>}
+        <label className={styles.field}>{copy.amount}<Input value={amount} required inputMode="decimal" disabled={disabled||pending} aria-invalid={!!amountProblem} aria-describedby="fee-amount-hint" onChange={event=>setAmount(event.target.value)}/></label>
+        <span id="fee-amount-hint" className={amountProblem?styles.error:styles.muted} role={amountProblem?'alert':undefined}>{amountProblem??wizard.amountExample}</span>
+      </>
+      case 'due':return <div className={styles.field}>
+        <label className={styles.field}>{dueDateCopy.label}<Input type="date" value={dueDate} disabled={disabled||pending} aria-invalid={dueInvalid} aria-describedby="fee-due-date-hint" onChange={event=>{setDueDate(event.target.value);setDueStatus('')}}/></label>
+        <span id="fee-due-date-hint" className={styles.muted}>{dueDateCopy.hint}</span>
+        {dueInvalid&&<p role="alert" className={styles.error}>{dueDateCopy.invalid}</p>}
+        {definition&&<div className={styles.actions}><Button type="button" variant="outline" disabled={disabled||pending||dueInvalid||dueDate===savedDueDate} onClick={()=>void saveDueDateOnly()}>{dueDateCopy.save}</Button>{dueStatus&&<span role="status" className={styles.muted}>{dueStatus}</span>}</div>}
+      </div>
+      case 'who':return <>
+        <FeeScopeFields eventSelectionDisabled={!!definition} eventId={eventId} pickingEvent={pickingEvent} onPickingEventChange={setPickingEvent} asOf={clock} events={pickerEvents} onEventChange={setEventId} scope={scope} onScopeChange={setScope} students={students.results.map(student=>({id:student.studentId,name:student.name,checked:studentIds.includes(student.studentId),disabled:studentIds.length>=500&&!studentIds.includes(student.studentId)}))} onStudentChange={(id,checked)=>setStudentIds(previous=>checked?previous.includes(id)?previous:previous.length<500?[...previous,id]:previous:previous.filter(value=>value!==id))} disabled={disabled||pending} loadingStudents={students.status==='LoadingFirstPage'||students.status==='LoadingMore'} moreStudents={students.status!=='Exhausted'} autoLoadStudents={scope==='selected'&&!eventId&&!pickingEvent} loadStudents={()=>students.loadMore(20)} loadingEvents={events.status==='LoadingFirstPage'||events.status==='LoadingMore'} moreEvents={events.status!=='Exhausted'} loadEvents={()=>events.loadMore(20)}/>
+        {effectiveScope==='selected'&&<p>{wizard.studentsLimit(studentIds.length)}</p>}
+      </>
+      case 'reason':return <>
+        {kind==='cancel'&&<><p>{copy.cancelNote} {copy.cancelTarget}</p>{latest?.job.state==='held'&&<PriorHeldScopeReview key={latest.job._id} jobId={latest.job._id} held={latest.job.held} disabled={disabled||pending} onReviewed={()=>setReviewedPrior({jobId:latest.job._id,held:latest.job.held})}/>}{!priorReady&&<p className={styles.notice} role="status">{wizard.priorFirst}</p>}</>}
+        <label className={styles.field}>{copy.reasonInput}<Input value={reason} required maxLength={1000} disabled={disabled||pending} onChange={event=>setReason(event.target.value)}/></label>
+        <span className={styles.muted}>{wizard.reasonHint}</span>
+      </>
+      case 'review':return <>
+        <dl className="m-0 grid">
+          <ReviewRow label={copy.name} value={label}/>
+          {kind==='cancel'?<ReviewRow label={copy.amount} value={wizard.cancelSummary}/>:<ReviewRow label={copy.amount} value={cents===null?'—':chargeCurrency(cents)} onEdit={()=>goTo('fee')} disabled={pending}/>}
+          {kind!=='cancel'&&<ReviewRow label={dueDateCopy.heading} value={dueAt!==null&&!dueInvalid?dueDateCopy.full(dueAt):wizard.noDue} onEdit={()=>goTo('due')} disabled={pending}/>}
+          {kind==='create'?<ReviewRow label={wizard.steps.who} value={whoText} onEdit={()=>goTo('who')} disabled={pending}/>:<ReviewRow label={wizard.steps.who} value={whoText}/>}
+          <ReviewRow label={copy.reason} value={reason.trim()} onEdit={()=>goTo('reason')} disabled={pending}/>
+        </dl>
+        <p className={styles.muted}>{wizard.reviewNote}</p>
+      </>
+    }
+  })()
+  return <Card className={`${styles.card} ${styles.formCard}`}><CardTitle>{title}</CardTitle><p>{copy.prepareBulkNote} {copy.scopeNote}</p>
+    <StepWizard title={title} step={stepIndex+1} total={steps.length} heading={wizard.steps[step]} nextLabel={last?(pending?wizard.saving:wizard.reviewButton):wizard.next} nextDisabled={disabled||!stepReady[step]} onNext={next} onBack={back} busy={pending} error={error}
+      onCancel={()=>{if(prepared.current)onJob(prepared.current.jobId);else onDismiss()}}>
+      {content}
+    </StepWizard>
   </Card>
 }
 
@@ -372,7 +427,7 @@ function MapHistoricalFees({ control, definitions, moreDefinitions, loadDefiniti
     } catch (failure) { setError(userFacingError(failure, copy.unavailable)) }
     finally { setPending(false) }
   }
-  return <Card className={styles.card}><CardTitle>{copy.legacy}</CardTitle><p>{copy.legacyNote}</p>
+  return <Card className={styles.card}><CardTitle>{copy.legacy}</CardTitle><p>{copy.legacyNote}</p><p className={styles.muted}>{copy.recordedPriorityNote}</p>
     {evidence.status === 'LoadingFirstPage' ? <p role="status">{copy.loading}</p> : <>
       <UnmappedFeeEvidence rows={evidence.results.map(row => ({ ...row, selected: selected.some(item => item.charge._id === row.charge._id), disabled: selected.length >= 20 && !selected.some(item => item.charge._id === row.charge._id) }))} disabled={pending || !!reviewed} onSelect={select} />
       {evidence.results.length === 0 && <p>{copy.noLegacy}</p>}
@@ -404,7 +459,8 @@ function CreateMappingDestination({ eventId, orderRevision, disabled, onCreated 
   const [created, setCreated] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const intent = useRef<{ fingerprint: string; key: string } | null>(null)
-  const cents = parseChargeTarget(amount)
+  const money = parseMoneyInput(amount)
+  const cents = money.ok ? money.cents : null
   async function submit() {
     if (disabled || pending || !label.trim() || cents === null || reason.trim().length < 8) return
     setPending(true); setError(null)
@@ -415,7 +471,7 @@ function CreateMappingDestination({ eventId, orderRevision, disabled, onCreated 
     finally { setPending(false) }
   }
   return <div className={styles.form}><Button type="button" variant="outline" disabled={disabled || pending || created} onClick={() => setOpen(value => !value)}>{copy.createMappingDefinition}</Button>
-    {open && <form className={styles.form} onSubmit={event => { event.preventDefault(); void submit() }}><p>{copy.mappingDefinitionNote}</p><label className={styles.field}>{copy.name}<Input value={label} required maxLength={150} disabled={disabled || pending} onChange={event => setLabel(event.target.value)} /></label><label className={styles.field}>{copy.defaultAmount}<Input value={amount} required inputMode="decimal" disabled={disabled || pending} onChange={event => setAmount(event.target.value)} /></label><label className={styles.field}>{copy.reasonInput}<Input value={reason} required maxLength={1000} disabled={disabled || pending} onChange={event => setReason(event.target.value)} /></label><Button type="submit" disabled={disabled || pending || !label.trim() || cents === null || reason.trim().length < 8}>{pending ? copy.submitting : copy.createMappingDefinition}</Button></form>}
+    {open && <form className={styles.form} onSubmit={event => { event.preventDefault(); void submit() }}><p>{copy.mappingDefinitionNote}</p><label className={styles.field}>{copy.name}<Input value={label} required maxLength={150} disabled={disabled || pending} onChange={event => setLabel(event.target.value)} /></label><label className={styles.field}>{copy.defaultAmount}<Input value={amount} required inputMode="decimal" disabled={disabled || pending} onChange={event => setAmount(event.target.value)} /></label>{amount.trim() !== '' && !money.ok && <span role="alert" className={styles.error}>{money.message}</span>}<label className={styles.field}>{copy.reasonInput}<Input value={reason} required maxLength={1000} disabled={disabled || pending} onChange={event => setReason(event.target.value)} /></label><Button type="submit" disabled={disabled || pending || !label.trim() || cents === null || reason.trim().length < 8}>{pending ? copy.submitting : copy.createMappingDefinition}</Button></form>}
     {created && <p role="status">{copy.mappingDefinitionCreated}</p>}{error && <p role="alert">{error}</p>}
   </div>
 }
@@ -485,6 +541,7 @@ function LivePriorityReceipt({ jobId }: { jobId: Id<'feePriorityJobs'> }) {
   return <><FeePriorityReceipt {...result} retryReason={reason} onRetryReasonChange={setReason} onRetry={() => void resume()} submitting={pending} />{error && <p role="alert">{error}</p>}</>
 }
 
+const addedFormat = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 type FeeRowPresentation = {
   key: string
   label: string
@@ -492,6 +549,8 @@ type FeeRowPresentation = {
   amountCents: number
   summary?: string
   dueAt?: number
+  /** When the fee was added, so two fees with the same name, amount and date can be told apart. */
+  addedAt?: number
   cancelled: boolean
   /** Shown directly under the row, e.g. the fee's due date control. */
   below?: ReactNode
@@ -519,7 +578,8 @@ export function FeeDefinitionDraftForm({ scopeFields, scopeValid, disabled, onPr
   const [reason, setReason] = useState('')
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const cents = parseChargeTarget(amount)
+  const money = parseMoneyInput(amount)
+  const cents = money.ok ? money.cents : null
   async function prepare() {
     if (pending || disabled || !scopeValid || !label.trim() || cents === null || reason.trim().length < 8) return
     setPending(true); setError(null)
@@ -529,7 +589,7 @@ export function FeeDefinitionDraftForm({ scopeFields, scopeValid, disabled, onPr
   }
   return <form className={styles.form} onSubmit={event => { event.preventDefault(); void prepare() }}>
     <label className={styles.field}>{copy.name}<Input value={label} required disabled={disabled || pending} onChange={event => setLabel(event.target.value)} /></label>
-    <label className={styles.field}>{copy.amount}<Input value={amount} required inputMode="decimal" disabled={disabled || pending} onChange={event => setAmount(event.target.value)} /></label>
+    <label className={styles.field}>{copy.amount}<Input value={amount} required inputMode="decimal" disabled={disabled || pending} onChange={event => setAmount(event.target.value)} /></label>{amount.trim() !== '' && !money.ok && <span role="alert" className={styles.error}>{money.message}</span>}
     <fieldset className={styles.form} disabled={disabled || pending}>{scopeFields}</fieldset>
     <label className={styles.field}>{copy.reasonInput}<Input value={reason} maxLength={1000} required disabled={disabled || pending} onChange={event => setReason(event.target.value)} /></label>
     <p className={styles.muted}>{copy.prepareBulkNote} {copy.append}</p>
@@ -542,7 +602,7 @@ export function FeeDefinitionDraftForm({ scopeFields, scopeValid, disabled, onPr
 export function FeePriorityRows({ rows, disabled }: { rows: ReadonlyArray<FeeRowPresentation>; disabled: boolean }) {
   return <div className={styles.order}>{rows.map((row, index) => <Fragment key={row.key}><div className={styles.fee}>
     <span className={styles.rank} aria-label={`Displayed fee order position ${index + 1}`}>{index + 1}</span>
-    <div className={styles.feeName}><strong>{row.label}</strong><span className={styles.muted}>{copy.defaultAmount}: {chargeCurrency(row.amountCents)}{row.dueAt !== undefined ? ` · ${dueDateCopy.short(row.dueAt)}` : ''}{row.summary ? ` · ${row.summary}` : ''}</span>{row.cancelled && <span className={styles.status}>{copy.cancelled}</span>}</div>
+    <div className={styles.feeName}><strong>{row.label}</strong><span className={styles.muted}>{copy.defaultAmount}: {chargeCurrency(row.amountCents)}{row.dueAt !== undefined ? ` · ${dueDateCopy.short(row.dueAt)}` : ''}{row.summary ? ` · ${row.summary}` : ''}{row.addedAt !== undefined ? ` · ${copy.addedAt} ${addedFormat.format(row.addedAt)}` : ''}</span>{row.cancelled && <span className={styles.status}>{copy.cancelled}</span>}</div>
     {row.actions && <div className={styles.feeActions}>
       {row.actions.dueDate && <Button type="button" variant="outline" aria-expanded={row.actions.dueDateOpen ?? false} aria-label={`${row.dueAt !== undefined ? dueDateCopy.changeAction : dueDateCopy.setAction} for ${row.label}`} onClick={row.actions.dueDate}>{row.dueAt !== undefined ? dueDateCopy.changeAction : dueDateCopy.setAction}</Button>}
       {row.actions.view && <Button type="button" variant="outline" aria-label={`${copy.details} ${row.label}`} onClick={row.actions.view}>{copy.details}</Button>}
@@ -631,15 +691,20 @@ export function UnmappedFeeEvidence({ rows, disabled, onSelect }: {
     <div className={styles.feeName}><strong>{row.studentName} · {row.charge.label}</strong>
       <span className={styles.muted}>{copy.connectedTo}: {row.eventName ?? (row.charge.eventId ? copy.eventUnavailable : copy.noEvent)}</span>
       <span>{copy.originalAmount}: {chargeCurrency(row.charge.amountCents)} · {copy.effectiveAmount}: {chargeCurrency(row.effectiveCents)} · {copy.appliedAmount}: {chargeCurrency(row.charge.appliedCents)}</span>
-      <span className={styles.muted}>{copy.recordedPriority}: {row.charge.priority} · {copy.chargeRevision}: {row.charge.revision ?? 0}</span>
+      <span className={styles.muted}>{copy.recordedPriority}: {row.charge.priority}</span>
     </div>
   </div>)}</div>
 }
 
 /** Controlled scope fields; no membership or monetary facts are generated here. */
-export function FeeScopeFields({ eventId, events, onEventChange, scope, onScopeChange, students, onStudentChange, disabled, loadingStudents, moreStudents, autoLoadStudents=false, loadStudents, loadingEvents, moreEvents, loadEvents, eventSelectionDisabled }: {
+export function FeeScopeFields({ eventId, pickingEvent, onPickingEventChange, asOf, events, onEventChange, scope, onScopeChange, students, onStudentChange, disabled, loadingStudents, moreStudents, autoLoadStudents=false, loadStudents, loadingEvents, moreEvents, loadEvents, eventSelectionDisabled }: {
   eventId: Id<'events'> | null
-  events: ReadonlyArray<{ id: Id<'events'>; name: string }>
+  /** True while "For an event" is chosen, even before an event is picked. */
+  pickingEvent: boolean
+  onPickingEventChange: (picking: boolean) => void
+  /** The current time in milliseconds, for sorting events into upcoming and past. */
+  asOf: number
+  events: ReadonlyArray<PickerEvent>
   onEventChange: (eventId: Id<'events'> | null) => void
   scope: 'allActive' | 'selected'
   onScopeChange: (scope: 'allActive' | 'selected') => void
@@ -656,14 +721,18 @@ export function FeeScopeFields({ eventId, events, onEventChange, scope, onScopeC
   eventSelectionDisabled?: boolean
 }) {
   return <div className={styles.form}>
-    <label className={styles.field}>{copy.connectedTo}<NativeSelect value={eventId ?? ''} disabled={disabled || eventSelectionDisabled} onChange={event => {
-      if (!event.target.value) { onEventChange(null); return }
-      const selected = events.find(option => option.id === event.target.value)
-      if (selected) onEventChange(selected.id)
-    }}><NativeSelectOption value="">{copy.noEvent}</NativeSelectOption>{eventId && !events.some(option => option.id === eventId) && <NativeSelectOption value={eventId} disabled>Loading connected event…</NativeSelectOption>}{events.map(event => <NativeSelectOption value={event.id} key={event.id}>{event.name}</NativeSelectOption>)}</NativeSelect></label>
-    {loadingEvents && <p role="status">{copy.loadingEvents}</p>}
-    {moreEvents && loadEvents && <Button type="button" variant="outline" disabled={disabled || loadingEvents} onClick={loadEvents}>{copy.moreEvents}</Button>}
-    {eventId ? <p className={styles.muted}>{copy.confirmedScope}</p> : <>
+    {eventSelectionDisabled
+      ? <p><strong>{copy.connectedTo}:</strong> {eventId ? (events.find(option => option._id === eventId)?.name ?? copy.eventUnavailable) : copy.noEvent}</p>
+      : <>
+        <div className={styles.scope} role="group" aria-label={copy.connectedTo}>
+          <Button type="button" variant={!pickingEvent ? 'default' : 'outline'} aria-pressed={!pickingEvent} disabled={disabled} onClick={() => { onPickingEventChange(false); onEventChange(null) }}>{copy.wizard.notForEvent}</Button>
+          <Button type="button" variant={pickingEvent ? 'default' : 'outline'} aria-pressed={pickingEvent} disabled={disabled} onClick={() => onPickingEventChange(true)}>{copy.wizard.forEvent}</Button>
+        </div>
+        {pickingEvent && <EventPicker events={events} value={eventId} onChange={id => onEventChange(id as Id<'events'>)} asOf={asOf} label={copy.wizard.chooseEvent} emptyText={loadingEvents ? copy.loadingEvents : undefined} />}
+      </>}
+    {pickingEvent && !eventSelectionDisabled && loadingEvents && <p role="status">{copy.loadingEvents}</p>}
+    {pickingEvent && !eventSelectionDisabled && moreEvents && loadEvents && <Button type="button" variant="outline" disabled={disabled || loadingEvents} onClick={loadEvents}>{copy.moreEvents}</Button>}
+    {eventId ? <p className={styles.muted}>{copy.confirmedScope}</p> : pickingEvent ? <p className={styles.muted}>{copy.wizard.chooseEvent}.</p> : <>
       <span className={styles.field}>{copy.whoOwes}</span>
       <div className={styles.scope} role="group" aria-label={copy.whoOwes}><Button type="button" variant={scope === 'allActive' ? 'default' : 'outline'} aria-pressed={scope === 'allActive'} disabled={disabled} onClick={() => onScopeChange('allActive')}>{copy.allActive}</Button><Button type="button" variant={scope === 'selected' ? 'default' : 'outline'} aria-pressed={scope === 'selected'} disabled={disabled} onClick={() => onScopeChange('selected')}>{copy.selected}</Button></div>
       {scope === 'allActive' ? <p className={styles.muted}>{copy.allActiveSnapshot}</p> : <>

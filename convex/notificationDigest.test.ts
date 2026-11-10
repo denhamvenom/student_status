@@ -156,7 +156,7 @@ describe("Mentor meeting digest (M4/M5)", () => {
     await f.t.finishInProgressScheduledFunctions();
   };
 
-  it("M4: a new event is queued once for Mentors who can sign up, never the creator or invited Mentors, and pushed only in the 5 PM summary", async () => {
+  it("M4: a new event is queued once for Mentors who can sign up (not for specific-students meetings), never the creator or invited Mentors, and pushed only in the 5 PM summary", async () => {
     const f = await fixture();
     const m = await mentors(f);
     vi.setSystemTime(FLUSH_NOW - 7 * HOUR); // Wed 10 AM Chicago: quiet hours; the digest still holds every push
@@ -164,25 +164,25 @@ describe("Mentor meeting digest (M4/M5)", () => {
     const buildOnly = await meeting(f, m.creator.id, { name: "Build subteam", audienceKind: "subteams", audienceSubteams: ["Build"] });
     const elecOnly = await meeting(f, m.creator.id, { name: "Electrical subteam", audienceKind: "subteams", audienceSubteams: ["Electrical"] });
     const skipped = [await meeting(f, m.creator.id, { name: "Canceled", cancelled: true }), await meeting(f, m.creator.id, { name: "Over", startsAt: FLUSH_NOW - 9 * HOUR, endsAt: FLUSH_NOW - 8 * HOUR })];
-    // Every type of event is open to Mentors (owner decision, Nov 6 2026), specific-students ones included.
+    // Mentors get "New meeting" notices only for whole-team or their-subteam meetings; specific-students ones are not queued (owner decision, Nov 9 2026).
     const students = await meeting(f, m.creator.id, { name: "Students", audienceKind: "students" });
     const competition = await meeting(f, f.ids.coach, { name: "Competition", type: "Competition", audienceKind: undefined, mandatory: undefined });
     await f.t.run(ctx => ctx.db.insert("eventMentorInvites", { eventId: everyone, mentorUserId: m.invited.id, source: "individual", status: "invited", invitedBy: m.creator.id, createdAt: 0 }));
     for (const eventId of [everyone, everyone, buildOnly, elecOnly, ...skipped, students, competition]) await f.t.run(ctx => queueMentorMeetingOpenDigest(ctx, { eventId }));
     const titles = async (userId: Id<"appUsers">) => (await f.inbox(userId)).map(row => [row.title, row.category, row.pushStatus]);
     const row = (title: string, status = "digest") => [title, "mentorEvents", status];
-    expect(await titles(m.build.id)).toEqual([row("New meeting: Build Night"), row("New meeting: Build subteam"), row("New meeting: Students"), row("New event: Competition")]);
-    expect(await titles(m.elec.id)).toEqual([row("New meeting: Build Night"), row("New meeting: Electrical subteam"), row("New meeting: Students"), row("New event: Competition")]);
-    expect(await titles(m.quiet.id)).toEqual([row("New meeting: Build Night", "skipped"), row("New meeting: Build subteam", "skipped"), row("New meeting: Students", "skipped"), row("New event: Competition", "skipped")]);
+    expect(await titles(m.build.id)).toEqual([row("New meeting: Build Night"), row("New meeting: Build subteam"), row("New event: Competition")]);
+    expect(await titles(m.elec.id)).toEqual([row("New meeting: Build Night"), row("New meeting: Electrical subteam"), row("New event: Competition")]);
+    expect(await titles(m.quiet.id)).toEqual([row("New meeting: Build Night", "skipped"), row("New meeting: Build subteam", "skipped"), row("New event: Competition", "skipped")]);
     // Already invited to Build Night, so not that one.
-    expect(await titles(m.invited.id)).toEqual([row("New meeting: Build subteam"), row("New meeting: Students"), row("New event: Competition")]);
+    expect(await titles(m.invited.id)).toEqual([row("New meeting: Build subteam"), row("New event: Competition")]);
     // The creator hears only about what someone else created.
     expect(await titles(m.creator.id)).toEqual([row("New event: Competition")]);
     for (const userId of [f.ids.coach, f.ids.parent, f.ids.studentUser]) expect(await f.inbox(userId)).toEqual([]);
     expect(await f.sends()).toEqual([]);
     await flushAt5(f);
     expect(await f.sends()).toEqual(expect.arrayContaining([
-      expect.objectContaining({ title: "Meetings: 4 new events you can join", url: "/inbox" }),
+      expect.objectContaining({ title: "Meetings: 3 new events you can join", url: "/inbox" }),
       expect.objectContaining({ title: "Meetings: 1 new event you can join", url: `/events/${competition}` }),
     ]));
     expect(await f.sends()).toHaveLength(2);

@@ -170,7 +170,7 @@ function ManageActions({ meeting }: { meeting: MentorMeeting }) {
   return <>
     <div className="flex flex-wrap gap-2 border-t border-vs-border-subtle pt-3" role="group" aria-label={copy.page.edit}>
       <button type="button" className={dashboardButtonVariants({ tone: 'soft' })} onClick={open}>{copy.page.edit}</button>
-      <ConfirmAction description={copy.page.cancelConfirm} onConfirm={async () => { await cancel({ eventId: meeting.eventId, expectedRevision: meeting.calendarRevision }); toast.success(copy.page.canceledToast) }}>{copy.page.cancel}</ConfirmAction>
+      <ConfirmAction title="Cancel this meeting?" description={copy.page.cancelConfirm} onConfirm={async () => { await cancel({ eventId: meeting.eventId, expectedRevision: meeting.calendarRevision }); toast.success(copy.page.canceledToast) }}>{copy.page.cancel}</ConfirmAction>
     </div>
     <Dialog open={draft !== null} disablePointerDismissal onOpenChange={next => { if (!next && !busy) setDraft(null) }}>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain sm:max-w-lg">

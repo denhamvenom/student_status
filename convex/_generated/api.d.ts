@@ -24,6 +24,7 @@ import type * as bulkInvites from "../bulkInvites.js";
 import type * as calendar from "../calendar.js";
 import type * as calendarState from "../calendarState.js";
 import type * as chargeAdmin from "../chargeAdmin.js";
+import type * as coachContact from "../coachContact.js";
 import type * as coachProfileEdit from "../coachProfileEdit.js";
 import type * as coachRoster from "../coachRoster.js";
 import type * as consentPdfRehearsal from "../consentPdfRehearsal.js";
@@ -212,6 +213,7 @@ declare const fullApi: ApiFromModules<{
   calendar: typeof calendar;
   calendarState: typeof calendarState;
   chargeAdmin: typeof chargeAdmin;
+  coachContact: typeof coachContact;
   coachProfileEdit: typeof coachProfileEdit;
   coachRoster: typeof coachRoster;
   consentPdfRehearsal: typeof consentPdfRehearsal;

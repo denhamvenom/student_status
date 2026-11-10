@@ -3,6 +3,8 @@ import { useQueries } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
+import { AskCoachButton } from '@/AskCoachButton'
+import { TaskSheetEmailContext } from '@/features/student-home/tiles/TaskSheet'
 import { useLiveSignupSource } from '../event-signup/wizardSource'
 import { toAgendaEvents, type AgendaEvent, type ListedEventRow } from './agenda'
 import type { HomeAttendance, PinnedAnnouncement, StudentHomeSummary } from './contract'
@@ -78,11 +80,15 @@ function useStudentHomeData(studentId: Id<'students'>, asOfDay: string) {
 }
 
 /** Student Home for the signed-in Student. `studentId` is the Student's own record (viewer.students[0]). */
-export function StudentHome({ studentId }: { studentId: Id<'students'> }) {
+export function StudentHome({ studentId, email }: { studentId: Id<'students'>; email?: string }) {
   const now = useNow()
   const asOfDay = chicagoDateKey(now)
   const { summary, attendance, announcements, finance, events, retry } = useStudentHomeData(studentId, asOfDay)
   const signup = useLiveSignupSource()
   const handlers = useMemo<StudentHomeHandlers>(() => ({ signup, retry }), [signup, retry])
-  return <StudentHomeView summary={summary} attendance={attendance} announcements={announcements} finance={finance} events={events} now={now} handlers={handlers} />
+  // Mounted here, not in the view: the previews render the view without a backend.
+  return <div className="flex min-w-0 flex-col gap-2.5 md:mx-auto md:w-full md:max-w-[720px] lg:mx-0 lg:max-w-none lg:gap-4">
+    <TaskSheetEmailContext.Provider value={email}><StudentHomeView summary={summary} attendance={attendance} announcements={announcements} finance={finance} events={events} now={now} handlers={handlers} /></TaskSheetEmailContext.Provider>
+    <div><AskCoachButton email={email} /></div>
+  </div>
 }

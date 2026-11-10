@@ -47,16 +47,22 @@ export type ParentNext = {
 }
 
 /**
- * The linked Student's next event for slide 1: the summary's next event (it knows the Student's signup status),
- * filled in with end time, place and cost from app.listEvents when the event is there.
+ * The one "Next" for Parent Home, from the same event list This week uses: the soonest event that has not ended and is
+ * either required for the Student or the one the Student signed up for (the summary knows the signup; Parents get no
+ * status per row in the list). An event under way counts, so today's meeting is Next, not left only in This week.
+ * Only when the list lacks the signed-up event does the summary's own copy of it compete, by start time.
  */
 export function parentNext(summary: ParentHomeSummary, events: readonly AgendaEvent[], now: number): ParentNext | null {
-  const next = upcomingEvent(summary, now)
-  if (!next) return null
-  const listed = events.find(event => event.eventId === next.eventId)
-  if (listed) return { eventId: next.eventId, name: next.name, line: agendaLine({ ...listed, status: next.status }), required: listed.required }
-  const line = [formatWhen(next.startsAt, next.startsAt), next.location, statusLabel[next.status]].filter(Boolean).join(' · ')
-  return { eventId: next.eventId, name: next.name, line, required: null }
+  const mine = upcomingEvent(summary, now)
+  const listedMine = mine ? events.find(event => event.eventId === mine.eventId) : undefined
+  const going = events.find(event => event.endsAt > now && (event.required || event.eventId === mine?.eventId))
+  if (mine && !listedMine && (!going || mine.startsAt < going.startsAt)) {
+    const line = [formatWhen(mine.startsAt, mine.startsAt), mine.location, statusLabel[mine.status]].filter(Boolean).join(' · ')
+    return { eventId: mine.eventId, name: mine.name, line, required: null }
+  }
+  if (!going) return null
+  const status = going.eventId === mine?.eventId ? mine.status : null
+  return { eventId: going.eventId, name: going.name, line: agendaLine({ ...going, status }), required: going.required }
 }
 
 /** This week for Parents: the next seven days, without the event already shown as Next. */
@@ -77,7 +83,7 @@ export function formsSummary(input: { events: readonly FormEvent[]; coverage: re
     .filter(event => event.endsAt > input.now && (state.get(event.eventId) ?? 'required') !== 'accepted' && state.get(event.eventId) !== 'pending')
     .sort((a, b) => a.startsAt - b.startsAt)
   const message = needForm.length === 0 ? 'Nothing to sign right now.'
-    : input.signingPaused ? 'Forms open soon — we’ll notify you.'
+    : input.signingPaused ? 'Permission forms are not open yet. A Coach or Travel Lead will post a date.'
     : needForm.length === 1 ? '1 event needs a signed form.' : `${needForm.length} events need a signed form.`
   return { needForm, message }
 }

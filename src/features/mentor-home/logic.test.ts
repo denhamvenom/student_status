@@ -4,7 +4,7 @@ import { at } from '../student-home/fixtures'
 import { eventEditValues, draftFrom } from '../operations/event-edit'
 import { clockedIn, homeData, joinEntry, meeting, NOW } from './fixtures'
 import type { Id } from '../../../convex/_generated/dataModel'
-import { clockLabel, COMING_UP_LIMIT, comingUpTags, createdList, editableMeeting, eventTags, goingList, hereGroups, homeView, joinEntryLines, joinSections, meetingPlace, myPartLabel, needsAnswer, pinKey, seriesStatus, showsSubteamTag, subteamsLine, tabFromHash, typeLabel, unreadPinned } from './logic'
+import { clockLabel, COMING_UP_LIMIT, comingUpTags, createdList, editableMeeting, eventTags, goingList, hereGroups, homeView, joinEntryLines, joinInScope, joinSections, meetingPlace, myPartLabel, needsAnswer, pinKey, seriesStatus, showsSubteamTag, subteamsLine, tabFromHash, typeLabel, unreadPinned } from './logic'
 
 const HOUR = 3_600_000
 const titles = (rows: readonly { title: string }[]) => rows.map(row => row.title)
@@ -142,6 +142,22 @@ describe('Schedule › Join', () => {
     expect(titles(sections.meetings)).toEqual(['meeting soon', 'meeting later'])
   })
 
+  it('leaves out meetings for other subteams until widened, and always keeps whole-team and own-subteam ones', () => {
+    const forSubteam = (name: string, subteam: string) => joinEntry(meeting(name, NOW + HOUR, { canSignUp: true, audience: { kind: 'subteams', subteams: [subteam], required: false, text: subteam } }))
+    const entries = [forSubteam('mine', 'Programming'), forSubteam('other', 'Mechanical'), joinEntry(meeting('whole team', NOW + 2 * HOUR, { canSignUp: true }))]
+    expect(titles(joinSections(entries, NOW, ['programming']).meetings)).toEqual(['mine', 'whole team'])
+    expect(joinSections(entries, NOW, ['Programming']).hidden).toBe(1)
+    expect(titles(joinSections(entries, NOW, ['Programming'], true).meetings)).toEqual(['mine', 'other', 'whole team'])
+    expect(joinSections(entries, NOW).hidden).toBe(0)
+    expect(joinInScope(entries[1], [])).toBe(false)
+  })
+
+  it('drops a series from Home’s could-help-with count once the Mentor signs up for it', () => {
+    const next = meeting('series', NOW + HOUR, { canSignUp: true, seriesId: 'fixture_series_a' as Id<'eventSeries'> })
+    expect(homeView(homeData({ joinable: [joinEntry(next)] }), NOW).joinCount).toBe(1)
+    expect(homeView(homeData({ joinable: [joinEntry(next, { hasSeriesSignup: true })] }), NOW).joinCount).toBe(0)
+  })
+
   it.each([
     ['a meeting for the Mentor’s subteam', 'meetings', true, true],
     ['a meeting for Everyone', 'meetings', false, false],
@@ -165,11 +181,14 @@ describe('Schedule › Join', () => {
 })
 
 describe('Who’s here now', () => {
-  it('gives one line per subteam with how many are clocked in, and their names', () => {
-    expect(hereGroups(clockedIn({ Programming: ['Avery N.', 'Jordan W.'], CAD: [] }))).toEqual([
-      { subteam: 'Programming', count: 2, names: ['Avery N.', 'Jordan W.'], label: 'Programming · 2 clocked in' },
-      { subteam: 'CAD', count: 0, names: [], label: 'CAD · 0 clocked in' },
+  it('lists each student with the time they clocked in, and says plainly when a subteam is empty', () => {
+    const groups = hereGroups(clockedIn({ Programming: ['Avery N.', 'Jordan W.'], CAD: [] }))
+    expect(groups.map(group => [group.label, group.students.map(student => student.name)])).toEqual([
+      ['Programming · 2 clocked in', ['Avery N.', 'Jordan W.']],
+      ['CAD · nobody clocked in', []],
     ])
+    // NOW is 12:00 PM Central; the fixtures clock students in 10 and 20 minutes earlier.
+    expect(groups[0].students.map(student => student.since)).toEqual(['since 11:50 AM', 'since 11:40 AM'])
   })
 })
 

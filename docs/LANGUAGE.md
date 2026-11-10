@@ -62,6 +62,14 @@ Write every new or changed user-facing string to this page. Rewrite screen by sc
 | Signing in | sign in (verb), sign-in (noun) | Same | log in, login |
 | Team reports | (not shown) | Reports (Coach, Travel Lead); Team report (Mentor); menu label matches heading | Report (alone) |
 | Attendance | Attendance; meetings | Attendance; meetings | sessions, practices, Attendance fixes (as a menu name) |
+| Messaging the Coach (November 9) | Ask a Coach (button/form; topic and message) | (not shown) | Contact admin (that is Coach-only setup errors) |
+| Changing a recorded payment (November 9) | (not shown) | Edit payment (reason required) | Fix payment, Reverse |
+| Roster bulk actions (November 9) | (not shown) | Copy reminder (text only, nothing sent); Export list | Send reminder |
+| Open-only filter (November 9) | Show only open | Show only open | Hide closed |
+| Mentor subteam scope (November 9) | (not shown) | Showing: {subteam} · Show all subteams | |
+| Calendar progress (November 9) | (not shown) | Adding to Team Calendar… | |
+| Wrong Google account (November 9) | Use a different Google account | Same | Use another account (for the generic sign-in switch only) |
+| View-only money screens (November 9) | (not shown) | "A Coach or a Travel Lead with Money editing access can record and edit payments." | grant, capability |
 
 ## Student Home (October 27)
 

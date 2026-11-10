@@ -1,6 +1,7 @@
 export const adultProfileCopy = {
   title: 'Profile',
   mentor: 'Mentor', travelLead: 'Travel Lead',
+  subteams: 'Your subteams', noSubteams: 'No subteams set yet.', subteamsNote: 'A Coach sets your subteams.',
   setup: 'Add your shirt size to finish setting up.',
   about: 'About you', name: 'Name', phone: 'Phone', googleAccount: 'Sign-in email', shirt: 'Shirt size (adult)',
   driving: 'Driving', canDrive: 'I can drive students', vehicle: 'Vehicle', passengerSeats: 'Passenger seats (not counting you)', tow: 'I can tow the team trailer',

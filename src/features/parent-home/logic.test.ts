@@ -55,9 +55,25 @@ describe('Parent Home decisions', () => {
     expect(parentNext(summary, [], now)).toMatchObject({ line: 'Tue Nov 3, 6 PM · Kansas City · Signed up', required: null })
   })
 
+  it('makes a required meeting under way today Next, so Next and This week agree', () => {
+    const eventId = 'plant-sale' as Id<'events'>
+    const summary: ParentHomeSummary = { studentId: 's' as Id<'students'>, whatsLeft: [], nextEvent: { eventId, name: 'Plant Sale', startsAt: at('2026-11-11T16:00'), location: 'Campus', status: 'confirmed' } }
+    const sale: AgendaEvent = { eventId, name: 'Plant Sale', startsAt: at('2026-11-11T16:00'), endsAt: at('2026-11-11T18:00'), place: 'Campus', feeCents: 500, required: false, status: null }
+    const meeting: AgendaEvent = { ...sale, eventId: 'meeting' as Id<'events'>, name: 'Team Meeting', startsAt: at('2026-11-09T16:00'), endsAt: at('2026-11-09T19:00'), feeCents: 0, required: true }
+    const optional: AgendaEvent = { ...meeting, eventId: 'extra' as Id<'events'>, name: 'Open Shop', required: false }
+    const now = at('2026-11-09T17:00')
+    const next = parentNext(summary, [optional, meeting, sale], now)
+    expect(next?.name).toBe('Team Meeting')
+    expect(next?.line).not.toContain('Signed up')
+    // This week never repeats Next; the optional event stays a plain "also" row with its Optional badge.
+    expect(parentWeek([optional, meeting, sale], next, now).map(event => event.name)).toEqual(['Open Shop', 'Plant Sale'])
+    // Once the meeting is over, the Student's signup is Next.
+    expect(parentNext(summary, [optional, meeting, sale], at('2026-11-09T20:00'))).toMatchObject({ name: 'Plant Sale', line: expect.stringContaining('Signed up') })
+  })
+
   type Coverage = { eventId: string; state: 'required' | 'pending' | 'accepted' | 'correction' }
   it.each([
-    { paused: true, coverage: [] as Coverage[], names: ['Regional', 'Scrimmage'], message: 'Forms open soon — we’ll notify you.' },
+    { paused: true, coverage: [] as Coverage[], names: ['Regional', 'Scrimmage'], message: 'Permission forms are not open yet. A Coach or Travel Lead will post a date.' },
     { paused: false, coverage: [{ eventId: 'scrimmage', state: 'accepted' }] as Coverage[], names: ['Regional'], message: '1 event needs a signed form.' },
     { paused: true, coverage: [{ eventId: 'regional', state: 'pending' }, { eventId: 'scrimmage', state: 'accepted' }] as Coverage[], names: [], message: 'Nothing to sign right now.' },
     { paused: false, coverage: [{ eventId: 'regional', state: 'correction' }] as Coverage[], names: ['Regional', 'Scrimmage'], message: '2 events need a signed form.' },

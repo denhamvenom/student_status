@@ -42,7 +42,7 @@ export const processPage = internalMutation({
       const spent = !locked && reduction > available;
       if (unavailable || stale || spent) {
         if (locked) throw new Error("Locked fundraiser student became unavailable; Coach retry is required.");
-        await ctx.db.patch(row._id, { state: "held", holdCode: unavailable ? "projectionUnavailable" : stale ? "financialStateChanged" : "spentOrTransferred", message: unavailable ? "This student's money records are still updating." : stale ? "This student's money changed. Review the amounts again before retrying." : "This student's Fundraising credit was already spent or moved, so it can't be lowered. Balances have not changed. A Coach needs to sort it out." });
+        await ctx.db.patch(row._id, { state: "held", holdCode: unavailable ? "projectionUnavailable" : stale ? "financialStateChanged" : "spentOrTransferred", message: unavailable ? "This student's money records are still updating." : stale ? "This student's money changed. Review the amounts again before trying again." : "This student's Fundraising credit was already spent or moved, so it can't be lowered. Balances have not changed. A Coach needs to sort it out." });
         held++;
       } else {
         if (!account) throw new Error("This student's money records aren't ready. Wait a moment, then try again.");
@@ -170,9 +170,9 @@ export const retry = mutation({
     if (actor.role !== "coach") throw new ConvexError("Only a Coach can retry posting fundraiser amounts.");
     if (!job || !fundraiser || fundraiser.seasonId !== season._id || !["failed", "held"].includes(job.state) || fundraiser.postingJobId !== job._id) throw new ConvexError("There is no stopped or held posting to retry. Reload to see the latest.");
     await requireSeasonFinancialRetry(ctx, season._id, job._id);
-    if (args.reason.trim().length < 8 || args.reason.length > 1000 || args.rows.length > 500 || new Set(args.rows.map(r => r.studentId)).size !== args.rows.length) throw new ConvexError("Review the students to retry and enter a reason of at least eight characters.");
+    if (args.reason.trim().length < 8 || args.reason.length > 1000 || args.rows.length > 500 || new Set(args.rows.map(r => r.studentId)).size !== args.rows.length) throw new ConvexError("Review the students to try again and enter a reason of at least eight characters.");
     for (const input of args.rows) {
-      if (!Number.isSafeInteger(input.expectedRowRevision) || input.expectedRowRevision < 0 || !Number.isSafeInteger(input.expectedFinancialRevision) || input.expectedFinancialRevision < 0) throw new ConvexError("Review the students again before retrying.");
+      if (!Number.isSafeInteger(input.expectedRowRevision) || input.expectedRowRevision < 0 || !Number.isSafeInteger(input.expectedFinancialRevision) || input.expectedFinancialRevision < 0) throw new ConvexError("Review the students again before trying again.");
       const row = await ctx.db.query("fundraiserPostingRows").withIndex("by_jobId_and_studentId", q => q.eq("jobId", job._id).eq("studentId", input.studentId)).unique();
       if (!row || row.state !== "held" || row.pendingRevisionId) throw new ConvexError("Only students still on hold can be reviewed again. Reload to see the latest.");
       await ctx.db.patch(row._id, { expectedRowRevision: input.expectedRowRevision, expectedFinancialRevision: input.expectedFinancialRevision, state: "pending", holdCode: undefined, message: undefined });

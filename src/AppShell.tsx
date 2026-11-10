@@ -21,12 +21,12 @@ import { MentorAboutYou } from './features/mentor-home/MentorHome'
 type ShellViewer = { user: { name: string; email: string } | null; season: { name: string } | null }
 export { menu }
 export const primaryPaths:Record<string,string[]>={student:['/','/events','/finances','/profile'],parent:['/','/events','/forms','/finances'],coach:['/','/events','/readiness','/finances'],travelLead:['/readiness','/events','/','/drivers'],mentor:['/','/events/new','/invited']}
-/** A Mentor's pages: Home, Create and Schedule on the phone bar; About you (Edit my profile, Student report) and Settings under More. */
+/** A Mentor's pages: Home, Create and Schedule on the phone bar; About you (Profile, Team report) and Settings under More. */
 /** Shown inside About you in the Mentor's More menu instead of as plain links. */
 const aboutPaths = new Set(['/myprofile', '/report'])
 export const mentorMenu:[string,string][]=[[mentorHomeCopy.nav.home,'/'],[mentorHomeCopy.nav.create,'/events/new'],[mentorHomeCopy.nav.schedule,'/invited'],[mentorHomeCopy.nav.report,'/report'],[mentorHomeCopy.nav.profile,'/myprofile'],[mentorHomeCopy.nav.settings,'/settings']]
 
-export function AppShell({ children, viewer, familyContext, role = "coach" }: { children: ReactNode; viewer: ShellViewer; familyContext?: ReactNode; role?: string }) {
+export function AppShell({ children, viewer, familyContext, role = "coach", profileLabel }: { children: ReactNode; viewer: ShellViewer; familyContext?: ReactNode; role?: string; /** Parent menu: "{Student's name}'s profile". */ profileLabel?: string }) {
   const shellRef=useRef<HTMLDivElement>(null), headerRef=useRef<HTMLElement>(null)
   useLayoutEffect(()=>{if(shellRef.current&&headerRef.current)return observeStickyHeader(headerRef.current,shellRef.current)},[])
   // Student and Parent Home share the redesign palette (src/shadcn.css).
@@ -51,13 +51,14 @@ export function AppShell({ children, viewer, familyContext, role = "coach" }: { 
   const nav = navigationCopy.groups
   const groups: Record<string, [string, string][]> = {
     [nav.team]: [[nav.team, '/'], [nav.joinRequests, '/enroll'], [nav.attendance, '/attendance'], [nav.reports, '/reports']],
-    [nav.events]: [[nav.events, '/events'], [mentorHomeCopy.nav.schedule, '/invited'], ['Archived events', '/events/archive'], [nav.readiness, '/readiness'], [nav.permissionForms, '/permissions'], [nav.drivers, '/drivers'], [nav.withdrawals, '/withdrawals'], [navigationCopy.labels.announcements, '/announcements']],
+    [nav.events]: [[nav.events, '/events'], [mentorHomeCopy.nav.schedule, '/invited'], ['Past events', '/events/archive'], [nav.readiness, '/readiness'], [nav.permissionForms, '/permissions'], [nav.drivers, '/drivers'], [nav.withdrawals, '/withdrawals'], [navigationCopy.labels.announcements, '/announcements']],
     [nav.money]: [[nav.money, '/finances'], [nav.fundraising, '/fundraising']],
     [nav.admin]: [[nav.users, '/adults'], [nav.season, '/season'], [nav.archived, '/retention'], ['Money tools', '/money-tools'], [nav.settings, '/settings']],
   }
   if (role === 'travelLead') { groups[nav.money].push(['Money tools', '/money-tools']); delete groups[nav.admin]; groups[uiCopy.navigation.account] = [[navigationCopy.labels.myProfile, '/myprofile'], [nav.settings, '/settings']] }
   // A Travel Lead is a Mentor too: their own Schedule (/invited) sits in the Events group, and under More on a phone.
-  const allowed = role === 'mentor' ? mentorMenu : role === 'travelLead' ? [...menu.travelLead, [mentorHomeCopy.nav.schedule, '/invited'] as [string, string]] : menu[role] ?? mentorMenu
+  const baseMenu = role === 'mentor' ? mentorMenu : role === 'travelLead' ? [...menu.travelLead, [mentorHomeCopy.nav.schedule, '/invited'] as [string, string]] : menu[role] ?? mentorMenu
+  const allowed = role === 'parent' && profileLabel ? baseMenu.map(([label, path]): [string, string] => [path === '/profile' ? profileLabel : label, path]) : baseMenu
   const staff = role === 'coach' || role === 'travelLead'
   const allowedPaths = new Set(allowed.map(([, path]) => path))
   const filteredGroups = Object.fromEntries(Object.entries(groups).map(([label, links]) => [label, links.filter(([, path]) => allowedPaths.has(path))]).filter(([, links]) => links.length)) as Record<string, [string, string][]>

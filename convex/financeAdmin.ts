@@ -48,11 +48,11 @@ export function boundedFinancePage<T extends Options>(opts: T): T {
 }
 
 export const status = query({
-  args: {}, returns: v.object({ seasonId: v.id("seasons"), maintenance: feeMaintenanceValidator, coverage: v.object({ state: v.union(v.literal("updating"), v.literal("ready"), v.literal("failed")), startedAt: nullable, completedAt: nullable }), canPrepareHistory: v.boolean() }),
+  args: {}, returns: v.object({ seasonId: v.id("seasons"), maintenance: feeMaintenanceValidator, coverage: v.object({ state: v.union(v.literal("updating"), v.literal("ready"), v.literal("failed")), startedAt: nullable, completedAt: nullable }), canPrepareHistory: v.boolean(), canEdit: v.boolean() }),
   handler: async ctx => {
     const actor = await viewer(ctx); if (!isCoachOrTravelLead(actor)) throw new ConvexError("Only a Coach or Travel Lead can see team money.");
     const season = await activeSeason(ctx);
     const coverage = await ctx.db.query("financeChangeBackfills").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).unique();
-    return { seasonId: season._id, maintenance: await feeMaintenanceProjection(ctx, season._id), coverage: { state: coverage?.state === "complete" ? "ready" as const : coverage?.state === "failed" ? "failed" as const : "updating" as const, startedAt: coverage?.startedAt ?? null, completedAt: coverage?.completedAt ?? null }, canPrepareHistory: actor.role === "coach" && coverage?.state !== "running" && coverage?.state !== "complete" };
+    return { seasonId: season._id, maintenance: await feeMaintenanceProjection(ctx, season._id), coverage: { state: coverage?.state === "complete" ? "ready" as const : coverage?.state === "failed" ? "failed" as const : "updating" as const, startedAt: coverage?.startedAt ?? null, completedAt: coverage?.completedAt ?? null }, canPrepareHistory: actor.role === "coach" && coverage?.state !== "running" && coverage?.state !== "complete", canEdit: actor.role === "coach" || (actor.role === "mentor" && actor.travelLead && actor.financialEdit) };
   },
 });

@@ -22,7 +22,7 @@ const copy = {
   open: 'Import from Team Calendar',
   title: 'Import from Team Calendar',
   stepCount: (step: number) => `Step ${step} of 2`,
-  next: 'Next',
+  next: 'Continue',
   back: 'Back',
   description: 'Choose a repeating series that is already on Team Calendar. Its meetings will show in Events. Nobody is notified.',
   loading: 'Checking Team Calendar…',

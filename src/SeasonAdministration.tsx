@@ -3,6 +3,7 @@ import { useRef, useState, type FormEvent } from 'react'
 import { useMutation, usePaginatedQuery, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
 import type { Id } from '../convex/_generated/dataModel'
+import { ConfirmAction } from './ConfirmAction'
 import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { seasonAdminCopy as copy } from './lib/season-admin-copy'
@@ -13,7 +14,7 @@ type Plan = { id: Id<'seasonTransitionPlans'>; targetName: string; targetCompeti
 const message = (error: unknown) => userFacingError(error, copy.retry)
 const steps = [copy.newSeason, copy.returningStudents, copy.archiveDeparting, copy.balances, copy.retainReset, copy.confirm]
 
-function DraftForm({plan, sourceYear}: {plan: Plan | null; sourceYear: number}) {
+function DraftForm({plan, sourceYear, onSaved, onDiscarded}: {plan: Plan | null; sourceYear: number; onSaved: () => void; onDiscarded: () => void}) {
   const create = useMutation(api.seasonAdmin.createDraft)
   const update = useMutation(api.seasonAdmin.updateDraft)
   const discard = useMutation(api.seasonAdmin.discardDraft)
@@ -44,13 +45,14 @@ function DraftForm({plan, sourceYear}: {plan: Plan | null; sourceYear: number}) 
         setBaseRevision(revision)
       } else await create({ ...values, idempotencyKey: key.current })
       setSaved(copy.saved)
+      onSaved()
     } catch (cause) { setError(message(cause)) } finally { setBusy(false) }
   }
   const remove = async () => {
     if (!plan || busy || stale) return
     setBusy(true); setError(''); setSaved('')
-    try { await discard({ planId: plan.id, expectedRevision: baseRevision ?? plan.revision, reason: discardReason }); key.current = crypto.randomUUID() }
-    catch (cause) { setError(message(cause)) } finally { setBusy(false) }
+    try { await discard({ planId: plan.id, expectedRevision: baseRevision ?? plan.revision, reason: discardReason }); key.current = crypto.randomUUID(); onDiscarded() }
+    finally { setBusy(false) }
   }
   return <form className={styles.section} onSubmit={event => void submit(event)}>
     <h2>{copy.newSeason}</h2>
@@ -64,8 +66,8 @@ function DraftForm({plan, sourceYear}: {plan: Plan | null; sourceYear: number}) 
     {plan && <label className={styles.field}>{copy.discardReason}<Input value={discardReason} onChange={event => setDiscardReason(event.target.value)} maxLength={500} disabled={busy || stale} /></label>}
     {error && <p className={styles.error} role="alert">{error}</p>}{saved && <p role="status">{saved}</p>}
     <div className={styles.actions}>
-      {plan && <Button type="button" variant="outline" disabled={busy || stale || discardReason.trim().length < 8} onClick={() => void remove()}>{copy.discardDraft}</Button>}
-      <Button type="submit" disabled={busy || stale || !name.trim() || !year || !startDate || !endDate}>{plan ? copy.saveDraft : copy.createDraft}</Button>
+      {plan && <ConfirmAction title="Discard this season draft?" disabled={busy || stale || discardReason.trim().length < 8} description={copy.discardConfirm(discardReason)} onConfirm={remove}>{copy.discardDraft}</ConfirmAction>}
+      <Button type="submit" disabled={busy || stale || !name.trim() || !year || !startDate || !endDate}>{plan ? copy.saveAndContinue : copy.createDraft}</Button>
     </div>
   </form>
 }
@@ -118,7 +120,7 @@ function RosterReview({ plan }: { plan: Plan }) {
     } catch (cause) { setError(message(cause)) } finally { setBusyId(null) }
   }
   return <section className={styles.section} aria-labelledby="season-returning-title">
-    <h2 id="season-returning-title">{copy.returningStudents}</h2><p className={styles.muted}>{copy.rosterDescription}</p>
+    <h2 id="season-returning-title">{copy.returningStudents}</h2><p className={styles.muted}>{copy.rosterDescription} {copy.choicesSaveAsYouGo}</p>
     {rows.status === 'LoadingFirstPage' && <p role="status">{copy.loadingRoster}</p>}
     {rows.results.length > 0 && <div className={styles.roster}>{rows.results.map(row => <article className={styles.student} key={row.studentId}>
       <div><strong>{row.legalName || row.preferredName}</strong><small>{row.subteam}</small>{row.decisionStale && <small className={styles.error}>{copy.staleDecision}</small>}</div>
@@ -137,25 +139,37 @@ function RosterReview({ plan }: { plan: Plan }) {
 /** Six-step Coach season transition. */
 export function SeasonAdministration() {
   const [step, setStep] = useState(0)
+  const [furthest, setFurthest] = useState(0)
   const completedSource = useRef<string | null>(null)
   const view = useQuery(api.seasonAdmin.overview, {})
   if (view === undefined) return <p role="status">{copy.loading}</p>
   const plan = view.plan as Plan | null
   if (plan && plan.state !== "draft") completedSource.current = view.source.id
   const completed = completedSource.current !== null && completedSource.current !== view.source.id
+  const goTo = (next: number) => { setStep(next); setFurthest(current => Math.max(current, next)) }
+  const isDraft = plan?.state === 'draft'
+  const finished = steps.map((label, index) => ({ label, index })).filter(item => item.index < furthest && item.index !== step)
   return <div className={styles.page}>
     {completed && <p role="status">Season transition complete. {view.source.name} is now active; historical records remain preserved.</p>}
     <header className={styles.heading}><h1>{copy.title}</h1><p>{copy.description}</p></header>
     <BuildHoursTarget key={view.source.id} current={view.source.buildHoursTarget} />
     <p className={styles.notice}>Save each choice before you confirm. Old records stay with the season they came from.</p>
-    <nav className={styles.steps} aria-label="Season transition steps">{steps.map((label, index) => <Button key={label} type="button" variant={step === index ? 'default' : 'outline'} disabled={!plan && index > 0 || !!plan && plan.state !== 'draft'} onClick={() => setStep(index)}>{index + 1}. {label}</Button>)}</nav>
     <p className={styles.muted}>{copy.activeSeason}: {view.source.name}</p>
-    {step === 0 && (!plan || plan.state === 'draft') && <DraftForm key={plan?.id ?? 'new'} plan={plan} sourceYear={view.source.year} />}
+    {(!plan || isDraft) && <div role="group" aria-label={copy.stepsLabel} className={styles.section}>
+      <ol aria-hidden="true" className={styles.progress}>{steps.map((label, index) => <li key={label} data-done={index <= step} />)}</ol>
+      <p className={styles.stepLabel}>{copy.stepOf(step + 1, steps.length)}: {steps[step]}</p>
+      {isDraft && finished.length > 0 && <nav aria-label={copy.doneSteps} className={styles.choices}>{finished.map(item => <Button key={item.label} type="button" variant="outline" onClick={() => goTo(item.index)}>{item.index + 1}. {item.label}</Button>)}</nav>}
+    </div>}
+    {step === 0 && (!plan || isDraft) && <DraftForm key={plan?.id ?? 'new'} plan={plan} sourceYear={view.source.year} onSaved={() => goTo(1)} onDiscarded={() => { setStep(0); setFurthest(0) }} />}
     {view.kickoff?.state === 'verified' && <p>{copy.verifiedKickoff(view.kickoff.kickoffDate)}</p>}
     {view.kickoff?.state === 'unavailable' && <p className={styles.notice}>{copy.unverifiedKickoff}</p>}
-    {plan?.state === 'draft' && step === 1 && <RosterReview plan={plan} />}
-    {plan?.state === 'draft' && step >= 2 && <SeasonReviewSteps plan={plan} step={step} />}
-    {plan && plan.state !== 'draft' && <SeasonTransitionProgress plan={plan} onReview={setStep} />}
+    {isDraft && step === 1 && <RosterReview plan={plan} />}
+    {isDraft && step >= 2 && <SeasonReviewSteps plan={plan} step={step} onContinue={() => goTo(step + 1)} />}
+    {isDraft && step >= 1 && <div className={styles.wizardNav}>
+      <Button type="button" variant="outline" onClick={() => goTo(step - 1)}>{copy.back}</Button>
+      {step <= 3 && <Button type="button" onClick={() => goTo(step + 1)}>{copy.continue}</Button>}
+    </div>}
+    {plan && plan.state !== 'draft' && <SeasonTransitionProgress plan={plan} onReview={goTo} />}
     <SeasonHistory />
   </div>
 }

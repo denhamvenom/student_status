@@ -179,3 +179,8 @@
 .familyContext :global(.viewing){order:-1;margin:0;padding:0;background:transparent;color:inherit}
 .familyContext :global(.student-switch){margin:0 0 0 auto}
 @media(max-width:767px){.familyContext{padding:8px 16px;flex-wrap:wrap;gap:8px}.familyContext :global(.student-switch){gap:6px}.familyContext :global(.student-switch button){padding:8px 12px}}
+
+.eventLinks{display:flex;flex-direction:column;align-items:flex-start;gap:2px}
+.eventLinks a{display:inline-flex;align-items:center;min-height:44px;font-size:14px;font-weight:700;text-decoration:underline}
+.filter{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 16px;cursor:pointer;font-size:14px;font-weight:600}
+.studentName a{color:inherit}

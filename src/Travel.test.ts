@@ -1,7 +1,7 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import { EventTransport, IndependentTravel } from './Travel'
+import { driverStepIssue, EventTransport, IndependentTravel } from './Travel'
 
 const state = vi.hoisted(() => ({ enabled: false }))
 vi.mock('convex/react', () => ({
@@ -29,5 +29,21 @@ describe('transportation controls', () => {
     const html = renderToStaticMarkup(createElement(EventTransport, { id: 'synthetic-event' }))
     expect(html).toContain('type="number"')
     expect(renderToStaticMarkup(createElement(IndependentTravel, { id: 'synthetic-event', student: 'synthetic-student' }))).toContain('My student will travel on their own')
+  })
+})
+
+describe('driver wizard steps', () => {
+  const ok = { name: 'Sam Driver', email: 'sam@example.org', phone: '555-0100', vehicleName: '', seats: '6', approved: false, towCapable: false, active: true }
+  it.each([
+    [0, { name: ' ' }, 'Enter the driver’s name.'],
+    [0, { email: 'sam' }, 'Enter a full email address, like name@example.org.'],
+    [0, { phone: '' }, 'Enter a phone number.'],
+    [1, { seats: '' }, 'Enter passenger seats as a whole number from 0 to 100.'],
+    [1, { seats: '101' }, 'Enter passenger seats as a whole number from 0 to 100.'],
+    [1, { seats: '2.5' }, 'Enter passenger seats as a whole number from 0 to 100.'],
+    [1, { seats: '0' }, ''],
+    [2, {}, ''],
+  ])('step %i with %o -> %s', (step, change, expected) => {
+    expect(driverStepIssue(step, { ...ok, ...change })).toBe(expected)
   })
 })

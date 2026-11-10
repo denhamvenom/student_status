@@ -1,6 +1,6 @@
 // Plain words for Mentor Home, Schedule, the Mentor event page and the Mentor version of the New meeting wizard.
 export const mentorHomeCopy = {
-  nav: { home: 'Home', create: 'Create', schedule: 'Schedule', report: 'Student report', profile: 'Edit my profile', settings: 'Settings' },
+  nav: { home: 'Home', create: 'Create', schedule: 'Schedule', report: 'Team report', profile: 'Profile', settings: 'Settings' },
   /** "Sat, Nov 7 · Hi, Sam". */
   greeting: (date: string, name: string) => `${date} · ${name.trim() ? `Hi, ${name.trim().split(/\s+/)[0]}` : 'Hi there'}`,
   states: {
@@ -50,7 +50,7 @@ export const mentorHomeCopy = {
     skipping: 'Skipping this one',
     joinHint: 'Sign up once for a repeating series and you’re on every upcoming date. You can skip single dates later.',
     createdNone: 'You haven’t created any upcoming meetings.',
-    createHint: { mentor: 'To make something new, tap Create in the bottom bar.', travelLead: 'To make something new, use New event on the Events page.' },
+    createHint: { mentor: 'To make something new, use Create at the top or bottom of the screen.', travelLead: 'To make something new, use New event on the Events page.' },
   },
   join: {
     none: 'Nothing to join right now. New events and meetings for Everyone or your subteams show up here.',
@@ -87,6 +87,18 @@ export const mentorHomeCopy = {
     count: (subteam: string, count: number) => `${subteam} · ${count} clocked in`,
     noSubteams: 'A Coach sets your subteams. Then you’ll see who from them is clocked in.',
     truncated: 'Some clocked-in students may be missing. Check Timeclock for the full list.',
+    /** A subteam with nobody clocked in; and the line above the list. */
+    nobody: (subteam: string) => `${subteam} · nobody clocked in`,
+    nobodyAll: 'Nobody from your subteams is clocked in right now.',
+    since: (time: string) => `since ${time}`,
+    showing: (list: string) => `Showing: ${list}`,
+  },
+  /** Subteam scope on Schedule › Join: your subteams and whole-team items until widened. */
+  scope: {
+    showing: (list: string) => `Showing: ${list} and whole-team items`,
+    all: 'Show all subteams',
+    mine: 'Show only my subteams',
+    showingAll: 'Showing: all subteams',
   },
   /** About you, in the Mentor's More menu. */
   about: {
@@ -94,8 +106,8 @@ export const mentorHomeCopy = {
     subteams: (list: string) => `Your subteams: ${list}`,
     noSubteams: 'No subteams yet. A Coach sets your subteams.',
     loading: 'Loading your subteams…',
-    profile: 'Edit my profile',
-    report: 'Student report',
+    profile: 'Profile',
+    report: 'Team report',
   },
   /** Event types, in Mentor words. */
   types: { Team: 'Team meeting', Competition: 'Competition', Outreach: 'Outreach', Fundraiser: 'Fundraiser' } as Record<string, string>,
@@ -132,7 +144,7 @@ export const mentorHomeCopy = {
     decline: 'No, I can’t make it',
     close: 'Close',
     back: 'Back',
-    next: 'Next',
+    next: 'Continue',
     saving: 'Saving…',
     loading: 'Loading…',
     loadFailed: 'This event could not load. Close this and try again.',
@@ -153,7 +165,7 @@ export const mentorHomeCopy = {
       pick: 'Choose which meetings you’ll come to.',
       countInvalid: 'Choose a number from 1 to 52.',
       changeNote: 'Changing this doesn’t take you off meetings already on your schedule. Use Skip this one or Leave all for that.',
-      oneUnavailable: 'To go to just this one, leave all meetings in this series first, then sign up for this one.',
+      oneUnavailable: 'To switch to just this one, choose Leave all meetings in this series, then sign up again.',
     },
     drive: {
       title: 'Can you drive students?',

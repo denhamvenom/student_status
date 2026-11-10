@@ -111,7 +111,7 @@ export function TravelLeadSchedule() {
   </section>
 }
 
-/** About you, in the Mentor's More menu: their subteams, Edit my profile and Student report. */
+/** About you, in the Mentor's More menu: their subteams, Edit my profile and Team report. */
 export function MentorAboutYou({ onNavigate, className }: { onNavigate: () => void; className?: string }) {
   const id = useId()
   const now = useNow()

@@ -89,6 +89,12 @@ export async function requireMentor(ctx: Parameters<typeof viewer>[0]) {
   return await requireMeetingMentor(ctx, await viewer(ctx));
 }
 
+/** The name shown for a Mentor on a meeting: their account name, else "A Mentor" (an account with a blank name), else a note that the account is gone. */
+export function mentorDisplayName(account: Pick<Doc<"appUsers">, "name"> | null): string {
+  if (!account) return "Mentor account unavailable";
+  return account.name.trim() || "A Mentor";
+}
+
 const UNAVAILABLE = "This meeting is no longer available. Reload to see current meetings.";
 const NOT_CURRENT = "This event is canceled, over or no longer available. Reload to see current events.";
 
@@ -312,7 +318,7 @@ export const view = query({
     const meeting = meetingSummary(event, user, invite, creatorId, now, signup, series);
     const participating = isCreator || invite?.status === "accepted";
     const list = await listMeetingMentors(ctx, event._id);
-    const nameOf = async (id: Id<"appUsers">) => (await ctx.db.get(id))?.name ?? "Mentor account unavailable";
+    const nameOf = async (id: Id<"appUsers">) => mentorDisplayName(await ctx.db.get(id));
     const mentors: { userId: Id<"appUsers">; name: string; isCreator: boolean }[] = [];
     const pendingMentors: { userId: Id<"appUsers">; name: string; status: "invited" | "declined" }[] = [];
     for (const entry of list) {

@@ -11,7 +11,7 @@ beforeEach(() => { mocks.useQuery.mockReturnValue(undefined); mocks.useMutation.
 it('offers the complete active scope without pretending an unprepared file is available', () => {
   const html = renderToStaticMarkup(createElement(FinanceExport))
   expect(html).toContain('All active students'); expect(html).toContain('Prepare export'); expect(html).not.toContain('Download charge details (CSV)'); expect(html).not.toContain('Download student list and collection details (JSON)')
-  expect(html).toContain('The data is gathered over a short time, not at one exact moment.'); expect(html).toContain('those with no charges')
+  expect(html).toContain('The data is gathered over a short time, not at one exact moment.'); expect(html).toContain('those with no fees')
   expect(mocks.useQuery.mock.calls.filter(([reference]) => getFunctionName(reference) === getFunctionName(api.financeExport.status)).map(([, args]) => args)).toEqual(['skip'])
 })
 it('offers selected-student export only when an explicit student was supplied', () => {

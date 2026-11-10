@@ -17,8 +17,8 @@ describe('event badges no longer show legacy audience names', () => {
 
 describe('Required / Optional with its meaning', () => {
   it.each([
-    { event: { signupMode: 'assigned', assignmentScope: 'wholeTeam' }, parent: 'Required — signed up automatically', student: 'Required — you’re signed up' },
-    { event: { signupMode: 'open' }, parent: 'Optional — your student signs up', student: 'Optional — you choose' },
+    { event: { signupMode: 'assigned', assignmentScope: 'wholeTeam' }, parent: 'Required — your student is signed up automatically', student: 'Required — you’re signed up' },
+    { event: { signupMode: 'open' }, parent: 'Optional — your student signs up in Venom Status. You can see the signup here but cannot change it.', student: 'Optional — you choose' },
     { event: { signupMode: 'assigned', audienceKind: 'mentorsOnly' }, parent: null, student: null },
     { event: {}, parent: null, student: null },
   ])('$event', ({ event, parent, student }) => {
@@ -39,7 +39,7 @@ describe('Team Calendar chip', () => {
   it.each([
     { status: { state: 'synced' }, label: 'On Team Calendar', canRetry: false },
     { status: { state: 'pending', calendarEventId: 'g1' }, label: 'On Team Calendar', canRetry: false },
-    { status: { state: 'pending' }, label: 'Not on Team Calendar', canRetry: false },
+    { status: { state: 'pending' }, label: 'Adding to Team Calendar…', canRetry: false },
     { status: { state: 'unlinked' }, label: 'Not on Team Calendar', canRetry: false },
     { status: { state: 'disabled' }, label: 'Not on Team Calendar', canRetry: false },
     { status: { state: 'failed' }, label: 'Needs attention', canRetry: true },

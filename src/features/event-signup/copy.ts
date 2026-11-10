@@ -104,7 +104,7 @@ export const signupCopy = {
   parent: {
     title: (name: string) => `${name}'s times`,
     onlyDuring: (name: string) => `${name} only needs to be there during these times, not the whole event.`,
-    none: (name: string) => `${name} hasn't chosen a time slot yet.`,
+    none: (name: string) => `${name} hasn't chosen a time slot yet. ${name} picks one in Venom Status. You can see it here once it is chosen.`,
     loadFailed: "We couldn't load the time slots. Refresh the page to try again.",
   },
 }

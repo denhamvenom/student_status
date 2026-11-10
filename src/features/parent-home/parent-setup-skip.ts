@@ -11,9 +11,6 @@ type KeyValueStorage = Pick<Storage, 'getItem' | 'setItem'>
 
 export const parentSetupSkipKey = (userId: string) => `venom.parentSetupSkippedAt.${userId}`
 
-/** Shown next to "Finish later" so parents know it sticks. */
-export const parentSetupLaterNote = `Finish later takes you to Home. We won't bring you back here for ${PARENT_SETUP_SKIP_DAYS} days on this device; unfinished steps stay on Home.`
-
 export function parentSetupSkipped(storage: KeyValueStorage | null, userId: string | undefined, now: number): boolean {
   if (!storage || !userId) return false
   try {

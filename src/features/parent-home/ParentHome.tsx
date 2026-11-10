@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQueries } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
+import { AskCoachButton } from '@/AskCoachButton'
+import { TaskSheetEmailContext } from '@/features/student-home/tiles/TaskSheet'
 import { chicagoDateKey } from '../student-home/format'
 import { useNow } from '../student-home/useNow'
 import { toAgendaEvents, type ListedEventRow } from '../student-home/agenda'
@@ -11,7 +13,7 @@ import { ParentHomeView, type ParentHomeSource } from './ParentHomeView'
 type Loadable<T> = T | Error | undefined
 const none: ReadonlySet<ParentHomeSource> = new Set()
 
-export function ParentHome({ studentId, studentName }: { studentId: Id<'students'>; studentName: string }) {
+export function ParentHome({ studentId, studentName, email }: { studentId: Id<'students'>; studentName: string; email?: string }) {
   const now = useNow()
   const asOfDay = chicagoDateKey(now)
   const [paused, setPaused] = useState(none)
@@ -33,5 +35,8 @@ export function ParentHome({ studentId, studentName }: { studentId: Id<'students
   const rows = results.events as Loadable<ListedEventRow[]>
   const events = useMemo(() => rows === undefined || rows instanceof Error ? rows : toAgendaEvents(rows), [rows])
   const retry = useCallback((source: ParentHomeSource) => setPaused(previous => new Set([...previous, source])), [])
-  return <ParentHomeView studentName={studentName} now={now} summary={results.summary as Loadable<ParentHomeSummary>} announcements={results.announcements as Loadable<ParentPinnedAnnouncement[]>} finance={results.finance as Loadable<ParentHomeFinance>} events={events} retry={retry} />
+  return <div className="flex min-w-0 flex-col gap-3 md:mx-auto md:max-w-[720px] lg:max-w-none">
+    <TaskSheetEmailContext.Provider value={email}><ParentHomeView studentName={studentName} now={now} summary={results.summary as Loadable<ParentHomeSummary>} announcements={results.announcements as Loadable<ParentPinnedAnnouncement[]>} finance={results.finance as Loadable<ParentHomeFinance>} events={events} retry={retry} /></TaskSheetEmailContext.Provider>
+    <div><AskCoachButton email={email} /></div>
+  </div>
 }

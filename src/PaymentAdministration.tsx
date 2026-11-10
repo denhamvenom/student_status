@@ -1,5 +1,5 @@
 import { userFacingError } from '@/lib/error-message'
-import { Component, useRef, useState, type ReactNode } from 'react'
+import { Component, useId, useRef, useState, type ReactNode } from 'react'
 import { useConvex, useMutation, usePaginatedQuery, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { api } from '../convex/_generated/api'
@@ -7,118 +7,438 @@ import type { Id } from '../convex/_generated/dataModel'
 import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { Card, CardTitle } from './components/ui/card'
+import { ReviewRow, StepWizard } from './components/StepWizard'
 import { NativeSelect, NativeSelectOption } from './components/ui/native-select'
-import { chargeCurrency, parseChargeTarget } from './lib/charge-money'
+import { chargeCurrency, overpaymentCents, overpaymentQuestion, parseMoneyInput } from './lib/charge-money'
 import styles from './ChargeAdministration.module.css'
 import { paymentAdministrationCopy as copy } from './lib/payment-admin-copy'
 import { FeePaymentImport } from './FeePaymentImport'
 import { normalizeEmail } from '../shared/contact-format'
-import { chicagoMidnight } from '../shared/chicago-time'
-type PaymentRow = { studentEmail: string; amountCents: number; method: 'cash' | 'check' | 'other'; reference: string; occurredAt: number; rowReference: string }
-type ReviewedRow = PaymentRow & FunctionReturnType<typeof api.paymentAdministration.previewPayments>[number]
-const message = (error: unknown) => userFacingError(error)
-const usd = chargeCurrency
+import { chicagoDateString, chicagoMidnight } from '../shared/chicago-time'
 
-/** CSV stays in memory; quoted commas, quotes, CRLF and multiline fields are supported. */
-export function parsePaymentCsv(text: string): PaymentRow[] {
+export type PaymentMethod = 'cash' | 'check' | 'other'
+export type StudentOption = { studentId: Id<'students'>; name: string }
+type PaymentRow = { studentEmail?: string; studentId?: Id<'students'>; amountCents: number; method: PaymentMethod; reference: string; occurredAt: number; rowReference: string }
+type LabeledRow = PaymentRow & { label: string }
+type ReviewedRow = Omit<LabeledRow, 'studentId'> & FunctionReturnType<typeof api.paymentAdministration.previewPayments>[number]
+const usd = chargeCurrency
+const methods: PaymentMethod[] = ['cash', 'check', 'other']
+const methodName = (method: PaymentMethod | null) => method ? copy[method] : '—'
+const today = () => chicagoDateString(Date.now())
+const validDate = (date: string) => /^\d{4}-\d{2}-\d{2}$/.test(date) && new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) === date
+const shortDate = (at: number) => new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', dateStyle: 'medium' }).format(at)
+const when = (at: number) => new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', dateStyle: 'medium', timeStyle: 'short' }).format(at)
+export function referenceLabel(method: PaymentMethod | '') { return method === 'check' ? copy.checkNumber : method === 'cash' ? copy.cashReference : copy.receiptNumber }
+/** Only cash may leave the check or receipt number empty (owner decision November 9, 2026). */
+export function referenceProblem(method: PaymentMethod, reference: string) { return method !== 'cash' && !reference.trim() ? (method === 'check' ? 'Enter the check number.' : 'Enter a receipt number or note for this payment.') : null }
+/** Changing a payment to Cash clears the old check or receipt number, as Record payment does; other changes keep it. */
+export function referenceAfterMethodChange(method: PaymentMethod, reference: string) { return method === 'cash' ? '' : reference }
+
+/** Amount box that accepts $, thousands commas and cents, refuses anything ambiguous and shows the amount it will save. */
+export function MoneyInput({ label, value, onChange, disabled, allowZero, hint }: { label: string; value: string; onChange: (value: string) => void; disabled?: boolean; allowZero?: boolean; hint?: string }) {
+  const id = useId(); const result = value.trim() ? parseMoneyInput(value, { allowZero }) : null
+  return <div className={styles.field}>
+    <label htmlFor={id}>{label} <span className={styles.muted}>{copy.required}</span></label>
+    <Input id={id} type="text" inputMode="decimal" autoComplete="off" placeholder="0.00" value={value} disabled={disabled} aria-invalid={result?.ok === false || undefined} aria-describedby={`${id}-help`} onChange={event => onChange(event.target.value)}/>
+    <div id={`${id}-help`} aria-live="polite">{result?.ok ? <p className="m-0"><span className={styles.muted}>{copy.amountPreview} </span><strong className="text-2xl tabular-nums">{usd(result.cents)}</strong></p> : result ? <p className="m-0 text-sm font-semibold text-destructive">{result.message}</p> : <p className={styles.muted}>{hint ?? copy.amountHelp}</p>}</div>
+  </div>
+}
+function MethodFields({ method, reference, onMethod, onReference, disabled, allowUnset, hideCashReference }: { method: PaymentMethod | ''; reference: string; onMethod: (value: PaymentMethod) => void; onReference: (value: string) => void; disabled?: boolean; allowUnset?: boolean; hideCashReference?: boolean }) {
+  const id = useId()
+  return <>
+    <div className={styles.field}><label htmlFor={`${id}-method`}>{copy.method} <span className={styles.muted}>{copy.required}</span></label><NativeSelect id={`${id}-method`} value={method} disabled={disabled} onChange={event => onMethod(event.target.value as PaymentMethod)}>{allowUnset && <NativeSelectOption value="" disabled>Choose how it was paid</NativeSelectOption>}{methods.map(item => <NativeSelectOption key={item} value={item}>{copy[item]}</NativeSelectOption>)}</NativeSelect></div>
+    {!(hideCashReference && method === 'cash') && <div className={styles.field}><label htmlFor={`${id}-reference`}>{referenceLabel(method)} <span className={styles.muted}>{method === 'cash' ? copy.optional : copy.required}</span></label><Input id={`${id}-reference`} value={reference} maxLength={150} disabled={disabled} onChange={event => onReference(event.target.value)}/></div>}
+  </>
+}
+function StudentSelect({ students, value, onChange, disabled, label }: { students: StudentOption[] | undefined; value: string; onChange: (value: Id<'students'>) => void; disabled?: boolean; label?: string }) {
+  const id = useId()
+  return <div className={styles.field}><label htmlFor={id}>{label ?? copy.student}{!label && <> <span className={styles.muted}>{copy.required}</span></>}</label><NativeSelect id={id} value={value} disabled={disabled || !students} onChange={event => onChange(event.target.value as Id<'students'>)}><NativeSelectOption value="">{students ? copy.chooseStudent : copy.loading}</NativeSelectOption>{students?.map(student => <NativeSelectOption key={student.studentId} value={student.studentId}>{student.name}</NativeSelectOption>)}</NativeSelect></div>
+}
+
+/**
+ * Each row gets its own lasting id when the spreadsheet is read (unless the file has a rowReference column),
+ * so removing a row never makes another payment look like one already saved.
+ * Spreadsheet text stays in memory; quoted commas, quotes, CRLF and multiline cells are supported. Student is a name (matched to active students) or an email. */
+export function parsePaymentCsv(text: string, students: StudentOption[] = []): LabeledRow[] {
   if (text.length > 1_000_000) throw new Error(copy.csvTooLarge)
-  const records: string[][] = []; let record: string[] = []; let field = ''; let quoted = false; let closedQuote = false
+  const records: { line: number; cells: string[] }[] = []; let record: string[] = []; let field = ''; let quoted = false; let closedQuote = false; let line = 1; let recordLine = 1
   for (let index = 0; index < text.length; index++) {
     const char = text[index]
     if (char === '"') { if (quoted && text[index + 1] === '"') { field += '"'; index++ } else if (quoted) { quoted = false; closedQuote = true } else { if (field || closedQuote) throw new Error(copy.invalidQuotes); quoted = true } }
     else if (char === ',' && !quoted) { record.push(field); field = ''; closedQuote = false }
-    else if ((char === '\n' || char === '\r') && !quoted) { record.push(field); if (record.some(value => value.trim())) records.push(record); record = []; field = ''; closedQuote = false; if (char === '\r' && text[index + 1] === '\n') index++ }
-    else { if (closedQuote && char.trim()) throw new Error(copy.invalidQuotes); if (!closedQuote) field += char }
+    else if ((char === '\n' || char === '\r') && !quoted) { record.push(field); if (record.some(value => value.trim())) records.push({ line: recordLine, cells: record }); record = []; field = ''; closedQuote = false; if (char === '\r' && text[index + 1] === '\n') index++; line++; recordLine = line }
+    else { if (char === '\n') line++; if (closedQuote && char.trim()) throw new Error(copy.invalidQuotes); if (!closedQuote) field += char }
   }
   if (quoted) throw new Error(copy.unfinishedCsv)
-  record.push(field); if (record.some(value => value.trim())) records.push(record)
-  const header = records.shift()?.map(value => value.replace(/^\uFEFF/, '').trim().toLowerCase())
-  const required = ['studentemail', 'amount', 'method', 'reference', 'date', 'rowreference']
-  if (!header || header.length !== required.length || new Set(header).size !== required.length || required.some(name => !header.includes(name))) throw new Error(copy.columns)
+  record.push(field); if (record.some(value => value.trim())) records.push({ line: recordLine, cells: record })
+  // "check or receipt number" is the column name people see; "reference" stays accepted for older files.
+  const header = records.shift()?.cells.map(value => value.replace(/^\uFEFF/, '').trim().toLowerCase().replace(/\s+/g, '')).map(name => name === 'checkorreceiptnumber' ? 'reference' : name)
+  const studentColumn = header?.includes('student') ? 'student' : 'studentemail'
+  const required = [studentColumn, 'amount', 'method', 'date']; const known = new Set([...required, 'reference', 'rowreference'])
+  if (!header || new Set(header).size !== header.length || required.some(name => !header.includes(name)) || header.some(name => !known.has(name))) throw new Error(copy.columns)
   if (!records.length || records.length > 500) throw new Error(copy.rowLimit)
-  return records.map((cells, index) => {
-    if (cells.length !== header.length) throw new Error(copy.badColumns(index + 2))
-    const value = (key: string) => cells[header.indexOf(key)].trim()
-    const amountCents = parseChargeTarget(value('amount')); const method = value('method').toLowerCase(); const date = value('date')
-    const occurredAt = /^\d{4}-\d{2}-\d{2}$/.test(date) ? Date.parse(`${date}T00:00:00Z`) : NaN
-    if (!amountCents || !Number.isSafeInteger(occurredAt) || new Date(occurredAt).toISOString().slice(0, 10) !== date || !['cash', 'check', 'other'].includes(method)) throw new Error(copy.badRow(index + 2))
-    const teamMidnight = chicagoMidnight(date)
-    const studentEmail = normalizeEmail(value('studentemail'), `Row ${index + 2} student email`)
-    if (!studentEmail) throw new Error(`Row ${index + 2}: student email is required.`)
-    return { studentEmail, amountCents, method: method as PaymentRow['method'], reference: value('reference'), occurredAt: teamMidnight, rowReference: value('rowreference') }
+  const byName = new Map<string, StudentOption[]>(); for (const student of students) { const key = student.name.trim().toLowerCase(); byName.set(key, [...byName.get(key) ?? [], student]) }
+  return records.map(({ line, cells }) => {
+    if (cells.length !== header.length) throw new Error(copy.badColumns(line))
+    const value = (key: string) => header.includes(key) ? cells[header.indexOf(key)].trim() : ''
+    const label = copy.csvLine(line)
+    const amount = parseMoneyInput(value('amount')); if (!amount.ok) throw new Error(copy.badAmount(label, amount.message))
+    const method = value('method').toLowerCase(); if (!methods.includes(method as PaymentMethod)) throw new Error(copy.badMethod(line))
+    const date = value('date'); if (!validDate(date)) throw new Error(copy.badDate(line))
+    const reference = value('reference'); if (referenceProblem(method as PaymentMethod, reference)) throw new Error(copy.missingReference(label))
+    const who = value(studentColumn); if (!who) throw new Error(copy.missingStudent(label))
+    let student: Pick<PaymentRow, 'studentEmail' | 'studentId'>
+    if (who.includes('@')) student = { studentEmail: normalizeEmail(who, `${label} student email`) }
+    else { const matches = byName.get(who.toLowerCase()) ?? []; if (matches.length > 1) throw new Error(copy.sameName(label, who)); if (!matches.length) throw new Error(copy.unknownStudent(label, who)); student = { studentId: matches[0].studentId } }
+    return { ...student, label, amountCents: amount.cents, method: method as PaymentMethod, reference, occurredAt: chicagoMidnight(date), rowReference: value('rowreference') || crypto.randomUUID() }
   })
 }
+/** `id` is made when the row is added and kept through edits; it is the row's part of the save key. */
+export type Draft = { id: string; studentId: string; amount: string; method: PaymentMethod; reference: string; date: string }
+/** Typed payments become rows labeled "Payment N" so every message matches what is on screen. Returns every problem at once. */
+export function draftRows(drafts: Draft[]): { rows: LabeledRow[]; problems: string[] } {
+  const rows: LabeledRow[] = []; const problems: string[] = []
+  drafts.forEach((draft, index) => {
+    const label = copy.paymentRow(index + 1); const amount = parseMoneyInput(draft.amount); const reference = referenceProblem(draft.method, draft.reference)
+    if (!draft.studentId) problems.push(copy.missingStudent(label))
+    if (!amount.ok) problems.push(copy.badAmount(label, amount.message))
+    if (reference) problems.push(`${label}: ${reference}`)
+    if (!validDate(draft.date)) problems.push(`${label}: choose the date received.`)
+    if (draft.studentId && amount.ok && !reference && validDate(draft.date)) rows.push({ label, studentId: draft.studentId as Id<'students'>, amountCents: amount.cents, method: draft.method, reference: draft.reference.trim(), occurredAt: chicagoMidnight(draft.date), rowReference: draft.id })
+  })
+  return { rows, problems }
+}
+/** The reason saved with a list of payments: the note when it is long enough, the default when empty, otherwise a problem to show. */
+export function bulkNoteReason(note: string): { ok: true; reason: string } | { ok: false; message: string } {
+  const text = note.trim()
+  if (!text) return { ok: true, reason: copy.bulkNoteDefault }
+  return text.length < 8 ? { ok: false, message: copy.bulkNoteShort } : { ok: true, reason: text }
+}
+/** Students a reviewed list would leave $1,000 or more over their Balance due. */
+export function bulkOverpayments(rows: Pick<ReviewedRow, 'studentId' | 'studentName' | 'amountCents' | 'balanceDueCents'>[]) {
+  const totals = new Map<string, { name: string; amountCents: number; dueCents: number | null }>()
+  for (const row of rows) { if (!row.studentId) continue; const current = totals.get(row.studentId) ?? { name: row.studentName, amountCents: 0, dueCents: row.balanceDueCents }; current.amountCents += row.amountCents; totals.set(row.studentId, current) }
+  return [...totals.values()].flatMap(item => { const extra = overpaymentCents(item.amountCents, item.dueCents); return extra === null ? [] : [{ name: item.name, extraCents: extra }] })
+}
+
 class PaymentBoundary extends Component<{ children: ReactNode; retry: () => void }, { error: unknown }> {
   state = { error: null as unknown }
   static getDerivedStateFromError(error: unknown) { return { error } }
   render() { return this.state.error !== null ? <Card className={styles.card}><p role="alert">{userFacingError(this.state.error, copy.unavailable, false)}</p><Button variant="outline" onClick={this.props.retry}>{copy.reload}</Button></Card> : this.props.children }
 }
-export function PaymentAdministration({ studentId, mode = 'bulk' }: { studentId?: Id<'students'>; mode?: 'bulk' | 'import' | 'correction' }) {
+function Recoverable({ children }: { children: ReactNode }) {
   const [attempt, setAttempt] = useState(0)
-  const [path, setPath] = useState<'fee' | 'other'>(mode === 'import' ? 'other' : 'fee')
-  return <section className={styles.root}><PaymentBoundary key={attempt} retry={() => setAttempt(value => value + 1)}>{mode === 'correction' && studentId ? <PaymentCorrections studentId={studentId}/> : <><div className={styles.actions}><Button variant={path === 'fee' ? 'default' : 'outline'} onClick={() => setPath('fee')}>Pay a selected fee from CSV</Button><Button variant={path === 'other' ? 'default' : 'outline'} onClick={() => setPath('other')}>Other bulk payments</Button></div>{path === 'fee' ? <FeePaymentImport/> : <BulkPayments key={mode} initialMode={mode === 'import' ? 'import' : 'bulk'}/>}</>}</PaymentBoundary></section>
+  return <PaymentBoundary key={attempt} retry={() => setAttempt(value => value + 1)}>{children}</PaymentBoundary>
 }
-function BulkPayments({ initialMode }: { initialMode: 'bulk' | 'import' }) {
-  const convex = useConvex(); const post = useMutation(api.paymentAdministration.recordPaymentRow)
-  const [mode, setMode] = useState(initialMode); const [csv, setCsv] = useState('')
-  const [drafts, setDrafts] = useState([{ studentEmail: '', amount: '', method: 'check', reference: '', date: new Date().toISOString().slice(0, 10), rowReference: '1' }])
-  const [batch, setBatch] = useState(''); const [reason, setReason] = useState(''); const [review, setReview] = useState<ReviewedRow[] | null>(null)
-  const [results, setResults] = useState<Record<number, string>>({}); const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const guard = useRef(false)
-  function invalidate() { setReview(null); setResults({}); setError('') }
-  async function preview() {
-    if (guard.current) return; guard.current = true; setBusy(true); setError('')
+/**
+ * mode "correction" renders nothing: Edit payment now lives in the account's money tools (FinanceOperations),
+ * where Coaches and Travel Leads with Money editing access both see it.
+ */
+export function PaymentAdministration({ mode = 'bulk' }: { studentId?: Id<'students'>; mode?: 'bulk' | 'import' | 'correction' }) {
+  const [path, setPath] = useState<'fee' | 'other'>(mode === 'import' ? 'other' : 'fee')
+  if (mode === 'correction') return null
+  return <section className={styles.root}><Recoverable><p className={styles.muted}>{copy.whoCanAct}</p><div className={styles.actions}><Button variant={path === 'fee' ? 'default' : 'outline'} onClick={() => setPath('fee')}>{copy.feePath}</Button><Button variant={path === 'other' ? 'default' : 'outline'} onClick={() => setPath('other')}>{copy.otherPath}</Button></div>{path === 'fee' ? <FeePaymentImport/> : <BulkPayments key={mode} initialMode={mode === 'import' ? 'import' : 'bulk'}/>}</Recoverable></section>
+}
+
+/** Record payment for one student: a short step-by-step flow that stays open after saving and lists what was recorded, with a total. */
+export function RecordPaymentForm({ studentId }: { studentId: Id<'students'> }) {
+  return <Recoverable><RecordPayment initialStudentId={studentId}/></Recoverable>
+}
+type RecordStep = keyof typeof copy.recordSteps
+const recordSteps: RecordStep[] = ['amount', 'how', 'note', 'review']
+function RecordPayment({ initialStudentId }: { initialStudentId: Id<'students'> }) {
+  const [studentId, setStudentId] = useState(initialStudentId)
+  const context = useQuery(api.paymentAdministration.recordContext, { studentId })
+  const students = useQuery(api.paymentAdministration.studentOptions, {})
+  const record = useMutation(api.paymentAdministration.recordPayment)
+  const [step, setStep] = useState<RecordStep>('amount')
+  const [amount, setAmount] = useState(''); const [method, setMethod] = useState<PaymentMethod>('check'); const [reference, setReference] = useState(''); const [date, setDate] = useState(today); const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [saved, setSaved] = useState(''); const [confirming, setConfirming] = useState<number | null>(null)
+  const [recorded, setRecorded] = useState<{ amountCents: number; label: string }[]>([])
+  const key = useRef<string | null>(null); const noteId = useId(); const dateId = useId()
+  const ready = context?.state === 'ready'
+  const parsed = parseMoneyInput(amount)
+  const number = method === 'cash' ? '' : reference.trim()
+  const studentName = (id: Id<'students'>) => students?.find(item => item.studentId === id)?.name ?? copy.student
+  // Any change to what will be saved needs a new save key, so a repeat never saves different details under an old one.
+  const change = <T,>(setter: (value: T) => void) => (value: T) => { setter(value); key.current = null; setConfirming(null); setError('') }
+  const index = recordSteps.indexOf(step)
+  function problem(at: RecordStep) {
+    if (at === 'amount') return parsed.ok ? null : parsed.message
+    if (at === 'how') return referenceProblem(method, number) ?? (!validDate(date) ? copy.dateMissing : null)
+    if (at === 'review') return !ready ? copy.accountNotReady : null
+    return null
+  }
+  function next() {
+    const found = problem(step); if (found) { setError(found); return }
+    setError('')
+    if (step !== 'review') { setStep(recordSteps[index + 1]); return }
+    void submit(false)
+  }
+  async function submit(confirmed: boolean) {
+    if (busy || !parsed.ok) return
+    const extra = overpaymentCents(parsed.cents, context?.balanceDueCents ?? null)
+    if (extra !== null && !confirmed) { setConfirming(extra); return }
+    key.current ??= crypto.randomUUID(); setBusy(true); setError(''); setConfirming(null)
     try {
-      if (!batch.trim() || reason.trim().length < 8) throw new Error(copy.invalidReview)
-      const rows = mode === 'import' ? parsePaymentCsv(csv) : parsePaymentCsv('studentEmail,amount,method,reference,date,rowReference\n' + drafts.map(item => [item.studentEmail, item.amount, item.method, item.reference, item.date, item.rowReference].map(value => `"${value.replaceAll('"', '""')}"`).join(',')).join('\n'))
-      const preview = await convex.query(api.paymentAdministration.previewPayments, { rows })
-      setReview(rows.map((row, index) => ({ ...row, ...preview[index] }))); setResults({})
-    } catch (failure) { setError(message(failure)); setReview(null) }
-    finally { guard.current = false; setBusy(false) }
+      await record({ studentId, amountCents: parsed.cents, method, reference: number, occurredAt: chicagoMidnight(date), note: note.trim(), idempotencyKey: key.current })
+      key.current = null
+      const who = studentId !== initialStudentId ? `${studentName(studentId)} · ` : ''
+      setRecorded(previous => [...previous, { amountCents: parsed.cents, label: who + [copy[method], number].filter(Boolean).join(' · ') }])
+      setSaved(copy.recordedOne(usd(parsed.cents))); setAmount(''); setReference(''); setNote('')
+    } catch (failure) { setError(userFacingError(failure)) } finally { setBusy(false) }
+  }
+  // Method and date stay for the next payment, which is usually from the same meeting.
+  function again(next?: Id<'students'>) { if (next) setStudentId(next); key.current = null; setSaved(''); setError(''); setConfirming(null); setStep('amount') }
+  function cancel() { key.current = null; setAmount(''); setReference(''); setNote(''); setError(''); setConfirming(null); setStep('amount') }
+  const total = recorded.reduce((sum, item) => sum + item.amountCents, 0)
+  return <div className={styles.form}>
+    <p className={styles.muted}>{copy.recordPurpose}</p>
+    {studentId !== initialStudentId && <p className="m-0 font-semibold">{copy.student}: {studentName(studentId)}</p>}
+    {context && !ready && <p role="status" className={styles.notice}>{copy.accountNotReady}</p>}
+    {saved ? <div className={styles.notice}>
+      <p role="status" className="m-0">{saved}</p>
+      <div className={styles.actions}><Button type="button" autoFocus onClick={() => again()}>{copy.recordAnother}</Button></div>
+      <div className={styles.field}><StudentSelect students={students?.filter(item => item.studentId !== studentId)} value="" label={copy.anotherStudent} onChange={id => again(id)}/></div>
+    </div>
+      : <StepWizard title={copy.recordTitle} step={index + 1} total={recordSteps.length} heading={copy.recordSteps[step]} nextLabel={step === 'review' ? (busy ? copy.recording : copy.recordButton) : copy.next} nextDisabled={step === 'review' && (confirming !== null || !ready)} onNext={next} onBack={index > 0 ? () => { setError(''); setConfirming(null); setStep(recordSteps[index - 1]) } : undefined} onCancel={cancel} busy={busy} error={error}>
+        {step === 'amount' && <MoneyInput label={copy.amount} value={amount} onChange={change(setAmount)}/>}
+        {step === 'how' && <div className={styles.fields}>
+          <MethodFields method={method} reference={reference} hideCashReference onMethod={change(setMethod)} onReference={change(setReference)}/>
+          <div className={styles.field}><label htmlFor={dateId}>{copy.date} <span className={styles.muted}>{copy.required}</span></label><Input id={dateId} type="date" value={date} max={today()} onChange={event => change(setDate)(event.target.value)}/></div>
+        </div>}
+        {step === 'note' && <div className={styles.field}><label htmlFor={noteId}>{copy.note} <span className={styles.muted}>{copy.optional}</span></label><Input id={noteId} value={note} maxLength={1000} placeholder={copy.notePlaceholder} onChange={event => change(setNote)(event.target.value)}/></div>}
+        {step === 'review' && <dl className="m-0">
+          <ReviewRow label={copy.amount} value={parsed.ok ? usd(parsed.cents) : '—'} onEdit={() => setStep('amount')} disabled={busy}/>
+          <ReviewRow label={copy.method} value={[copy[method], number || null, validDate(date) ? shortDate(chicagoMidnight(date)) : null].filter(Boolean).join(' · ')} onEdit={() => setStep('how')} disabled={busy}/>
+          <ReviewRow label={copy.note} value={note.trim() || copy.noNote} onEdit={() => setStep('note')} disabled={busy}/>
+        </dl>}
+        {step === 'review' && confirming !== null && <div className={styles.notice} role="alert"><p>{overpaymentQuestion(confirming, studentName(studentId), 'record')}</p><div className={styles.actions}><Button type="button" disabled={busy} onClick={() => void submit(true)}>{copy.recordAnyway}</Button><Button type="button" variant="outline" disabled={busy} onClick={() => { setConfirming(null); setStep('amount') }}>{copy.changeAmount}</Button></div></div>}
+      </StepWizard>}
+    {recorded.length > 0 && <section aria-label={copy.recordedThisVisit} className={styles.history}><strong>{copy.recordedThisVisit}</strong><ul className="m-0 grid gap-1 pl-5">{recorded.map((item, index) => <li key={index}>{usd(item.amountCents)} · {item.label}</li>)}</ul><p className="m-0 font-semibold">{copy.recordedTotal(recorded.length, usd(total))}</p></section>}
+  </div>
+}
+
+type BulkStep = keyof typeof copy.bulkSteps
+const bulkSteps: BulkStep[] = ['payments', 'note', 'review']
+/** A new typed row with its own lasting id; method and date carry over from the row before it. */
+export const blankDraft = (previous?: Draft): Draft => ({ id: crypto.randomUUID(), studentId: '', amount: '', method: previous?.method ?? 'check', reference: '', date: previous?.date ?? today() })
+/** Several payments at once: Payments (typed or from a spreadsheet) → Note → Review, then Record. */
+function BulkPayments({ initialMode }: { initialMode: 'bulk' | 'import' }) {
+  const convex = useConvex(); const post = useMutation(api.paymentAdministration.recordPaymentRow); const students = useQuery(api.paymentAdministration.studentOptions, {})
+  const [mode, setMode] = useState(initialMode); const [csv, setCsv] = useState(''); const [imported, setImported] = useState<{ text: string; rows: LabeledRow[] } | null>(null)
+  const [drafts, setDrafts] = useState<Draft[]>(() => [blankDraft()])
+  const [step, setStep] = useState<BulkStep>('payments')
+  const [note, setNote] = useState(''); const [review, setReview] = useState<ReviewedRow[] | null>(null); const [confirmOver, setConfirmOver] = useState(false); const [asking, setAsking] = useState(false)
+  // Row results by the row's lasting id; "Recorded" survives edits so a saved row is never shown as ready again.
+  const [results, setResults] = useState<Record<string, string>>({}); const [problems, setProblems] = useState<string[]>([]); const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const guard = useRef(false)
+  // One list key per list; with each row's id it makes the save key, so trying again never saves a payment twice.
+  const listKey = useRef(crypto.randomUUID()); const noteId = useId()
+  const isRecorded = (id: string) => results[id] === copy.recorded
+  const anyRecorded = Object.values(results).includes(copy.recorded)
+  function invalidate() { setReview(null); setError(''); setProblems([]); setConfirmOver(false); setAsking(false); setResults(previous => Object.fromEntries(Object.entries(previous).filter(([, value]) => value === copy.recorded))) }
+  const updateDraft = (id: string, patch: Partial<Draft>) => { setDrafts(previous => previous.map(item => item.id === id ? { ...item, ...patch } : item)); invalidate() }
+  const index = bulkSteps.indexOf(step)
+  function buildRows(): LabeledRow[] | null {
+    if (mode === 'bulk') { const built = draftRows(drafts); if (built.problems.length) { setProblems(built.problems); return null } return built.rows }
+    // Rows keep the ids they got when the spreadsheet was read until the text changes.
+    if (imported && imported.text === csv) return imported.rows
+    if (!csv.trim()) { setProblems([copy.pasteOrUpload]); return null }
+    try { const rows = parsePaymentCsv(csv, students ?? []); setImported({ text: csv, rows }); return rows } catch (failure) { setProblems([userFacingError(failure)]); return null }
+  }
+  async function next() {
+    if (guard.current) return
+    setError(''); setProblems([])
+    if (step === 'payments') { const rows = buildRows(); if (!rows) return; if (!rows.length) { setProblems([copy.noPaymentsYet]); return } setStep('note'); return }
+    if (step === 'note') {
+      const noteCheck = bulkNoteReason(note); if (!noteCheck.ok) { setProblems([noteCheck.message]); return }
+      const rows = buildRows(); if (!rows) { setStep('payments'); return }
+      guard.current = true; setBusy(true)
+      try { const preview = await convex.query(api.paymentAdministration.previewPayments, { rows: rows.map(({ label: _label, ...row }) => row) }); setReview(rows.map((row, at) => ({ ...row, ...preview[at] }))); setConfirmOver(false); setAsking(false); setStep('review') }
+      catch (failure) { setError(userFacingError(failure)) } finally { guard.current = false; setBusy(false) }
+      return
+    }
+    if (review && bulkOverpayments(review).length && !confirmOver) { setAsking(true); return }
+    await record()
   }
   async function record() {
-    if (guard.current || !review || review.some(row => row.error)) return
-    guard.current = true; setBusy(true); setError('')
+    const noteCheck = bulkNoteReason(note)
+    if (guard.current || !review || review.some(row => row.error) || !noteCheck.ok) return
+    guard.current = true; setBusy(true); setError(''); setAsking(false)
     try {
-      for (let index = 0; index < review.length; index++) {
-        if (results[index] === copy.recorded) continue
-        const row = review[index]
+      for (const row of review) {
+        if (isRecorded(row.rowReference)) continue
         if (!row.studentId || row.expectedGeneration === null) throw new Error(copy.unmatched)
-        setResults(previous => ({ ...previous, [index]: copy.recording }))
-        try { await post({ studentId: row.studentId, amountCents: row.amountCents, method: row.method, reference: row.reference, occurredAt: row.occurredAt, rowReference: row.rowReference, batchReference: batch.trim(), reason: reason.trim(), expectedGeneration: row.expectedGeneration }); setResults(previous => ({ ...previous, [index]: copy.recorded })) }
-        catch (failure) { setResults(previous => ({ ...previous, [index]: copy.needsRetry })); throw failure }
+        setResults(previous => ({ ...previous, [row.rowReference]: copy.recordingRow }))
+        try { await post({ studentId: row.studentId, amountCents: row.amountCents, method: row.method, reference: row.reference, occurredAt: row.occurredAt, rowReference: row.rowReference, batchReference: listKey.current, reason: noteCheck.reason, expectedGeneration: row.expectedGeneration }); setResults(previous => ({ ...previous, [row.rowReference]: copy.recorded })) }
+        catch (failure) { setResults(previous => ({ ...previous, [row.rowReference]: copy.needsRetry })); throw failure }
       }
-    } catch (failure) { setError(message(failure)) }
+    } catch (failure) { setError(userFacingError(failure)) }
     finally { guard.current = false; setBusy(false) }
   }
-  const recorded = Object.values(results).filter(value => value === copy.recorded).length
-  return <Card className={styles.card}><CardTitle>{mode === 'import' ? copy.importTitle : copy.bulkTitle}</CardTitle><p className={styles.muted}>{copy.purpose}</p>
-    <div className={styles.actions}><Button variant={mode === 'bulk' ? 'default' : 'outline'} disabled={busy} onClick={() => { setMode('bulk'); invalidate() }}>{copy.enterRows}</Button><Button variant={mode === 'import' ? 'default' : 'outline'} disabled={busy} onClick={() => { setMode('import'); invalidate() }}>{copy.importCsv}</Button></div>
-    <div className={styles.fields}><label className={styles.field}>{copy.batchReference}<Input value={batch} maxLength={150} disabled={busy} onChange={event => { setBatch(event.target.value); invalidate() }}/></label><label className={styles.field}>{copy.reason}<Input value={reason} maxLength={1000} disabled={busy} onChange={event => { setReason(event.target.value); invalidate() }}/></label></div>
-    {mode === 'import' ? <><label className={styles.field}>{copy.chooseFile}<Input type="file" accept=".csv,text/csv" disabled={busy} onChange={async event => { const file = event.target.files?.[0]; if (!file) return; try { if (file.size > 1_000_000) throw new Error(copy.csvTooLarge); const value = await file.text(); setCsv(value); invalidate() } catch (failure) { setError(message(failure)) } }}/></label><p className={styles.muted}>{copy.csvHelp}</p><label className={styles.field}>{copy.pasteCsv}<textarea rows={7} value={csv} disabled={busy} onChange={event => { setCsv(event.target.value); invalidate() }} className="rounded border p-3 font-mono text-sm"/></label></> : <>{drafts.map((row, index) => <fieldset key={index} className={styles.form}><legend>{copy.paymentRow(index + 1)}</legend><div className={styles.fields}>{(['studentEmail', 'amount', 'reference', 'date', 'rowReference'] as const).map(key => <label key={key} className={styles.field}>{({ studentEmail: copy.studentEmail, amount: copy.amount, reference: copy.reference, date: copy.date, rowReference: copy.rowReference })[key]}<Input type={key === 'date' ? 'date' : key === 'studentEmail' ? 'email' : 'text'} value={row[key]} maxLength={150} disabled={busy} onChange={event => { setDrafts(previous => previous.map((item, rowIndex) => rowIndex === index ? { ...item, [key]: event.target.value } : item)); invalidate() }}/></label>)}<label className={styles.field}>{copy.method}<NativeSelect value={row.method} disabled={busy} onChange={event => { setDrafts(previous => previous.map((item, rowIndex) => rowIndex === index ? { ...item, method: event.target.value } : item)); invalidate() }}>{['cash', 'check', 'other'].map(method => <NativeSelectOption key={method} value={method}>{copy[method as 'cash' | 'check' | 'other']}</NativeSelectOption>)}</NativeSelect></label></div>{drafts.length > 1 && <Button variant="outline" disabled={busy} onClick={() => { setDrafts(previous => previous.filter((_, rowIndex) => rowIndex !== index)); invalidate() }}>{copy.removeRow}</Button>}</fieldset>)}<Button variant="outline" disabled={busy || drafts.length >= 500} onClick={() => { setDrafts(previous => [...previous, { studentEmail: '', amount: '', method: 'check', reference: '', date: new Date().toISOString().slice(0, 10), rowReference: String(previous.length + 1) }]); invalidate() }}>{copy.addRow}</Button></>}
-    <Button disabled={busy} variant="outline" onClick={() => void preview()}>{busy ? copy.working : copy.review}</Button>
-    {review && <div className={styles.history}><p role="status">{copy.progress(review.length, recorded)}</p>{review.map((row, index) => <div className={styles.historyRow} key={index}><strong>{row.studentName} / {usd(row.amountCents)}</strong><span>{row.method==='cash'?copy.cash:row.method==='check'?copy.check:copy.other} / {row.reference} / {new Date(row.occurredAt).toISOString().slice(0, 10)}</span><span role={row.error ? 'alert' : 'status'}>{row.error ?? results[index] ?? copy.ready}</span></div>)}<Button disabled={busy || review.some(row => !!row.error) || recorded === review.length} onClick={() => void record()}>{recorded ? copy.recordRemaining : copy.recordReviewed}</Button></div>}
-    {error && <p className={styles.error} role="alert">{error} {copy.partialFailure}</p>}
+  function startOver() { listKey.current = crypto.randomUUID(); setDrafts([blankDraft()]); setCsv(''); setImported(null); setNote(''); setResults({}); setStep('payments'); setReview(null); setError(''); setProblems([]); setConfirmOver(false); setAsking(false) }
+  const recorded = review?.filter(row => isRecorded(row.rowReference)).length ?? 0
+  const over = review ? bulkOverpayments(review) : []
+  const total = review?.reduce((sum, row) => sum + row.amountCents, 0) ?? 0
+  const allDone = !!review && review.length > 0 && recorded === review.length
+  const goTo = (target: BulkStep) => { setError(''); setProblems([]); setAsking(false); setStep(target) }
+  const reviewList = review && <dl className="m-0">
+    {review.map(row => <ReviewRow key={row.rowReference} label={`${row.label}: ${row.studentName}`} value={<>{usd(row.amountCents)} · {copy[row.method]}{row.reference ? ` · ${row.reference}` : ''} · {shortDate(row.occurredAt)}<span className="block text-sm font-normal" role={row.error ? 'alert' : 'status'}>{row.error ?? results[row.rowReference] ?? copy.ready}</span></>} onEdit={allDone ? undefined : () => goTo('payments')} disabled={busy}/>)}
+  </dl>
+  const title = mode === 'import' ? copy.importTitle : copy.bulkTitle
+  if (allDone) return <Card className={styles.card}><CardTitle>{title}</CardTitle>
+    <p role="status" className={styles.notice}><strong>{copy.reviewTotal(review.length, usd(total))}</strong> · {copy.progress(review.length, recorded)}</p>
+    {reviewList}
+    <div className={styles.actions}><Button autoFocus onClick={startOver}>{copy.startOver}</Button></div>
+  </Card>
+  return <Card className={styles.card}><CardTitle>{title}</CardTitle><p className={styles.muted}>{copy.purpose}</p>
+    <StepWizard title={title} step={index + 1} total={bulkSteps.length} heading={copy.bulkSteps[step]} nextLabel={busy ? copy.working : step === 'review' ? (recorded ? copy.recordRemaining : copy.recordReviewed) : copy.next} nextDisabled={step === 'review' && (asking || !review || review.some(row => !!row.error))} onNext={() => void next()} onBack={index > 0 ? () => goTo(bulkSteps[index - 1]) : undefined} onCancel={startOver} busy={busy} error={error ? `${error} ${review && step === 'review' ? (recorded > 0 ? copy.partialSaved(recorded) : copy.nothingSaved) : ''}`.trim() : null}>
+      {step === 'payments' && <>
+        <div className={styles.actions}><Button type="button" variant={mode === 'bulk' ? 'default' : 'outline'} disabled={busy || anyRecorded} onClick={() => { setMode('bulk'); invalidate() }}>{copy.enterRows}</Button><Button type="button" variant={mode === 'import' ? 'default' : 'outline'} disabled={busy || anyRecorded} onClick={() => { setMode('import'); invalidate() }}>{copy.importCsv}</Button></div>
+        {mode === 'import' ? <>
+          {anyRecorded ? <p className={styles.notice}>{copy.csvLocked}</p> : <>
+            <label className={styles.field}>{copy.chooseFile}<Input type="file" accept=".csv,text/csv" disabled={busy} onChange={async event => { const file = event.target.files?.[0]; if (!file) return; try { if (file.size > 1_000_000) throw new Error(copy.csvTooLarge); setCsv(await file.text()); invalidate() } catch (failure) { setError(userFacingError(failure)) } }}/></label>
+            <p className={styles.muted}>{copy.csvHelp}</p>
+            <label className={styles.field}>{copy.pasteCsv}<textarea rows={7} value={csv} disabled={busy} onChange={event => { setCsv(event.target.value); invalidate() }} className="rounded border p-3 font-mono text-sm"/></label>
+          </>}
+          {imported && imported.text === csv && <section aria-label={copy.importedRows(imported.rows.length)} className={styles.history}><strong>{copy.importedRows(imported.rows.length)}</strong>
+            {imported.rows.map(row => <div key={row.rowReference} className={styles.historyRow}><span>{row.label} · {usd(row.amountCents)} · {copy[row.method]}{row.reference ? ` · ${row.reference}` : ''} · {shortDate(row.occurredAt)}{isRecorded(row.rowReference) ? ` · ${copy.recorded}` : ''}</span>
+              {imported.rows.length > 1 && <Button type="button" variant="outline" disabled={busy} onClick={() => { setImported({ text: csv, rows: imported.rows.filter(item => item.rowReference !== row.rowReference) }); invalidate() }}>{copy.removeRow}</Button>}</div>)}
+          </section>}
+        </> : <>{drafts.map((row, at) => <fieldset key={row.id} className={styles.form} disabled={busy}><legend className="font-semibold">{copy.paymentRow(at + 1)}{isRecorded(row.id) ? ` · ${copy.recorded}` : ''}</legend>
+          <fieldset className={styles.fields} disabled={isRecorded(row.id)}>
+            <StudentSelect students={students} value={row.studentId} onChange={studentId => updateDraft(row.id, { studentId })}/>
+            <MoneyInput label={copy.amount} value={row.amount} onChange={amount => updateDraft(row.id, { amount })}/>
+            <MethodFields method={row.method} reference={row.reference} onMethod={method => updateDraft(row.id, { method })} onReference={reference => updateDraft(row.id, { reference })}/>
+            <label className={styles.field}><span>{copy.date} <span className={styles.muted}>{copy.required}</span></span><Input type="date" value={row.date} max={today()} onChange={event => updateDraft(row.id, { date: event.target.value })}/></label>
+          </fieldset>
+          {drafts.length > 1 && <Button type="button" variant="outline" onClick={() => { setDrafts(previous => previous.filter(item => item.id !== row.id)); invalidate() }}>{copy.removeRow}</Button>}</fieldset>)}
+          <Button type="button" variant="outline" disabled={busy || drafts.length >= 500} onClick={() => { setDrafts(previous => [...previous, blankDraft(previous.at(-1))]); invalidate() }}>{copy.addRow}</Button></>}
+      </>}
+      {step === 'note' && <div className={styles.field}><label htmlFor={noteId}>{copy.bulkNote} <span className={styles.muted}>{copy.optional}</span></label><Input id={noteId} value={note} maxLength={1000} placeholder={copy.notePlaceholder} onChange={event => { setNote(event.target.value); invalidate() }}/></div>}
+      {step === 'review' && review && <>
+        <p role="status" className="m-0"><strong>{copy.reviewTotal(review.length, usd(total))}</strong>{recorded > 0 && <> · {copy.progress(review.length, recorded)}</>}</p>
+        {reviewList}
+        <dl className="m-0"><ReviewRow label={copy.bulkNote} value={note.trim() || copy.bulkNoteDefault} onEdit={() => goTo('note')} disabled={busy}/></dl>
+        {asking && over.length > 0 && <div className={styles.notice} role="alert"><p className="m-0">{copy.bulkOverpayment(over.map(item => ({ name: item.name, amount: usd(item.extraCents) })))}</p><div className={styles.actions}><Button type="button" disabled={busy} onClick={() => { setConfirmOver(true); void record() }}>{copy.recordAllAnyway}</Button><Button type="button" variant="outline" disabled={busy} onClick={() => goTo('payments')}>{copy.changeAmounts}</Button></div></div>}
+      </>}
+      {problems.length > 0 && <div role="alert" className={styles.error}><ul className="m-0 grid gap-1 pl-5">{problems.map(problem => <li key={problem}>{problem}</li>)}</ul></div>}
+    </StepWizard>
   </Card>
 }
-function PaymentCorrections({ studentId }: { studentId: Id<'students'> }) {
-  const page = usePaginatedQuery(api.paymentAdministration.receipts, { studentId }, { initialNumItems: 20 })
-  const [selected, setSelected] = useState<Id<'ledgerEntries'> | null>(null)
-  return <Card className={styles.card}><CardTitle>{copy.correctionTitle}</CardTitle><p className={styles.muted}>{copy.correctionPurpose}</p><div className={styles.history}>{page.results.map(row => <div className={styles.historyRow} key={row.sourceEntryId}><strong>{row.reference} / {usd(row.currentAmountCents)}</strong><span>{copy.original} {usd(row.originalAmountCents)} / {copy.available} {usd(row.availableCents)} / {new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago' }).format(new Date(row.occurredAt))}</span><Button variant="outline" disabled={row.carried} onClick={() => setSelected(row.sourceEntryId)}>{row.carried ? copy.linkedCarryover : copy.reviewCorrection}</Button></div>)}</div>{page.status === 'CanLoadMore' && <Button variant="outline" onClick={() => page.loadMore(20)}>{copy.loadMore}</Button>}{page.status === 'LoadingFirstPage' && <p role="status">{copy.loading}</p>}{page.status !== 'LoadingFirstPage' && !page.results.length && <p>{copy.noPayments}</p>}{selected && <CorrectionForm key={selected} studentId={studentId} sourceEntryId={selected}/>}</Card>
+
+/** Payments on one student's account, each with Edit payment and its change history. */
+export function EditPayments({ studentId }: { studentId: Id<'students'> }) {
+  return <Recoverable><PaymentList studentId={studentId}/></Recoverable>
 }
-function CorrectionForm({ sourceEntryId, studentId }: { sourceEntryId: Id<'ledgerEntries'>; studentId: Id<'students'> }) {
-  const [amount, setAmount] = useState(''); const target = parseChargeTarget(amount); const [reason, setReason] = useState(''); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [jobId, setJobId] = useState<Id<'financialOperationJobs'> | null>(null); const key = useRef(crypto.randomUUID()); const guard = useRef(false)
-  const current = useQuery(api.paymentAdministration.previewCorrection, target === null ? 'skip' : { sourceEntryId, targetAmountCents: target })
-  const [review, setReview] = useState<FunctionReturnType<typeof api.paymentAdministration.previewCorrection> | null>(null)
-  const job = useQuery(api.paymentAdministration.correctionStatus, jobId ? { jobId } : 'skip')
-  const correct = useMutation(api.paymentAdministration.correct); const retry = useMutation(api.paymentAdministration.retryCorrection); const rebuild = useMutation(api.financialSources.rebuild)
-  const ready = review?.state === 'ready' && current?.state === 'ready' && review.targetAmountCents === target && review.expectedSourceRevision === current.expectedSourceRevision && review.expectedFinancialRevision === current.expectedFinancialRevision
-  async function commit() { if (guard.current || !ready || target === null || review?.expectedSourceRevision === null || review?.expectedFinancialRevision === null || !review) return; guard.current = true; setBusy(true); setError(''); try { setJobId(await correct({ sourceEntryId, targetAmountCents: target, expectedSourceRevision: review.expectedSourceRevision, expectedFinancialRevision: review.expectedFinancialRevision, reason, idempotencyKey: key.current })) } catch (failure) { setError(message(failure)) } finally { guard.current = false; setBusy(false) } }
-  async function recover() { if (!jobId) return; setBusy(true); setError(''); try { await retry({ jobId, reason: reason || copy.retryReason }) } catch (failure) { setError(message(failure)) } finally { setBusy(false) } }
-  return <div className={styles.form}><div className={styles.fields}><label className={styles.field}>{copy.targetAmount}<Input inputMode="decimal" value={amount} disabled={busy || !!jobId} onChange={event => { setAmount(event.target.value); setReview(null); key.current = crypto.randomUUID() }}/></label><label className={styles.field}>{copy.correctionReason}<Input value={reason} maxLength={1000} disabled={busy || !!jobId} onChange={event => { setReason(event.target.value); setReview(null); key.current = crypto.randomUUID() }}/></label></div>
-    {!jobId && <Button variant="outline" disabled={!current || busy || reason.trim().length < 8} onClick={() => setReview(current!)}>{copy.previewCorrection}</Button>}
-    {review && <div className={styles.notice}><p>{copy.original} {usd(review.originalAmountCents)} / {copy.current} {review.currentAmountCents === null ? copy.notAvailable : usd(review.currentAmountCents)} / {copy.corrected} {usd(review.targetAmountCents)}</p><p>{copy.release(review.releaseRequiredCents === null ? copy.notAvailable : usd(review.releaseRequiredCents))}</p>{review.message && <p role="status">{review.message}</p>}</div>}
-    {current?.state === 'updating' && <Button variant="outline" disabled={busy} onClick={async () => { setBusy(true); setError(''); try { await rebuild({ studentId }) } catch (failure) { setError(message(failure)) } finally { setBusy(false) } }}>{copy.rebuild}</Button>}
-    {!jobId && <Button disabled={!ready || busy || reason.trim().length < 8} onClick={() => void commit()}>{copy.confirm}</Button>}
-    {job && <p role={job.state === 'failed' ? 'alert' : 'status'}>{job.state === 'complete' ? copy.correctionComplete : job.state === 'failed' ? userFacingError(new Error(job.lastError ?? ''), copy.correctionFailed) : copy.correcting}</p>}{job?.state === 'failed' && <Button disabled={busy} onClick={() => void recover()}>{copy.retryCorrection}</Button>}{error && <p className={styles.error} role="alert">{error}</p>}
+function PaymentList({ studentId }: { studentId: Id<'students'> }) {
+  const page = usePaginatedQuery(api.paymentAdministration.receipts, { studentId }, { initialNumItems: 20 })
+  const [selected, setSelected] = useState<Id<'ledgerEntries'> | null>(null); const [saved, setSaved] = useState('')
+  return <Card className={styles.card}><CardTitle>{copy.paymentsTitle}</CardTitle><p className={styles.muted}>{copy.paymentsPurpose}</p>
+    {saved && <p role="status" className={styles.notice}>{saved}</p>}
+    <div className={styles.history}>{page.results.map(row => <div className={styles.historyRow} key={row.sourceEntryId}>
+      <strong>{usd(row.currentAmountCents)} · {methodName(row.method)}{row.reference ? ` · ${row.reference}` : ''}</strong>
+      <span className={styles.muted}>{shortDate(row.occurredAt)}{row.currentAmountCents !== row.originalAmountCents ? ` · first recorded as ${usd(row.originalAmountCents)}` : ''}{row.movedToName ? ` · ${copy.movedTo(row.movedToName)}` : ''}{row.carried ? ` · ${copy.fromEarlierSeason}` : ''}</span>
+      {row.pending?.state === 'running' && <p role="status" className="m-0">{copy.pendingSaving(row.pending.movingToName)}</p>}
+      {row.pending?.state === 'failed' && <RetryEdit sourceEntryId={row.sourceEntryId} movingToName={row.pending.movingToName} onCanceled={() => setSaved(copy.canceled)}/>}
+      {row.edits.length > 0 && <details><summary>{copy.changes(row.edits.length)}</summary><ul className="m-0 grid gap-1 pl-5">{row.edits.map(edit => <li key={edit.at}>{when(edit.at)} · {edit.actorName}: {edit.summary}. {edit.reason}</li>)}</ul></details>}
+      {!row.carried && !row.movedToName && !row.pending && selected !== row.sourceEntryId && <Button variant="outline" aria-label={copy.editFor(usd(row.currentAmountCents), shortDate(row.occurredAt))} onClick={() => { setSelected(row.sourceEntryId); setSaved('') }}>{copy.editPayment}</Button>}
+      {selected === row.sourceEntryId && <EditPaymentForm key={row.sourceEntryId} sourceEntryId={row.sourceEntryId} onDone={message => { setSelected(null); setSaved(message) }} onCancel={() => setSelected(null)}/>}
+    </div>)}</div>
+    {page.status === 'CanLoadMore' && <Button variant="outline" onClick={() => page.loadMore(20)}>{copy.showMore}</Button>}{page.status === 'LoadingFirstPage' && <p role="status">{copy.loading}</p>}{page.status !== 'LoadingFirstPage' && !page.results.length && <p>{copy.noPayments}</p>}
+  </Card>
+}
+/** A stopped edit, with Try again and Cancel for the same people who can edit payments. */
+function RetryEdit({ sourceEntryId, movingToName, onCanceled }: { sourceEntryId: Id<'ledgerEntries'>; movingToName: string | null; onCanceled: () => void }) {
+  const retry = useMutation(api.paymentAdministration.retryEdit)
+  const cancelEdit = useMutation(api.paymentAdministration.cancelEdit)
+  const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [canceling, setCanceling] = useState(false); const [reason, setReason] = useState(''); const reasonId = useId()
+  const cancelLabel = movingToName ? copy.cancelMove : copy.cancelEdit
+  async function run(action: () => Promise<unknown>) { setBusy(true); setError(''); try { await action(); return true } catch (failure) { setError(userFacingError(failure)); return false } finally { setBusy(false) } }
+  return <div className={styles.notice} role="alert">
+    <p className="m-0"><strong>{copy.stopped}</strong></p>
+    <p className="m-0">{copy.pendingFailed(movingToName)}</p>
+    {canceling ? <form className={styles.form} onSubmit={event => { event.preventDefault(); if (reason.trim().length < 8) { setError(copy.reasonShort); return } void run(() => cancelEdit({ sourceEntryId, reason: reason.trim() })).then(done => { if (done) onCanceled() }) }}>
+      <p className="m-0">{copy.cancelConfirm(movingToName)}</p>
+      <div className={styles.field}><label htmlFor={reasonId}>{copy.cancelReason} <span className={styles.muted}>{copy.required}</span></label><Input id={reasonId} value={reason} maxLength={1000} disabled={busy} aria-describedby={`${reasonId}-help`} onChange={event => { setReason(event.target.value); setError('') }}/><p id={`${reasonId}-help`} className={styles.muted}>{copy.editReasonHelp}</p></div>
+      <div className={styles.actions}><Button type="submit" disabled={busy}>{busy ? copy.canceling : cancelLabel}</Button><Button type="button" variant="outline" disabled={busy} onClick={() => { setCanceling(false); setReason(''); setError('') }}>{copy.keepEdit}</Button></div>
+    </form> : <div className={styles.actions}><Button type="button" disabled={busy} onClick={() => void run(() => retry({ sourceEntryId }))}>{busy ? copy.retrying : copy.tryAgain}</Button><Button type="button" variant="outline" disabled={busy} onClick={() => { setCanceling(true); setError('') }}>{cancelLabel}</Button></div>}
+    {error && <p className={styles.error}>{error}</p>}
   </div>
+}
+function EditPaymentForm({ sourceEntryId, onDone, onCancel }: { sourceEntryId: Id<'ledgerEntries'>; onDone: (message: string) => void; onCancel: () => void }) {
+  const context = useQuery(api.paymentAdministration.editContext, { sourceEntryId })
+  // The form keeps the details from when it opened; a later change by someone else stops the save instead of being adopted.
+  const [opened, setOpened] = useState<OpenedEdit | null>(null)
+  if (!opened && context && !context.lockedMessage && context.expectedSourceRevision !== null) setOpened({ ...context, expectedSourceRevision: context.expectedSourceRevision })
+  if (opened) return <EditFields key={`${opened.expectedEditId}:${opened.expectedSourceRevision}`} sourceEntryId={sourceEntryId} initial={opened} stale={context !== undefined && editContextChanged(opened, context)} onReload={() => setOpened(null)} onDone={onDone} onCancel={onCancel}/>
+  if (!context) return <p role="status">{copy.loading}</p>
+  return <div className={styles.notice}><p role="status">{context.lockedMessage ?? copy.accountNotReady}</p><Button variant="outline" onClick={onCancel}>{copy.cancel}</Button></div>
+}
+type EditContext = FunctionReturnType<typeof api.paymentAdministration.editContext>
+type OpenedEdit = EditContext & { expectedSourceRevision: number }
+/** True when the payment changed after the Edit payment form opened, or can't be edited now. */
+export function editContextChanged(opened: OpenedEdit, live: EditContext) {
+  return !!live.lockedMessage || live.expectedEditId !== opened.expectedEditId || live.expectedSourceRevision !== opened.expectedSourceRevision || live.studentId !== opened.studentId || live.amountCents !== opened.amountCents || live.method !== opened.method || live.reference !== opened.reference
+}
+type EditStep = keyof typeof copy.editSteps
+const editSteps: EditStep[] = ['what', 'why', 'review']
+function EditFields({ sourceEntryId, initial, stale: changed, onReload, onDone, onCancel }: { sourceEntryId: Id<'ledgerEntries'>; initial: OpenedEdit; stale: boolean; onReload: () => void; onDone: (message: string) => void; onCancel: () => void }) {
+  const students = useQuery(api.paymentAdministration.studentOptions, {})
+  const edit = useMutation(api.paymentAdministration.editPayment)
+  const [step, setStep] = useState<EditStep>('what')
+  const [studentId, setStudentId] = useState<Id<'students'>>(initial.studentId); const [amount, setAmount] = useState((initial.amountCents / 100).toFixed(2))
+  const [method, setMethod] = useState<PaymentMethod | ''>(initial.method ?? ''); const [reference, setReference] = useState(initial.reference ?? ''); const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [confirming, setConfirming] = useState<number | null>(null); const key = useRef<string | null>(null); const reasonId = useId()
+  // While this person's own save is running, the change it makes isn't someone else's.
+  const [saving, setSaving] = useState(false); const stale = changed && !saving
+  const parsed = parseMoneyInput(amount, { allowZero: true }); const moving = studentId !== initial.studentId
+  const target = useQuery(api.paymentAdministration.recordContext, { studentId })
+  const correction = useQuery(api.paymentAdministration.previewCorrection, parsed.ok && (moving || parsed.cents !== initial.amountCents) ? { sourceEntryId, targetAmountCents: moving ? 0 : parsed.cents } : 'skip')
+  // Any change to the edit needs a new save key; the server refuses a reused key with different details.
+  const change = <T,>(setter: (value: T) => void) => (value: T) => { setter(value); key.current = null; setConfirming(null); setError('') }
+  const studentName = (id: Id<'students'>) => students?.find(item => item.studentId === id)?.name ?? copy.student
+  const lines = [parsed.ok && parsed.cents !== initial.amountCents ? `${copy.amount}: ${usd(initial.amountCents)} → ${usd(parsed.cents)}` : null, method && method !== initial.method ? `${copy.method}: ${methodName(initial.method)} → ${copy[method]}` : null, reference.trim() !== (initial.reference ?? '') ? `${referenceLabel(method)}: ${initial.reference || 'none'} → ${reference.trim() || 'none'}` : null, moving ? `${copy.student}: ${studentName(initial.studentId)} → ${studentName(studentId)}` : null].filter((line): line is string => !!line)
+  const index = editSteps.indexOf(step)
+  function problem(at: EditStep): string | null {
+    if (at === 'what') return !parsed.ok ? parsed.message : !method ? copy.chooseMethod : referenceProblem(method, reference) ?? (moving && initial.amountCents === 0 ? copy.moveZero : moving && parsed.cents === 0 ? copy.moveNeedsAmount : !lines.length ? copy.noChange : correction?.state === 'hold' && correction.message ? correction.message : null)
+    if (at === 'why') return reason.trim().length < 8 ? copy.reasonShort : null
+    return problem('what') ?? problem('why')
+  }
+  function next() {
+    const found = problem(step); if (found) { setError(found); return }
+    setError('')
+    if (step !== 'review') { setStep(editSteps[index + 1]); return }
+    void save(false)
+  }
+  async function save(confirmed: boolean) {
+    if (busy || stale || !parsed.ok || !method) return
+    const added = moving ? parsed.cents : parsed.cents - initial.amountCents
+    const extra = added > 0 ? overpaymentCents(added, target?.balanceDueCents ?? null) : null
+    if (extra !== null && !confirmed) { setConfirming(extra); return }
+    key.current ??= crypto.randomUUID(); setBusy(true); setSaving(true); setError(''); setConfirming(null)
+    try { await edit({ sourceEntryId, studentId, amountCents: parsed.cents, method, reference: reference.trim(), reason: reason.trim(), expectedSourceRevision: initial.expectedSourceRevision, expectedEditId: initial.expectedEditId, expectedBefore: { studentId: initial.studentId, amountCents: initial.amountCents, method: initial.method, reference: initial.reference }, idempotencyKey: key.current }); onDone(copy.edited) }
+    catch (failure) { setSaving(false); setError(userFacingError(failure)) } finally { setBusy(false) }
+  }
+  return <StepWizard title={copy.editTitle} step={index + 1} total={editSteps.length} heading={copy.editSteps[step]} nextLabel={step === 'review' ? (busy ? copy.saving : copy.saveEdit) : copy.next} nextDisabled={stale || (step === 'review' && confirming !== null)} onNext={next} onBack={index > 0 ? () => { setError(''); setConfirming(null); setStep(editSteps[index - 1]) } : undefined} onCancel={onCancel} busy={busy} error={error}>
+    {stale && <div className={styles.notice} role="alert"><p className="m-0">{copy.staleEdit}</p><Button type="button" variant="outline" onClick={onReload}>{copy.reload}</Button></div>}
+    {step === 'what' && <>
+      <div className={styles.fields}>
+        <StudentSelect students={students} value={studentId} onChange={change(setStudentId)}/>
+        <MoneyInput label={copy.amount} value={amount} allowZero hint={copy.zeroHint} onChange={change(setAmount)}/>
+        <MethodFields method={method} reference={reference} allowUnset={!initial.method} onMethod={change((value: PaymentMethod) => { setMethod(value); setReference(previous => referenceAfterMethodChange(value, previous)) })} onReference={change(setReference)}/>
+      </div>
+      <p className={styles.muted}>{copy.moveHint}</p>
+    </>}
+    {step === 'why' && <div className={styles.field}><label htmlFor={reasonId}>{copy.editReason} <span className={styles.muted}>{copy.required}</span></label><Input id={reasonId} value={reason} maxLength={1000} aria-describedby={`${reasonId}-help`} onChange={event => change(setReason)(event.target.value)}/><p id={`${reasonId}-help`} className={styles.muted}>{copy.editReasonHelp}</p></div>}
+    {step === 'review' && <>
+      <dl className="m-0">
+        <ReviewRow label={copy.editSteps.what} value={<ul className="m-0 grid gap-1 pl-5">{lines.map(line => <li key={line}>{line}</li>)}</ul>} onEdit={() => setStep('what')} disabled={busy}/>
+        <ReviewRow label={copy.editSteps.why} value={reason.trim()} onEdit={() => setStep('why')} disabled={busy}/>
+      </dl>
+      {(moving || (parsed.ok && parsed.cents < initial.amountCents)) && <p className={styles.notice}>{copy.lowering}</p>}
+      {correction?.state === 'hold' && correction.message && <p role="status" className={styles.notice}>{correction.message}</p>}
+      {confirming !== null && <div className={styles.notice} role="alert"><p>{overpaymentQuestion(confirming, studentName(studentId), 'save')}</p><div className={styles.actions}><Button type="button" disabled={busy || stale} onClick={() => void save(true)}>{copy.saveAnyway}</Button><Button type="button" variant="outline" disabled={busy} onClick={() => { setConfirming(null); setStep('what') }}>{copy.changeAmount}</Button></div></div>}
+    </>}
+  </StepWizard>
 }

@@ -38,30 +38,30 @@ describe('rendered charge administration controls', () => {
   const chargeId = 'synthetic-charge' as Id<'charges'>
   it('uses an explicit submit button for the Coach correction form', () => {
     const html = renderToStaticMarkup(createElement(ChargeAdministration, { chargeId, allowEditing: true }))
-    expect(html).toContain('Review exact correction')
-    expect(html).toMatch(/<button[^>]*type="submit"[^>]*>Review exact correction<\/button>/)
+    expect(html).toContain('Review correction')
+    expect(html).toMatch(/<button[^>]*type="submit"[^>]*>Review correction<\/button>/)
   })
   it('uses an explicit submit button for failed-job retry and separates source progress from the target', () => {
     view.canCorrect = false; view.financialState = 'failed'; view.failedJob = true
     const html = renderToStaticMarkup(createElement(ChargeAdministration, { chargeId, allowEditing: true }))
-    expect(html).toMatch(/<button[^>]*type="submit"[^>]*>Retry remaining work<\/button>/)
-    expect(html).toContain('Money already returned to available funds')
+    expect(html).toMatch(/<button[^>]*type="submit"[^>]*>Try again<\/button>/)
+    expect(html).toContain('Money already returned to Available funds')
     expect(html).toContain('$5.00')
     expect(html).toContain('Planned amount')
-    expect(html).not.toContain('Review exact correction')
+    expect(html).not.toContain('Review correction')
   })
   it('shows family details without editing or retry forms', () => {
     view.failedJob = true
     const html = renderToStaticMarkup(createElement(ChargeAdministration, { chargeId }))
     expect(html).toContain('Synthetic fee')
     expect(html).not.toContain('<form')
-    expect(html).not.toContain('Review exact correction')
-    expect(html).not.toContain('Retry remaining work')
+    expect(html).not.toContain('Review correction')
+    expect(html).not.toContain('Try again')
   })
   it('does not show empty receipts or financial values during initial loading', () => {
     view.loading = true
     const html = renderToStaticMarkup(createElement(ChargeAdministration, { chargeId, allowEditing: true }))
-    expect(html).toContain('Loading charge details')
+    expect(html).toContain('Loading fee details')
     expect(html).not.toContain('No charge revisions')
     expect(html).not.toContain('$100.00')
     expect(html).not.toContain('<form')

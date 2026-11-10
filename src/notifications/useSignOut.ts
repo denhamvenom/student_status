@@ -93,9 +93,16 @@ export async function signOutSafely({ cleanup, retryCleanup, signOut, clearLocal
   return 'forced'
 }
 
+/** What runs once the server sign-out settles. When it was forced the page is about to reload to '/', so `onForced` (for example
+ * discarding a saved invitation token) must run here: the caller's code after `await signOut()` will never run. */
+export function localClearer(forced: boolean, onForced?: () => void, clearAuth: () => void = clearAuthKeys, clearKey: () => void = removeDeveloperKey) {
+  if (forced) { clearAuth(); try { onForced?.() } catch { /* best effort */ } }
+  clearKey()
+}
+
 /** Sign out, first turning off notifications on this device so the next person to use it does not get this account's pushes.
  * Use this for every Sign out control; it resolves within about CLEANUP_TIMEOUT_MS + SIGN_OUT_TIMEOUT_MS. */
-export function useSignOut() {
+export function useSignOut(onForced?: () => void) {
   const { signOut } = useAuthActions()
   const deleteSubscription = useMutation(api.push.deleteSubscription)
   return useCallback(async () => {
@@ -103,8 +110,8 @@ export function useSignOut() {
       cleanup: () => removeThisDevice(deleteSubscription),
       retryCleanup: unsubscribeLocally,
       signOut,
-      clearLocal: forced => { if (forced) clearAuthKeys(); removeDeveloperKey() },
+      clearLocal: forced => localClearer(forced, onForced),
       forceLocal: () => forceLocalSignOut(),
     })
-  }, [deleteSubscription, signOut])
+  }, [deleteSubscription, signOut, onForced])
 }

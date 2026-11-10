@@ -18,7 +18,7 @@ describe('financial query presentation integration', () => {
   it('subscribes to student accounts with a bounded server page', () => {
     mocks.usePaginatedQuery.mockReturnValue({ results: [], status: 'CanLoadMore', loadMore: vi.fn() })
     const html = renderToStaticMarkup(createElement(CoachFinanceAccounts, { onOpen: vi.fn(), onRecord: vi.fn() }))
-    expect(html).toContain('Student accounts')
+    expect(html).toContain('Money')
     const subscriptions = mocks.usePaginatedQuery.mock.calls.filter(([reference]) => getFunctionName(reference) === getFunctionName(api.financeAdmin.students))
     expect(subscriptions).toHaveLength(1)
     const [, args, options] = subscriptions[0]

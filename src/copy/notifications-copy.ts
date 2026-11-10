@@ -86,7 +86,7 @@ export const notificationsCopy = {
     markAll: 'Mark all as read',
     marking: 'Marking…',
     markFailed: 'Messages could not be marked as read. Please try again.',
-    loadMore: 'Load more',
+    loadMore: 'Show more',
     loadingMore: 'Loading…',
     unread: 'Unread',
     showMore: 'Show full message',

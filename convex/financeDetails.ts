@@ -2,10 +2,11 @@ import { paginationOptsValidator, paginationResultValidator } from "convex/serve
 import { ConvexError, v } from "convex/values";
 import { query } from "./_generated/server";
 import type { QueryCtx } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { activeSeason, studentAccess, viewer, isCoachOrTravelLead } from "./lib/access";
 import schema from "./schema";
 import { effectiveChargeDueAt } from "./lib/feeDefinitions";
+import { financeRow } from "./lib/financeRow";
 
 const familyCharge = v.object({_id: v.id("charges"), eventId: v.optional(v.id("events")), label: v.string(), category: v.optional(v.union(v.literal("main"), v.literal("extra"))), cancelledCents: v.optional(v.number()), outstanding: v.optional(v.boolean()), adjustedCents: v.optional(v.number()), amountCents: v.number(), appliedCents: v.number(), priority: v.number(), createdAt: v.number(), dueAt: v.optional(v.number())});
 const familyHistoryEntry = v.object({_id: v.id("ledgerEntries"), kind: schema.doc("ledgerEntries").fields.kind, amountCents: v.number(), recordedAt: v.number(), method: v.optional(schema.doc("ledgerEntries").fields.method), sourceKind: v.optional(schema.doc("ledgerEntries").fields.sourceKind), destination: v.optional(v.literal("team")), safeDescription: v.string()});
@@ -77,6 +78,8 @@ export const history = query({
 
 /** Most unpaid charges one family student can have before the summary refuses to guess. */
 const OWED_SUMMARY_LIMIT = 200;
+/** Most older charges without an outstanding flag read before the total falls back to the account's Balance due. */
+const UNFLAGGED_READ_LIMIT = 2000;
 
 /**
  * The family Money lead line across every unpaid charge, not just the first charges page:
@@ -87,12 +90,21 @@ export const owedSummary = query({
   returns: v.object({ owedCents: v.number(), soonestDueAt: v.union(v.number(), v.null()), soonestDueCents: v.number() }),
   handler: async (ctx, args) => {
     await authorize(ctx, args.studentId, 1);
+    const owed = (charge: Doc<"charges">) => charge.amountCents + (charge.adjustedCents ?? 0) - (charge.cancelledCents ?? 0) - charge.appliedCents;
     const unpaid = await ctx.db.query("charges").withIndex("by_studentId_and_outstanding_and_priority", q => q.eq("studentId", args.studentId).eq("outstanding", true)).take(OWED_SUMMARY_LIMIT + 1);
+    // A charge written before the outstanding flag existed has no flag until its account is rebuilt; treat it as possibly unpaid so
+    // this total cannot disagree with the account total. Paid ones are skipped as they are read, so only unpaid ones count toward the limit.
+    let unflaggedRead = 0, unflaggedComplete = true;
+    for await (const charge of ctx.db.query("charges").withIndex("by_studentId_and_outstanding_and_priority", q => q.eq("studentId", args.studentId).eq("outstanding", undefined))) {
+      if (++unflaggedRead > UNFLAGGED_READ_LIMIT) { unflaggedComplete = false; break; }
+      if (owed(charge) > 0) unpaid.push(charge);
+      if (unpaid.length > OWED_SUMMARY_LIMIT) break;
+    }
     if (unpaid.length > OWED_SUMMARY_LIMIT) throw new ConvexError("This summary couldn't load. Reload the page to try again.");
     const feeDueAt = new Map<Id<"feeDefinitions">, number | undefined>();
     let owedCents = 0, soonestDueAt: number | null = null, soonestDueCents = 0;
     for (const charge of unpaid) {
-      const dueCents = charge.amountCents + (charge.adjustedCents ?? 0) - (charge.cancelledCents ?? 0) - charge.appliedCents;
+      const dueCents = owed(charge);
       if (dueCents <= 0) continue;
       owedCents += dueCents;
       let dueAt = charge.dueAt;
@@ -103,6 +115,12 @@ export const owedSummary = query({
       if (dueAt === undefined) continue;
       if (soonestDueAt === null || dueAt < soonestDueAt) { soonestDueAt = dueAt; soonestDueCents = dueCents; }
       else if (dueAt === soonestDueAt) soonestDueCents += dueCents;
+    }
+    if (!unflaggedComplete) {
+      // Too many older charges to read them all here: use the account's Balance due, the same total Home shows.
+      const accountDue = (await financeRow(ctx, args.studentId)).dueCents;
+      if (accountDue === null) throw new ConvexError("This summary couldn't load. Reload the page to try again.");
+      owedCents = Math.max(owedCents, accountDue);
     }
     return { owedCents, soonestDueAt, soonestDueCents: Math.min(soonestDueCents, owedCents) };
   },

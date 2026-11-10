@@ -19,7 +19,7 @@ describe('printable readiness summary', () => {
   })
 
   it('marks open requirements, empty rosters, and incomplete room or requirement coverage Draft', () => {
-    expect(readinessPrintSummary({ ...complete, students: [{ studentId: 'student', name: 'Student', state: 'open', open: ['FIRST registration'] }] }).status).toBe('Draft')
+    expect(readinessPrintSummary({ ...complete, students: [{ studentId: 'student', name: 'Student', state: 'open', open: ['FIRST registration: Waiting for Coach approval'] }] }).status).toBe('Draft')
     expect(readinessPrintSummary({ ...complete, students: [] }).status).toBe('Draft')
     expect(readinessPrintSummary({ ...complete, coverage: { participantsComplete: true, roomingComplete: false }, requirementsComplete: false }).notes).toEqual(expect.arrayContaining(['Some room groups could not be checked.', 'Some event requirements could not be checked.']))
   })

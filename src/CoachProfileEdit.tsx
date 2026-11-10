@@ -38,7 +38,7 @@ function EmailField({ value, original, onChange, disabled, note }: { value: stri
   const changed = emailKey(value) !== emailKey(original)
   return <div className={styles.field}>
     <label className={styles.field}>Sign-in email<Input type="email" autoComplete="off" required maxLength={254} value={value} disabled={disabled} onChange={event => onChange(event.target.value)} aria-describedby={changed ? 'coach-profile-email-warning' : undefined}/></label>
-    {changed && <p id="coach-profile-email-warning" role="status" className={styles.warning}><strong>Login email is changing.</strong> {note ?? signInWarning}</p>}
+    {changed && <p id="coach-profile-email-warning" role="status" className={styles.warning}><strong>Sign-in email is changing.</strong> {note ?? signInWarning}</p>}
   </div>
 }
 
@@ -66,7 +66,7 @@ function SaveControls({ busy, stale, emailChanged, invalid, onCancel, onReload, 
       <Button type="button" variant="outline" disabled={busy} onClick={onCancel}>Cancel</Button>
       {stale && <Button type="button" variant="outline" onClick={onReload}>Load latest</Button>}
       {emailChanged
-        ? <ConfirmAction disabled={busy || stale || invalid} description={`Change the login email? ${signInWarning}`} onConfirm={run}>Save profile</ConfirmAction>
+        ? <ConfirmAction title="Change the sign-in email?" disabled={busy || stale || invalid} description={`Change the sign-in email? ${signInWarning}`} onConfirm={run}>Save profile</ConfirmAction>
         : <Button type="submit" disabled={busy || stale || invalid}>{busy ? 'Saving…' : 'Save profile'}</Button>}
     </div>
   </>

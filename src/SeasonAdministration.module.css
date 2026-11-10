@@ -5,6 +5,12 @@
 .step { border: 1px solid var(--border-default); border-radius: .3rem; padding: .45rem .65rem; background: var(--surface-card); font-size: .85rem; font-weight: 600; }
 .stepCurrent { background: var(--purple-700); color: #fff; border-color: var(--purple-700); }
 .stepLater { color: var(--text-muted); }
+.check { display: flex; align-items: center; gap: .6rem; font-size: .9rem; }
+.progress { display: flex; gap: .25rem; margin: 0; padding: 0; list-style: none; }
+.progress li { flex: 1; height: .375rem; border-radius: 999px; background: var(--border-default); }
+.progress li[data-done='true'] { background: var(--purple-700); }
+.stepLabel { margin: 0; color: var(--text-muted); font-size: .85rem; font-weight: 600; }
+.wizardNav { display: flex; align-items: center; justify-content: space-between; gap: .6rem; flex-wrap: wrap; }
 .notice { margin: 0; padding: .8rem 1rem; border-radius: .35rem; background: var(--gold-100); border: 1px solid var(--gold-600); }
 .section { display: grid; gap: 1rem; border: 1px solid var(--border-default); border-radius: .5rem; background: var(--surface-card); padding: 1.25rem; }
 .section h2 { margin: 0; font-family: Anton, Impact, sans-serif; font-size: 1.45rem; font-weight: 400; }

@@ -163,7 +163,7 @@ export const retryBulk = mutation({
     const waiting = await ctx.db.query("feeBulkRows").withIndex("by_jobId_and_state", q => q.eq("jobId", job._id).eq("state", "waiting")).first();
     if (waiting) {
       const account = await financialAccount(ctx, waiting.studentId);
-      if (account?.state !== "ready") throw new ConvexError("A student's money is still updating. Retry that student first, then try again.");
+      if (account?.state !== "ready") throw new ConvexError("A student's money is still updating. Finish that student first, then try again.");
     }
     if (job.state === "held" && !args.rows.length) throw new ConvexError("Review at least one student on hold, then try again.");
     if (args.rows.length && !job.snapshotComplete) throw new ConvexError("The student list is still being prepared. Wait, or cancel this fee change, then try again.");

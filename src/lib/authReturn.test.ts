@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { authReturnPhase, clearSignInIntent, readSignInIntent, SIGN_IN_INTENT_KEY, SIGN_IN_INTENT_TTL_MS, withoutOAuthCode, writeSignInIntent } from './authReturn'
+import { authReturnPhase, recordSignInScreenChange, clearEmailCodeStep, clearSignInIntent, EMAIL_STEP_KEY, EMAIL_STEP_TTL_MS, readEmailCodeStep, SIGN_IN_NOTICE_KEY, SIGN_IN_NOTICE_TTL_MS, takeSignInNotice, writeEmailCodeStep, writeSignInNotice, isGoogleIntent, keepSignInStorage, readSignInIntent, SIGN_IN_INTENT_KEY, SIGN_IN_INTENT_TTL_MS, withoutOAuthCode, writeSignInIntent } from './authReturn'
 
 function memoryStorage(initial: Record<string, string> = {}) {
   const data = new Map(Object.entries(initial))
@@ -15,6 +15,7 @@ describe('sign-in intent', () => {
     { name: 'fresh adult intent at the TTL edge', stored: { intent: 'adult', at: NOW - SIGN_IN_INTENT_TTL_MS }, expected: 'adult', kept: true },
     { name: 'expired intent', stored: { intent: 'student', at: NOW - SIGN_IN_INTENT_TTL_MS - 1 }, expected: null, kept: false },
     { name: 'timestamp far in the future', stored: { intent: 'adult', at: NOW + 10 * 60_000 }, expected: null, kept: false },
+    { name: 'fresh email intent (reload while fetching the code)', stored: { intent: 'email', at: NOW - 5 * 60_000 }, expected: 'email', kept: true },
     { name: 'unknown intent value', stored: { intent: 'coach', at: NOW }, expected: null, kept: false },
     { name: 'malformed JSON', stored: '{not json', expected: null, kept: false },
   ])('$name', ({ stored, expected, kept }) => {
@@ -66,5 +67,94 @@ describe('withoutOAuthCode', () => {
     { location: { pathname: '/events', search: '?code=abc&tab=2', hash: '#top' }, expected: '/events?tab=2#top' },
   ])('$location.search$location.hash', ({ location, expected }) => {
     expect(withoutOAuthCode(location)).toBe(expected)
+  })
+})
+
+describe('Google sign-in never reuses the email intent', () => {
+  it.each([['student', true], ['adult', true], ['email', false], [null, false]] as const)('%s', (intent, google) => {
+    expect(isGoogleIntent(intent)).toBe(google)
+  })
+})
+
+describe('keepSignInStorage', () => {
+  const storage = (persisted: boolean, grant: boolean | Error) => {
+    const calls: string[] = []
+    return { calls, api: { persisted: async () => { calls.push('persisted'); return persisted }, persist: async () => { calls.push('persist'); if (grant instanceof Error) throw grant; return grant } } }
+  }
+  it.each([
+    { name: 'browser tab: never asks (some browsers would prompt)', standalone: false, persisted: false, grant: true, result: false, calls: [] },
+    { name: 'installed app: asks once', standalone: true, persisted: false, grant: true, result: true, calls: ['persisted', 'persist'] },
+    { name: 'installed app already persistent: does not ask again', standalone: true, persisted: true, grant: true, result: true, calls: ['persisted'] },
+    { name: 'installed app refused', standalone: true, persisted: false, grant: false, result: false, calls: ['persisted', 'persist'] },
+    { name: 'installed app, API throws', standalone: true, persisted: false, grant: new Error('denied'), result: false, calls: ['persisted', 'persist'] },
+  ])('$name', async ({ standalone, persisted, grant, result, calls }) => {
+    const fake = storage(persisted, grant)
+    await expect(keepSignInStorage({ standalone, storage: fake.api })).resolves.toBe(result)
+    expect(fake.calls).toEqual(calls)
+  })
+  it('no Storage API', async () => {
+    await expect(keepSignInStorage({ standalone: true, storage: undefined })).resolves.toBe(false)
+  })
+})
+
+describe('email code step', () => {
+  const step = { email: 'parent@example.com', resendAvailableAt: NOW + 30_000 }
+  it('saves and restores the address and resend time, and nothing else', () => {
+    const storage = memoryStorage()
+    writeEmailCodeStep(storage, step, NOW)
+    expect(JSON.parse(storage.data.get(EMAIL_STEP_KEY)!)).toEqual({ ...step, at: NOW })
+    expect(readEmailCodeStep(storage, NOW + 60_000)).toEqual(step)
+  })
+  it('is still valid at the TTL edge and expires after it', () => {
+    const storage = memoryStorage()
+    writeEmailCodeStep(storage, step, NOW)
+    expect(readEmailCodeStep(storage, NOW + EMAIL_STEP_TTL_MS)).toEqual(step)
+    expect(readEmailCodeStep(storage, NOW + EMAIL_STEP_TTL_MS + 1)).toBeNull()
+    expect(storage.data.has(EMAIL_STEP_KEY)).toBe(false)
+  })
+  it('clears on request', () => {
+    const storage = memoryStorage()
+    writeEmailCodeStep(storage, step, NOW)
+    clearEmailCodeStep(storage)
+    expect(readEmailCodeStep(storage, NOW)).toBeNull()
+  })
+  it.each(['{not json', JSON.stringify({ email: '', resendAvailableAt: 1, at: NOW }), JSON.stringify({ email: 'a@b.co', resendAvailableAt: 'x', at: NOW }), JSON.stringify({ email: 'a@b.co', resendAvailableAt: 1, at: NOW + 10 * 60_000 })])('drops malformed or future data %#', raw => {
+    const storage = memoryStorage({ [EMAIL_STEP_KEY]: raw })
+    expect(readEmailCodeStep(storage, NOW)).toBeNull()
+    expect(storage.data.has(EMAIL_STEP_KEY)).toBe(false)
+  })
+})
+
+describe('sign-in notice', () => {
+  it('is read once, then gone', () => {
+    const storage = memoryStorage()
+    writeSignInNotice(storage, 'Google could not open.', NOW)
+    expect(takeSignInNotice(storage, NOW + 1000)).toBe('Google could not open.')
+    expect(takeSignInNotice(storage, NOW + 1000)).toBeNull()
+  })
+  it('expires and is removed', () => {
+    const storage = memoryStorage()
+    writeSignInNotice(storage, 'x', NOW)
+    expect(takeSignInNotice(storage, NOW + SIGN_IN_NOTICE_TTL_MS + 1)).toBeNull()
+    expect(storage.data.has(SIGN_IN_NOTICE_KEY)).toBe(false)
+  })
+})
+
+describe('leaving the email sign-in', () => {
+  const step = { email: 'parent@example.com', resendAvailableAt: NOW + 60_000 }
+  it.each(['adult', 'choose'])('forgets the code step and email intent when going to %s', next => {
+    const storage = memoryStorage()
+    writeSignInIntent(storage, 'email', NOW)
+    writeEmailCodeStep(storage, step, NOW)
+    recordSignInScreenChange(storage, 'email', next, NOW)
+    expect(readEmailCodeStep(storage, NOW)).toBeNull()
+    expect(readSignInIntent(storage, NOW)).toBeNull()
+  })
+  it('keeps the step while moving into or staying on the email screen', () => {
+    const storage = memoryStorage()
+    writeEmailCodeStep(storage, step, NOW)
+    recordSignInScreenChange(storage, 'adult', 'email', NOW)
+    expect(readSignInIntent(storage, NOW)).toBe('email')
+    expect(readEmailCodeStep(storage, NOW)).toEqual(step)
   })
 })

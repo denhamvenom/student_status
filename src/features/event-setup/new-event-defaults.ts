@@ -38,7 +38,7 @@ export const newEventWizardCopy = {
   /** Step counter on a Team meeting's Extras, which is not counted as a step. */
   optionalStep: 'Optional step',
   addExtras: 'Add extras',
-  addExtrasDetail: 'Signup questions, things students must do, forms or a fee',
+  addExtrasDetail: 'A fee, signup questions, things students must do or forms',
   extrasQuestions: 'Signup questions',
   extrasRequirements: 'Things students must do',
   extrasForms: 'Forms and support',

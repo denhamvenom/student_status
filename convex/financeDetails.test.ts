@@ -90,4 +90,21 @@ describe("paginated financial evidence", () => {
     expect(await client.query(api.financeDetails.owedSummary, { studentId: ids.studentId })).toEqual({ owedCents: 30 * 100 + 300 + 250 + 70, soonestDueAt: 1_000, soonestDueCents: 550 });
     await expect(client.query(api.financeDetails.owedSummary, { studentId: ids.unrelatedId })).rejects.toThrow();
   });
+  it.each([0, 250])("counts a charge whose outstanding flag was never written, beside %i paid older charges, so the Money lead line matches the account total", async paidUnflagged => {
+    const t = createTest(schema, modules);
+    const ids = await t.run(async ctx => {
+      const auth = await ctx.db.insert("users", { email: "legacy-owed@example.invalid" });
+      const parent = await ctx.db.insert("appUsers", { authUserId: auth, name: "Synthetic Parent", email: "legacy-owed@example.invalid", role: "parent", active: true, travelLead: false, financialEdit: false });
+      const seasonId = await ctx.db.insert("seasons", { name: "Synthetic", year: 2026, status: "active", startsAt: 0, permissionVersion: "DRAFT", createdBy: parent });
+      const studentId = await ctx.db.insert("students", { seasonId, legalName: "Synthetic", preferredName: "Synthetic", email: "synthetic@example.invalid", subteam: "Build", active: true, travelTeam: false, roomCategoryLocked: false, allergies: { state: "unknown" as const }, medications: { state: "unknown" as const } });
+      await ctx.db.insert("familyLinks", { parentUserId: parent, studentId, active: true, createdBy: parent });
+      await ctx.db.insert("charges", { studentId, label: "Flag never written", amountCents: 500, appliedCents: 0, priority: 1, createdBy: parent, createdAt: 1 });
+      await ctx.db.insert("charges", { studentId, label: "Flag cleared", amountCents: 300, appliedCents: 300, priority: 2, createdBy: parent, createdAt: 2, outstanding: false });
+      // More paid older charges than the unpaid limit: paid ones don't count toward it.
+      for (let index = 0; index < paidUnflagged; index++) await ctx.db.insert("charges", { studentId, label: `Paid older ${index}`, amountCents: 100, appliedCents: 100, priority: 10 + index, createdBy: parent, createdAt: 10 + index });
+      return { auth, studentId };
+    });
+    const client = t.withIdentity({ subject: `${ids.auth}|session` });
+    expect(await client.query(api.financeDetails.owedSummary, { studentId: ids.studentId })).toEqual({ owedCents: 500, soonestDueAt: null, soonestDueCents: 0 });
+  });
 });

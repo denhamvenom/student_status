@@ -28,6 +28,12 @@ Accepted deferrals are listed in [KNOWN_GAPS.md](KNOWN_GAPS.md); consult them on
   - Coach team-wide Mentor overview (who is going to what, across events).
   - Store the creator's role label at creation time (Created by currently reads the creator's role now).
   - Theme flash on load.
+- Usability audit follow-ups (November 9, 2026, `feat/usability-audit`, unreleased):
+  - Owner decision: sign-in session length. Sessions currently end 30 days after sign-in by default.
+  - Real-phone checks for installed-app sign-in on an iPhone and an Android phone (remembered email-code step, persistent storage request); not yet run on physical devices.
+  - Mentor "Required meetings attended" may read "Not counted yet" if `attendanceMeetings` is empty; verify on live data.
+  - The Home vs Money balance fix assumes charges missing the outstanding flag; verify on development data.
+  - Event Readiness and roster first-load query cost has not been measured.
 - Roster bulk edit and assigning CAD/Leadership from the roster subteam dropdown.
 - Student Home wording: carousel, FIRST registration/Consent & Release jargon, doubled "optional" label on open signups.
 - Owner decision: whether Travel Leads keep adding/removing Mentor invitations on Coach-only required events (current policy allows it).

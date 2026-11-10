@@ -22,7 +22,7 @@ type Invalid = { field: string | null; message: string }
 
 /** Skip always either advances (nothing to discard) or opens the in-app confirm that names how many unfinished items go. */
 export function SkipButton({ onSkip, skipCount }: { onSkip: () => void; skipCount: number }) {
-  return <div>{skipCount > 0 ? <ConfirmAction description={copy.skipConfirm(skipCount)} onConfirm={async () => onSkip()}>{copy.skip}</ConfirmAction> : <Button type="button" variant="outline" onClick={onSkip}>{copy.skip}</Button>}</div>
+  return <div>{skipCount > 0 ? <ConfirmAction title={copy.skipConfirmTitle} description={copy.skipConfirm(skipCount)} onConfirm={async () => onSkip()}>{copy.skip}</ConfirmAction> : <Button type="button" variant="outline" onClick={onSkip}>{copy.skip}</Button>}</div>
 }
 
 /** Time slots: generate several back-to-back slots, add or remove single ones, and set how many a student picks. Nothing is saved until Create event. */

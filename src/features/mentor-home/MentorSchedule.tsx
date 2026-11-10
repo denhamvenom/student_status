@@ -1,4 +1,4 @@
-import { useId, useRef, type KeyboardEvent } from 'react'
+import { useId, useRef, useState, type KeyboardEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { cn } from 'cn'
 import { TileError } from '@/components/dashboard/TileErrorBoundary'
@@ -11,7 +11,7 @@ import type { MentorHomeData } from './contract'
 import { useMentorHomeData } from './MentorHome'
 import { NeedsAnswer, type MentorHomeHandlers } from './MentorHomeView'
 import { JoinSectionsList } from './MentorJoinRow'
-import { createdList, goingList, joinSections, meetingLine, needsAnswer, SCHEDULE_TABS, seriesLine, tabFromHash, type ScheduleTab } from './logic'
+import { createdList, goingList, joinSections, meetingLine, needsAnswer, SCHEDULE_TABS, seriesLine, subteamsList, tabFromHash, type ScheduleTab } from './logic'
 import { blockHeading, EventLinkRow, RowList, Tags } from './rows'
 
 const copy = mentorHomeCopy
@@ -39,6 +39,21 @@ function Created({ data, now, createHint }: { data: MentorHomeData; now: number;
       <ul className="m-0 flex list-none flex-col gap-1 p-0">{data.createdSeries.map(series => <li key={series.seriesId} className="text-[14px] text-vs-text-2"><span className="font-semibold text-vs-text">{series.name}</span> · {seriesLine(series)}</li>)}</ul>
     </div>}
     <p className="m-0 text-[13px] text-vs-muted">{createHint}</p>
+  </>
+}
+
+/** Join: the Mentor's subteams and whole-team items; "Show all subteams" widens it. The line only appears when something is hidden. */
+function JoinPanel({ data, now, handlers }: { data: MentorHomeData; now: number; handlers: MentorHomeHandlers }) {
+  const [showAll, setShowAll] = useState(false)
+  const sections = joinSections(data.joinable, now, data.subteams, showAll)
+  const list = subteamsList(data.subteams)
+  return <>
+    <p className="m-0 text-[14px] text-vs-text-2">{copy.schedule.joinHint}</p>
+    {(sections.hidden > 0 || showAll) && <p className="m-0 flex flex-wrap items-center gap-x-2 text-[13px] text-vs-muted">
+      <span>{showAll ? copy.scope.showingAll : copy.scope.showing(list)}</span>
+      <button type="button" aria-pressed={showAll} onClick={() => setShowAll(value => !value)} className={cn('min-h-11 cursor-pointer border-0 bg-transparent p-0 text-[13px] font-semibold text-vs-accent-text underline', focusRing)}>{showAll ? copy.scope.mine : copy.scope.all}</button>
+    </p>}
+    <JoinSectionsList sections={sections} actions={handlers} />
   </>
 }
 
@@ -77,10 +92,7 @@ export function MentorSchedule({ createHint }: { createHint: string }) {
   let panel
   if (data === undefined) panel = <TileSkeleton label={copy.states.loading(copy.schedule.title)} />
   else if (data instanceof Error) panel = <TileError title={copy.states.homeTitle} message={copy.states.homeFailed} retryLabel={copy.states.tryAgain} onRetry={handlers.retry} />
-  else if (tab === 'join') panel = <>
-    <p className="m-0 text-[14px] text-vs-text-2">{copy.schedule.joinHint}</p>
-    <JoinSectionsList sections={joinSections(data.joinable, now)} actions={handlers} />
-  </>
+  else if (tab === 'join') panel = <JoinPanel data={data} now={now} handlers={handlers} />
   else if (tab === 'created') panel = <Created data={data} now={now} createHint={createHint} />
   else panel = <Going data={data} now={now} handlers={handlers} />
   return <div className="flex min-w-0 flex-col gap-3 pb-24 font-sans text-vs-text md:mx-auto md:w-full md:max-w-[720px] lg:pb-6">

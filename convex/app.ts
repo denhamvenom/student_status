@@ -1,8 +1,8 @@
 import { normalizeChangedPhone } from "./lib/contactValidation";
 import { enrollmentPending } from "./lib/eventEnrollmentState";
 import { ConvexError, v } from "convex/values";
-import { mutation, query } from "./_generated/server";
-import type { Doc } from "./_generated/dataModel";
+import { mutation, query, type QueryCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
 import { seriesProgress } from "./lib/seriesGenerate";
 import { eventVisibleFor, parentLinkedStudentsFallback, parentLinkedStudentsOrNull, participationOn, requireStudentOrParentCanSeeEvent } from "./lib/eventVisibility";
 import { resolveAudience } from "./lib/eventAudienceRules";
@@ -10,7 +10,10 @@ import { eventDetailReturns, familyEvent, listEventsReturns } from "./lib/eventP
 import { creatorCaches, eventCreatorFor } from "./lib/eventCreator";
 import { seriesOf } from "./lib/mentorMeetings";
 import { activeSeason, identity, linkedStudents, maybeViewer, mentorEvent, mentorStudent, privateStudent, publicStudent, studentGroups, requireRole, studentAccess, viewer as requireViewer, audit, isCoachOrTravelLead } from "./lib/access";
-import { attendanceFor, financeFor, studentReadiness } from "./lib/readModels";
+import { attendanceFor, financeFor, roomSelectionState, studentReadiness } from "./lib/readModels";
+import { effectiveChargeCents } from "./lib/chargeObligation";
+import { activeShifts, eventShiftSignups } from "./lib/eventSignupExtras";
+import { chargeCurrency } from "../src/lib/charge-money";
 import { coverageFor } from "./lib/permissionCoverage";
 import { fieldTripApproved } from "../src/lib/field-trip-approved";
 import { v2SigningAllowed } from "./lib/permissionSigningMode";
@@ -160,7 +163,7 @@ export const studentDashboard = query({
     const signingAvailable = user.role === "parent" && activeVersion?.formFormat === 2 && activeVersion.version === fieldTripApproved.templateVersion && await v2SigningAllowed(ctx, student._id, user._id);
     const signingPaused = await permissionSigningPaused(ctx);
     if (!studentSetupComplete) todos.push({eventId: null, eventName: "Student setup", label: user.role === "student" ? "Finish your student setup" : "Student setup needs to be finished by the student", dueAt: null, href: user.role === "student" ? "/setup" : null, responsible: "student", blocked: user.role !== "student"});
-    if (!parentProfileComplete) todos.push({eventId: null, eventName: "Profile & health", label: user.role === "parent" ? "Finish the health and contact profile" : "A parent or legal guardian needs to finish the health and contact profile", dueAt: null, href: user.role === "parent" ? "/setup" : null, responsible: "parent", blocked: user.role !== "parent"});
+    if (!parentProfileComplete) todos.push({eventId: null, eventName: "Health information", label: user.role === "parent" ? "Finish health information" : "A parent needs to finish health information", dueAt: null, href: user.role === "parent" ? "/setup" : null, responsible: "parent", blocked: user.role !== "parent"});
     const firstRegistrationState = await firstStatus(ctx, student._id);
     const adultStudent = user.role === "student" && args.asOf !== undefined && Number.isFinite(args.asOf) && age18((await ctx.db.query("setupDrafts").withIndex("by_studentId",q=>q.eq("studentId",student._id)).unique())?.dateOfBirth ?? student.consentProfileV2?.dateOfBirth, args.asOf);
     if (firstRegistrationState !== "verified") {
@@ -230,6 +233,67 @@ export const mentorReport = query({
   },
 });
 
+export type ReadinessColumn = { key: string; label: string };
+type ReadinessEventFields = Pick<Doc<"events">, "feeCents" | "permissionRequired" | "firstRequired" | "type" | "overnight" | "roomingEnabled" | "shiftsEnabled">;
+
+/**
+ * The requirement columns that apply to one event, in display order. A requirement an event does not have gets no column.
+ * The permission form column appears only while permission signing is open for the team.
+ */
+export function readinessColumns(event: ReadinessEventFields, options: { signingOpen: boolean; requirements: { key: string; label: string }[] }): ReadinessColumn[] {
+  return [
+    ...(event.feeCents > 0 ? [{ key: "payment", label: "Payment" }] : []),
+    ...(event.permissionRequired && options.signingOpen ? [{ key: "permission", label: "Permission form" }] : []),
+    ...(event.type === "Competition" || event.firstRequired ? [{ key: "first", label: "FIRST registration" }] : []),
+    ...options.requirements.map(requirement => ({ key: `custom:${requirement.key}`, label: requirement.label })),
+    ...(event.overnight && event.roomingEnabled ? [{ key: "room", label: "Room choice" }] : []),
+  ];
+}
+
+/**
+ * The Event readiness list reads at most READINESS_LIST_EVENTS events. Per event it reads at most READINESS_LIST_REQUIREMENTS
+ * requirements and, only when nothing else lists the event, READINESS_LIST_CHARGES charges: 100 x (25 + 25) + 100 events = 5,100
+ * documents, well under Convex's 32,000-document limit (the old 200 x (100 + 50) approached it at 30,200).
+ */
+const READINESS_LIST_EVENTS = 100;
+const READINESS_LIST_REQUIREMENTS = 25;
+const READINESS_LIST_CHARGES = 25;
+
+/** Whether any of the event's charges (first 25) still has a balance due. Bounded per event. */
+async function eventHasOpenCharge(ctx: QueryCtx, eventId: Id<"events">) {
+  const charges = await ctx.db.query("charges").withIndex("by_eventId_and_studentId", q => q.eq("eventId", eventId)).take(READINESS_LIST_CHARGES);
+  return charges.some(charge => effectiveChargeCents(charge) - charge.appliedCents > 0);
+}
+
+/** Events a Coach or Travel Lead has something to complete for: only those with at least one requirement or team transport. */
+export const readinessEvents = query({
+  args: { asOf: v.number() },
+  returns: v.array(v.object({ _id: v.id("events"), name: v.string(), type: v.string(), startsAt: v.number(), endsAt: v.number(), requirements: v.array(v.string()), isPast: v.boolean() })),
+  handler: async (ctx, args) => {
+    const user = await requireViewer(ctx);
+    if (!isCoachOrTravelLead(user)) throw new ConvexError("Only a Coach or Travel Lead can see event readiness.");
+    const season = await activeSeason(ctx);
+    const signingOpen = !(await permissionSigningPaused(ctx));
+    // Newest-ending first so a long season keeps its upcoming and recent events; the list is re-sorted oldest-first below.
+    const events = await ctx.db.query("events").withIndex("by_seasonId_and_archived_and_endsAt", q => q.eq("seasonId", season._id).eq("archived", false)).order("desc").take(READINESS_LIST_EVENTS);
+    const listed = [];
+    for (const event of events) {
+      if (event.cancelled) continue;
+      const requirements = await ctx.db.query("requirements").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(READINESS_LIST_REQUIREMENTS);
+      const columns = readinessColumns(event, { signingOpen, requirements });
+      // A free event still shows Payment (as its page does) while someone owes an event charge. Only events that would otherwise be skipped pay for this read.
+      if (!columns.some(column => column.key === "payment") && await eventHasOpenCharge(ctx, event._id)) columns.unshift({ key: "payment", label: "Payment" });
+      // While signing is paused the form column is hidden, but the page still counts an unsigned form against readiness, so the list keeps the event too.
+      const formsNotOpen = event.permissionRequired && !signingOpen;
+      if (!columns.length && !event.transportEnabled && !formsNotOpen) continue;
+      listed.push({ _id: event._id, name: event.name, type: event.type, startsAt: event.startsAt, endsAt: event.endsAt, requirements: [...columns.map(column => column.label), ...(formsNotOpen ? ["Permission form (not open yet)"] : []), ...(event.transportEnabled ? ["Transport"] : [])], isPast: event.endsAt < args.asOf });
+    }
+    return listed.sort((a, b) => a.startsAt - b.startsAt);
+  },
+});
+
+const leftoverHidden = new Set(["Required payment", "Permission accepted", "FIRST registration and Consent & Release", "FIRST registration", "Room selection", "This event is canceled."]);
+
 export const eventReadiness = query({
   args: { eventId: v.id("events"), studentId: v.optional(v.id("students")) }, returns: v.any(),
   handler: async (ctx, args) => {
@@ -242,16 +306,56 @@ export const eventReadiness = query({
       const student = await studentAccess(ctx, user, args.studentId);
       return { event: { _id: event._id, name: event.name }, students: [{ student: publicStudent(student), ...await studentReadiness(ctx, event, student) }], transportation: null, rooming: null, overall: null };
     }
-    if (enrollmentPending(event)) return { event: { _id: event._id, name: event.name }, students: [], transportation: null, rooming: null, overall: "open", enrollmentState: event.enrollmentState, coverage: { participantsComplete: false, roomingComplete: false } };
+    if (enrollmentPending(event)) return { event: { _id: event._id, name: event.name }, columns: [], counts: { students: 0, ready: 0, open: 0, openItems: 0 }, students: [], transportation: null, rooming: null, overall: "open", enrollmentState: event.enrollmentState, coverage: { participantsComplete: false, roomingComplete: false } };
     const participantPage = await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(501);
     const participantsComplete = participantPage.length <= 500;
     const participants = participantPage.slice(0, 500);
-    const rows = [];
+    const signingOpen = !(await permissionSigningPaused(ctx));
+    const custom = await ctx.db.query("requirements").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(100);
+    const shifts = event.shiftsEnabled ? await activeShifts(ctx, event._id) : [];
+    const shiftPlaces = event.shiftsEnabled ? await eventShiftSignups(ctx, event._id) : [];
+    const minShifts = Math.min(event.minShiftsPerStudent ?? 1, shifts.length);
+    const base = readinessColumns(event, { signingOpen, requirements: custom });
+    const built = [];
     for (const p of participants.filter(x => x.status === "confirmed")) {
       const student = await ctx.db.get(p.studentId);
-      if (student?.active && student.seasonId === season._id) rows.push({ student: publicStudent(student), ...await studentReadiness(ctx, event, student) });
+      if (!student?.active || student.seasonId !== season._id) continue;
+      const readiness = await studentReadiness(ctx, event, student);
+      const charges = await ctx.db.query("charges").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(101);
+      const dueCents = charges.reduce((sum, charge) => sum + Math.max(0, effectiveChargeCents(charge) - charge.appliedCents), 0);
+      const room = event.overnight && event.roomingEnabled ? await roomSelectionState(ctx, event._id, student._id) : null;
+      const shiftCount = shiftPlaces.filter(x => x.studentId === student._id && shifts.some(s => s._id === x.shiftId)).length;
+      built.push({ student, readiness, dueCents, room, shiftCount });
     }
-    const openStudents = rows.filter(x => x.state === "open").length;
+    // Payment shows for a free event too when a student still owes an event charge.
+    const columns: ReadinessColumn[] = [...base];
+    if (!columns.some(c => c.key === "payment") && built.some(b => b.readiness.open.includes("Required payment"))) columns.unshift({ key: "payment", label: "Payment" });
+    const leftovers = (open: string[]) => open.filter(item => !leftoverHidden.has(item) && !custom.some(r => r.label === item));
+    if (built.some(b => leftovers(b.readiness.open).length)) columns.push({ key: "review", label: "Needs review" });
+    const rowsBuilt = built.map(({ student, readiness, dueCents, room, shiftCount }) => {
+      const cells = columns.map(column => {
+        const cell = (done: boolean, doneText: string, openText: string) => ({ key: column.key, state: done ? "done" as const : "open" as const, text: done ? doneText : openText });
+        if (column.key === "payment") return cell(!readiness.open.includes("Required payment"), "Paid", dueCents > 0 ? `Owes ${chargeCurrency(dueCents)}` : "Payment not complete");
+        if (column.key === "permission") return cell(readiness.permissionStatus !== "missing", "Signed", "Not signed yet");
+        if (column.key === "first") {
+          if (event.type === "Competition") return cell(readiness.firstRegistrationState === "verified", "Verified", readiness.firstRegistrationState === "awaitingVerification" ? "Waiting for Coach approval" : "Not finished");
+          return cell(!readiness.open.includes("FIRST registration"), "Done", "Not marked done");
+        }
+        if (column.key === "room") return cell(!readiness.open.includes("Room selection"), "Chosen", room?.membership ? "Room group not final yet" : "No room choice yet");
+        if (column.key === "review") { const items = leftovers(readiness.open); return cell(items.length === 0, "Nothing to review", items.join("; ")); }
+        return cell(!readiness.open.includes(column.label), "Done", "Not done");
+      });
+      const openCells = cells.filter(item => item.state === "open");
+      // While signing is paused the Permission form column is hidden, but a required unsigned form still keeps the student from being ready.
+      // The per-student reason stays server-side while paused: rows carry only the combined state and count, the page gets an event-level count.
+      const awaitingForm = event.permissionRequired && !signingOpen && readiness.permissionStatus === "missing";
+      const openCount = openCells.length + (awaitingForm ? 1 : 0);
+      return { awaitingForm, shiftCount, row: { student: publicStudent(student), state: openCount ? "open" as const : "ready" as const, open: openCells.map(item => columns.find(c => c.key === item.key)!.label), cells, openCount, participation: readiness.participation, ...(signingOpen ? { permissionStatus: readiness.permissionStatus } : {}), firstRegistrationState: readiness.firstRegistrationState } };
+    });
+    const studentsAwaitingForms = rowsBuilt.filter(item => item.awaitingForm).length;
+    const permissionFormsClosed = studentsAwaitingForms > 0;
+    const rows = rowsBuilt.map(item => ({ ...item.row, ...(event.shiftsEnabled ? { shiftCount: item.shiftCount } : {}) }));
+    const counts = { students: rows.length, ready: rows.filter(x => x.state === "ready").length, open: rows.filter(x => x.state === "open").length, openItems: rows.reduce((sum, row) => sum + row.openCount, 0) };
     const transportation = participantsComplete ? await transportSummary(ctx, event) : null;
     const roomGroupPage = await ctx.db.query("roomGroups").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(101);
     const roomingComplete = roomGroupPage.length <= 100;
@@ -259,9 +363,9 @@ export const eventReadiness = query({
     const memberships = await Promise.all(rows.map(x => ctx.db.query("roomMemberships").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", x.student._id)).unique()));
     const roomingCovered = memberships.every(m => m && groups.some(g => g._id === m.groupId && g.finalized && !g.needsReview));
     const rooming = !event.overnight || !event.roomingEnabled ? { state: "notApplicable", open: 0 } : { state: roomingComplete && participantsComplete && groups.every(x => x.finalized && !x.needsReview) && roomingCovered ? "ready" : "open", open: groups.filter(x => !x.finalized || x.needsReview).length + memberships.filter(x => !x).length };
-    const overall = event.cancelled || !participantsComplete || !roomingComplete || openStudents || transportation?.state === "open" || rooming.state === "open" ? "open" : "ready";
-    if (user.role === "mentor" && !user.travelLead) return { event: { _id: event._id, name: event.name }, students: [], transportation: null, rooming: null, overall };
-    return { event: { _id: event._id, name: event.name }, students: rows.sort((a, b) => (a.state === "open" ? -1 : 1) - (b.state === "open" ? -1 : 1)), transportation, rooming, overall, coverage: { participantsComplete, roomingComplete } };
+    const overall = event.cancelled || !participantsComplete || !roomingComplete || counts.open || transportation?.state === "open" || rooming.state === "open" ? "open" : "ready";
+    if (user.role === "mentor" && !user.travelLead) return { event: { _id: event._id, name: event.name }, columns: [], counts: null, students: [], transportation: null, rooming: null, overall };
+    return { event: { _id: event._id, name: event.name }, columns, counts, students: rows.sort((a, b) => (a.state === "open" ? -1 : 1) - (b.state === "open" ? -1 : 1)), transportation, rooming, overall, permissionFormsClosed, studentsAwaitingForms, shifts: event.shiftsEnabled ? { minimum: minShifts } : null, coverage: { participantsComplete, roomingComplete } };
   },
 });
 

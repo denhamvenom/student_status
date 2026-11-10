@@ -9,6 +9,8 @@ import { dashboardButtonVariants, focusRing, inset, warningText } from '@/compon
 import type { WhatsLeftItem } from '../contract'
 import { homeCopy } from '../copy'
 import { formatShortDate } from '../format'
+import { guideForItem, taskCopy } from '../tasks'
+import { TaskSheet } from './TaskSheet'
 import { dueState, whatsLeftSummary, type WhatsLeftBadge, type WhatsLeftGroup } from '../logic'
 
 const copy = homeCopy.whatsLeft
@@ -28,20 +30,24 @@ function DueText({ item, now }: { item: WhatsLeftItem; now: number }) {
 /** "Invite a parent" always opens Parents, whatever the backend sends. */
 export const itemHref = (item: WhatsLeftItem) => item.kind === 'inviteParent' ? '/parents' : item.href
 
-function ItemRow({ item, now }: { item: WhatsLeftItem; now: number }) {
-  const href = itemHref(item)
-  const body = <>
+/** Every row is a 44px tap target. A task the student does goes straight to where it gets done; the sheet says who is on the rest. */
+function ItemRow({ item, now, all }: { item: WhatsLeftItem; now: number; all: WhatsLeftItem[] }) {
+  const [open, setOpen] = useState(false)
+  const guide = guideForItem(item.kind === 'inviteParent' ? { ...item, href: itemHref(item) } : item, { viewer: 'student', all })
+  const rowClass = cn(inset, 'flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-left font-sans! font-normal! text-vs-text-2!', focusRing)
+  const content = <>
     <span className="flex min-w-0 flex-1 flex-col">
       <span className="truncate text-[13px] text-vs-text-2">{itemLabel(item)}</span>
       {item.eventName && <span className="truncate text-[11px] text-vs-muted">{item.eventName}</span>}
     </span>
     <DueText item={item} now={now} />
-    {href && <ChevronRight size={16} aria-hidden="true" className="shrink-0 text-vs-muted" />}
+    <ChevronRight size={16} aria-hidden="true" className="shrink-0 text-vs-muted" />
   </>
-  const row = cn(inset, 'flex min-h-11 items-center gap-3 rounded-lg px-3 py-2')
-  return <li>{href
-    ? <Link to={href} className={cn(row, 'font-normal! text-vs-text-2! no-underline! hover:no-underline! hover:brightness-110', focusRing)}>{body}</Link>
-    : <div className={row}>{body}</div>}</li>
+  if (guide.actor === 'reader' && guide.action) return <li><Link to={guide.action.to} className={rowClass}>{content}</Link></li>
+  return <li>
+    <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" className={rowClass}>{content}</button>
+    <TaskSheet guide={guide} open={open} onOpenChange={setOpen} remindLabel={taskCopy.remindParent} />
+  </li>
 }
 
 function Badge({ badge }: { badge: WhatsLeftBadge }) {
@@ -91,7 +97,7 @@ export function WhatsLeftTile({ items, now }: { items: WhatsLeftItem[]; now: num
       </div>
     </div>
 
-    {summary.count > 0 && <ul className="mt-3 flex flex-col gap-1.5 lg:hidden">{summary.own.slice(0, INLINE_ROWS).map(item => <ItemRow key={item.key} item={item} now={now} />)}</ul>}
+    {summary.count > 0 && <ul className="mt-3 flex flex-col gap-1.5 lg:hidden">{summary.own.slice(0, INLINE_ROWS).map(item => <ItemRow key={item.key} item={item} now={now} all={items} />)}</ul>}
     {summary.waiting.length > 0 && <ul className="mt-2.5 flex flex-col gap-1 lg:hidden">{summary.waiting.map(line => <li key={line.group} className="flex items-center gap-2 text-[12px] text-vs-muted">
       <Clock size={13} aria-hidden="true" className="shrink-0" />
       <span className="min-w-0 flex-1">{copy.groups[line.group]}</span>
@@ -103,7 +109,7 @@ export function WhatsLeftTile({ items, now }: { items: WhatsLeftItem[]; now: num
       {items.length === 0 ? <p className="text-[14px] text-vs-muted">{copy.emptySheet}</p> : <div className="flex flex-col gap-5">
         {sheetGroups.filter(group => summary.groups[group].length > 0).map(group => <section key={group} aria-label={copy.groups[group]}>
           <h3 className="m-0! mb-2! font-sans! text-[12px]! leading-normal! font-semibold! tracking-[0.06em]! text-vs-muted uppercase">{copy.groups[group]}</h3>
-          <ul className="flex flex-col gap-1.5">{summary.groups[group].map(item => <ItemRow key={item.key} item={item} now={now} />)}</ul>
+          <ul className="flex flex-col gap-1.5">{summary.groups[group].map(item => <ItemRow key={item.key} item={item} now={now} all={items} />)}</ul>
         </section>)}
       </div>}
     </DetailsSheet>

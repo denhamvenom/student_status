@@ -67,7 +67,8 @@ export const recordPayout = mutation({
     await activeStudent(ctx, args.studentId);
     validAmount(args.amountCents);
     const reason = requiredText(args.reason, "Reason", 500);
-    const reference = requiredText(args.reference, "Check or receipt number", 150);
+    // Cash needs no check or receipt number (owner decision November 9, 2026).
+    const reference = args.method === "cash" && !args.reference.trim() ? undefined : requiredText(args.reference, "Check or receipt number", 150);
     const key = requiredText(args.idempotencyKey, "Transaction key", 150);
     if (key.length < 8 || !Number.isSafeInteger(args.occurredAt) || args.occurredAt < 0 || args.occurredAt > Date.now()) throw new ConvexError("Enter a payout date that isn't in the future.");
     const existing = await ctx.db.query("financeOperations").withIndex("by_idempotencyKey", q => q.eq("idempotencyKey", key)).unique();
