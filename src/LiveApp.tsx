@@ -121,7 +121,7 @@ import { EventListSections, EventTitleLink, MentorMeetingTag, viewEventLabel } f
 import { RoomOperations } from './features/operations/RoomOperations'
 import { FinanceOperations } from './features/operations/FinanceOperations'
 import { DriversPage, EventTransport, IndependentTravel } from './Travel'
-import { StudentWithdrawal, WithdrawalQueue, ChargeEditor } from './Withdrawals'
+import { StudentWithdrawal, WithdrawalQueue } from './Withdrawals'
 import { CoachParentAccess, ParentInvitationLanding, StudentParents } from './ParentInvites'
 
 type Student = { _id:string; secondarySubteam?:string|null; leadership?:boolean; fundraiserConnected?:boolean; profileRevision?:number; profileSetupRequired?:boolean; preferredName:string; legalName?:string; subteam:string; travelTeam?:boolean; active?:boolean; roomCategory?:string|null; email?:string; shirtSize?:string|null; allergies?:{state:string;text?:string}; medications?:{state:string;text?:string} }
@@ -258,7 +258,7 @@ function FinancePage({studentId,showHeading=true,allowChargeEditing=false}:{stud
             {due>0&&dueAt!==undefined&&<p className="muted">{dueDateCopy.short(dueAt)}</p>}
             {!(charged===0&&c.appliedCents===0&&(c.cancelledCents??0)>0)&&<div className={familyStyles.chargeAmounts}><div><span>{familyCopy.finance.charge}</span><strong>{chargeCurrency(charged)}</strong></div><div><span>{familyCopy.finance.appliedShort}</span><strong>{chargeCurrency(c.appliedCents)}</strong></div><div><span>{familyCopy.finance.dueShort}</span><strong>{chargeCurrency(due)}</strong></div></div>}
             {(c.adjustedCents??0)!==0&&<p className="muted">{chargeCurrency(c.adjustedCents??0)} {chargeAdministrationCopy.adjusted}</p>}
-            <Button type="button" variant="outline" onClick={()=>setChargeDetail({studentId,chargeId:c._id})}>{chargeAdministrationCopy.details}</Button>
+            <Button type="button" variant="outline" aria-label={familyCopy.finance.detailsFor(c.label)} onClick={()=>setChargeDetail({studentId,chargeId:c._id})}>{chargeAdministrationCopy.details}</Button>
             {(c.cancelledCents??0)>0&&<p className="muted">{chargeCurrency(c.cancelledCents??0)} {familyCopy.finance.canceledLower}. {familyCopy.finance.canceledFeeNote}</p>}
           </article>
         })}</div>
@@ -295,7 +295,7 @@ function AdminFinance({viewer}:{viewer:Viewer}) {
           <div style={scrollBody}>
             {!canEdit&&<p className="muted">{liveCopy.financeAdmin.viewOnlyNotice}</p>}
             <FinancePage key={details.id} studentId={details.id} showHeading={false} allowChargeEditing={viewer.user?.role==='coach'}/>
-            {canEdit&&<><ChargeEditor key={`charge:${details.id}`} studentId={sid(details.id)}/><FinanceOperations key={`finance:${details.id}`} studentId={sid(details.id)}/></>}
+            {canEdit&&<FinanceOperations key={`finance:${details.id}`} studentId={sid(details.id)} studentName={details.name}/>}
           </div>
         </>}
         <Button type="button" variant="outline" onClick={closeDetails}>{financeWorkspaceCopy.close}</Button>

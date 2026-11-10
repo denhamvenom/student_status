@@ -11,6 +11,7 @@ import { Input } from './components/ui/input'
 import { Checkbox } from './components/ui/checkbox'
 import { NativeSelect, NativeSelectOption } from './components/ui/native-select'
 import { StepWizard } from './components/StepWizard'
+import { normalizePhone } from '../shared/contact-format'
 import styles from './features/operations/Operations.module.css'
 
 const eventId = (id: string) => id as Id<'events'>
@@ -28,13 +29,22 @@ const driverCopy = {
   ...operationsText.driverForm,
   vehicleRequired: 'Enter the vehicle, like “Gray minivan”, so a Coach or Travel Lead can tell it apart.',
   seatsInvalid: 'Enter passenger seats as a whole number from 1 to 100. A driver who carries no students does not need to be added.',
+  phoneInvalid: 'Enter a 10-digit phone number, with an optional leading 1.',
+  approvalHint: 'A Coach or Travel Lead approves drivers. Approved means this driver can be assigned to an event vehicle; a driver who is not approved or not active cannot be.',
 }
 
-export function driverStepIssue(step: number, form: DriverForm): string {
+/** Server errors name the field ("Driver phone: ..."); the screen already shows which field, so drop the prefix. */
+export const withoutFieldPrefix = (message: string) => message.replace(/^Driver (?:phone|email): /, '')
+
+const phoneProblem = (phone: string) => { try { normalizePhone(phone); return '' } catch { return driverCopy.phoneInvalid } }
+
+export function driverStepIssue(step: number, form: DriverForm, previousPhone?: string): string {
   if (step === 0) {
     if (!form.name.trim()) return driverCopy.nameRequired
     if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) return driverCopy.emailInvalid
     if (!form.phone.trim()) return driverCopy.phoneRequired
+    // An unchanged saved number stays valid, like the server rule, so editing a legacy driver is not blocked.
+    if (form.phone.trim() !== previousPhone?.trim() && phoneProblem(form.phone)) return driverCopy.phoneInvalid
   }
   if (step === 1) {
     if (!form.vehicleName.trim()) return driverCopy.vehicleRequired
@@ -51,7 +61,7 @@ function DriverWizard({ editing, initial, busy, error, onSave, onCancel }: { edi
   const last = driverCopy.steps.length - 1
   const title = editing ? operationsCopy.travel.editDriver : operationsCopy.travel.addDriver
   const next = () => {
-    const problem = driverStepIssue(step, form)
+    const problem = driverStepIssue(step, form, editing ? initial.phone : undefined)
     setIssueText(problem)
     if (problem) return
     if (step === last) onSave(form)
@@ -59,7 +69,7 @@ function DriverWizard({ editing, initial, busy, error, onSave, onCancel }: { edi
   }
   const back = () => { setIssueText(''); setStep(step - 1) }
   const row = (label: string, value: string) => <div><dt>{label}</dt><dd>{value}</dd></div>
-  return <StepWizard className="card" title={title} step={step + 1} total={driverCopy.steps.length} heading={driverCopy.steps[step]} nextLabel={step === last ? (busy ? operationsCopy.travel.saving : operationsCopy.travel.saveDriver) : driverCopy.next} onNext={next} onBack={step > 0 ? back : undefined} onCancel={onCancel} busy={busy} error={issueText || error}>
+  return <StepWizard className="card" title={title} step={step + 1} total={driverCopy.steps.length} heading={driverCopy.steps[step]} nextLabel={step === last ? (busy ? operationsCopy.travel.saving : operationsCopy.travel.saveDriver) : driverCopy.next} onNext={next} onBack={step > 0 ? back : undefined} onCancel={onCancel} busy={busy} error={issueText || withoutFieldPrefix(error)}>
       {step === 0 && <><p className="muted">{driverCopy.personHint}</p><label>{operationsCopy.travel.driverName}<Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required maxLength={100}/></label><label>{operationsCopy.travel.email}<Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required/></label><label>{operationsCopy.travel.phone}<Input type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} required/></label></>}
       {step === 1 && <><p className="muted">{driverCopy.vehicleHint}</p><label>{operationsCopy.travel.vehicleName}<Input value={form.vehicleName} onChange={e => setForm({ ...form, vehicleName: e.target.value })} placeholder={operationsCopy.travel.vanOrCarDescription} required maxLength={100}/></label><label>{operationsCopy.travel.passengerSeatsExcludingDriver}<Input type="number" min="1" max="100" step="1" value={form.seats} onChange={e => setForm({ ...form, seats: e.target.value })} required/></label><label className="checkbox-label"><Checkbox checked={form.towCapable} onCheckedChange={checked => setForm({ ...form, towCapable: checked })}/> {operationsCopy.travel.towCapable}</label></>}
       {step === 2 && <><p className="muted">{driverCopy.approvalHint}</p><label className="checkbox-label"><Checkbox checked={form.approved} onCheckedChange={checked => setForm({ ...form, approved: checked })}/> {operationsCopy.travel.approvedToDrive}</label><label className="checkbox-label"><Checkbox checked={form.active} onCheckedChange={checked => setForm({ ...form, active: checked })}/> {operationsCopy.travel.activeLabel}</label></>}

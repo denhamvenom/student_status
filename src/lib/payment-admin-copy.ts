@@ -34,7 +34,8 @@ export const paymentAdministrationCopy = {
   discardQuestion: 'Discard this payment?',
   discard: 'Discard',
   keepEditing: 'Keep editing',
-  recordSteps: { amount: 'Amount', how: 'How it was paid', note: 'Note', review: 'Review' },
+  recordSteps: { amount: 'Amount', how: 'How it was paid', review: 'Review' },
+  balanceDue: (amount: string) => `Balance due: ${amount}`,
   next: 'Continue',
   recordAnother: 'Record another',
   done: 'Done',
@@ -144,6 +145,8 @@ export const paymentAdministrationCopy = {
   unavailable: "Payments couldn't load. Try again. If it keeps happening, contact a Coach.",
   reload: 'Reload',
   reasonShort: 'Enter a reason of at least 8 characters.',
+  /** Every money reason (edits, cancels, money returned, transfers) uses this minimum. */
+  reasonMinLength: 8,
 } as const
 
 /** Money returned and transfers on one account (FinanceOperations). */
@@ -157,10 +160,14 @@ export const moneyReturnedCopy = {
     transfer: { amount: 'Amount', who: 'Recipient student', reason: 'Reason', review: 'Review' },
   },
   reviewReturned: (amount: string) => `Record ${amount} returned`,
-  reviewTransfer: (amount: string, name: string) => `Transfer ${amount} of fundraising credit to ${name}`,
+  reviewTransfer: (amount: string, name: string, from?: string) => from ? `Transfer ${amount} from ${from} to ${name}` : `Transfer ${amount} of fundraising credit to ${name}`,
+  teamTransferConfirm: 'Confirm transfer to team',
+  actionsLabel: 'Account actions',
+  actions: { fee: 'Add a fee', edit: 'Edit a payment', returned: 'Money returned or transfer' },
   dateReturned: 'Date returned',
   reason: 'Reason',
-  enterReason: 'Enter a reason.',
+  enterReason: 'Enter a reason of at least 8 characters.',
+  reasonHelp: 'At least 8 characters.',
   enterDate: 'Choose the date the money was returned.',
   refundSubmitted: 'Saving the money returned. This account updates when it finishes.',
   refundDone: 'Money returned recorded. This app only keeps the record; it does not send money.',

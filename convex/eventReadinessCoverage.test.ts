@@ -61,6 +61,16 @@ describe('event readiness list and columns', () => {
     expect(listed.every(e => e.isPast)).toBe(true)
   })
 
+  it('flags listed events that have no confirmed students so the picker can say so', async () => {
+    const f = await fixture()
+    await f.t.run(ctx => ctx.db.insert('participants', { eventId: f.ids.event, studentId: f.ids.student, status: 'confirmed', createdAt: 1, updatedAt: 1 }))
+    const listed = (await f.coach.query(api.app.readinessEvents, { asOf: 0 })) as { _id: string; hasStudents: boolean }[]
+    expect(listed.find(e => e._id === f.ids.event)?.hasStudents).toBe(true)
+    await f.t.run(async ctx => { const p = await ctx.db.query('participants').first(); await ctx.db.patch(p!._id, { status: 'withdrawn' }) })
+    const after = (await f.coach.query(api.app.readinessEvents, { asOf: 0 })) as { _id: string; hasStudents: boolean }[]
+    expect(after.find(e => e._id === f.ids.event)?.hasStudents).toBe(false)
+  })
+
   it('lists a free event once a student owes an event charge, matching its page', async () => {
     const f = await fixture()
     const season = (await f.t.run(ctx => ctx.db.get(f.ids.student)))!.seasonId
@@ -103,6 +113,10 @@ describe('event readiness list and columns', () => {
     expect(closed.counts?.open).toBe(1)
     expect(closed.permissionFormsClosed).toBe(true)
     expect(closed.studentsAwaitingForms).toBe(1)
+    // The hidden form is not a visible open item: the student is open, but nothing red is counted.
+    const visible = (closed.students as { cells: { state: string }[]; openCount: number }[]).reduce((sum, r) => sum + r.cells.filter(c => c.state === 'open').length, 0)
+    expect((closed.students as { openCount: number }[])[0].openCount).toBe(visible + 1)
+    expect(closed.counts?.openItems).toBe(visible)
     await f.t.run(ctx => ctx.db.patch(student.seasonId, { permissionSigningPaused: false }))
     const open = await f.coach.query(api.app.eventReadiness, { eventId: f.ids.event })
     expect(open.permissionFormsClosed).toBe(false)
@@ -151,7 +165,7 @@ describe('event readiness list and columns', () => {
   })
 
   // November 10 owner decision (reverses November 9): shifts below the event minimum keep a student from being ready.
-  it('counts shifts below the minimum as open and shows N of M minimum', async () => {
+  it('counts shifts below the minimum as open and shows N signed up (M needed)', async () => {
     const f = await fixture()
     const shift = await f.t.run(async ctx => {
       await ctx.db.patch(f.ids.event, { type: 'Outreach', overnight: false, roomingEnabled: false, shiftsEnabled: true, minShiftsPerStudent: 1, firstRequired: false, feeCents: 0, permissionRequired: false })
@@ -165,13 +179,13 @@ describe('event readiness list and columns', () => {
     const before = await f.coach.query(api.app.eventReadiness, { eventId: f.ids.event })
     expect(before.columns).toContainEqual({ key: 'shifts', label: 'Shifts' })
     expect(before.shifts).toEqual({ minimum: 1, total: 3 })
-    expect(shiftsCell(before)).toEqual({ key: 'shifts', state: 'open', text: '0 of 1 minimum' })
+    expect(shiftsCell(before)).toEqual({ key: 'shifts', state: 'open', text: '0 signed up (1 needed)' })
     expect((before.students as Row[])[0].open).toContain('Shifts')
     const listed = (await f.coach.query(api.app.readinessEvents, { asOf: 0 })) as { name: string; requirements: string[] }[]
     expect(listed.find(e => e.name === 'Regional')?.requirements).toContain('Shifts')
     await f.t.run(ctx => ctx.db.insert('shiftSignups', { eventId: f.ids.event, shiftId: shift, studentId: f.ids.student, createdAt: 1 }))
     const after = await f.coach.query(api.app.eventReadiness, { eventId: f.ids.event })
-    expect(shiftsCell(after)).toEqual({ key: 'shifts', state: 'done', text: '1 of 1 minimum' })
+    expect(shiftsCell(after)).toEqual({ key: 'shifts', state: 'done', text: '1 signed up (1 needed)' })
     expect((after.students as Row[])[0].open).not.toContain('Shifts')
   })
 

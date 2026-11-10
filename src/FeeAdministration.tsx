@@ -72,7 +72,7 @@ function FeeWorkspace({ isCoach, canSetDueDates }: { isCoach: boolean; canSetDue
     {maintenance?.control && <FeeMaintenanceNotice state={maintenance.control.state} />}
     <Card className={styles.card}><CardTitle>{copy.title}</CardTitle><p className={styles.muted}>{copy.description} {copy.futureOnly}</p>
       {!maintenance || fees.status === 'LoadingFirstPage' ? <p role="status">{copy.loading}</p> : <>
-        {maintenance.mappingState !== 'ready' && <p className={styles.notice}>{maintenance.mappingState === 'uninitialized' ? copy.mappingUnknown : copy.partialOrder}</p>}
+        {maintenance.mappingState !== 'ready' && <p className={styles.notice}>{maintenance.mappingState === 'uninitialized' ? (isCoach && maintenance.canMap ? copy.mappingUnknown : copy.mappingUnknownViewOnly) : copy.partialOrder}</p>}
         {fees.results.length === 0 && fees.status === 'Exhausted' && <p>{copy.noFees}</p>}
         <FeePriorityRows disabled={pending || maintenance.control?.state !== 'ready'} rows={fees.results.map(row => ({ key: row.definition._id, label: row.definition.label, summary: row.eventName ? `${copy.connectedTo}: ${row.eventName}` : undefined, priority: row.definition.priority, amountCents: row.definition.defaultAmountCents, dueAt: row.definition.dueAt, addedAt: row.definition._creationTime, cancelled: row.definition.state === 'cancelled',
           below: dueDateFeeId === row.definition._id && row.definition.state === 'active' ? <FeeDueDate key={row.definition._id} definition={row.definition} onClose={() => setDueDateFeeId(null)} /> : undefined,

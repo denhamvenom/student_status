@@ -15,7 +15,7 @@ import { readinessCopy as copy } from './readinessCopy'
 import { readinessPrintSummary } from './readinessPrint'
 import styles from './ReadinessReview.module.css'
 
-type ListedEvent = { _id: Id<'events'>; name: string; type: string; startsAt: number; endsAt: number; requirements: string[]; isPast: boolean }
+type ListedEvent = { _id: Id<'events'>; name: string; type: string; startsAt: number; endsAt: number; requirements: string[]; isPast: boolean; hasStudents: boolean }
 type Column = { key: string; label: string }
 type Cell = { key: string; state: 'done' | 'open'; text: string }
 type StudentRow = { student: { _id: Id<'students'>; preferredName: string; legalName?: string }; state: 'ready' | 'open'; open: string[]; cells: Cell[]; openCount: number }
@@ -78,7 +78,10 @@ export function ReadinessReview() {
   const selected = params.get('event')
   const [changing, setChanging] = useState(false)
   const [onlyOpen, setOnlyOpen] = useState(false)
-  const pickable = listed?.map(item => ({ _id: item._id as string, name: item.name, startsAt: item.startsAt, endsAt: item.endsAt, detail: item.requirements.join(', ') }))
+  const pickable = listed?.map(item => ({ _id: item._id as string, name: item.name, startsAt: item.startsAt, endsAt: item.endsAt, detail: item.hasStudents ? item.requirements.join(', ') : copy.noStudentsLabel, hasStudents: item.hasStudents }))
+  // Events with students come first; events with none follow in their own group.
+  const withStudents = pickable?.filter(item => item.hasStudents) ?? []
+  const withoutStudents = pickable?.filter(item => !item.hasStudents) ?? []
   const eventId = (selected && listed?.some(item => item._id === selected) ? selected : pickable ? defaultEventId(pickable, asOf) : null) as Id<'events'> | null
   const readiness = useQuery(api.app.eventReadiness, eventId ? { eventId } : 'skip') as Readiness | undefined
   const detail = useQuery(api.app.eventDetail, eventId ? { eventId } : 'skip') as EventDetail | undefined
@@ -119,7 +122,10 @@ export function ReadinessReview() {
     {listed.length === 0 ? <section className={styles.panel}><p role="status">{copy.noEvents}</p></section> : <>
       {picked && event && !changing
         ? <section className={styles.chosenEvent} aria-label={copy.selectedEvent}><span><strong>{event.name}</strong> · {fmtDate(event.startsAt)}</span><Button type="button" variant="outline" onClick={() => setChanging(true)}>{copy.changeEvent}</Button></section>
-        : <section className={styles.panel}><EventPicker events={pickable ?? []} value={eventId} onChange={choose} asOf={asOf} label={copy.chooseEvent} /></section>}
+        : <section className={styles.panel}>
+          <EventPicker events={withStudents.length ? withStudents : withoutStudents} value={eventId} onChange={choose} asOf={asOf} label={copy.chooseEvent} />
+          {withStudents.length > 0 && withoutStudents.length > 0 && <div className={styles.noStudentsGroup}><h3>{copy.noStudentsLabel}</h3><ul>{withoutStudents.map(item => <li key={item._id}><button type="button" aria-pressed={item._id === eventId} onClick={() => choose(item._id)}><strong>{item.name}</strong><span>{fmtDate(item.startsAt)} · {copy.noStudentsLabel}</span></button></li>)}</ul></div>}
+        </section>}
       {!event || !eventId || !readiness ? <section className={styles.panel}><p role="status">{copy.loadingSelected}</p></section> : readiness.enrollmentState === 'running' || readiness.enrollmentState === 'failed' ? <EventEnrollmentNotice eventId={eventId} staff coach={isCoach} failed={readiness.enrollmentState === 'failed'} /> : <>
         <section className={styles.eventSummary} aria-label={copy.selectedEvent}>
           <div className={styles.eventTop}>
@@ -129,7 +135,7 @@ export function ReadinessReview() {
               {readiness.shifts && <Link to={`/events/${eventId}#shifts`}>{copy.shiftSignups}</Link>}
             </div>
           </div>
-          {!emptyParticipants && <div className={styles.chips}><StatusChip label={copy.students} state={!readiness.coverage?.participantsComplete ? 'unknown' : counts.openItems ? 'open' : 'ready'} text={counts.openItems ? copy.thingsOpen(counts.openItems) : undefined} />{transportState !== 'notApplicable' && <StatusChip label={copy.transportation} state={transportState} open={readiness.transportation?.open.length ?? 0} />}{roomState !== 'notApplicable' && <StatusChip label={copy.rooming} state={roomState} open={readiness.rooming?.open ?? 0} />}</div>}
+          {!emptyParticipants && <div className={styles.chips}><StatusChip label={copy.students} state={!readiness.coverage?.participantsComplete ? 'unknown' : counts.open ? 'open' : 'ready'} text={counts.openItems ? copy.thingsOpen(counts.openItems) : counts.open ? copy.formsNotOpenSummary : undefined} />{transportState !== 'notApplicable' && <StatusChip label={copy.transportation} state={transportState} open={readiness.transportation?.open.length ?? 0} />}{roomState !== 'notApplicable' && <StatusChip label={copy.rooming} state={roomState} open={readiness.rooming?.open ?? 0} />}</div>}
           {notes.length > 0 && <div className={styles.notes}><h3>{copy.notesHeading}</h3><ul>{notes.map(note => <li key={note.key}><strong>{note.label}</strong>{note.instructions ? `: ${note.instructions}` : ''}{note.url && /^https?:\/\//i.test(note.url) && <> · <a href={note.url} target="_blank" rel="noopener noreferrer">{copy.openLink}</a></>}</li>)}</ul></div>}
         </section>
         {emptyParticipants ? <section className={styles.panel}><p>{copy.noStudentsYet}</p></section> : <>

@@ -90,3 +90,6 @@ export function timesLine(event: Pick<ReportEvent, 'intervals' | 'sessionState'>
   if (event.intervals.length === 0) return copy.noClockIn
   return event.intervals.map(pair => formatTimeRange(pair.inAt, pair.outAt)).join(', ')
 }
+
+/** The report opens on the list, where every meeting shows its name; the calendar only shows colored days. */
+export const DEFAULT_VIEW = 'list' as 'calendar' | 'list'

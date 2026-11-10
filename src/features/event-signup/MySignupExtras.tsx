@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { cn } from 'cn'
 import { dashboardButtonVariants } from '@/components/dashboard/styles'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { signupCopy } from './copy'
 import { shiftDay, shiftTimes } from './format'
-import { shiftBounds, unansweredRequired } from './logic'
+import { PICK_PARAM, PICK_SHIFTS, shiftBounds, unansweredRequired } from './logic'
 import { SignupWizard } from './SignupWizard'
 import type { AnswerValue, EventShifts, SignupQuestions } from './types'
 import { useSignupExtras } from './useSignupExtras'
@@ -78,6 +79,17 @@ export function MySignupExtras({ eventId, eventName, participation }: { eventId:
   const [saved, setSaved] = useState<{ shifts: boolean; answers: boolean }>({ shifts: false, answers: false })
   // Queries can't read the clock, so the page decides whether signup has closed (as signUp's close check does).
   const [now] = useState(Date.now)
+  const [params, setParams] = useSearchParams()
+  const wantsShifts = params.get(PICK_PARAM) === PICK_SHIFTS
+  const shiftsReady = !!extras && !(extras instanceof Error) && !!extras.shifts && offersShifts(extras)
+  // Home's "Pick your shifts" link arrives with ?pick=shifts: open the picker once, then drop the marker.
+  useEffect(() => {
+    if (!wantsShifts || extras === undefined) return
+    const next = new URLSearchParams(params)
+    next.delete(PICK_PARAM)
+    setParams(next, { replace: true })
+    if (shiftsReady && participation !== 'waitlist' && !(extras instanceof Error)) { setStart('shifts'); setEditing('shifts') }
+  }, [wantsShifts, extras, shiftsReady, participation, params, setParams])
   if (extras === undefined) return null
   if (extras instanceof Error) return <section className="card"><p role="alert" className="m-0 text-[15px] text-vs-text-2">{copy.form.loadFailed}</p></section>
   const questions = extras.questions?.questions.length ? extras.questions : null
@@ -90,7 +102,7 @@ export function MySignupExtras({ eventId, eventName, participation }: { eventId:
   const idPrefix = `my-signup-${eventId}`
   const open = (part: Part) => { setSaved({ shifts: false, answers: false }); setStart(part); setEditing(part) }
   const todo: { key: Part; text: string; action: string }[] = []
-  if (shiftsShort > 0) todo.push({ key: 'shifts', text: copy.todo.pick(shiftsShort), action: copy.shifts.change })
+  if (shiftsShort > 0) todo.push({ key: 'shifts', text: copy.todo.pick(shiftsShort, shifts?.selectedShiftIds.length ?? 0), action: copy.shifts.change })
   if (unanswered.length > 0) todo.push({ key: 'answers', text: copy.todo.answer(unanswered.length), action: copy.questions.edit })
   return <div className="flex flex-col gap-4" id="my-signup">
     {todo.length > 0 && <section className="card border-vs-urgent-border!" aria-labelledby={`${idPrefix}-todo`}>

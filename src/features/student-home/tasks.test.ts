@@ -59,9 +59,19 @@ describe('event page requirement rows', () => {
     const event = { id: 'e1', name: 'Pancake breakfast' }
     const fallback = itemForOpenRow('Shifts', event, [])
     expect(fallback).toMatchObject({ key: 'shifts:e1', owner: 'student', href: '/events/e1#my-signup' })
-    expect(guideForItem(fallback, { viewer: 'student' })).toMatchObject({ title: 'Pick your shifts', headline: 'Your turn', action: { label: 'Pick your shifts', to: '/events/e1#my-signup' } })
+    expect(guideForItem(fallback, { viewer: 'student' })).toMatchObject({ title: 'Pick your shifts', headline: 'Your turn', action: { label: 'Pick your shifts', to: '/events/e1?pick=shifts#my-signup' } })
     expect(guideForItem(fallback, { viewer: 'parent', studentName: 'Alex' })).toMatchObject({ headline: 'Waiting for Alex', action: null })
     const home = item('requirement', 'student', { key: 'shifts:e1', label: 'Pick your shifts', href: '/events/e1#my-signup' })
     expect(itemForOpenRow('Shifts', event, [home])).toBe(home)
+  })
+})
+
+describe('FIRST registration while the invitation link is missing', () => {
+  const first = item('firstRegistration', 'parent')
+  it("is the same waiting state as setup and Home, not the Parent's turn", () => {
+    expect(guideForItem(first, { viewer: 'parent', firstLinkReady: false })).toMatchObject({ actor: 'coach', headline: 'Waiting for the Coach to send the FIRST invitation link', action: null, remind: null })
+  })
+  it.each([true, null, undefined])("stays the Parent's turn when the link is %s", firstLinkReady => {
+    expect(guideForItem(first, { viewer: 'parent', firstLinkReady })).toMatchObject({ actor: 'reader', headline: 'Your turn' })
   })
 })

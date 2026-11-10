@@ -61,3 +61,19 @@ describe('Money table Available funds, sort and filter', () => {
     expect(render([{ ...row, canRecord: true, state: 'updating' }])).not.toContain('Add a fee for')
   })
 })
+
+describe('Money table name search', () => {
+  const named = (name: string, dueCents: number | null = 0) => ({ ...row, studentId: name, name, dueCents })
+  const list = [named('Ada Lovelace', 500), named('Grace Hopper', 0), named('Ada Hopper', 900)]
+  it.each([['', 3], ['ada', 2], ['  HOPPER ', 2], ['ada hopper', 1], ['zzz', 0]])('query %j keeps %i students', (query, count) => {
+    expect(arrangeRows(list, { sortByDue: false, dueOnly: false, query })).toHaveLength(count)
+  })
+  it('combines with Balance due only and sorting', () => {
+    expect(arrangeRows(list, { sortByDue: true, dueOnly: true, query: 'hopper' }).map(item => item.name)).toEqual(['Ada Hopper'])
+  })
+  it('says which sort is on', () => {
+    const html = render([row])
+    expect(html).toContain('Sort by Balance due')
+    expect(html).toContain('Search students')
+  })
+})

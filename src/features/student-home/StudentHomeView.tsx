@@ -8,7 +8,7 @@ import { RingsSkeleton, TileSkeleton } from '@/components/dashboard/TileSkeleton
 import { homeCopy } from './copy'
 import { formatLongDate } from './format'
 import { nextUp, thisWeek } from './agenda'
-import { hasOwnWork, heroCards, visibleAnnouncements, type HeroCard } from './logic'
+import { hasOwnWork, heroCards, visibleAnnouncements, withoutChosenRooms, type HeroCard } from './logic'
 import { ActionCard, actionContent } from './tiles/ActionCard'
 import { AnnouncementCard } from './tiles/AnnouncementCard'
 import { BalanceTile } from './tiles/BalanceTile'
@@ -104,7 +104,8 @@ function Balance({ finance, summary, handlers }: Pick<StudentHomeViewProps, 'fin
  * What's left / Balance due on the right and Participation full width.
  * The shell supplies the page gutters (14px phone, 28px desktop in the artboards).
  */
-export function StudentHomeView({ summary, attendance, announcements, finance, events, now, handlers }: StudentHomeViewProps) {
+export function StudentHomeView({ summary: loaded, attendance, announcements, finance, events, now, handlers }: StudentHomeViewProps) {
+  const summary = loaded === undefined || loaded instanceof Error ? loaded : { ...loaded, whatsLeft: withoutChosenRooms(loaded.whatsLeft, loaded.roomChoices) }
   // Held here, not in the tile: the tile remounts when the summary reloads or its error boundary recovers,
   // and the signed-up event has already left the list by then.
   const [signedUp, setSignedUp] = useState<SignedUp | null>(null)

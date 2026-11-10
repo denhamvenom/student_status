@@ -278,7 +278,7 @@ async function hasActiveShift(ctx: QueryCtx, eventId: Id<"events">) {
 /** Events a Coach or Travel Lead has something to complete for: only those with at least one requirement or team transport. */
 export const readinessEvents = query({
   args: { asOf: v.number() },
-  returns: v.array(v.object({ _id: v.id("events"), name: v.string(), type: v.string(), startsAt: v.number(), endsAt: v.number(), requirements: v.array(v.string()), isPast: v.boolean() })),
+  returns: v.array(v.object({ _id: v.id("events"), name: v.string(), type: v.string(), startsAt: v.number(), endsAt: v.number(), requirements: v.array(v.string()), isPast: v.boolean(), hasStudents: v.boolean() })),
   handler: async (ctx, args) => {
     const user = await requireViewer(ctx);
     if (!isCoachOrTravelLead(user)) throw new ConvexError("Only a Coach or Travel Lead can see event readiness.");
@@ -297,7 +297,7 @@ export const readinessEvents = query({
       // While signing is paused the form column is hidden, but the page still counts an unsigned form against readiness, so the list keeps the event too.
       const formsNotOpen = event.permissionRequired && !signingOpen;
       if (!columns.length && !event.transportEnabled && !formsNotOpen) continue;
-      listed.push({ _id: event._id, name: event.name, type: event.type, startsAt: event.startsAt, endsAt: event.endsAt, requirements: [...columns.map(column => column.label), ...(formsNotOpen ? ["Permission form (not open yet)"] : []), ...(event.transportEnabled ? ["Transport"] : [])], isPast: event.endsAt < args.asOf });
+      listed.push({ _id: event._id, name: event.name, type: event.type, startsAt: event.startsAt, endsAt: event.endsAt, requirements: [...columns.map(column => column.label), ...(formsNotOpen ? ["Permission form (not open yet)"] : []), ...(event.transportEnabled ? ["Transport"] : [])], isPast: event.endsAt < args.asOf, hasStudents: (await ctx.db.query("participants").withIndex("by_eventId_and_status", q => q.eq("eventId", event._id).eq("status", "confirmed")).first()) !== null });
     }
     return listed.sort((a, b) => a.startsAt - b.startsAt);
   },
@@ -350,7 +350,7 @@ export const eventReadiness = query({
         const cell = (done: boolean, doneText: string, openText: string) => ({ key: column.key, state: done ? "done" as const : "open" as const, text: done ? doneText : openText });
         if (column.key === "payment") return cell(!readiness.open.includes("Required payment"), "Paid", dueCents > 0 ? `Owes ${chargeCurrency(dueCents)}` : "Payment not complete");
         if (column.key === "permission") return cell(readiness.permissionStatus !== "missing", "Signed", permissionInReview ? "Signed · needs review" : "Not signed yet");
-        if (column.key === "shifts") { const text = `${shiftCount} of ${minShifts} minimum`; return cell(!readiness.open.includes(READINESS_SHIFTS), text, text); }
+        if (column.key === "shifts") { const text = `${shiftCount} signed up (${minShifts} needed)`; return cell(!readiness.open.includes(READINESS_SHIFTS), text, text); }
         if (column.key === "first") {
           if (event.type === "Competition") return cell(readiness.firstRegistrationState === "verified", "Verified", readiness.firstRegistrationState === "awaitingVerification" ? "Waiting for Coach approval" : "Not finished");
           return cell(!readiness.open.includes("FIRST registration"), "Done", "Not marked done");
@@ -369,7 +369,7 @@ export const eventReadiness = query({
     const studentsAwaitingForms = rowsBuilt.filter(item => item.awaitingForm).length;
     const permissionFormsClosed = studentsAwaitingForms > 0;
     const rows = rowsBuilt.map(item => ({ ...item.row, ...(event.shiftsEnabled ? { shiftCount: item.shiftCount } : {}) }));
-    const counts = { students: rows.length, ready: rows.filter(x => x.state === "ready").length, open: rows.filter(x => x.state === "open").length, openItems: rows.reduce((sum, row) => sum + row.openCount, 0) };
+    const counts = { students: rows.length, ready: rows.filter(x => x.state === "ready").length, open: rows.filter(x => x.state === "open").length, openItems: rows.reduce((sum, row) => sum + row.open.length, 0) };
     const transportation = participantsComplete ? await transportSummary(ctx, event) : null;
     const roomGroupPage = await ctx.db.query("roomGroups").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(101);
     const roomingComplete = roomGroupPage.length <= 100;

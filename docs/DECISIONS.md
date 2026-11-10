@@ -132,6 +132,11 @@ November 10, 2026 owner decisions, implemented on `feat/usability-audit` (not me
 - **Session length stays at 30 days** (owner, November 10). Sign-in sessions end 30 days after sign-in; no change.
 - **Recording a payment.** There is no default payment method: the person chooses how it was paid. After recording, "Record another" asks whether the next payment is for the same student or someone else.
 - **Season transition.** "Mark all as Returning" sets every listed student not already Returning; each can be changed afterward.
+- **Past events un-archives.** An archived event whose end moves into the future is un-archived and returns to the live event lists.
+- **Mentor Join order.** Chosen-students items appear after subteam and whole-team items.
+- **Inbox Older.** Any notice whose linked event has ended goes under Older.
+- **Money reasons.** A reason for a money action needs at least 8 characters everywhere.
+- **Record payment** is 3 steps; the note is entered on Review.
 
 ## Attendance breakdown
 

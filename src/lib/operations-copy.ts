@@ -232,7 +232,7 @@ export const operationsCopy = {
     "yourRoomSelection": "Your room selection",
     "yourRoom": "Your room",
     "studentRoomChangesClosedAtTheDeadlineAskACoachOrTravelLeadForACorrection": "Student room changes closed at the deadline. Ask a Coach or Travel Lead for a correction.",
-    "leaveGroup": "Leave group",
+    "leaveGroup": "Leave room group",
     "youAskedTheTravelTeamToAssignYouARoom": "You asked the travel team to assign you a room.",
     "cancelRequest": "Cancel request",
     "youHaveNotSelectedARoomYet": "You have not selected a room yet.",
@@ -240,7 +240,7 @@ export const operationsCopy = {
     "createGroup": "Create group",
     "chooseATeammate": "Choose a teammate",
     "invite": "Invite",
-    "invitations": "Invitations",
+    "invitations": "Room invitations",
     "accept": "Accept",
     "decline": "Decline",
     "noRoomInvitations": "No room invitations.",
@@ -448,6 +448,7 @@ export const requirementWizardCopy = {
     checkoff: 'Checked off by a Coach or Travel Lead',
     checkoffHint: 'A Coach or Travel Lead marks it done for each student. Until then the student is not ready. Students and Parents can\'t check it off.',
   },
+  kindChoose: 'Choose one to continue.',
   fields: {
     label: 'What it says',
     labelHint: 'Students and Parents see this. Up to 100 characters.',
@@ -467,5 +468,4 @@ export const requirementWizardCopy = {
     link: 'The web link must start with https:// and be up to 500 characters. Fix it or leave it blank.',
     due: 'Enter a valid due date, or leave it blank.',
   },
-  infoTag: 'Something to know',
 } as const

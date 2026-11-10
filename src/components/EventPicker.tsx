@@ -1,4 +1,5 @@
 import { useId, useMemo, useState } from 'react'
+import { Button } from './ui/button'
 import { Input } from './ui/input'
 
 /**
@@ -31,6 +32,7 @@ export const eventPickerCopy = {
   none: 'No events match your search.',
   empty: 'No events to choose from.',
   chosen: 'Chosen',
+  change: 'Change event',
 } as const
 
 /** "Tue, Nov 10, 2026", with the start time added only when another event with the same name starts the same day. */
@@ -71,7 +73,7 @@ export function restrictEvents<E extends PickerEvent>(events: readonly E[], allo
   return events.filter(event => allowed.has(event._id))
 }
 
-export function EventPicker({ events: allEvents, allowedIds, value, onChange, asOf, label, emptyText = eventPickerCopy.empty }: {
+export function EventPicker({ events: allEvents, allowedIds, value, onChange, asOf, label, emptyText = eventPickerCopy.empty, collapseWhenChosen = false }: {
   events: readonly PickerEvent[]
   /** Optional: only these event ids can be chosen. Others are not shown. */
   allowedIds?: readonly string[]
@@ -80,8 +82,11 @@ export function EventPicker({ events: allEvents, allowedIds, value, onChange, as
   asOf: number
   label: string
   emptyText?: string
+  /** After an event is chosen, show only that event with a Change event button instead of the long list. */
+  collapseWhenChosen?: boolean
 }) {
   const [query, setQuery] = useState('')
+  const [changing, setChanging] = useState(false)
   const inputId = useId()
   const events = useMemo(() => restrictEvents(allEvents, allowedIds), [allEvents, allowedIds])
   const { upcoming, past } = useMemo(() => splitEvents(events, asOf), [events, asOf])
@@ -90,13 +95,15 @@ export function EventPicker({ events: allEvents, allowedIds, value, onChange, as
   const searching = query.trim().length > 0
   const chosenIsPast = past.some(event => event._id === value)
   const option = (event: PickerEvent) => <li key={event._id}>
-    <button type="button" aria-pressed={event._id === value} onClick={() => onChange(event._id)}
+    <button type="button" aria-pressed={event._id === value} onClick={() => { setChanging(false); onChange(event._id) }}
       className={`flex min-h-11 w-full flex-col items-start rounded-sm border px-3 py-2 text-left ${event._id === value ? 'border-primary bg-primary text-primary-foreground' : 'border-input bg-card hover:bg-muted'}`}>
       <strong>{event.name}</strong>
       <span className="text-sm">{eventPickerLabel(event, events)}{event.detail ? ` · ${event.detail}` : ''}</span>
     </button>
   </li>
   if (!events.length) return <p role="status">{emptyText}</p>
+  const chosen = collapseWhenChosen && !changing ? events.find(event => event._id === value) : undefined
+  if (chosen) return <div className="flex flex-col gap-2"><span className="font-bold">{label}</span><div className="flex flex-wrap items-center justify-between gap-2 rounded-sm border border-primary px-3 py-2"><span className="flex flex-col"><strong>{chosen.name}</strong><span className="text-sm">{eventPickerLabel(chosen, events)}</span></span><Button type="button" variant="outline" onClick={() => setChanging(true)}>{eventPickerCopy.change}</Button></div></div>
   return <div className="flex flex-col gap-2">
     <label htmlFor={inputId} className="font-bold">{label}</label>
     <Input id={inputId} type="search" value={query} placeholder={eventPickerCopy.searchPlaceholder} aria-label={eventPickerCopy.search} onChange={event => setQuery(event.target.value)} />

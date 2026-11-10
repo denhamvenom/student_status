@@ -94,7 +94,7 @@ export function EventOperations({ eventId, coach=false }: { eventId: Id<"events"
     if (parsed !== null && (!Number.isSafeInteger(parsed) || parsed < 1) || signup !== null && !Number.isFinite(signup) || room !== null && !Number.isFinite(room)) { setError(operationsCopy.event.enterValidCapacityAndDeadlines); return; }
     void act(() => settings({ eventId, capacity: parsed, ...(event.signupMode !== "assigned" ? { signupClosesAt: signup } : {}), ...(event.overnight && event.roomingEnabled ? { roomDeadline: room } : {}), ...(outreach !== null ? { isOutreach: outreach } : {}) }), operationsCopy.event.eventSettingsSaved);
   };
-  const kindTag = (r: Requirement) => r.kind === "info" ? ` · ${requirementWizardCopy.infoTag}` : r.dueAt ? operationsText.event.due(when(r.dueAt)) : "";
+  const kindTag = (r: Requirement) => r.kind === "info" ? ` · ${requirementWizardCopy.kinds.info}` : ` · ${requirementWizardCopy.kinds.checkoff}${r.dueAt ? operationsText.event.due(when(r.dueAt)) : ""}`;
   return <section aria-label={operationsCopy.event.eventOperations} className={styles.root}>
     <details id="event-participants" className={styles.disclosure}><summary><strong>{operationsCopy.event.signupsAndCapacity}</strong><span>{countLine}</span></summary><div className={styles.disclosureBody}><Card><CardHeader><CardTitle>{operationsCopy.event.signupsAndCapacity}</CardTitle></CardHeader><CardContent className="space-y-4">
       <p className={styles.statusLine}><span>{countLine}</span>{event.signupMode !== "assigned" && <span className="muted">· {operationsText.event.signupCloses(event.signupClosesAt ? when(event.signupClosesAt) : null)}</span>}<HelpToggle label={operationsCopy.event.signupRulesLabel}>{operationsCopy.event.signupRules}</HelpToggle></p>
@@ -176,8 +176,9 @@ function RequirementWizard({ eventId, requirement, onCancel, onSaved }: { eventI
     } catch (e) { setProblem(userFacingError(e)); } finally { setBusy(false); }
   }
   const last = step === "review";
-  return <StepWizard title={requirement ? copy.titleEdit : copy.titleAdd} step={at + 1} total={steps.length} heading={copy.steps[step]} onNext={() => void next()} nextLabel={last ? (busy ? copy.saving : copy.save) : copy.continue} onBack={at > 0 ? () => go(steps[at - 1]) : undefined} onCancel={onCancel} busy={busy} error={problem}>
-    {step === "kind" && <div role="radiogroup" aria-label={copy.steps.kind} className="grid gap-2">
+  return <StepWizard title={requirement ? copy.titleEdit : copy.titleAdd} step={at + 1} total={steps.length} heading={copy.steps[step]} onNext={() => void next()} nextDisabled={step === "kind" && !kind} nextLabel={last ? (busy ? copy.saving : copy.save) : copy.continue} onBack={at > 0 ? () => go(steps[at - 1]) : undefined} onCancel={onCancel} busy={busy} error={problem}>
+    {step === "kind" && <div role="radiogroup" aria-label={copy.steps.kind} aria-describedby={kind ? undefined : "requirement-kind-help"} className="grid gap-2">
+      {!kind && <p id="requirement-kind-help" className="text-sm text-muted-foreground">{copy.kindChoose}</p>}
       <RadioChoice name="requirement-kind" value="info" checked={kind === "info"} label={copy.kinds.info} helper={copy.kinds.infoHint} onSelect={() => { setKind("info"); setProblem(""); }} />
       <RadioChoice name="requirement-kind" value="checkoff" checked={kind === "checkoff"} label={copy.kinds.checkoff} helper={copy.kinds.checkoffHint} onSelect={() => { setKind("checkoff"); setProblem(""); }} />
     </div>}

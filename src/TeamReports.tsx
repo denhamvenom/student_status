@@ -57,7 +57,7 @@ const mentorReportCopy={
   title:'Team report',loading:'Loading team report…',
   showing:(teams:string[])=>teams.length?`Showing: ${teams.join(' · ')}`:'Showing: no subteams set',
   studentCount:(count:number)=>`${count} ${count===1?'student':'students'}`,
-  showAll:'Show all subteams',showMine:'Show my subteams only',
+  showAll:'Show all subteams',showMine:'Show only my subteams',
   cutOff:(shown:number,total:number)=>`Showing the first ${shown} of ${total} students. Ask a Coach for the full list.`,
   noSubteams:'Your subteams are not set yet. A Coach sets your subteams; until then, use Show all subteams.',
   empty:'No students to show for this view.',
@@ -85,13 +85,13 @@ export function MentorStudentReport(){
   const [all,setAll]=useState(false),[selected,setSelected]=useState<Id<'students'>|null>(null)
   const report=useQuery(api.teamReports.mentorList,{allSubteams:all})
   if(!report)return <p role="status">{mentorReportCopy.loading}</p>
-  const open=report.rows.find(row=>row.studentId===selected),showAttendance=mentorHasAttendance(report.rows)
+  const open=report.rows.find(row=>row.studentId===selected),showAttendance=mentorHasAttendance(report.rows),showSubteam=new Set(report.rows.map(row=>subteamDisplay(row.subteam))).size>1
   return <div className={styles.root}>
     <div className={styles.heading}><div><h1>{mentorReportCopy.title}</h1><p role="status">{report.scope==='all'?`Showing: all subteams · ${mentorReportCopy.studentCount(report.rows.length)}`:`${mentorReportCopy.showing(report.subteams)} · ${mentorReportCopy.studentCount(report.rows.length)}`}</p></div><Button type="button" variant="outline" onClick={()=>{setAll(!all);setSelected(null)}}>{all?mentorReportCopy.showMine:mentorReportCopy.showAll}</Button></div>
     {!report.studentsComplete&&<p role="status" className={styles.note}>{mentorReportCopy.cutOff(report.rows.length,report.totalStudents)}</p>}
     {report.scope==='mine'&&!report.subteams.length&&<p className={styles.note}>{mentorReportCopy.noSubteams}</p>}
     <p className={styles.note}>{showAttendance?mentorReportCopy.requiredHelp:mentorReportCopy.afterKickoff}</p>
-    <Card><CardContent><div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>{mentorReportCopy.student}</th><th>{mentorReportCopy.subteam}</th>{showAttendance&&<><th>{mentorReportCopy.required}</th><th>{mentorReportCopy.thursday}</th></>}<th>{mentorReportCopy.events}</th></tr></thead><tbody>{report.rows.length?report.rows.map(row=><tr key={row.studentId}><td data-label={mentorReportCopy.student}><button type="button" className={styles.rowName} aria-expanded={selected===row.studentId} onClick={()=>setSelected(selected===row.studentId?null:row.studentId)}>{row.name}</button></td><td data-label={mentorReportCopy.subteam}>{subteamDisplay(row.subteam)}</td>{showAttendance&&<><td data-label={mentorReportCopy.required}>{percent(row.requiredPercent)}</td><td data-label={mentorReportCopy.thursday}>{row.thursdayAttended}</td></>}<td data-label={mentorReportCopy.events}>{row.events.length}</td></tr>):<tr><td colSpan={showAttendance?5:3}>{mentorReportCopy.empty}</td></tr>}</tbody></table></div></CardContent></Card>
+    <Card><CardContent><div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>{mentorReportCopy.student}</th>{showSubteam&&<th>{mentorReportCopy.subteam}</th>}{showAttendance&&<><th>{mentorReportCopy.required}</th><th>{mentorReportCopy.thursday}</th></>}<th>{mentorReportCopy.events}</th></tr></thead><tbody>{report.rows.length?report.rows.map(row=><tr key={row.studentId}><td data-label={mentorReportCopy.student}><button type="button" className={styles.rowName} aria-expanded={selected===row.studentId} onClick={()=>setSelected(selected===row.studentId?null:row.studentId)}>{row.name}</button></td>{showSubteam&&<td data-label={mentorReportCopy.subteam}>{subteamDisplay(row.subteam)}</td>}{showAttendance&&<><td data-label={mentorReportCopy.required}>{percent(row.requiredPercent)}</td><td data-label={mentorReportCopy.thursday}>{row.thursdayAttended}</td></>}<td data-label={mentorReportCopy.events}>{row.events.length}</td></tr>):<tr><td colSpan={showAttendance?5:3}>{mentorReportCopy.empty}</td></tr>}</tbody></table></div></CardContent></Card>
     {open&&<MentorDetail key={open.studentId} row={open} showAttendance={showAttendance} onClose={()=>setSelected(null)}/>}
   </div>
 }

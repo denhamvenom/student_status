@@ -12,7 +12,7 @@ const going = { myStatus: 'accepted', mySource: 'individual', canWithdraw: true 
 const askDrive = { askDrive: true, askHotel: false }
 const askBoth = { askDrive: true, askHotel: true }
 const skippedSignup = { scope: 'all', count: null, coversThisMeeting: false, skippedThisMeeting: true } as const
-const everyone = { kind: 'everyone' as const, subteams: [], required: false, text: 'Everyone' }
+const everyone = { kind: 'everyone' as const, subteams: [], required: false, text: 'Whole team' }
 
 describe('which Home blocks show', () => {
   it('shows only Next event (empty) and Who’s here now for a new Mentor: no Needs your answer, Coming up or join tile', () => {
@@ -76,7 +76,7 @@ describe('Needs your answer', () => {
 describe('Coming up tags', () => {
   const subteams = (list: string[]) => ({ kind: 'subteams' as const, subteams: list, required: false, text: 'Subteams' })
   it.each([
-    { name: 'plain meeting for Everyone', row: { questions: { askDrive: false, askHotel: false }, audience: everyone }, tags: [] },
+    { name: 'plain meeting for the whole team', row: { questions: { askDrive: false, askHotel: false }, audience: everyone }, tags: [] },
     { name: 'trip', row: { questions: askDrive, audience: everyone }, tags: [copy.tags.travel] },
     { name: 'overnight only', row: { questions: { askDrive: false, askHotel: true }, audience: everyone }, tags: [copy.tags.travel] },
     { name: 'the Mentor’s subteam (any case)', row: { questions: { askDrive: false, askHotel: false }, audience: subteams(['programming']) }, tags: [copy.join.yourSubteam] },
@@ -140,6 +140,12 @@ describe('Schedule › Join', () => {
     const sections = joinSections(entries, NOW)
     expect(titles(sections.competitions)).toEqual(['outreach with travel', 'regional'])
     expect(titles(sections.meetings)).toEqual(['meeting soon', 'meeting later'])
+  })
+
+  it('lists chosen-students and Mentors-only events after whole-team and subteam ones, even when sooner', () => {
+    const forAudience = (name: string, kind: 'students' | 'mentorsOnly' | 'everyone', at: number) => joinEntry(meeting(name, at, { canSignUp: true, audience: { kind, subteams: [], required: false, text: name } }))
+    const entries = [forAudience('chosen', 'students', NOW + HOUR), forAudience('mentors', 'mentorsOnly', NOW + 2 * HOUR), forAudience('whole team', 'everyone', NOW + 5 * HOUR)]
+    expect(titles(joinSections(entries, NOW).meetings)).toEqual(['whole team', 'chosen', 'mentors'])
   })
 
   it('leaves out meetings for other subteams until widened, and always keeps whole-team and own-subteam ones', () => {

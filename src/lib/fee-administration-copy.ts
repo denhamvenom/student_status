@@ -15,6 +15,7 @@ export const feeAdministrationCopy = {
   moveReview: 'Review priority change',
   moveConfirm: 'Confirm priority change',
   mappingUnknown: 'Some earlier fees are not matched to a shared fee yet. Match them before you confirm the payment order.',
+  mappingUnknownViewOnly: 'Some earlier fees are not matched to a shared fee yet. A Coach needs to match them before the payment order can be confirmed.',
   prepareMapping: 'Match earlier fees',
   proofNote: 'Match earlier fees to their shared fee. A matching name or amount alone is not enough. Anything not matched waits for a Coach. For example, match each student’s old “Regional trip” fee to the shared Regional trip fee.',
   mappingReceipt: 'Earlier fee review',

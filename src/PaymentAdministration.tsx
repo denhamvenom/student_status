@@ -26,8 +26,12 @@ const methods: PaymentMethod[] = ['cash', 'check', 'other']
 const methodName = (method: PaymentMethod | null) => method ? copy[method] : '—'
 const today = () => chicagoDateString(Date.now())
 const validDate = (date: string) => /^\d{4}-\d{2}-\d{2}$/.test(date) && new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) === date
-const shortDate = (at: number) => new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', dateStyle: 'medium' }).format(at)
+export const shortDate = (at: number) => new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', dateStyle: 'medium' }).format(at)
 const when = (at: number) => new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', dateStyle: 'medium', timeStyle: 'short' }).format(at)
+/** Every money reason (edit, cancel, money returned, transfer) needs the same minimum length. */
+export function moneyReasonProblem(reason: string): string | null { return reason.trim().length < copy.reasonMinLength ? copy.reasonShort : null }
+/** The Balance due line shown on the amount step, or null while the account is still loading. */
+export function balanceDueLine(balanceDueCents: number | null | undefined): string | null { return balanceDueCents === null || balanceDueCents === undefined ? null : copy.balanceDue(usd(Math.max(0, balanceDueCents))) }
 /** Where a new payment's money goes, estimated from the Balance due before it: fees first, the rest to Unused payments. */
 export function paymentOutcome(amountCents: number, balanceDueCents: number | null) {
   if (balanceDueCents === null) return null
@@ -161,7 +165,8 @@ export function RecordPaymentForm({ studentId, onClose }: { studentId: Id<'stude
   return <Recoverable><RecordPayment initialStudentId={studentId} onClose={onClose}/></Recoverable>
 }
 type RecordStep = keyof typeof copy.recordSteps
-const recordSteps: RecordStep[] = ['amount', 'how', 'note', 'review']
+/** The optional note is part of Review, so recording takes three steps. */
+export const recordSteps: RecordStep[] = ['amount', 'how', 'review']
 function RecordPayment({ initialStudentId, onClose }: { initialStudentId: Id<'students'>; onClose?: () => void }) {
   const [studentId, setStudentId] = useState(initialStudentId)
   const context = useQuery(api.paymentAdministration.recordContext, { studentId })
@@ -230,20 +235,19 @@ function RecordPayment({ initialStudentId, onClose }: { initialStudentId: Id<'st
       </div>
       : <StepWizard title={copy.recordTitle} step={index + 1} total={recordSteps.length} heading={copy.recordSteps[step]} nextLabel={step === 'review' ? (busy ? copy.recording : copy.recordButton) : copy.next} nextDisabled={discarding || (step === 'review' && (confirming !== null || !ready))} onNext={next} onBack={index > 0 ? () => { setError(''); setConfirming(null); setDiscarding(false); setStep(recordSteps[index - 1]) } : undefined} onCancel={cancel} busy={busy} error={visibleStepError(error, parsed)}>
         {discarding && <div className={styles.notice} role="alert"><p className="m-0 font-semibold">{copy.discardQuestion}</p><div className={styles.actions}><Button type="button" onClick={cancel}>{copy.discard}</Button><Button type="button" variant="outline" onClick={() => setDiscarding(false)}>{copy.keepEditing}</Button></div></div>}
-        {step === 'amount' && <MoneyInput label={copy.amount} value={amount} onChange={change(setAmount)}/>}
+        {step === 'amount' && <>{balanceDueLine(context?.balanceDueCents) && <p className="m-0 font-semibold">{balanceDueLine(context?.balanceDueCents)}</p>}<MoneyInput label={copy.amount} value={amount} onChange={change(setAmount)}/></>}
         {step === 'how' && <div className={styles.fields}>
           <MethodFields method={method} reference={reference} allowUnset hideCashReference onMethod={change(setMethod)} onReference={change(setReference)}/>
           <div className={styles.field}><label htmlFor={dateId}>{copy.date} <span className={styles.muted}>{copy.required}</span></label><Input id={dateId} type="date" value={date} max={today()} onChange={event => change(setDate)(event.target.value)}/></div>
         </div>}
-        {step === 'note' && <div className={styles.field}><label htmlFor={noteId}>{copy.note} <span className={styles.muted}>{copy.optional}</span></label><Input id={noteId} value={note} maxLength={1000} placeholder={copy.notePlaceholder} onChange={event => change(setNote)(event.target.value)}/></div>}
         {step === 'review' && <>
           <p className="m-0 text-lg font-bold">{parsed.ok ? copy.recordReview(usd(parsed.cents), name) : copy.recordingFor(name)}</p>
           <dl className="m-0">
             <ReviewRow label={copy.student} value={name}/>
             <ReviewRow label={copy.amount} value={parsed.ok ? usd(parsed.cents) : '—'} onEdit={() => setStep('amount')} disabled={busy}/>
             <ReviewRow label={copy.method} value={[method ? copy[method] : null, number || null, validDate(date) ? shortDate(chicagoMidnight(date)) : null].filter(Boolean).join(' · ')} onEdit={() => setStep('how')} disabled={busy}/>
-            <ReviewRow label={copy.note} value={note.trim() || copy.noNote} onEdit={() => setStep('note')} disabled={busy}/>
           </dl>
+          <div className={styles.field}><label htmlFor={noteId}>{copy.note} <span className={styles.muted}>{copy.optional}</span></label><Input id={noteId} value={note} maxLength={1000} disabled={busy} placeholder={copy.notePlaceholder} onChange={event => change(setNote)(event.target.value)}/></div>
         </>}
         {step === 'review' && confirming !== null && <div className={styles.notice} role="alert"><p>{overpaymentQuestion(confirming, name, 'record')}</p><div className={styles.actions}><Button type="button" disabled={busy} onClick={() => void submit(true)}>{copy.recordAnyway}</Button><Button type="button" variant="outline" disabled={busy} onClick={() => { setConfirming(null); setStep('amount') }}>{copy.changeAmount}</Button></div></div>}
       </StepWizard>}
@@ -392,7 +396,7 @@ function RetryEdit({ sourceEntryId, movingToName, onCanceled }: { sourceEntryId:
   return <div className={styles.notice} role="alert">
     <p className="m-0"><strong>{copy.stopped}</strong></p>
     <p className="m-0">{copy.pendingFailed(movingToName)}</p>
-    {canceling ? <form className={styles.form} onSubmit={event => { event.preventDefault(); if (reason.trim().length < 8) { setError(copy.reasonShort); return } void run(() => cancelEdit({ sourceEntryId, reason: reason.trim() })).then(done => { if (done) onCanceled() }) }}>
+    {canceling ? <form className={styles.form} onSubmit={event => { event.preventDefault(); const short = moneyReasonProblem(reason); if (short) { setError(short); return } void run(() => cancelEdit({ sourceEntryId, reason: reason.trim() })).then(done => { if (done) onCanceled() }) }}>
       <p className="m-0">{copy.cancelConfirm(movingToName)}</p>
       <div className={styles.field}><label htmlFor={reasonId}>{copy.cancelReason} <span className={styles.muted}>{copy.required}</span></label><Input id={reasonId} value={reason} maxLength={1000} disabled={busy} aria-describedby={`${reasonId}-help`} onChange={event => { setReason(event.target.value); setError('') }}/><p id={`${reasonId}-help`} className={styles.muted}>{copy.editReasonHelp}</p></div>
       <div className={styles.actions}><Button type="submit" disabled={busy}>{busy ? copy.canceling : cancelLabel}</Button><Button type="button" variant="outline" disabled={busy} onClick={() => { setCanceling(false); setReason(''); setError('') }}>{copy.keepEdit}</Button></div>
@@ -436,7 +440,7 @@ function EditFields({ sourceEntryId, initial, stale: changed, onReload, onDone, 
   const index = editSteps.indexOf(step)
   function problem(at: EditStep): string | null {
     if (at === 'what') return !parsed.ok ? parsed.message : !method ? copy.chooseMethod : referenceProblem(method, reference) ?? (moving && initial.amountCents === 0 ? copy.moveZero : moving && parsed.cents === 0 ? copy.moveNeedsAmount : !lines.length ? copy.noChange : correction?.state === 'hold' && correction.message ? correction.message : null)
-    if (at === 'why') return reason.trim().length < 8 ? copy.reasonShort : null
+    if (at === 'why') return moneyReasonProblem(reason)
     return problem('what') ?? problem('why')
   }
   function next() {

@@ -27,11 +27,18 @@ function savedMessage(result: SaveResult, email: string) {
   return result.emailChanged ? `Profile saved. They now sign in with ${emailKey(email)}.` : 'Profile saved.'
 }
 
-/** Keep the revision the Coach opened; a live change shows a notice instead of silently replacing their edits. */
-function useOpenedSnapshot<T extends { profileRevision: number }>(live: T | undefined) {
+/**
+ * Keep the profile the Coach opened; a live change to the fields they are editing shows a notice instead of silently
+ * replacing their edits. A revision bump that leaves those fields the same (another screen touched the record, or the
+ * first result was a cached one) is not a change: the new revision is used for saving and no notice appears.
+ */
+function useOpenedSnapshot<T extends { profileRevision: number }>(live: T | undefined, fields: (profile: T) => string) {
   const [opened, setOpened] = useState<T | null>(null)
   useEffect(() => { if (live && !opened) setOpened(live) }, [live, opened])
-  return { opened, stale: !!live && !!opened && live.profileRevision !== opened.profileRevision, reload: () => { if (live) setOpened(live) } }
+  const sameFields = !!live && !!opened && fields(live) === fields(opened)
+  const stale = !!live && !!opened && live.profileRevision !== opened.profileRevision && !sameFields
+  const profile = opened && live && sameFields ? { ...opened, profileRevision: live.profileRevision } : opened
+  return { opened: profile, key: opened?.profileRevision, stale, reload: () => { if (live) setOpened(live) } }
 }
 
 function EmailField({ value, original, onChange, disabled, note }: { value: string; original: string; onChange: (value: string) => void; disabled: boolean; note?: string }) {
@@ -49,7 +56,8 @@ function ReasonField({ value, onChange, disabled, emailChanged }: { value: strin
 
 export const profileWizardCopy = {
   title: 'Edit profile',
-  steps: ['What to change', 'Reason', 'Review'],
+  reason: 'Reason',
+  review: 'Review',
   next: 'Continue',
   save: 'Save profile',
   saving: 'Saving…',
@@ -60,30 +68,34 @@ export const profileWizardCopy = {
   empty: 'Not provided',
 } as const
 
-type ReviewLine = { label: string; value: string; changed: boolean }
+type ReviewLine = { label: string; value: string; changed: boolean; page: number }
+type Page = { heading: string; valid: boolean; body: ReactNode }
 
 /** Each field's value for the Review step, marked when it differs from what the Coach opened. */
-export function reviewLines(fields: { label: string; original: string; value: string }[]): ReviewLine[] {
-  return fields.map(({ label, original, value }) => ({ label, value: value.trim() || profileWizardCopy.empty, changed: value.trim() !== original.trim() }))
+export function reviewLines(fields: { label: string; original: string; value: string; page: number }[]): ReviewLine[] {
+  return fields.map(({ label, original, value, page }) => ({ label, page, value: value.trim() || profileWizardCopy.empty, changed: value.trim() !== original.trim() }))
 }
 
 /**
- * Edit profile as three steps: What to change, Reason, Review. Nothing is saved until Save profile on Review,
- * and a changed sign-in email is called out there, so the Review step is the confirmation.
+ * Edit profile, one question at a time: each page of fields, then Reason, then Review. Nothing is saved until
+ * Save profile on Review, and a changed sign-in email is called out there, so the Review step is the confirmation.
  */
-function ProfileWizard({ stale, onReload, onCancel, busy, error, fieldsValid, emailChanged, emailNote, reason, onReason, lines, onSave, children }: { stale: boolean; onReload: () => void; onCancel: () => void; busy: boolean; error: string; fieldsValid: boolean; emailChanged: boolean; emailNote: string; reason: string; onReason: (value: string) => void; lines: ReviewLine[]; onSave: () => void; children: ReactNode }) {
+function ProfileWizard({ stale, onReload, onCancel, busy, error, pages, emailChanged, emailNote, reason, onReason, lines, onSave }: { stale: boolean; onReload: () => void; onCancel: () => void; busy: boolean; error: string; pages: Page[]; emailChanged: boolean; emailNote: string; reason: string; onReason: (value: string) => void; lines: ReviewLine[]; onSave: () => void }) {
   const [step, setStep] = useState(0)
   const reasonMissing = emailChanged && !reason.trim()
-  const ready = [fieldsValid, !reasonMissing, fieldsValid && !reasonMissing && !stale]
-  const last = step === profileWizardCopy.steps.length - 1
+  const reasonAt = pages.length, reviewAt = pages.length + 1
+  const allValid = pages.every(page => page.valid)
+  const headings = [...pages.map(page => page.heading), profileWizardCopy.reason, profileWizardCopy.review]
+  const ready = [...pages.map(page => page.valid), !reasonMissing, allValid && !reasonMissing && !stale]
+  const last = step === reviewAt
   return <div className={styles.form}>
     {stale && <p role="status" className={styles.warning}>{profileWizardCopy.stale} <Button type="button" variant="outline" onClick={onReload}>{profileWizardCopy.loadLatest}</Button></p>}
-    <StepWizard title={profileWizardCopy.title} step={step + 1} total={profileWizardCopy.steps.length} heading={profileWizardCopy.steps[step]!} nextLabel={last ? (busy ? profileWizardCopy.saving : profileWizardCopy.save) : profileWizardCopy.next} nextDisabled={!ready[step]} onNext={last ? onSave : () => setStep(step + 1)} onBack={step > 0 ? () => setStep(step - 1) : undefined} onCancel={onCancel} busy={busy} error={error} className={styles.form}>
-      {step === 0 && children}
-      {step === 1 && <><ReasonField value={reason} onChange={onReason} disabled={busy} emailChanged={emailChanged}/><p className={styles.muted}>{profileWizardCopy.reasonHint}</p></>}
-      {step === 2 && <>
-        <dl className="m-0">{lines.map(line => <ReviewRow key={line.label} label={line.label} value={<>{line.value}{line.changed && <span className={styles.muted}> · {profileWizardCopy.changed}</span>}</>} onEdit={() => setStep(0)} disabled={busy}/>)}
-          <ReviewRow label={profileWizardCopy.steps[1]!} value={reason.trim() || profileWizardCopy.empty} onEdit={() => setStep(1)} disabled={busy}/></dl>
+    <StepWizard title={profileWizardCopy.title} step={step + 1} total={headings.length} heading={headings[step]!} nextLabel={last ? (busy ? profileWizardCopy.saving : profileWizardCopy.save) : profileWizardCopy.next} nextDisabled={!ready[step]} onNext={last ? onSave : () => setStep(step + 1)} onBack={step > 0 ? () => setStep(step - 1) : undefined} onCancel={onCancel} busy={busy} error={error} className={styles.form}>
+      {step < reasonAt && pages[step]!.body}
+      {step === reasonAt && <><ReasonField value={reason} onChange={onReason} disabled={busy} emailChanged={emailChanged}/><p className={styles.muted}>{profileWizardCopy.reasonHint}</p></>}
+      {step === reviewAt && <>
+        <dl className="m-0">{lines.map(line => <ReviewRow key={line.label} label={line.label} value={<>{line.value}{line.changed && <span className={styles.muted}> · {profileWizardCopy.changed}</span>}</>} onEdit={() => setStep(line.page)} disabled={busy}/>)}
+          <ReviewRow label={profileWizardCopy.reason} value={reason.trim() || profileWizardCopy.empty} onEdit={() => setStep(reasonAt)} disabled={busy}/></dl>
         {emailChanged && <p role="status" className={styles.warning}><strong>Sign-in email is changing.</strong> {emailNote}</p>}
       </>}
     </StepWizard>
@@ -107,21 +119,26 @@ function AdultFields({ profile, stale, onReload, onCancel, onSaved, onBusy }: { 
       onSaved(savedMessage(result, email))
     } catch (cause) { setError(userFacingError(cause, failed)) } finally { setBusy(false); onBusy(false) }
   }
-  return <ProfileWizard stale={stale} onReload={onReload} onCancel={onCancel} busy={busy} error={error} fieldsValid={!!name.trim() && !!email.trim()} emailChanged={emailChanged} emailNote={signInWarning} reason={reason} onReason={setReason} onSave={() => void save()}
-    lines={reviewLines([{ label: 'Name', original: profile.name, value: name }, { label: 'Sign-in email', original: profile.email, value: email }, { label: 'Phone', original: profile.phone, value: phone }])}>
-    <p className={styles.muted}>{roleName[profile.role]}{profile.active ? '' : ' · Inactive account'}</p>
-    <label className={styles.field}>Name<Input value={name} required maxLength={100} disabled={busy} onChange={event => setName(event.target.value)}/></label>
-    <EmailField value={email} original={profile.email} onChange={setEmail} disabled={busy || profile.isSelf}/>
-    {profile.isSelf && <p className={styles.muted}>Ask another Coach to change your own sign-in email.</p>}
-    <label className={styles.field}>Phone<Input type="tel" autoComplete="off" maxLength={50} value={phone} disabled={busy} onChange={event => setPhone(event.target.value)}/></label>
-  </ProfileWizard>
+  const pages: Page[] = [
+    { heading: 'Name', valid: !!name.trim(), body: <>
+      <p className={styles.muted}>{roleName[profile.role]}{profile.active ? '' : ' · Inactive account'}</p>
+      <label className={styles.field}>Name<Input value={name} required maxLength={100} disabled={busy} onChange={event => setName(event.target.value)}/></label>
+    </> },
+    { heading: 'Sign-in email', valid: !!email.trim(), body: <>
+      <EmailField value={email} original={profile.email} onChange={setEmail} disabled={busy || profile.isSelf}/>
+      {profile.isSelf && <p className={styles.muted}>Ask another Coach to change your own sign-in email.</p>}
+    </> },
+    { heading: 'Phone', valid: true, body: <label className={styles.field}>Phone<Input type="tel" autoComplete="off" maxLength={50} value={phone} disabled={busy} onChange={event => setPhone(event.target.value)}/></label> },
+  ]
+  return <ProfileWizard stale={stale} onReload={onReload} onCancel={onCancel} busy={busy} error={error} pages={pages} emailChanged={emailChanged} emailNote={signInWarning} reason={reason} onReason={setReason} onSave={() => void save()}
+    lines={reviewLines([{ label: 'Name', original: profile.name, value: name, page: 0 }, { label: 'Sign-in email', original: profile.email, value: email, page: 1 }, { label: 'Phone', original: profile.phone, value: phone, page: 2 }])}/>
 }
 
 function AdultEditor({ userId, onCancel, onSaved, onBusy }: { userId: Id<'appUsers'>; onCancel: () => void; onSaved: (message: string) => void; onBusy: (busy: boolean) => void }) {
   const live = useQuery(api.coachProfileEdit.adultProfile, { userId })
-  const { opened, stale, reload } = useOpenedSnapshot(live)
+  const { opened, key, stale, reload } = useOpenedSnapshot(live, p => JSON.stringify([p.name, p.email, p.phone, p.active, p.role]))
   if (!opened) return <p role="status">Loading profile…</p>
-  return <AdultFields key={opened.profileRevision} profile={opened} stale={stale} onReload={reload} onCancel={onCancel} onSaved={onSaved} onBusy={onBusy}/>
+  return <AdultFields key={key} profile={opened} stale={stale} onReload={reload} onCancel={onCancel} onSaved={onSaved} onBusy={onBusy}/>
 }
 
 type EditorBody = (close: (message?: string) => void, setBusy: (busy: boolean) => void) => ReactNode
@@ -185,23 +202,26 @@ function StudentFields({ profile, stale, onReload, onCancel, onSaved, onBusy }: 
     } catch (cause) { setError(userFacingError(cause, failed)) } finally { setBusy(false); onBusy(false) }
   }
   const emailNote = linked ? signInWarning : 'No student sign-in is linked yet, so this changes the roster email only.'
-  return <ProfileWizard stale={stale} onReload={onReload} onCancel={onCancel} busy={busy} error={error} fieldsValid={!!legalName.trim() && !!preferredName.trim() && !!email.trim()} emailChanged={emailChanged} emailNote={emailNote} reason={reason} onReason={setReason} onSave={() => void save()}
-    lines={reviewLines([{ label: 'Legal name', original: profile.legalName, value: legalName }, { label: 'Preferred name', original: profile.preferredName, value: preferredName }, { label: 'Sign-in email', original: profile.email, value: email }, { label: 'Shirt size', original: profile.shirtSize ?? '', value: shirtSize }])}>
-    <div className={styles.row}>
+  const pages: Page[] = [
+    { heading: 'Names', valid: !!legalName.trim() && !!preferredName.trim(), body: <>
       <label className={styles.field}>Legal name<Input value={legalName} required maxLength={160} disabled={busy} onChange={event => setLegalName(event.target.value)}/></label>
       <label className={styles.field}>Preferred name<Input value={preferredName} required maxLength={80} disabled={busy} onChange={event => setPreferredName(event.target.value)}/></label>
-    </div>
-    <EmailField value={email} original={profile.email} onChange={setEmail} disabled={busy} note={linked ? undefined : emailNote}/>
-    <label className={styles.field}>Shirt size<NativeSelect value={shirtSize} disabled={busy} onChange={event => setShirtSize(event.target.value as Size | '')}><NativeSelectOption value="" disabled={profile.shirtSize !== null}>Not provided</NativeSelectOption>{SIZES.map(size => <NativeSelectOption key={size} value={size}>{size}</NativeSelectOption>)}</NativeSelect></label>
-    <p className={styles.muted}>Health, emergency and guardian details stay with the permission form.</p>
-  </ProfileWizard>
+    </> },
+    { heading: 'Sign-in email', valid: !!email.trim(), body: <EmailField value={email} original={profile.email} onChange={setEmail} disabled={busy} note={linked ? undefined : emailNote}/> },
+    { heading: 'Shirt size', valid: true, body: <>
+      <label className={styles.field}>Shirt size<NativeSelect value={shirtSize} disabled={busy} onChange={event => setShirtSize(event.target.value as Size | '')}><NativeSelectOption value="" disabled={profile.shirtSize !== null}>Not provided</NativeSelectOption>{SIZES.map(size => <NativeSelectOption key={size} value={size}>{size}</NativeSelectOption>)}</NativeSelect></label>
+      <p className={styles.muted}>Health, emergency and guardian details stay with the permission form.</p>
+    </> },
+  ]
+  return <ProfileWizard stale={stale} onReload={onReload} onCancel={onCancel} busy={busy} error={error} pages={pages} emailChanged={emailChanged} emailNote={emailNote} reason={reason} onReason={setReason} onSave={() => void save()}
+    lines={reviewLines([{ label: 'Legal name', original: profile.legalName, value: legalName, page: 0 }, { label: 'Preferred name', original: profile.preferredName, value: preferredName, page: 0 }, { label: 'Sign-in email', original: profile.email, value: email, page: 1 }, { label: 'Shirt size', original: profile.shirtSize ?? '', value: shirtSize, page: 2 }])}/>
 }
 
 function StudentEditor({ studentId, onCancel, onSaved, onBusy }: { studentId: Id<'students'>; onCancel: () => void; onSaved: (message: string) => void; onBusy: (busy: boolean) => void }) {
   const live = useQuery(api.coachProfileEdit.studentProfile, { studentId })
-  const { opened, stale, reload } = useOpenedSnapshot(live)
+  const { opened, key, stale, reload } = useOpenedSnapshot(live, p => JSON.stringify([p.legalName, p.preferredName, p.email, p.shirtSize, p.signIn]))
   if (!opened) return <p role="status">Loading profile…</p>
-  return <StudentFields key={opened.profileRevision} profile={opened} stale={stale} onReload={reload} onCancel={onCancel} onSaved={onSaved} onBusy={onBusy}/>
+  return <StudentFields key={key} profile={opened} stale={stale} onReload={reload} onCancel={onCancel} onSaved={onSaved} onBusy={onBusy}/>
 }
 
 /** Coach-only "Edit profile" for an active student record. */

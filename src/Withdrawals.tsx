@@ -121,7 +121,10 @@ export function ChargeEditor({studentId}:{studentId:Id<'students'>}) {
   const signedUp=useQuery(api.finance.signedUpEventIds,{studentId})
   const [stepIndex,setStepIndex]=useState(0)
   const [backToReview,setBackToReview]=useState(false)
-  const [pickingEvent,setPickingEvent]=useState(false)
+  // null until the person chooses: nothing is preselected, so a fee is never added to the wrong place by default.
+  const [forEvent,setForEvent]=useState<boolean|null>(null)
+  const pickingEvent=forEvent===true
+  const [nameEdited,setNameEdited]=useState(false)
   const [eventId,setEventId]=useState<string|null>(null)
   const [category,setCategory]=useState<'main'|'extra'|null>(null)
   const [paidCents,setPaidCents]=useState(0)
@@ -140,13 +143,16 @@ export function ChargeEditor({studentId}:{studentId:Id<'students'>}) {
   const cents=money.ok?money.cents:null
   const dueAt=dueAtFromInput(dueDate)
   const dueInvalid=Number.isNaN(dueAt)
+  const amountProblem=amount.trim()!==''&&!money.ok?money.message:null
   const pickerEvents=(events??[]).map(row=>({_id:row.event._id as string,name:row.event.name,startsAt:row.event.startsAt,endsAt:row.event.endsAt}))
   const eventName=pickerEvents.find(event=>event._id===eventId)?.name
   const ready:Record<FeeStep,boolean>={
-    what:label.trim().length>0&&!(pickingEvent&&!eventId)&&!(eventId&&!category),
+    what:forEvent!==null&&label.trim().length>0&&!(pickingEvent&&!eventId)&&!(eventId&&!category),
     amount:cents!==null&&!dueInvalid,
-    review:label.trim().length>0&&cents!==null&&!dueInvalid&&!(pickingEvent&&!eventId)&&!(eventId&&!category),
+    review:forEvent!==null&&label.trim().length>0&&cents!==null&&!dueInvalid&&!(pickingEvent&&!eventId)&&!(eventId&&!category),
   }
+  const whatProblem=forEvent===null?text.chooseWhetherEvent:pickingEvent&&!eventId?text.chooseEventFirst:eventId&&!category?text.chooseKind:!label.trim()?text.enterName:null
+  const amountMissing=cents===null&&!amountProblem?text.enterAmount:null
   const submit=async()=>{
     if(!ready.review||cents===null||pending.current.busy)return
     const idempotencyKey=pending.current.key??key()
@@ -159,7 +165,7 @@ export function ChargeEditor({studentId}:{studentId:Id<'students'>}) {
     }catch(e){setError(message(e))}
     finally{pending.current.busy=false;setBusy(false)}
   }
-  const reset=()=>{pending.current.key=null;setSaved(false);setStepIndex(0);setBackToReview(false);setPickingEvent(false);setEventId(null);setCategory(null);setPaidCents(0);setLabel('');setAmount('');setDueDate('');setError('')}
+  const reset=()=>{pending.current.key=null;setSaved(false);setStepIndex(0);setBackToReview(false);setForEvent(null);setNameEdited(false);setEventId(null);setCategory(null);setPaidCents(0);setLabel('');setAmount('');setDueDate('');setError('')}
   const goTo=(target:FeeStep)=>{setError('');setBackToReview(true);setStepIndex(feeSteps.indexOf(target))}
   const next=()=>{
     if(last){void submit();return}
@@ -168,32 +174,32 @@ export function ChargeEditor({studentId}:{studentId:Id<'students'>}) {
     setBackToReview(false)
   }
   const back=stepIndex>0?()=>{setError('');setBackToReview(false);setStepIndex(stepIndex-1)}:undefined
-  const amountProblem=amount.trim()!==''&&!money.ok?money.message:null
   if(saved)return <section className={`${styles.root} card`} aria-labelledby="charge-editor-title"><h2 id="charge-editor-title">{text.title}</h2><p role="status">{paidCents>0?text.addedPaid(usd(paidCents)):text.added}</p><Button type="button" variant="outline" onClick={reset}>{text.another}</Button></section>
   const content=(()=>{
     switch(step){
       case 'what':return <>
         <div role="group" aria-label={text.event} className="flex flex-wrap gap-2">
-          <Button type="button" variant={!pickingEvent?'default':'outline'} aria-pressed={!pickingEvent} disabled={busy} onClick={()=>{changed();setPickingEvent(false);setEventId(null);setCategory(null)}}>{text.notForEvent}</Button>
-          <Button type="button" variant={pickingEvent?'default':'outline'} aria-pressed={pickingEvent} disabled={busy} onClick={()=>{changed();setPickingEvent(true)}}>{text.forEvent}</Button>
+          <Button type="button" variant={forEvent===false?'default':'outline'} aria-pressed={forEvent===false} disabled={busy} onClick={()=>{changed();setForEvent(false);setEventId(null);setCategory(null)}}>{text.notForEvent}</Button>
+          <Button type="button" variant={pickingEvent?'default':'outline'} aria-pressed={pickingEvent} disabled={busy} onClick={()=>{changed();setForEvent(true)}}>{text.forEvent}</Button>
         </div>
-        {pickingEvent&&(events===undefined||signedUp===undefined?<p role="status">{text.loadingEvents}</p>:<EventPicker events={pickerEvents} allowedIds={signedUp} emptyText={text.noSignedUpEvents} value={eventId} onChange={id=>{changed();setEventId(id)}} asOf={clock} label={text.chooseEvent}/>)}
-        {pickingEvent&&!eventId&&signedUp!==undefined&&signedUp.length>0&&<p className="muted">{text.chooseEventFirst}</p>}
+        {pickingEvent&&(events===undefined||signedUp===undefined?<p role="status">{text.loadingEvents}</p>:<EventPicker events={pickerEvents} allowedIds={signedUp} emptyText={text.noSignedUpEvents} value={eventId} onChange={id=>{changed();setEventId(id);if(!nameEdited)setLabel(pickerEvents.find(event=>event._id===id)?.name??'')}} asOf={clock} label={text.chooseEvent} collapseWhenChosen/>)}
         {eventId&&<div role="group" aria-label={text.kind} className="flex flex-wrap gap-2">
           <Button type="button" variant={category==='main'?'default':'outline'} aria-pressed={category==='main'} disabled={busy} onClick={()=>{changed();setCategory('main')}}>{text.main}</Button>
           <Button type="button" variant={category==='extra'?'default':'outline'} aria-pressed={category==='extra'} disabled={busy} onClick={()=>{changed();setCategory('extra')}}>{text.extra}</Button>
         </div>}
-        {eventId&&!category&&<p className="muted">{text.chooseKind}</p>}
-        <label>{text.name} <Input value={label} disabled={busy} maxLength={150} onChange={e=>{changed();setLabel(e.target.value)}} required placeholder={text.namePlaceholder}/></label>
+        <label>{text.name} <span className="muted">{text.required}</span> <Input value={label} disabled={busy} maxLength={150} onChange={e=>{changed();setNameEdited(true);setLabel(e.target.value)}} required aria-describedby="add-fee-name-hint" placeholder={text.namePlaceholder}/></label>
+        <p id="add-fee-name-hint" className="muted">{text.nameHint}</p>
+        {whatProblem&&!(pickingEvent&&!eventId&&signedUp?.length===0)&&<p role="status" className="muted">{whatProblem}</p>}
       </>
       case 'amount':return <>
-        <label>{text.amount} <Input type="text" inputMode="decimal" value={amount} disabled={busy} onChange={e=>{changed();setAmount(e.target.value)}} required placeholder="0.00" aria-invalid={!!amountProblem} aria-describedby="add-fee-amount-hint"/></label>
+        <label>{text.amount} <span className="muted">{text.required}</span> <Input type="text" inputMode="decimal" value={amount} disabled={busy} onChange={e=>{changed();setAmount(e.target.value)}} required placeholder="0.00" aria-invalid={!!amountProblem} aria-describedby="add-fee-amount-hint"/></label>
         <p id="add-fee-amount-hint" role={amountProblem?'alert':undefined} className={amountProblem?undefined:'muted'}>{amountProblem??text.amountExample}</p>
         <label>{dueDateCopy.label} <Input type="date" value={dueDate} disabled={busy} aria-invalid={dueInvalid} onChange={e=>{changed();setDueDate(e.target.value)}}/></label>
         {dueInvalid&&<p role="alert">{dueDateCopy.invalid}</p>}
+        {amountMissing&&<p className="muted">{amountMissing}</p>}
       </>
       case 'review':return <dl className="m-0 grid">
-        <ReviewRow label={text.event} value={eventName??text.standalone} onEdit={()=>goTo('what')} disabled={busy}/>
+        {eventName&&<ReviewRow label={text.event} value={eventName} onEdit={()=>goTo('what')} disabled={busy}/>}
         {eventId&&category&&<ReviewRow label={text.kind} value={category==='main'?text.main:text.extra} onEdit={()=>goTo('what')} disabled={busy}/>}
         <ReviewRow label={text.name} value={label.trim()} onEdit={()=>goTo('what')} disabled={busy}/>
         <ReviewRow label={text.amount} value={cents===null?'—':usd(cents)} onEdit={()=>goTo('amount')} disabled={busy}/>

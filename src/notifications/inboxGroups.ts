@@ -1,5 +1,5 @@
 // Inbox tidy-up rules, pure so they are tested directly: fix doubled weekdays, fold repeats of one notice into one row,
-// and move "New meeting" notices for meetings that already happened under Older.
+// and move notices about events that already ended under Older.
 
 export type InboxRow = {
   _id: string
@@ -31,9 +31,6 @@ const doubledWeekday = new RegExp('(^|[^A-Za-z])(' + day + '), +' + day + ', +',
 /** "Tue, Tue, Dec 8" → "Tue, Dec 8" (a meeting named after its weekday followed by the date). */
 export const tidyDates = (text: string) => text.replace(doubledWeekday, '$1$2, ')
 
-/** A new-meeting or new-event notice: the only kind that goes stale once the event is over. */
-export const isNewEventNotice = (item: Pick<InboxRow, 'title'>) => /^New (meeting|event):/.test(item.title)
-
 /** Newest first; notices with the same link and title are one row (a meeting announced again is not a second message). */
 export function groupInbox<T extends InboxRow>(items: readonly T[], now: number): InboxGroups<T> {
   const folds = new Map<string, InboxEntry<T>>()
@@ -47,6 +44,7 @@ export function groupInbox<T extends InboxRow>(items: readonly T[], now: number)
     } else folds.set(key, { item, ids: [item._id], count: 1, unread: item.readAt === null })
   }
   const entries = [...folds.values()]
-  const isOlder = (entry: InboxEntry<T>) => isNewEventNotice(entry.item) && entry.item.eventEndsAt !== null && entry.item.eventEndsAt < now
+  // Any notice about an event that is over is stale (new-meeting, "Tomorrow:" reminders, invitations, cancellations).
+  const isOlder = (entry: InboxEntry<T>) => entry.item.eventEndsAt !== null && entry.item.eventEndsAt < now
   return { recent: entries.filter(entry => !isOlder(entry)), older: entries.filter(isOlder) }
 }

@@ -1,7 +1,7 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import { driverStepIssue, EventTransport, IndependentTravel } from './Travel'
+import { driverStepIssue, withoutFieldPrefix, EventTransport, IndependentTravel } from './Travel'
 
 const state = vi.hoisted(() => ({ enabled: false }))
 vi.mock('convex/react', () => ({
@@ -40,6 +40,9 @@ describe('driver wizard steps', () => {
     [0, { name: ' ' }, 'Enter the driver’s name.'],
     [0, { email: 'sam' }, 'Enter a full email address, like name@example.org.'],
     [0, { phone: '' }, 'Enter a phone number.'],
+    [0, { phone: '555-01' }, 'Enter a 10-digit phone number, with an optional leading 1.'],
+    [0, { phone: 'call me' }, 'Enter a 10-digit phone number, with an optional leading 1.'],
+    [0, { phone: '(555) 010-0100' }, ''],
     [1, { vehicleName: '  ' }, vehicleMessage],
     [1, { seats: '' }, seatsMessage],
     [1, { seats: '0' }, seatsMessage],
@@ -49,5 +52,9 @@ describe('driver wizard steps', () => {
     [2, {}, ''],
   ])('step %i with %o -> %s', (step, change, expected) => {
     expect(driverStepIssue(step, { ...ok, ...change })).toBe(expected)
+  })
+  it('keeps an unchanged saved phone valid and drops the server field prefix', () => {
+    expect(driverStepIssue(0, { ...ok, phone: 'ext 12' }, 'ext 12')).toBe('')
+    expect(withoutFieldPrefix('Driver phone: enter a 10-digit phone number, with an optional leading 1.')).toBe('enter a 10-digit phone number, with an optional leading 1.')
   })
 })

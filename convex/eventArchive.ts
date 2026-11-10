@@ -11,7 +11,11 @@ import { viewer, isCoachOrTravelLead } from "./lib/access";
 export const sweep = internalMutation({
   args: {}, returns: v.number(),
   handler: async ctx => {
-    const rows = await ctx.db.query("events").withIndex("by_archived_and_endsAt", q => q.eq("archived", false).lte("endsAt", Date.now())).take(100);
+    const now = Date.now();
+    // Repair events archived before a schedule change moved their end into the future.
+    const early = await ctx.db.query("events").withIndex("by_archived_and_endsAt", q => q.eq("archived", true).gt("endsAt", now)).take(100);
+    for (const event of early) await ctx.db.patch(event._id, { archived: false });
+    const rows = await ctx.db.query("events").withIndex("by_archived_and_endsAt", q => q.eq("archived", false).lte("endsAt", now)).take(100);
     for (const event of rows) await ctx.db.patch(event._id, { archived: true });
     if (rows.length === 100) await ctx.scheduler.runAfter(0, internal.eventArchive.sweep, {});
     return rows.length;
@@ -30,7 +34,12 @@ export const atEnd = internalMutation({
 
 export async function scheduleEventArchive(ctx: MutationCtx, eventId: Id<"events">) {
   const event = await ctx.db.get(eventId);
-  if (!event || event.archived) return;
+  if (!event) return;
+  if (event.archived) {
+    // A schedule change can move a past event's end into the future: it is current again.
+    if (event.endsAt <= Date.now()) return;
+    await ctx.db.patch(event._id, { archived: false });
+  }
   await ctx.scheduler.runAt(Math.max(Date.now(), event.endsAt), internal.eventArchive.atEnd, { eventId, endsAt: event.endsAt });
 }
 

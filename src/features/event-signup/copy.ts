@@ -1,5 +1,7 @@
 const plural = (count: number, one: string, many: string) => count === 1 ? one : many
 const shifts = (count: number) => `${count} ${plural(count, 'shift', 'shifts')}`
+/** "Pick 2 shifts." when none are picked yet, "Pick 1 more shift." once some are. One wording for the wizard and the To do list. */
+const pickShifts = (count: number, picked = 1) => `Pick ${count}${picked > 0 ? ' more' : ''} ${plural(count, 'shift', 'shifts')}.`
 
 /** Student words are short (9th graders on phones); parent words are plain, with no app terms. */
 export const signupCopy = {
@@ -10,7 +12,7 @@ export const signupCopy = {
     pickBetween: (min: number, max: number) => `Pick ${min} to ${shifts(max)}`,
     pickUpTo: (max: number) => `Pick up to ${shifts(max)}`,
     pickAtLeast: (min: number) => `Pick at least ${shifts(min)}`,
-    pickMore: (count: number) => `Pick ${count} more ${plural(count, 'shift', 'shifts')}.`,
+    pickMore: pickShifts,
     tooMany: (max: number) => `You can pick up to ${shifts(max)}. Remove one.`,
     atLimit: (max: number) => `That's ${shifts(max)}, the most you can pick. Tap one to remove it first.`,
     spotsLeft: (count: number) => `${count} ${plural(count, 'spot', 'spots')} left`,
@@ -18,7 +20,7 @@ export const signupCopy = {
     full: 'Full',
     overlaps: 'Same time as one you picked',
     picked: 'Picked',
-    none: 'No shifts yet.',
+    none: 'No shifts picked yet.',
     waitlist: "You'll pick shifts if you get a spot.",
     change: 'Change',
     save: 'Save shifts',
@@ -47,7 +49,7 @@ export const signupCopy = {
   todo: {
     title: 'To do',
     answer: (count: number) => `Answer ${count} required ${plural(count, 'question', 'questions')}.`,
-    pick: (count: number) => `Pick ${count} more ${plural(count, 'shift', 'shifts')}.`,
+    pick: pickShifts,
   },
   form: {
     fix: 'Fix the items marked below.',

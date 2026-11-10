@@ -7,6 +7,9 @@ export const permissionWorkflowCopy = {
   // Same words as PERMISSION_SIGNING_CLOSED in convex/lib/permissionSigningMode.ts.
   signingClosed: "Permission forms can't be signed here yet. Ask a Coach how to complete this student's form.",
   noStudent: 'Select a linked student.', noVersion: "A Coach needs to set up this season's permission form first.", noEvents: 'No eligible confirmed events.',
+  paperSigningPaused: 'Permission forms aren’t open yet, so a paper form can’t be recorded.',
+  paperNeedsAccess: 'Only a Coach, or a Travel Lead with Health export access, can record a paper form.',
+  paperNeedsSetup: 'This student must finish setup, and a parent must confirm the student’s profile, before a paper form can be recorded.',
   // No notification is sent when the form is set up, so Parents are told to check back.
   parentNoVersion: "A Coach hasn't set up this season's permission form yet. Check back later, or ask a Coach when it will be ready.",
   signerNameReason: 'Typing your name is your signature, so it must match the name on your account exactly.',

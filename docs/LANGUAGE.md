@@ -51,6 +51,12 @@ Write every new or changed user-facing string to this page. Rewrite screen by sc
 | Putting a student on an event | Sign up (verb), signup (noun); Signed up, Waitlisted, Waiting for approval, Not signed up | Signups | registered (for events), enrollment, Participants |
 | Joining the team | Join the team; invitation code (6 digits) | Join requests; invitation code | individual code, team code vs student code, enroll |
 | Hotel rooms | Rooms (page); Room type (Boys / Girls); Room choice | Rooming; Room type | Rooming category |
+| Readiness signups | {n} signed up ({m} needed); No students yet (readiness picker) | | |
+| Returning students (season transition) | All returning students; Use these choices for all returning students | | |
+| Mentor Join filter | Show only my subteams; Whole team | | |
+| Student room page | Room invitations; Leave room group | Invitations; Leave group | |
+| Fee details button | Details and history for {fee} (accessible name of each fee's button) | | |
+| Record payment | Balance due: $X (shown on Record payment) | | |
 | Leaving an event | Withdraw from this event; withdrawal request (statuses say refunded, moved to Available funds, or still owed) | Withdrawal requests | Financial work complete, Returned to travel accounts |
 | Ended events | Past events | Past events; Record review (the `/retention` page) | Archived, retention |
 | What a student still needs | What's left (Home); requirements | Event readiness | Readiness (alone), Open Readiness |

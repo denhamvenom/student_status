@@ -4,7 +4,7 @@ export const setupWizardCopy = {
   loading: 'Loading setup…', unavailable: 'Setup is unavailable. Try again or contact a Coach.',
   parentTitle: 'Complete student information', studentTitle: 'Set up your profile',
   // Health information is four short steps, one topic each (Allergies, Medications, Health insurance, Physician).
-  parentSteps: ['Student details', 'Contacts', 'Allergies', 'Medications', 'Health insurance', 'Physician', 'FIRST registration', 'Review'],
+  parentSteps: ['Names', 'Grade and birthday', 'Shirt and room type', 'Parent or guardian', 'Other emergency contact', 'Allergies', 'Medications', 'Health insurance', 'Physician', 'FIRST registration', 'Review'],
   studentSteps: ['About you', 'Team details', 'Parent connection & FIRST', 'Review'],
   back: 'Back', continue: 'Save and continue', later: 'Finish later', savesEachStep: 'Your answers save after each step.',
   review: 'Check your answers. Choose Edit to change anything.', edit: 'Edit', saveConfirm: 'Save and confirm',
@@ -40,15 +40,25 @@ export const setupWizardCopy = {
   firstReopened: 'Your Coach reopened this. Check both in FIRST, then report again.',
   reloadFirst: 'Reload FIRST status',
   studentDone: 'Your setup is saved. Parent information and Coach verification may still be needed before Competition readiness is clear.',
-  parentEarlierComplete: 'Student details, contacts and health information are already complete. Use Back to review them.',
-  parentDone: (status: string) => `Saved. FIRST registration: ${status}.`,
+  reviewEarlier: 'Use Back to review them.',
+  detailsNote: 'Your answers for Names, Grade and birthday, and Shirt and room type save when you finish Shirt and room type.',
+  guardianNote: 'Your answers for the parent or guardian and the other emergency contact save when you finish Other emergency contact.',
+  fillIn: (missing: readonly string[]) => `Fill in ${missing.length > 1 ? `${missing.slice(0, -1).join(', ')} and ${missing[missing.length - 1]}` : missing[0]} to continue.`,
+  contactsEmergencyHeading: 'Other emergency contact',
+  contactsEmergencyNote: 'Someone we can call if we cannot reach the parent or guardian.',
+  reviewTitles: { details: 'Student details', contacts: 'Contacts' },
+  parentSaved: 'Student details, contacts and health information are saved.',
+  nothingLeft: 'Nothing is left.',
+  stillLeft: (what: string) => `Still left: FIRST registration (${what}).`,
+  firstRegistrationStatus: (status: string) => `FIRST registration: ${status}.`,
+  doneEyebrow: { complete: 'SETUP COMPLETE', saved: 'SETUP SAVED', left: 'SAVED, ONE STEP LEFT' },
   firstChecking: 'Checking status', firstUnknown: 'Status unavailable',
   shirtSizes: ['XS','S','M','L','XL','2XL','3XL'] as const,
   subteams: subteamOptions,
 } as const
 
 /** Step numbers in the Parent wizard (see parentSteps). */
-export const PARENT_STEP = { details: 0, contacts: 1, allergies: 2, medications: 3, insurance: 4, physician: 5, first: 6, review: 7 } as const
+export const PARENT_STEP = { names: 0, grade: 1, shirtRoom: 2, guardian: 3, emergency: 4, allergies: 5, medications: 6, insurance: 7, physician: 8, first: 9, review: 10 } as const
 
 export type HealthTopic = 'allergies' | 'prescriptions' | 'insurance' | 'physician'
 const HEALTH_TOPICS: readonly HealthTopic[] = ['allergies', 'prescriptions', 'insurance', 'physician']

@@ -8,12 +8,11 @@ import { compareMonths, nextMonth, previousMonth, REPORT_STATUSES, type ReportSt
 import { DashboardTile, TileTitle } from '@/components/dashboard/DashboardTile'
 import { DetailsSheet } from '@/components/dashboard/DetailsSheet'
 import { dashboardButtonVariants, focusRing, inset } from '@/components/dashboard/styles'
-import { desktopQuery, useMediaQuery } from '@/components/dashboard/useMediaQuery'
 import { hoursMinutesLine } from '../attendance/logic'
 import { formatLongDate, formatShortDate } from '../student-home/format'
 import { useNow } from '../student-home/useNow'
 import { reportCopy as copy } from './copy'
-import { calendarWeeks, chicagoMonth, clampMonth, dayStatus, formatMonth, formatTime, formatTimeRange, monthLimits, neutralKey, statusBadges, statusWord, timesLine, visibleEvents, type AttendanceMonth, type CalendarDay, type Month, type ReportEvent } from './logic'
+import { calendarWeeks, chicagoMonth, DEFAULT_VIEW, clampMonth, dayStatus, formatMonth, formatTime, formatTimeRange, monthLimits, neutralKey, statusBadges, statusWord, timesLine, visibleEvents, type AttendanceMonth, type CalendarDay, type Month, type ReportEvent } from './logic'
 
 /** Color is never the only signal: every status also has its icon and its word. Late is blue, distinct from the yellow of leaving early. */
 const statusStyle: Record<ReportStatus, { icon: LucideIcon; badge: string; cell: string }> = {
@@ -151,14 +150,13 @@ function EventDetail({ event, now }: { event: ReportEvent; now: number }) {
 type Selection = { title: string; events: ReportEvent[] }
 
 /**
- * Monthly attendance for one Student, for the Student or a linked Parent. Phones open on the calendar,
- * desktops on the list; tapping an event (or a day) opens its clock times in a sheet.
+ * Monthly attendance for one Student, for the Student or a linked Parent. Opens on the list, which names every meeting; the calendar is one tap away. 
+ * Tapping an event (or a day) opens its clock times in a sheet.
  */
 export function AttendanceReport({ studentId }: { studentId: Id<'students'> }) {
   const now = useNow()
-  const desktop = useMediaQuery(desktopQuery)
   const [chosenView, setChosenView] = useState<'calendar' | 'list' | null>(null)
-  const view = chosenView ?? (desktop ? 'list' : 'calendar')
+  const view = chosenView ?? DEFAULT_VIEW
   const [requested, setRequested] = useState<Month>(() => chicagoMonth(Date.now()))
   const [seasonStartsAt, setSeasonStartsAt] = useState<number | null>(null)
   const [showAll, setShowAll] = useState(false)

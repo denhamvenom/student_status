@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Id } from '../convex/_generated/dataModel'
-import { blankDraft, bulkNoteReason, bulkOverpayments, draftRows, editContextChanged, parsePaymentCsv, recordedMessage, recordedRowLabel, referenceAfterMethodChange, visibleStepError } from './PaymentAdministration'
+import { balanceDueLine, blankDraft, bulkNoteReason, moneyReasonProblem, recordSteps, bulkOverpayments, draftRows, editContextChanged, parsePaymentCsv, recordedMessage, recordedRowLabel, referenceAfterMethodChange, visibleStepError } from './PaymentAdministration'
+import { moneyActions, nextMoneyAction } from './features/operations/FinanceOperations'
 import { moneyJobStateLabel, moneyReturnedCopy, paymentAdministrationCopy } from './lib/payment-admin-copy'
 import { overpaymentCents, overpaymentQuestion, parseMoneyInput } from './lib/charge-money'
 
@@ -167,5 +168,38 @@ describe('where a recorded payment went', () => {
     expect(bad.ok ? '' : visibleStepError(bad.message, bad)).toBe('')
     expect(visibleStepError('Choose how it was paid.', bad)).toBe('Choose how it was paid.')
     expect(visibleStepError('Enter a reason.', good)).toBe('Enter a reason.')
+  })
+})
+
+describe('Record payment amount step and note', () => {
+  it('shows the student Balance due on the amount step, never below $0, and nothing while loading', () => {
+    expect(balanceDueLine(12500)).toBe('Balance due: $125.00')
+    expect(balanceDueLine(0)).toBe('Balance due: $0.00')
+    expect(balanceDueLine(-300)).toBe('Balance due: $0.00')
+    expect(balanceDueLine(null)).toBeNull()
+    expect(balanceDueLine(undefined)).toBeNull()
+  })
+  it('has no separate Note step; the note is entered on Review', () => {
+    expect(recordSteps).toEqual(['amount', 'how', 'review'])
+  })
+})
+
+describe('minimum length for money reasons', () => {
+  it.each([['', false], ['x', false], ['1234567', false], ['   1234567   ', false], ['12345678', true], ['Wrong amount', true]])('reason %j ok=%s', (reason, ok) => {
+    expect(moneyReasonProblem(reason) === null).toBe(ok)
+  })
+  it('uses one minimum for Edit payment, Money returned and transfers', () => {
+    expect(paymentAdministrationCopy.reasonMinLength).toBe(8)
+    expect(moneyReturnedCopy.enterReason).toContain('8')
+  })
+})
+
+describe('account action menu', () => {
+  it('opens one tool at a time and closes it when chosen again', () => {
+    expect(nextMoneyAction(null, 'fee')).toBe('fee')
+    expect(nextMoneyAction('fee', 'edit')).toBe('edit')
+    expect(nextMoneyAction('edit', 'edit')).toBeNull()
+    expect(moneyActions).toEqual(['fee', 'edit', 'returned'])
+    expect(moneyActions.every(action => moneyReturnedCopy.actions[action])).toBe(true)
   })
 })

@@ -157,7 +157,10 @@ export function joinInScope(entry: Pick<JoinEntry, 'next'>, subteams: readonly s
 export function joinSections(entries: readonly JoinEntry[], now: number, subteams?: readonly string[], showAll = false): JoinSections {
   const openEntries = entries.filter(entry => openToJoin(entry.next, now))
   const scoped = subteams && !showAll ? openEntries.filter(entry => joinInScope(entry, subteams)) : openEntries
-  const open = [...scoped].sort((a, b) => a.nextStartsAt - b.nextStartsAt || a.title.localeCompare(b.title))
+  // Mentors can sign up for chosen-students and Mentors-only events too (DECISIONS: Mentor self sign-up), but they come after
+  // whole-team and subteam items in each group.
+  const narrow = (entry: JoinEntry) => entry.next.audience.kind === 'students' || entry.next.audience.kind === 'mentorsOnly' ? 1 : 0
+  const open = [...scoped].sort((a, b) => narrow(a) - narrow(b) || a.nextStartsAt - b.nextStartsAt || a.title.localeCompare(b.title))
   return {
     competitions: open.filter(entry => entry.category === 'competitionsAndTrips'),
     meetings: open.filter(entry => entry.category !== 'competitionsAndTrips'),

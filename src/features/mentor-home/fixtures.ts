@@ -15,7 +15,7 @@ export const meetingId = (key: string) => `fixture_meeting_${key}` as Id<'events
 export function meeting(key: string, startsAt: number, overrides: Partial<MentorMeeting> = {}): MentorMeeting {
   return {
     eventId: meetingId(key), title: key, type: 'Team', startsAt, endsAt: startsAt + 2 * HOUR, place: 'DSHS STEM Center (on site)', virtual: false, cancelled: false,
-    audience: { kind: 'everyone', subteams: [], required: false, text: 'Everyone' }, seriesId: null, repeatLabel: null, calendarRevision: 0, onTeamCalendar: false,
+    audience: { kind: 'everyone', subteams: [], required: false, text: 'Whole team' }, seriesId: null, repeatLabel: null, calendarRevision: 0, onTeamCalendar: false,
     myStatus: null, mySource: null, questions: { askDrive: false, askHotel: false }, myAnswers: { canDriveStudents: null, needsHotelRoom: null }, seriesSignup: null,
     isCreator: false, canSignUp: false, canWithdraw: false, canManage: false,
     ...overrides,
@@ -55,7 +55,7 @@ export function clockedIn(groups: Record<string, string[]>, truncated = false): 
 const programming = { kind: 'subteams' as const, subteams: ['Programming'], required: false, text: 'Subteams: Programming' }
 const busyOpen = [
   meeting('CAD design review', at('2026-11-09T18:30'), { canSignUp: true, audience: { kind: 'subteams', subteams: ['CAD'], required: false, text: 'Subteams: CAD' } }),
-  meeting('Team meeting', at('2026-11-11T18:00'), { canSignUp: true, audience: { kind: 'everyone', subteams: [], required: true, text: 'Everyone (required)' } }),
+  meeting('Team meeting', at('2026-11-11T18:00'), { canSignUp: true, audience: { kind: 'everyone', subteams: [], required: true, text: 'Whole team (required)' } }),
   meeting('Monday open shop', at('2026-11-09T18:00'), { canSignUp: true, seriesId: 'fixture_series_shop' as Id<'eventSeries'>, repeatLabel: 'Repeats weekly' }),
   meeting('Programming robot code', at('2026-11-10T19:00'), { canSignUp: true, seriesId: 'fixture_series_prog' as Id<'eventSeries'>, repeatLabel: 'Repeats weekly', audience: programming }),
   meeting('Bayou Robotics Showcase', at('2026-11-20T08:00'), { canSignUp: true, type: 'Competition', questions: { askDrive: true, askHotel: false }, place: 'Baton Rouge River Center' }),

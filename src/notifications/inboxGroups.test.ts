@@ -26,12 +26,17 @@ describe('groupInbox', () => {
     expect(recent.map(entry => entry.item._id)).toEqual(['a', 'b'])
   })
 
-  it('moves new-meeting notices for meetings that already happened under Older, and nothing else', () => {
-    const past = row('past', { eventEndsAt: NOW - DAY })
-    const canceled = row('cancel', { title: 'Canceled: Build night', url: '/events/e3', eventEndsAt: NOW - DAY })
+  it('moves every notice about an ended event under Older (new, reminder, canceled), keeps the rest', () => {
+    const rows = [
+      row('past'),
+      row('tomorrow', { title: 'Tomorrow: Test Team Meeting', url: '/events/e2', eventEndsAt: NOW - 2 * DAY }),
+      row('canceled', { title: 'Canceled: Build night', url: '/events/e3', eventEndsAt: NOW - DAY }),
+      row('gone', { title: 'New event: Removed', url: '/events/e4', eventEndsAt: 0 }),
+    ].map(r => r._id === 'past' ? { ...r, eventEndsAt: NOW - DAY } : r)
+    const live = row('live', { url: '/events/e5', title: 'Tomorrow: Next meeting', eventEndsAt: NOW + 6 * DAY })
     const announcement = row('news', { title: 'New meeting: Tue, Dec 8', url: '/', eventEndsAt: null })
-    const { recent, older } = groupInbox([past, canceled, announcement], NOW)
-    expect(older.map(entry => entry.item._id)).toEqual(['past'])
-    expect(recent.map(entry => entry.item._id).sort()).toEqual(['cancel', 'news'])
+    const { recent, older } = groupInbox([...rows, live, announcement], NOW)
+    expect(older.map(entry => entry.item._id).sort()).toEqual(['canceled', 'gone', 'past', 'tomorrow'])
+    expect(recent.map(entry => entry.item._id).sort()).toEqual(['live', 'news'])
   })
 })

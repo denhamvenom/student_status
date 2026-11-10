@@ -256,6 +256,16 @@ const urgencyRank = (item: WhatsLeftItem, now: number) => {
   return state === 'overdue' ? 0 : state === 'soon' || item.kind === 'inviteParent' ? 1 : state === 'later' ? 2 : 3
 }
 
+/**
+ * What's left without "Choose your room" for an event where the Student already has a room: in a group, asked to be
+ * assigned, or in a final group. The server keeps the item open until a group has a second member
+ * (roomSelectionComplete in convex/lib/readModels.ts), so Home hides it here.
+ */
+export function withoutChosenRooms(items: WhatsLeftItem[], roomChoices: Pick<RoomChoice, 'eventId' | 'status'>[]): WhatsLeftItem[] {
+  const chosen = new Set(roomChoices.filter(room => room.status !== 'notChosen').map(room => room.eventId))
+  return items.filter(item => !(item.kind === 'roomChoice' && item.eventId !== null && chosen.has(item.eventId)))
+}
+
 export type WhatsLeftBadge = { kind: 'overdue' } | { kind: 'dueSoon'; count: number } | { kind: 'allSet' } | null
 
 /**

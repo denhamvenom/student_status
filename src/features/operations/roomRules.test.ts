@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assignIssue, finalizeIssue, roomTypeIssue } from './roomRules'
+import { assignIssue, assignPickerNote, finalizeIssue, roomFieldIssues, roomTypeIssue } from './roomRules'
 
 const open = (memberCount: number) => ({ closed: false, finalized: false, memberCount })
 
@@ -26,4 +26,15 @@ describe('room rules', () => {
     expect(roomTypeIssue('')).toBe('Choose a room type.')
     expect(roomTypeIssue('Girls')).toBe('')
   })
+  it('reports every missing room field at once', () => {
+    expect(roomFieldIssues('  ', '')).toEqual(['Enter a room name.', 'Choose a room type.'])
+    expect(roomFieldIssues('Room 1', '')).toEqual(['Choose a room type.'])
+    expect(roomFieldIssues('Room 1', 'Boys')).toEqual([])
+  })
+  it.each([
+    ['matching student exists', 'Boys', [{ category: 'Boys' as const, groupId: null }], ''],
+    ['everyone already in this room', 'Boys', [{ category: 'Boys' as const, groupId: 'g' }], ''],
+    ['only the other type', 'Boys', [{ category: 'Girls' as const, groupId: null }], 'No Boys students can be assigned to this Boys room. Students with a Girls room type go in Girls rooms.'],
+    ['only students with no type', 'Girls', [{ category: null, groupId: null }], 'No Girls students can be assigned to this Girls room. 1 student has no room type yet. Set it on the student record.'],
+  ])('picker note: %s', (_n, type, students, expected) => expect(assignPickerNote(type as 'Boys' | 'Girls', students, 'g')).toBe(expected))
 })

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useQuery } from 'convex/react'
+import { useEffect, useState } from 'react'
+import { useMutation, useQuery } from 'convex/react'
 import { ChevronRight } from 'lucide-react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
@@ -22,9 +22,22 @@ function useWork(reader: TaskViewer, studentId: Id<'students'> | null): WhatsLef
   return (reader === 'student' ? student : parent)?.whatsLeft ?? []
 }
 
-function Row({ label, item, props, all }: { label: string; item: WhatsLeftItem; props: Props; all: WhatsLeftItem[] }) {
+/** For a Parent: false while the Coach has not posted the FIRST invitation link (the same check setup and Home make). */
+function useFirstLinkReady(reader: TaskViewer, studentId: Id<'students'> | null, needed: boolean): boolean | null {
+  const getFirst = useMutation(api.firstRegistration.get)
+  const [ready, setReady] = useState<boolean | null>(null)
+  useEffect(() => {
+    if (reader !== 'parent' || !studentId || !needed) return
+    let current = true
+    void getFirst({ studentId }).then(value => { if (current) setReady(!value.canAccessInvitation || !!value.invitationUrl) }).catch(() => { if (current) setReady(null) })
+    return () => { current = false }
+  }, [getFirst, reader, studentId, needed])
+  return ready
+}
+
+function Row({ label, item, props, all, firstLinkReady }: { label: string; item: WhatsLeftItem; props: Props; all: WhatsLeftItem[]; firstLinkReady: boolean | null }) {
   const [sheet, setSheet] = useState(false)
-  const guide = guideForItem(item, { viewer: props.reader, all, studentName: props.studentName, studentId: props.studentId ?? undefined })
+  const guide = guideForItem(item, { viewer: props.reader, all, firstLinkReady, studentName: props.studentName, studentId: props.studentId ?? undefined })
   return <>
     <button type="button" onClick={() => setSheet(true)} aria-haspopup="dialog" className={cn('split-line min-h-11 w-full cursor-pointer items-center border-0 bg-transparent p-0 text-left font-sans text-inherit', focusRing)}>
       {/* The row says who it waits on ("Waiting for your parent", "Waiting for a Coach to review the form"), not only that it is open. */}
@@ -38,5 +51,6 @@ function Row({ label, item, props, all }: { label: string; item: WhatsLeftItem; 
 /** The red "Open" rows in an event's Requirements box: each one opens a sheet that does the task or says who must act. */
 export function EventRequirementRows(props: Props) {
   const all = useWork(props.reader, props.studentId)
-  return <div className="simple-list">{props.open.map(label => <Row key={label} label={label} item={itemForOpenRow(label, { id: props.eventId, name: props.eventName }, all)} props={props} all={all} />)}</div>
+  const firstLinkReady = useFirstLinkReady(props.reader, props.studentId, props.open.some(label => openRowKind(label) === 'firstRegistration'))
+  return <div className="simple-list">{props.open.map(label => <Row key={label} label={label} item={itemForOpenRow(label, { id: props.eventId, name: props.eventName }, all)} props={props} all={all} firstLinkReady={firstLinkReady} />)}</div>
 }

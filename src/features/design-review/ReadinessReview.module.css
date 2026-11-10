@@ -191,3 +191,10 @@
 .notes ul{margin:0;padding-left:18px}
 .notes li{margin:2px 0}
 .allOpen{margin:0;padding:0 16px 10px;color:var(--rr-muted);font-size:13px}
+.studentsPanel>.muted{margin:0;padding:0 16px 10px}
+.noStudentsGroup{margin-top:12px}
+.noStudentsGroup h3{margin:0 0 6px;color:var(--rr-muted);font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+.noStudentsGroup ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px}
+.noStudentsGroup button{display:flex;flex-direction:column;align-items:flex-start;width:100%;min-height:44px;padding:8px 12px;text-align:left;background:var(--rr-card);border:1px solid var(--rr-border);border-radius:4px;color:inherit;cursor:pointer}
+.noStudentsGroup button[aria-pressed=true]{border-color:var(--rr-purple)}
+.noStudentsGroup button span{font-size:12px;color:var(--rr-muted)}

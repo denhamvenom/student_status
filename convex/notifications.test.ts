@@ -204,7 +204,7 @@ describe("inbox", () => {
     expect(Object.fromEntries(page.map(row => [row.title, row.eventEndsAt]))).toEqual({ "New meeting: Past meeting": endsAt, Elsewhere: null, Announcement: null });
   });
 
-  it("gives no end time for a notice linking to an archived event", async () => {
+  it("still gives the end time for an archived event, and 0 for a deleted one, so both count as past", async () => {
     vi.setSystemTime(OPEN_NOW);
     const f = await fixture();
     const eventId = await f.t.run(async ctx => {
@@ -213,7 +213,7 @@ describe("inbox", () => {
     });
     await f.t.run(ctx => notifyUsers(ctx, { ...base, userIds: [f.ids.a], url: `/events/${eventId}`, title: "Archived notice" }));
     const page = (await f.a.query(api.notifications.listMine, { paginationOpts: { numItems: 10, cursor: null } })).page;
-    expect(page.find(r => r.title === "Archived notice")?.eventEndsAt).toBeNull();
+    expect(page.find(r => r.title === "Archived notice")?.eventEndsAt).toBe(2);
   });
 
   it("preferences list only categories for the viewer's role, and sendTestToMe is rate limited", async () => {

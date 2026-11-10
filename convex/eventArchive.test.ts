@@ -87,6 +87,20 @@ describe("automatic past-event archive", () => {
     expect((await f.t.run(ctx => ctx.db.get(f.ids.future)))!.archived).toBe(true);
   });
 
+  it("shows only ended events: a schedule moved into the future leaves Past events", async () => {
+    const f = await fixture();
+    await f.t.mutation(internal.eventArchive.sweep, {});
+    // Rescheduled through Calendar or event settings.
+    await f.t.run(async ctx => { await ctx.db.patch(f.ids.past, { startsAt: Date.now() + 5_000_000, endsAt: Date.now() + 6_000_000 }); await scheduleEventArchive(ctx, f.ids.past); });
+    expect((await f.t.run(ctx => ctx.db.get(f.ids.past)))!.archived).toBe(false);
+    expect((await f.coach.query(api.eventArchive.page, { paginationOpts })).page).toEqual([]);
+    // Rows archived before this fix are repaired by the next sweep.
+    await f.t.run(ctx => ctx.db.patch(f.ids.future, { archived: true }));
+    await f.t.mutation(internal.eventArchive.sweep, {});
+    expect((await f.t.run(ctx => ctx.db.get(f.ids.future)))!.archived).toBe(false);
+    expect((await f.coach.query(api.eventArchive.page, { paginationOpts })).page).toEqual([]);
+  });
+
   it("catches up in bounded batches, pages historical seasons, and keeps archived rows out of the active event limit", async () => {
     vi.useFakeTimers();
     const f = await fixture();

@@ -55,7 +55,7 @@ export const mentorHomeCopy = {
     createHint: { mentor: 'To make something new, use Create at the top or bottom of the screen.', travelLead: 'To make something new, use New event on the Events page.' },
   },
   join: {
-    none: 'Nothing to join right now. New events and meetings for Everyone or your subteams show up here.',
+    none: 'Nothing to join right now. New events and meetings for the whole team or your subteams show up here.',
     /** Grouped sections (owner decision, Nov 7 2026): competitions and trips first, then meetings and events. */
     competitions: 'Competitions & trips',
     meetings: 'Meetings & events',
@@ -274,7 +274,7 @@ export const mentorHomeCopy = {
     inviteNeedsSubteams: 'To invite other Mentors, choose Subteams above.',
     invitesLegend: 'Invite other Mentors (optional)',
     invitesBySubteam: 'Mentors of the chosen subteams',
-    mentorsOnlyUnavailable: 'A Mentors-only meeting needs at least one invited Mentor, and inviting Mentors one by one isn’t available yet. Choose Everyone, Subteams or specific students.',
+    mentorsOnlyUnavailable: 'A Mentors-only meeting needs at least one invited Mentor, and inviting Mentors one by one isn’t available yet. Choose Whole team, Subteams or specific students.',
     created: 'Meeting created.',
     seriesCreated: 'Repeating meeting created.',
     addToCalendar: 'Add to Team Calendar',

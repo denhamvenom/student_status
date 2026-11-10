@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calendarWeeks, clampMonth, dayStatus, monthLimits, statusBadges, statusWord, visibleEvents, type ReportEvent } from './logic'
+import { calendarWeeks, clampMonth, DEFAULT_VIEW, dayStatus, monthLimits, statusBadges, statusWord, visibleEvents, type ReportEvent } from './logic'
 
 const at = (iso: string) => Date.parse(iso)
 const event = (overrides: Partial<ReportEvent>): ReportEvent => ({
@@ -60,4 +60,8 @@ describe('row and day labels', () => {
     expect(visibleEvents(events, false).map(row => row.key)).toEqual(['r', 'b', 'x'])
     expect(visibleEvents(events, true).map(row => row.key)).toEqual(['r', 'b', 'o', 'x'])
   })
+})
+
+describe('default view', () => {
+  it('opens on the list so meeting names show', () => expect(DEFAULT_VIEW).toBe('list'))
 })

@@ -16,6 +16,8 @@ export const familyCopy = {
     charges: 'Fees', chargesByEvent: 'Fees by event', otherCharges: 'Other fees', eventCharges: 'Event fees',
     charge: 'Fee', appliedShort: 'Paid so far', dueShort: 'Balance due', covered: 'Paid', canceled: 'Canceled', canceledLower: 'canceled', balanceDue: 'Balance due',
     canceledFeeNote: 'This fee was removed, so nothing is owed for it. Money already paid toward it went back to Available funds. If Available funds is $0, nothing had been paid toward it.',
+    /** Accessible name for a fee's details button; the fee name tells apart rows that all read "Details and history". */
+    detailsFor: (feeName: string) => `Details and history for ${feeName}`,
     noCharges: 'No fees yet.', history: 'Fee and payment history', noTransactions: 'No fees or payments yet.',
     payment: 'Payment', paymentCorrection: 'Payment receipt corrected', deallocation: 'Returned to available funds', payout: 'Cash/check refund recorded',
     transferOut: 'Fundraising transferred out', transferIn: 'Fundraising transfer received', fundraisingSource: 'Fundraising',

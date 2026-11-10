@@ -12,7 +12,7 @@ describe('team transfer review', () => {
     const html = renderToStaticMarkup(createElement(TeamTransferReview, { preview, current: preview, amountCents: preview.amountCents, busy: false, reasonValid: true, onReview: () => undefined }))
     expect(html).toContain('$90,071,992,547,409.91')
     expect(html).toMatch(/<button[^>]*type="button"[^>]*>Review transfer to team<\/button>/)
-    expect(html).toMatch(/<button[^>]*type="submit"[^>]*>Confirm reviewed team transfer<\/button>/)
+    expect(html).toMatch(/<button[^>]*type="submit"[^>]*>Confirm transfer to team<\/button>/)
     expect(teamTransferReviewReady(preview, preview, preview.amountCents)).toBe(true)
   })
   it('blocks confirmation after a financial revision changes or while updating', () => {

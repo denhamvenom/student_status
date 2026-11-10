@@ -1,4 +1,6 @@
 import type { Id } from '../../../convex/_generated/dataModel'
+import { setupWizardCopy } from '@/lib/setup-wizard-copy'
+import { shiftPickerHref } from '../event-signup/logic'
 import { parentItemHref } from '../parent-home/logic'
 import type { WhatsLeftItem, WhatsLeftKind, WhatsLeftOwner } from './contract'
 import { formatShortDate } from './format'
@@ -29,6 +31,7 @@ export const taskCopy = {
   waitingForParent: 'Waiting for your parent',
   waitingForStudent: (name: string) => `Waiting for ${name}`,
   waitingForCoach: 'Waiting for Coach approval',
+  waitingForFirstLink: 'Waiting for the Coach to send the FIRST invitation link',
   remindParent: 'Copy reminder for your parent',
   remindStudent: (name: string) => `Copy reminder for ${name}`,
   copied: 'Copied. Paste it into a text message.',
@@ -124,7 +127,7 @@ export function effectiveOwner(item: WhatsLeftItem, all: readonly WhatsLeftItem[
   return season ? season.owner : 'parent'
 }
 
-export type TaskContext = { viewer: TaskViewer; /** Every item, so the event FIRST requirement can find its owner. */ all?: readonly WhatsLeftItem[]; studentName?: string; studentId?: string }
+export type TaskContext = { viewer: TaskViewer; /** false while the Coach has not posted the FIRST invitation link: a Parent's FIRST registration then waits for the Coach, as in setup and on Home. */ firstLinkReady?: boolean | null; /** Every item, so the event FIRST requirement can find its owner. */ all?: readonly WhatsLeftItem[]; studentName?: string; studentId?: string }
 
 function coachHeadline(kind: WhatsLeftKind) {
   if (kind === 'permissionReview') return 'Waiting for a Coach to review the form'
@@ -146,9 +149,14 @@ export function guideForItem(item: WhatsLeftItem, context: TaskContext): TaskGui
 
   if (owner === 'coach') return { ...base, actor: 'coach', headline: coachHeadline(kind), explain: `${explain} ${taskCopy.coachWorking}`, action: null, remind: null }
 
+  if (viewer === 'parent' && owner === 'parent' && kind === 'firstRegistration' && context.firstLinkReady === false) {
+    return { ...base, actor: 'coach', headline: taskCopy.waitingForFirstLink, explain: setupWizardCopy.firstUnavailable, action: null, remind: null }
+  }
+
   const readerActs = owner === viewer
   if (readerActs) {
-    const to = viewer === 'parent' ? parentItemHref({ ...item, kind }, context.studentId) : item.href ?? (kind === 'firstRegistration' ? '/setup' : null)
+    const link = viewer === 'parent' ? parentItemHref({ ...item, kind }, context.studentId) : item.href ?? (kind === 'firstRegistration' ? '/setup' : null)
+    const to = shifts && viewer === 'student' && link ? shiftPickerHref(link) : link
     const label = shifts && viewer === 'student' ? shiftsCopy.action : (viewer === 'parent' ? parentActions : studentActions)[kind]
     // A custom requirement has no page of its own; the event page lists it, so the sheet stays an explanation.
     return { ...base, actor: 'reader', headline: taskCopy.yourTurn, explain, action: to && label ? { label, to } : null, remind: null }

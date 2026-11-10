@@ -8,15 +8,19 @@ import type { ConsentProfileV2 } from '../convex/lib/consentSnapshotV2'
 import { Input } from './components/ui/input'
 import { GradeSelect } from './GradeSelect'
 import { ContactsFields, MedicalStep, ReviewSections, WizardField, WizardFrame, contactRows, healthRows, reviewDate, shown, type HealthChosen } from './SetupWizard'
-import { setupWizardCopy as copy } from './lib/setup-wizard-copy'
+import { setupWizardCopy as copy, PARENT_STEP } from './lib/setup-wizard-copy'
+import { stepIssue } from './features/parent-home/setup-steps'
 import styles from './ConsentProfileV2Form.module.css'
 
 type Profile = FunctionReturnType<typeof api.permissionsV2.profile>
 const blank = (): ConsentProfileV2 => ({ grade: '', dateOfBirth: '', guardian: { name: '', relationship: '', phone: '', email: '' }, emergency: { name: '', relationship: '', phone: '' }, allergies: { state: 'none', entries: [] }, prescriptions: { state: 'none', entries: [] }, insurance: { state: 'unavailable', provider: null, policy: null }, physician: { state: 'unavailable', name: null, phone: null } })
 // One health topic per step, the same four steps the setup wizard uses.
-const steps = ['Student details', 'Contacts', copy.health.allergies.title, copy.health.prescriptions.title, copy.health.insurance.title, copy.health.physician.title, 'Review'] as const
+// The same step names the setup wizard uses, minus the ones this form does not ask (names, shirt and room type, FIRST).
+const steps = [copy.parentSteps[PARENT_STEP.grade], copy.parentSteps[PARENT_STEP.guardian], copy.parentSteps[PARENT_STEP.emergency], copy.health.allergies.title, copy.health.prescriptions.title, copy.health.insurance.title, copy.health.physician.title, copy.parentSteps[PARENT_STEP.review]] as const
+const blankValues = { preferred: 'x', grade: 'x', dob: 'x', shirt: 'x', category: 'x', contacts: { guardian: { name: 'x', relationship: 'x', phone: 'x', email: 'x' }, emergency: { name: 'x', relationship: 'x', phone: 'x' } } }
 const TOPICS = ['allergies', 'prescriptions', 'insurance', 'physician'] as const
-const FIRST_HEALTH = 2
+const GRADE = 0, GUARDIAN = 1, EMERGENCY = 2
+const FIRST_HEALTH = 3
 const REVIEW = steps.length - 1
 
 /** `studentName` is the student's preferred name when the caller already has it; the contact questions say "your student" without it. `accountEmail` is the signed-in account's email. */
@@ -39,6 +43,8 @@ function ProfileEditor({ profile, studentName, accountEmail }: { profile: Profil
   async function submit(event: FormEvent) {
     event.preventDefault()
     setError(''); setSaved(false)
+    const issue = step === GRADE ? stepIssue(PARENT_STEP.grade, { ...blankValues, grade: value.grade, dob: value.dateOfBirth }) : step === GUARDIAN ? stepIssue(PARENT_STEP.guardian, { ...blankValues, contacts: { guardian: value.guardian, emergency: value.emergency } }) : step === EMERGENCY ? stepIssue(PARENT_STEP.emergency, { ...blankValues, contacts: { guardian: value.guardian, emergency: value.emergency } }) : null
+    if (issue) { setError(issue); return }
     if (topic && !chosen[topic]) { setError(copy.healthChoose); return }
     if (step < REVIEW) { setStep(step + 1); return }
     setBusy(true)
@@ -51,15 +57,15 @@ function ProfileEditor({ profile, studentName, accountEmail }: { profile: Profil
     {!profile.setupComplete && <p role="status" className={styles.notice}>Your student needs to finish setup (shirt size and room type) before you can review the permission form.</p>}
     {profile.completed && <p role="status" className={styles.ready}>This information is confirmed.</p>}
     <WizardFrame embedded title="Health and contact information" step={step} total={steps.length} steps={steps} intro="Your answers are kept while you move between steps. Nothing is saved until you choose Save and confirm." onBack={() => goTo(step - 1)} busy={busy} submitLabel={step === REVIEW ? 'Save and confirm' : 'Continue'} onSubmit={event => void submit(event)} error={error} saved={false} stale={false} onReload={() => undefined}>
-      {step === 0 ? <div className={styles.fields}>
+      {step === GRADE ? <div className={styles.fields}>
         <WizardField label="Grade"><GradeSelect value={value.grade} original={profile.value?.grade} onChange={grade => setValue(current => ({ ...current, grade }))}/></WizardField>
         <WizardField label="Date of birth"><Input required type="date" value={value.dateOfBirth} onChange={event => setValue(current => ({ ...current, dateOfBirth: event.target.value }))}/></WizardField>
       </div>
-      : step === 1 ? <ContactsFields studentName={studentName} accountEmail={accountEmail} value={{ guardian: value.guardian, emergency: value.emergency }} setValue={next => setValue(current => ({ ...current, ...next }))}/>
+      : step === GUARDIAN || step === EMERGENCY ? <ContactsFields part={step === GUARDIAN ? 'guardian' : 'emergency'} studentName={studentName} accountEmail={accountEmail} value={{ guardian: value.guardian, emergency: value.emergency }} setValue={next => setValue(current => ({ ...current, ...next }))}/>
       : topic ? <MedicalStep topic={topic} studentName={studentName} value={value} setValue={next => setValue(current => ({ ...current, allergies: next.allergies, prescriptions: next.prescriptions, insurance: next.insurance, physician: next.physician }))} chosen={chosen} setChosen={setChosen}/>
       : <ReviewSections onEdit={goTo} sections={[
-        { title: steps[0], step: 0, rows: [['Grade', shown(value.grade)], ['Date of birth', reviewDate(value.dateOfBirth)]] },
-        { title: steps[1], step: 1, rows: contactRows({ guardian: value.guardian, emergency: value.emergency }) },
+        { title: copy.reviewTitles.details, step: GRADE, rows: [['Grade', shown(value.grade)], ['Date of birth', reviewDate(value.dateOfBirth)]] },
+        { title: copy.reviewTitles.contacts, step: GUARDIAN, rows: contactRows({ guardian: value.guardian, emergency: value.emergency }) },
         { title: copy.healthSection, step: FIRST_HEALTH, rows: healthRows(value) },
       ]}/>}
     </WizardFrame>
