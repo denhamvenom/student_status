@@ -1,10 +1,11 @@
 # Handoff
 
-November 8, 2026 | main `18ffc06`
+November 11, 2026 | main `fe73423`
 
 ## Student Status
 
-- Latest release: the November 2026 audit cleanup, PRs #81–#84 (main `ab7824b`, `4c9894a`, `08eb5e7`, `480b44e`) and receipt PR #85 (`18ffc06`, docs only). Production Convex amicable-eel-413 deployed from main after each code merge (no schema change, 577 to 554 functions); one strict Coach-or-Travel-Lead rule; removing `bulkInvites.previewCode` ends backend compatibility with the pre-2026-10-25 frontend. [Receipt](docs/releases/RELEASE_2026-11-08_AUDIT_CLEANUP.md)
+- Latest release: the usability audit, PR #88 (main `fe73423`, deployed to production Convex amicable-eel-413 on 2026-11-11; additive schema: `paymentEdits` table with three indexes and optional `requirements.kind`; 565 functions; both Workers Builds succeeded and both sites returned 200). [Receipt](docs/releases/RELEASE_2026-11-10_USABILITY_AUDIT.md)
+- Previous release: the November 2026 audit cleanup, PRs #81–#84 (main `ab7824b`, `4c9894a`, `08eb5e7`, `480b44e`) and receipt PR #85 (`18ffc06`, docs only). Production Convex amicable-eel-413 deployed from main after each code merge (no schema change, 577 to 554 functions); one strict Coach-or-Travel-Lead rule; removing `bulkInvites.previewCode` ends backend compatibility with the pre-2026-10-25 frontend. [Receipt](docs/releases/RELEASE_2026-11-08_AUDIT_CLEANUP.md)
 - Team Calendar meetings (PR #80, main `1e9768b`) has no receipt; its code reached production with the November 8 deploys from main. Behavior: [EVENT_CALENDAR_SYNC.md](docs/EVENT_CALENDAR_SYNC.md).
 - Earlier releases (Mentor Home, withdrawals, PWA and push, event audiences and others) are in CHANGELOG.md and docs/releases/.
 
@@ -16,8 +17,7 @@ November 8, 2026 | main `18ffc06`
 
 ## In progress
 
-- Usability audit: PR #88 (`feat/usability-audit`, `9aa78a8`) is a release candidate, not merged or deployed. Receipt: docs/releases/RELEASE_2026-11-10_USABILITY_AUDIT.md.
-- No open pull requests as of `18ffc06`. The shared checkout `student-status-app` is clean and detached at `5971124` (behind main); work happens in worktrees per docs/REPOSITORY.md. Worktrees `wt-calendar-team-meetings` and `wt-handoff-fix` hold already-merged work.
+- No open pull requests as of `fe73423`. The shared checkout `student-status-app` is detached at `5971124` (behind main) and had 13 uncommitted modified files on November 11 that belong to another session, so leave it alone; work happens in worktrees per docs/REPOSITORY.md. Worktrees `wt-calendar-team-meetings` and `wt-handoff-fix` hold already-merged work.
 
 ## Owner decisions
 
@@ -38,4 +38,5 @@ November 8, 2026 | main `18ffc06`
 
 ## Next
 
+- Usability audit follow-ups and open production checks (real Google account chooser, installed-app Parent sign-in on a phone, Ask a Coach email delivery): see [receipt](docs/releases/RELEASE_2026-11-10_USABILITY_AUDIT.md).
 - The owner chooses the next work from BACKLOG: the November 8 persona findings (Product) or the audit's Code health decisions.

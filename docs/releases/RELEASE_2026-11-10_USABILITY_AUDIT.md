@@ -1,14 +1,14 @@
 # Release 2026-11-10: Usability audit (wizards, money edits, readiness, roster, Mentor scope, Parent Home, Ask a Coach, sign-in)
 
-**Status: release candidate. Not merged and not deployed.** [PR #88](https://github.com/denhamvenom/student_status/pull/88), branch `feat/usability-audit`, HEAD `9aa78a8` on origin/main (VERIFY base commit at merge). Merge needs the owner's explicit approval, and so does the production deploy. Placeholders marked (VERIFY) are filled in after release.
+**Status: released 2026-11-11.** [PR #88](https://github.com/denhamvenom/student_status/pull/88), branch `feat/usability-audit`, head `dd17c47`, merged as main `fe7342390a83ab7ddd43ff51d46f76bd48e08af1` (`fe73423`); base origin/main `d41b34b` had no drift at merge. Production Convex amicable-eel-413 was deployed from main on 2026-11-11. Open production checks are listed under Validation limits.
 
 | Item | Value |
 | --- | --- |
-| Commits | 4: `ad9b32b`, `614f034`, `27ab9ce`, `9aa78a8` |
+| Commits | Branch head `dd17c47` (earlier commits `ad9b32b`, `614f034`, `27ab9ce`, `9aa78a8`) |
 | Size | 260 files, +8021/-1756 |
-| Merge commit on main | (VERIFY) |
-| Production Convex deploy | (VERIFY) amicable-eel-413, time and result |
-| Workers Builds | (VERIFY) student-status and timeclock |
+| Merge commit on main | `fe7342390a83ab7ddd43ff51d46f76bd48e08af1` (`fe73423`) |
+| Production Convex deploy | `bunx convex deploy --yes`, 2026-11-11 12:49:06-12:49:31 UTC, to https://amicable-eel-413.convex.cloud; added the three `paymentEdits` indexes |
+| Workers Builds | On `fe73423`: denham-venom-student-status success, denham-venom-timeclock success |
 
 ## Scope
 Decisions are in docs/DECISIONS.md (Usability audit, November 9 and November 10, 2026); the November 10 lines win where they differ.
@@ -35,14 +35,20 @@ Both additive; no existing data changes.
 - Full vitest 2863/2865; the 2 failures are known load timeouts that pass when run alone.
 - Opus security reviews: no High or Medium findings.
 - Six role walkthroughs on development deployment rounds v2 to v4 with fictional data.
-- Production: calendar writes on and the email key present, checked without printing values (VERIFY at deploy).
-- Production-verified: nothing yet.
+- Dry run before deploy: `CONVEX_DEPLOYMENT=prod:amicable-eel-413 bunx convex deploy --dry-run` from a clean worktree equal to origin/main: target amicable-eel-413, schema valid, would add the three `paymentEdits` indexes, no index deletions. It also listed "Change the server's version for Node.js actions" with no detail, as in earlier releases.
+- Production settings checked without printing values: Team Calendar writes on, email key present.
+- Production-verified: function spec after deploy lists 565 functions, including `coachContact:send`, `paymentAdministration:editPayment`, `paymentAdministration:cancelEdit`, `rooms:parentRoomStatus`, `app:readinessEvents` and `teamReports:mentorList`; https://students.team8044.org and https://timeclock.team8044.org return 200; the live bundle contains the Google account chooser text and "Ask a Coach", "Finish setup", "Something to know".
 
 ## Validation limits
 - No real Google sign-in was tested.
 - Installed-app sign-in was not tested on a real phone.
 - Walkthroughs used the development deployment, where Team Calendar writes are off; calendar behavior with writes on is untested in walkthroughs.
-- Ask a Coach email delivery in production not exercised (VERIFY after deploy).
+- Ask a Coach email delivery in production not exercised.
+
+Open production checks (not yet confirmed):
+- Real Google sign-in showing the account chooser.
+- Installed-app Parent sign-in staying signed in on a real phone.
+- An Ask a Coach email actually delivered.
 
 ## Known open items (follow-up, not blocking)
 - Team transfer review sender.
@@ -58,11 +64,11 @@ Both additive; no existing data changes.
 - "I don't know" for allergies and medications.
 
 ## Release steps
-1. Owner approves; merge PR #88 (merge commit) -> (VERIFY) main commit.
-2. Pull main in a clean worktree; confirm HEAD equals origin/main.
-3. `convex deploy` from main, announcing the target first (dry run, then deploy) -> (VERIFY).
-4. Workers Builds for both Workers succeed -> (VERIFY).
-5. Verify https://students.team8044.org and https://timeclock.team8044.org return 200 with new assets, and `bunx convex function-spec` against production lists the new functions (VERIFY).
+1. Owner approved; PR #88 merged as main `fe73423`.
+2. Clean worktree equal to origin/main.
+3. Dry run, then `convex deploy` from main to amicable-eel-413 (2026-11-11 12:49 UTC).
+4. Workers Builds for both Workers succeeded.
+5. Both sites returned 200 with the new assets; production function spec lists the new functions.
 
 ## Rollback
 - Revert the merge commit on main and redeploy main. The `paymentEdits` table and `requirements.kind` are unused by older code and can stay; older code treats all requirements as checked off.
