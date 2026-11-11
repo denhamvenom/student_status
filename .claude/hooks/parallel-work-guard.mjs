@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 // Claude Code PreToolUse guard for parallel sessions (Bash and PowerShell tools).
 // Rules: AGENTS.md "Git and releases"; how-to: docs/REPOSITORY.md "Parallel sessions".
-// Exit 2 blocks the tool call and shows stderr to Claude. Any hook error or
-// unparseable input exits 0 (fail open) after printing a warning.
+// Exit 2 blocks the tool call and shows stderr to Claude (Convex deploy and sync checks).
+// Shared-checkout Git rewrites ask the owner instead: exit 0 with permissionDecision "ask"
+// JSON on stdout. Set STUDENT_STATUS_GUARD_NO_ASK=1 to block those too (for harnesses
+// that cannot show prompts). Any hook error or unparseable input exits 0 (fail open)
+// after printing a warning.
 // Node built-ins only; no dependencies.
 
 import { Buffer } from 'node:buffer';
@@ -13,7 +16,13 @@ import path from 'node:path';
 
 const SHARED_CHECKOUT =
   process.env.STUDENT_STATUS_SHARED_CHECKOUT || 'C:/dev/denham-venom/student-status-app';
+const NO_ASK = process.env.STUDENT_STATUS_GUARD_NO_ASK === '1';
 const MAX_DEPTH = 4;
+const MAX_LISTED_PATHS = 20;
+const LIST_BUDGET_MS = 20000; // the hook itself times out at 30s
+// In these modes an ask may be auto-approved without the owner seeing it, so block instead.
+const NO_PROMPT_MODES = new Set(['bypassPermissions', 'dontAsk']);
+let permissionMode = null;
 const RULES_REF = "See AGENTS.md 'Git and releases' and docs/REPOSITORY.md 'Parallel sessions'.";
 
 const warn = (message) => process.stderr.write(`[parallel-work-guard] warning: ${message}\n`);
@@ -43,11 +52,11 @@ const isSharedCheckout = (toplevel) => pathKey(toplevel) === pathKey(SHARED_CHEC
 
 // ---------- git ----------
 
-function git(cwd, args) {
+function git(cwd, args, timeout = 15000) {
   return execFileSync('git', ['-C', toNativePath(cwd), ...args], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
-    timeout: 15000,
+    timeout,
     env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' },
   }).trim();
 }
@@ -353,6 +362,58 @@ function gitRewriteReason(sub, args) {
 
 // ---------- evaluation ----------
 
+const gitSucceeds = (cwd, args, timeout) => {
+  try {
+    git(cwd, args, timeout);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// "same as main", "older version, already in main's history" or "NOT in main's history".
+function mainLabel(cwd, file, untracked, timeout) {
+  if (untracked) return "NOT in main's history";
+  if (gitSucceeds(cwd, ['diff', '--quiet', 'origin/main', '--', file], timeout)) return 'same as main';
+  try {
+    const blob = git(cwd, ['hash-object', '--', file], timeout);
+    const history = git(cwd, ['log', 'origin/main', '--raw', '--no-abbrev', '--format=', '--', file], timeout);
+    // Raw lines look like ":100644 100644 <old blob> <new blob> M<TAB>path".
+    const known = history.split('\n').some((line) => line.trim().split(/\s+/)[3] === blob);
+    return known ? "older version, already in main's history" : "NOT in main's history";
+  } catch {
+    return "NOT in main's history";
+  }
+}
+
+// What a shared-checkout rewrite could lose: changed/untracked paths and whether main already has them.
+function lostWorkLines(cwd) {
+  const started = Date.now();
+  const remaining = () => LIST_BUDGET_MS - (Date.now() - started);
+  try {
+    const lines = git(cwd, ['status', '--porcelain'], Math.min(15000, remaining())).split('\n').filter(Boolean);
+    if (!lines.length) return ['Nothing is changed or untracked right now.'];
+    const out = [`${lines.length} changed/untracked path(s)${lines.length > MAX_LISTED_PATHS ? `, first ${MAX_LISTED_PATHS} shown` : ''}:`];
+    for (const line of lines.slice(0, MAX_LISTED_PATHS)) {
+      const untracked = line.startsWith('??');
+      const file = line.replace(/^\s*\S+\s+/, '').split(' -> ').pop().replace(/^"|"$/g, '');
+      const label = remaining() < 1000 ? 'not checked' : mainLabel(cwd, file, untracked, Math.min(15000, remaining()));
+      out.push(`  ${file} (${label})`);
+    }
+    return out;
+  } catch (error) {
+    return [`The list of changed files could not be read (${error.message.split('\n')[0]}).`];
+  }
+}
+
+function askReason(finding, toplevel) {
+  return [
+    `\`${finding.label}\` ${finding.reason} in the shared checkout ${toplevel}, which several sessions use at once.`,
+    'It can move their branch or discard their uncommitted work. Safer: use your own worktree.',
+    ...lostWorkLines(toplevel),
+  ].join('\n');
+}
+
 function evaluate(finding) {
   const toplevel = tryGit(finding.cwd, ['rev-parse', '--show-toplevel']);
   if (toplevel === null) {
@@ -362,12 +423,15 @@ function evaluate(finding) {
 
   if (finding.kind === 'git') {
     if (!isSharedCheckout(toplevel)) return null;
+    const modeBlocks = NO_PROMPT_MODES.has(permissionMode);
+    if (!NO_ASK && !modeBlocks) return { ask: askReason(finding, toplevel) };
     return [
       `BLOCKED: \`${finding.label}\` ${finding.reason} in the shared checkout ${toplevel}.`,
       'Several sessions work in this folder at once; changing its branch or discarding files there moves or destroys their work.',
       'Work in your own worktree instead, for example (run from the shared folder; `git worktree add` is allowed):',
       '  git fetch origin && git worktree add ../wt-<feature> -b feat/<feature> origin/main',
       'then run Git commands inside ../wt-<feature>. To restore one of YOUR files, ask the owner first.',
+      ...(modeBlocks ? [`Shared-checkout Git rewrites need the owner's approval in a prompt; this session's permission mode (${permissionMode}) may not show one. Run the command yourself, or use a session in default mode.`] : []),
     ].join('\n');
   }
 
@@ -436,18 +500,33 @@ async function main() {
   if (typeof command !== 'string' || !command.trim()) return 0;
   const cwd = typeof input.cwd === 'string' && input.cwd ? input.cwd : process.cwd();
 
+  permissionMode = typeof input.permission_mode === 'string' ? input.permission_mode : null;
   const messages = [];
+  const asks = [];
   for (const finding of analyze(command, cwd, 0, null)) {
     try {
       const message = evaluate(finding);
-      if (message && !messages.includes(message)) messages.push(message);
+      if (message?.ask) {
+        if (!asks.includes(message.ask)) asks.push(message.ask);
+      } else if (message && !messages.includes(message)) messages.push(message);
     } catch (error) {
       warn(`could not check "${finding.label}" (${error.message}); allowing it`);
     }
   }
-  if (!messages.length) return 0;
-  process.stderr.write(`${messages.join('\n\n')}\n`);
-  return 2;
+  if (messages.length) {
+    process.stderr.write(`${messages.join('\n\n')}\n`);
+    return 2;
+  }
+  if (asks.length) {
+    process.stdout.write(`${JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'ask',
+        permissionDecisionReason: asks.join('\n\n'),
+      },
+    })}\n`);
+  }
+  return 0;
 }
 
 main().then(
