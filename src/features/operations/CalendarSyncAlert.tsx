@@ -8,7 +8,7 @@ import { calendarChipCopy, TEAM_CALENDAR_ANCHOR } from './event-page'
 
 export const calendarSyncAlertCopy = {
   heading: 'Team Calendar needs attention',
-  description: 'These upcoming events didn’t update on Team Calendar. Open each one to retry or reload its Calendar details.',
+  description: 'These upcoming events didn’t update on Team Calendar. Open each one to try again or reload its Calendar details.',
   open: 'Open Team Calendar controls',
   more: 'More events need attention. Fix these first to see the rest.',
 } as const

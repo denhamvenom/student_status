@@ -3,7 +3,7 @@ import { formsSummary } from './logic'
 
 /**
  * Plain summary at the top of the parent Forms page: which upcoming events need a form, and either
- * "Nothing to sign right now" or, while signing is off, "Forms open soon — we'll notify you."
+ * "Nothing to sign right now" or, while signing is off, "Permission forms are not open yet. A Coach or Travel Lead will post a date."
  * Reads only permissions.workspace (events, coverage, signingPaused), which the page already loads.
  */
 export function FormsSummary(props: Parameters<typeof formsSummary>[0]) {

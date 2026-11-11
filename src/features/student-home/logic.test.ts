@@ -5,7 +5,7 @@ import type { HomeAttendance, OpenSignup, PinnedAnnouncement, RoomChoice, Studen
 import { homeCopy } from './copy'
 import { at } from './fixtures'
 import { formatDateRange } from './format'
-import { calendarDaysUntil, DAY_MS, countdownTarget, countdownValue, dueShowsDate, heroCards, highlightActions, HOUR_MS, isWithinSoon, openSignupDetails, openSignupRows, openSignupsSummary, participationView, percentAttended, roomDeadlineView, signupDateLine, SOON_MS, upcomingMilestones, whatsLeftSummary } from './logic'
+import { calendarDaysUntil, DAY_MS, countdownTarget, countdownValue, dueShowsDate, heroCards, highlightActions, HOUR_MS, isWithinSoon, openSignupDetails, openSignupRows, openSignupsSummary, participationView, percentAttended, roomDeadlineView, signupDateLine, SOON_MS, upcomingMilestones, whatsLeftSummary, withoutChosenRooms } from './logic'
 import { actionContent } from './tiles/ActionCard'
 
 const NOW = at('2026-10-26T12:00')
@@ -331,5 +331,21 @@ describe('signup date line', () => {
     { name: 'never closes', closesAt: null, line: 'Starts Fri, Nov 20' },
   ])('$name', ({ closesAt, line }) => {
     expect(signupDateLine({ signupClosesAt: closesAt, startsAt: at('2026-11-20T09:00') }, NOW)).toBe(line)
+  })
+})
+
+describe('withoutChosenRooms', () => {
+  const choose = (eventId: string): WhatsLeftItem => ({ ...item(`room:${eventId}`, 'student', null, 'roomChoice'), eventId: event(eventId) })
+  it.each([
+    ['in a group', 'inGroup', 0],
+    ['asked to be assigned', 'assignmentRequested', 0],
+    ['in a final group', 'final', 0],
+    ['nothing chosen yet', 'notChosen', 1],
+  ] as const)('%s: Choose your room left in What\'s left = %i', (_name, status, left) => {
+    expect(withoutChosenRooms([choose('e1')], [room('e1', null, status)])).toHaveLength(left)
+  })
+  it('only drops the room item of the event that has a room', () => {
+    const items = [choose('e1'), choose('e2'), item('other', 'student')]
+    expect(withoutChosenRooms(items, [room('e1', null, 'inGroup'), room('e2', null, 'notChosen')]).map(i => i.key)).toEqual(['room:e2', 'other'])
   })
 })

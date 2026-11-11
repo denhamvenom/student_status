@@ -87,7 +87,7 @@ export function FundraiserLinkSettings() {
   const cleared = changed.filter(row => !row.after).length
   return <Card><CardHeader><CardTitle>Student fundraiser links</CardTitle></CardHeader><CardContent className={styles.content}>
     <p className={styles.note}>Download the current student CSV, edit only Fundraiser Link, then upload it to review. Use HTTPS Zeffy links. Each student’s linked parents use the same link.</p>
-    <p className={styles.note}>A blank Fundraiser Link removes an existing link and hides Pay Now and Share. Keep Student ID and Link Revision unchanged. Import up to 500 students at a time; remove other rows from larger exports. Students omitted from a file stay unchanged.</p>
+    <p className={styles.note}>A blank Fundraiser Link removes an existing link and hides Pay Now and Share. Leave the Student ID and Link Check columns as downloaded. Import up to 500 students at a time; remove other rows from larger exports. Students omitted from a file stay unchanged.</p>
     <div className={styles.actions}><Button type="button" variant="outline" disabled={busy} onClick={() => void exportCsv()}>Download current CSV</Button></div>
     <label>Upload fundraiser CSV<Input type="file" accept=".csv,text/csv" disabled={busy} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void review(file) }} /></label>
     {busy && <p role="status">Working…</p>}

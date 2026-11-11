@@ -87,4 +87,71 @@ describe("bounded role-scoped team reports",()=>{
     const budget=await f.coach.query(rows,{...args,paginationOpts:{numItems:10,maximumRowsRead:1,cursor:null}});
     expect(budget.page.length).toBeLessThanOrEqual(1);
   });
+  it("lists only a Mentor's own subteams by default, widens on request, and never returns private data",async()=>{
+    const f=await fixture();
+    const mentorList=makeFunctionReference<"query">("teamReports:mentorList");
+    await f.t.run(async ctx=>{
+      await ctx.db.patch(f.ids.mentor.id,{subteams:["Programming"]});
+      const base=(await ctx.db.get(f.ids.student))!;
+      const {_id,_creationTime,...rest}=base;
+      void _id;void _creationTime;
+      await ctx.db.insert("students",{...rest,legalName:"Programmer",preferredName:"Prog",subteam:"Programming",email:"prog-private@example.invalid"});
+    });
+    const mine=await f.mentor.query(mentorList,{allSubteams:false});
+    expect(mine).toMatchObject({scope:"mine",subteams:["Programming"],totalStudents:1});
+    expect(mine.rows.map((row:{name:string})=>row.name)).toEqual(["Prog"]);
+    const all=await f.mentor.query(mentorList,{allSubteams:true});
+    expect(all.rows.map((row:{name:string})=>row.name).sort()).toEqual(["Prog","Synthetic"]);
+    expect(JSON.stringify(all)).not.toMatch(/PRIVATE HEALTH|private@|prog-private|private-student/);
+    expect(Object.keys(all.rows[0]).sort()).toEqual(["events","name","requiredPercent","studentId","subteam","thursdayAttended","travelTeam"]);
+    await f.t.run(ctx=>ctx.db.patch(f.ids.mentor.id,{subteams:[]}));
+    expect((await f.mentor.query(mentorList,{allSubteams:false})).rows).toEqual([]);
+    for(const actor of [f.coach,f.parent]) await expect(actor.query(mentorList,{allSubteams:false})).rejects.toThrow("Only a Mentor");
+  });
+  it("caps the Mentor report at 40 students and says when the list is incomplete",async()=>{
+    const f=await fixture();
+    const mentorList=makeFunctionReference<"query">("teamReports:mentorList");
+    await f.t.run(async ctx=>{
+      const base=(await ctx.db.get(f.ids.student))!;
+      const {_id,_creationTime,...rest}=base;
+      void _id;void _creationTime;
+      for(let n=0;n<45;n++) await ctx.db.insert("students",{...rest,legalName:`Extra ${n}`,preferredName:`Extra ${n}`});
+    });
+    const result=await f.mentor.query(mentorList,{allSubteams:true});
+    expect(result.rows).toHaveLength(40);
+    // 45 extras plus the fixture student: the true total is reported, and the 40 shown are the first 40 by name.
+    expect(result).toMatchObject({totalStudents:46,studentsComplete:false});
+    const names=result.rows.map((row:{name:string})=>row.name);
+    expect(names).toEqual([...names].sort((a:string,b:string)=>a.localeCompare(b)));
+    expect(names).not.toContain("Synthetic");
+  });
+  it("finds a Mentor's own students even when they are last on a roster of 50",async()=>{
+    const f=await fixture();
+    const mentorList=makeFunctionReference<"query">("teamReports:mentorList");
+    await f.t.run(async ctx=>{
+      const base=(await ctx.db.get(f.ids.student))!;
+      const {_id,_creationTime,...rest}=base;
+      void _id;void _creationTime;
+      for(let n=0;n<50;n++) await ctx.db.insert("students",{...rest,legalName:`Other ${n}`,preferredName:`Other ${n}`,subteam:"Mechanical"});
+      for(let n=0;n<5;n++) await ctx.db.insert("students",{...rest,legalName:`Mine ${n}`,preferredName:`Mine ${n}`,subteam:"Programming"});
+      await ctx.db.patch(f.ids.mentor.id,{subteams:["Programming"]});
+    });
+    const result=await f.mentor.query(mentorList,{allSubteams:false});
+    expect(result.rows.map((row:{name:string})=>row.name)).toEqual(["Mine 0","Mine 1","Mine 2","Mine 3","Mine 4"]);
+    expect(result).toMatchObject({totalStudents:5,studentsComplete:true});
+  });
+  it("still lists a student's newest event when the season has more than 200 events",async()=>{
+    const f=await fixture();
+    const mentorList=makeFunctionReference<"query">("teamReports:mentorList");
+    await f.t.run(async ctx=>{
+      const seasonId=(await ctx.db.get(f.ids.student))!.seasonId;
+      const base={seasonId,type:"Team" as const,destination:"Shop",travel:"None",overnight:false,roomingEnabled:false,feeCents:0,signupMode:"open" as const,allowWithdrawal:true,permissionRequired:false,firstRequired:false,archived:false};
+      for(let n=0;n<200;n++) await ctx.db.insert("events",{...base,name:`Old ${n}`,startsAt:10+n,endsAt:20+n});
+      const newest=await ctx.db.insert("events",{...base,name:"Newest trip",startsAt:90_000,endsAt:91_000});
+      await ctx.db.insert("participants",{eventId:newest,studentId:f.ids.student,status:"confirmed",createdAt:1,updatedAt:1});
+      await ctx.db.patch(f.ids.mentor.id,{subteams:[(await ctx.db.get(f.ids.student))!.subteam]});
+    });
+    const result=await f.mentor.query(mentorList,{allSubteams:true});
+    expect(result.rows.find((row:{studentId:string})=>row.studentId===f.ids.student)?.events).toEqual(["Newest trip"]);
+  });
 });

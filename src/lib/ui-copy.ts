@@ -27,7 +27,7 @@ export const uiCopy = {
     notSignedUp: 'Not signed up',
     withdrawn: 'Withdrawn',
   },
-  finance: { editDescription: 'Review a student account and record payments.', readDescription: 'Review a student account.', description: 'Charges, credits and transaction history.' },
+  finance: { editDescription: 'Review a student account and record payments.', readDescription: 'Review a student account.', description: 'Fees, credits and transaction history.' },
   event: {
     staffRequirements: 'Review student requirements in Event readiness.', readiness: 'Event readiness', noRequirements: 'No requirements for this event.', participants: 'Signups', requirements: 'Requirements', transport: 'Transport', rooming: 'Rooming', overview: 'Overview',
     // Student and Parent event page Details box (design audit, November 2026): When, Where, Signup, Cost, Status.

@@ -3,7 +3,7 @@ import { eventLocation, teamTransportEnabled, transportationLabel } from "./tran
 
 describe("transportation display", () => {
   it.each([
-    ["Provide your Own", "Provide your Own Ride"],
+    ["Provide your Own", "Own transport"],
     ["Charter Bus", "Charter Bus"],
     ["Team Carpool", "Team Carpool"],
     ["Families provide transportation", "Families provide transportation"],

@@ -5,6 +5,7 @@ import { api } from '../convex/_generated/api'
 import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { Checkbox } from './components/ui/checkbox'
+import { subteamDisplay } from './lib/subteams'
 import { adultProfileCopy as copy } from './lib/adult-profile-copy'
 import styles from './AdultProfile.module.css'
 
@@ -12,7 +13,7 @@ type Size = 'XS' | 'S' | 'M' | 'L' | 'XL' | '2XL' | '3XL'
 type OwnProfile = {
   name: string; email: string; phone: string; shirtSize: string | null
   emergencyName: string; emergencyRelationship: string; emergencyPhone: string
-  role: 'coach' | 'mentor'; travelLead: boolean; profileRevision: number
+  role: 'coach' | 'mentor'; travelLead: boolean; subteams: string[]; profileRevision: number
   driverState: 'owned' | 'none' | 'coachReviewRequired' | 'capacityReview' | 'seasonUnavailable'
   driverFingerprint: string | null; canDrive: boolean; vehicleName: string; passengerSeats: number | null; towCapable: boolean; approved: boolean
 }
@@ -46,6 +47,7 @@ function ProfileForm({ profile, saved, onSaved }: { profile: OwnProfile; saved: 
   }
   return <form className={styles.page} onSubmit={event => void submit(event)}>
     <header className={styles.heading}><h1>{copy.title}</h1><div className={styles.roles}><span className={styles.role}>{profile.role === 'coach' ? 'Coach' : copy.mentor}</span>{profile.travelLead && <span className={styles.role}>{copy.travelLead}</span>}</div></header>
+    <section className={styles.section} aria-labelledby="adult-subteams-title"><h2 id="adult-subteams-title">{copy.subteams}</h2><p>{profile.subteams.length ? profile.subteams.map(subteamDisplay).join(' · ') : copy.noSubteams}</p><p className={styles.muted}>{copy.subteamsNote}</p></section>
     {!profile.shirtSize && <p className={styles.setup}>{copy.setup}</p>}
     <section className={styles.section} aria-labelledby="adult-about-title"><h2 id="adult-about-title">{copy.about}</h2>
       <div className={styles.fields}><label className={styles.field}>{copy.name}<Input value={name} onChange={event => setName(event.target.value)} maxLength={100} required disabled={busy} /></label><label className={styles.field}>{copy.phone}<Input type="tel" value={phone} onChange={event => setPhone(event.target.value)} maxLength={50} disabled={busy} /></label></div>

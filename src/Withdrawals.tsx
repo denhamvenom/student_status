@@ -1,7 +1,7 @@
 import { userFacingError } from '@/lib/error-message'
 import { operationsCopy, operationsText } from './lib/operations-copy'
 import { useRef, useState, type FormEvent } from 'react'
-import { useMutation, useQuery } from 'convex/react'
+import { useConvex, useMutation, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { api } from '../convex/_generated/api'
 import type { Id } from '../convex/_generated/dataModel'
@@ -11,13 +11,16 @@ import { Input } from './components/ui/input'
 import { Checkbox } from './components/ui/checkbox'
 import { NativeSelect, NativeSelectOption } from './components/ui/native-select'
 import styles from './features/operations/Operations.module.css'
-import { chargeCurrency } from './lib/charge-money'
+import { chargeCurrency, parseMoneyInput } from './lib/charge-money'
 import { dueAtFromInput, dueDateCopy } from './copy/due-date-copy'
 import { chicagoDisplayTime } from './lib/chicago-time'
+import { chargeAdministrationCopy } from './lib/charge-administration-copy'
+import { EventPicker } from './components/EventPicker'
+import { ReviewRow, StepWizard } from './components/StepWizard'
 
 const usd = chargeCurrency
 const message = (error:unknown) => userFacingError(error)
-const progressLabel = (state:string) => state === 'complete' ? 'Financial work complete' : state === 'failed' ? 'Needs Coach review' : 'In progress'
+const progressLabel = (state:string) => state === 'complete' ? 'Finished' : state === 'failed' ? 'Needs Coach review' : 'In progress'
 const key = () => crypto.randomUUID()
 const exactCents = (value: string) => {
   if (value.length > 128 || !/^\d+(?:\.\d{1,2})?$/.test(value)) return NaN
@@ -32,8 +35,8 @@ function ProcessingStatus({ progress, canRetry = false, alreadyLeft = false }: {
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  if (!progress) return <p role="status">{alreadyLeft?'Your place has been released. The fee decision is still being processed.':'Withdrawal processing is underway. Participation and room placement remain unchanged until all work finishes.'}</p>
-  return <section aria-label="Withdrawal processing status"><p role="status">Withdrawal processing: {progressLabel(progress.state)}. Returned to travel accounts: {usd(progress.committedCents)} of {usd(progress.totalCents)}. {progress.state !== 'complete' && (alreadyLeft?'Your place has already been released. Remaining fee changes are not complete.':'Remaining returns and charge changes are not complete. Participation and room placement remain unchanged until all work finishes.')}</p>{progress.lastError && <p role="alert" className="open-text">{userFacingError(new Error(progress.lastError), 'Processing stopped. Check the current status before retrying, or ask a Coach for help.')}</p>}{canRetry && <form className="form-grid" onSubmit={async event => { event.preventDefault(); if (busy || reason.trim().length < 8) return; setBusy(true); setError(''); try { await retry({ jobId: progress.jobId, reason: reason.trim() }); setReason('') } catch (cause) { setError(message(cause)) } finally { setBusy(false) } }}><label>Reason for retry (at least 8 characters)<Input value={reason} onChange={event => setReason(event.target.value)} minLength={8} maxLength={1000} disabled={busy} required /></label><Button type="submit" disabled={busy || reason.trim().length < 8}>Retry remaining withdrawal work</Button></form>}{error && <p role="alert">{error}</p>}</section>
+  if (!progress) return <p role="status">{alreadyLeft?'Your place has been released. The fee decision is still being finished.':'Your withdrawal is being finished. Your place and room stay the same until it is done.'}</p>
+  return <section aria-label="Withdrawal status"><p role="status">Withdrawal: {progressLabel(progress.state)}. Moved to Available funds: {usd(progress.committedCents)} of {usd(progress.totalCents)}. {progress.state !== 'complete' && (alreadyLeft?'Your place has already been released. The remaining fee changes are not finished.':'The rest of the refunds and fee changes are not finished. Your place and room stay the same until it is done.')}</p>{progress.lastError && <p role="alert" className="open-text">{userFacingError(new Error(progress.lastError), 'This stopped before it finished. Check the current status before you try again, or ask a Coach for help.')}</p>}{canRetry && <form className="form-grid" onSubmit={async event => { event.preventDefault(); if (busy || reason.trim().length < 8) return; setBusy(true); setError(''); try { await retry({ jobId: progress.jobId, reason: reason.trim() }); setReason('') } catch (cause) { setError(message(cause)) } finally { setBusy(false) } }}><label>Reason for trying again (at least 8 characters)<Input value={reason} onChange={event => setReason(event.target.value)} minLength={8} maxLength={1000} disabled={busy} required /></label><Button type="submit" disabled={busy || reason.trim().length < 8}>Try again</Button></form>}{error && <p role="alert">{error}</p>}</section>
 }
 
 export function StudentWithdrawal({eventId,studentId}:{eventId:Id<'events'>;studentId:Id<'students'>}) {
@@ -43,17 +46,16 @@ export function StudentWithdrawal({eventId,studentId}:{eventId:Id<'events'>;stud
   const undo = useMutation(api.withdrawals.undoWithdrawal)
   const [busy,setBusy] = useState(false)
   const [error,setError] = useState('')
-  const submit = async () => {setBusy(true);setError('');try{await request({eventId,idempotencyKey:key()})}catch(e){setError(message(e))}finally{setBusy(false)}}
   if (!data) return <p>{operationsCopy.withdrawals.loadingWithdrawalStatus}</p>
   if (data.wholeTeamLeft) return <section className={`${styles.root} card`}><p role="status">You have left this event. Your Coach has been told.</p>{data.requestStatus==='pending'&&<p>The fee decision is waiting for Coach review.</p>}{data.requestStatus==='processing'&&<ProcessingStatus progress={data.progress} alreadyLeft/>}</section>
   const undoNow = async () => {setBusy(true);setError('');try{await undo({eventId})}catch(e){setError(message(e))}finally{setBusy(false)}}
   if (data.status === 'withdrawn' && data.withdrawnImmediately && data.canUndo) return <section className={`${styles.root} card`}><p role="status">{operationsText.withdrawals.withdrawnNow(data.eventName)}</p><p>{operationsText.withdrawals.undoHint(chicagoDisplayTime(data.undoUntil))}</p><Button className="button button-outline" disabled={busy} onClick={()=>void undoNow()}>{busy?operationsCopy.withdrawals.undoing:operationsCopy.withdrawals.undoWithdrawal}</Button>{error && <p role="alert" className="open-text">{error}</p>}</section>
   if (data.status === 'withdrawn' && data.withdrawnImmediately && data.undoBlocked) return <section className={`${styles.root} card`}><p role="status">{operationsText.withdrawals.withdrawnNow(data.eventName)}</p><p>{data.undoBlocked}</p></section>
   if (data.status === 'withdrawn') return <p role="status">{data.withdrawnImmediately?operationsText.withdrawals.withdrawnNow(data.eventName):operationsCopy.withdrawals.withdrawalApprovedYourPlaceHasBeenReleased}</p>
-  if (data.wholeTeam && data.status === 'confirmed') return <section className={`${styles.root} card`} aria-labelledby="withdraw-title"><h2 id="withdraw-title">Leave this event</h2><p>You can leave this Whole Team event now. Your Coach will be told.</p><ConfirmAction description={`Leave ${data.eventName}? Your Coach will be told.`} onConfirm={()=>leaveWholeTeam({eventId})}>Leave this event</ConfirmAction></section>
+  if (data.wholeTeam && data.status === 'confirmed') return <section className={`${styles.root} card`} aria-labelledby="withdraw-title"><h2 id="withdraw-title">Leave this event</h2><p>{operationsText.withdrawals.leaveWholeTeamHint}</p><ConfirmAction title={operationsText.withdrawals.leaveWholeTeamTitle} description={operationsText.withdrawals.leaveWholeTeam(data.eventName)} onConfirm={()=>leaveWholeTeam({eventId})}>Leave this event</ConfirmAction></section>
   if (!data.allowWithdrawal) return null
   return <section className={`${styles.root} card`} aria-labelledby="withdraw-title"><h2 id="withdraw-title">{operationsCopy.withdrawals.withdrawal}</h2>
-    {data.requestStatus === 'processing' ? <ProcessingStatus progress={data.progress} /> : data.requestStatus === 'pending' ? <p role="status">{operationsCopy.withdrawals.yourWithdrawalRequestIsAwaitingCoachOrTravelLeadReviewYourParticipationStatusAnd}</p> : data.reviewRequired === false ? <><p>{operationsText.withdrawals.leaveNow(data.eventName)}</p><ConfirmAction description={operationsText.withdrawals.confirmLeaveNow(data.eventName,chicagoDisplayTime(data.undoUntil))} onConfirm={()=>request({eventId,idempotencyKey:key()})}>{operationsCopy.withdrawals.withdrawNow}</ConfirmAction></> : <><p>{operationsText.withdrawals.requestToLeave(data.eventName)}</p>{data.coachAssigned && <p>{operationsText.withdrawals.coachAssignedReview}</p>}{data.requestStatus === 'denied' && <p role="status">{operationsCopy.withdrawals.aPreviousRequestWasDeniedYouMaySubmitAnotherRequest}</p>}<Button className="button button-outline" disabled={busy} onClick={()=>void submit()}>{busy?operationsCopy.withdrawals.submitting:operationsCopy.withdrawals.requestWithdrawal}</Button></>}
+    {data.requestStatus === 'processing' ? <ProcessingStatus progress={data.progress} /> : data.requestStatus === 'pending' ? <p role="status">{operationsCopy.withdrawals.yourWithdrawalRequestIsAwaitingCoachOrTravelLeadReviewYourParticipationStatusAnd}</p> : data.reviewRequired === false ? <><p>{operationsText.withdrawals.leaveNow(data.eventName)}</p><ConfirmAction title={operationsText.withdrawals.withdrawNowTitle} description={operationsText.withdrawals.confirmLeaveNow(data.eventName,chicagoDisplayTime(data.undoUntil))} onConfirm={()=>request({eventId,idempotencyKey:key()})}>{operationsCopy.withdrawals.withdrawNow}</ConfirmAction></> : <><p>{operationsText.withdrawals.requestToLeave(data.eventName)}</p>{data.coachAssigned && <p>{operationsText.withdrawals.coachAssignedReview}</p>}{data.requestStatus === 'denied' && <p role="status">{operationsCopy.withdrawals.aPreviousRequestWasDeniedYouMaySubmitAnotherRequest}</p>}<ConfirmAction title={operationsText.withdrawals.requestWithdrawalTitle} description={operationsText.withdrawals.requestWithdrawal(data.eventName)} onConfirm={()=>request({eventId,idempotencyKey:key()})}>{operationsCopy.withdrawals.requestWithdrawal}</ConfirmAction></>}
     {error && <p role="alert" className="open-text">{error}</p>}
   </section>
 }
@@ -108,35 +110,105 @@ export function WithdrawalQueue({coach=false}:{coach?:boolean}) {
   return <><WholeTeamLeaveNotices coach={coach}/><section className={`${styles.root} ${styles.queue}`} aria-labelledby="withdraw-queue-title"><h2 id="withdraw-queue-title">{operationsText.withdrawals.pendingReview(queue.length)}</h2>{queue.length===0?<p className={styles.notice}>{operationsCopy.withdrawals.noRequestsAreWaiting}</p>:<div className="two-col">{queue.map(row=><Review key={row.requestId} {...row}/>)}</div>}</section></>
 }
 
+type FeeStep='what'|'amount'|'review'
+const feeSteps:FeeStep[]=['what','amount','review']
+
 export function ChargeEditor({studentId}:{studentId:Id<'students'>}) {
-  const events = useQuery(api.app.listEvents,{})
-  const create = useMutation(api.finance.createCharge)
-  const [eventId,setEventId] = useState('')
-  const [category,setCategory] = useState<'main'|'extra'>('extra')
-  const [label,setLabel] = useState('')
-  const [amount,setAmount] = useState('')
-  const [priority,setPriority] = useState('')
-  const [dueDate,setDueDate] = useState('')
-  const [busy,setBusy] = useState(false)
-  const [error,setError] = useState('')
-  const [saved,setSaved] = useState(false)
-  const pending = useRef<{key:string|null;busy:boolean}>({key:null,busy:false})
-  const changed = () => {pending.current.key=null;setError('');setSaved(false)}
-  const cents = exactCents(amount)
-  const priorityNumber = Number(priority)
-  const dueAt = dueAtFromInput(dueDate)
-  const dueInvalid = Number.isNaN(dueAt)
-  const valid = label.trim().length>0 && Number.isSafeInteger(cents) && cents>0 && Number.isSafeInteger(priorityNumber) && priority.trim()!=='' && !dueInvalid
-  const submit = async (event:FormEvent) => {event.preventDefault();if(!valid||pending.current.busy)return;const idempotencyKey=pending.current.key??key();pending.current.key=idempotencyKey;pending.current.busy=true;setBusy(true);setError('');setSaved(false);try{await create({studentId,...(eventId?{eventId:eventId as Id<'events'>,category}:{}),label:label.trim(),amountCents:cents,priority:priorityNumber,...(dueAt!==null?{dueAt}:{}),idempotencyKey});pending.current.key=null;setLabel('');setAmount('');setDueDate('');setSaved(true)}catch(e){setError(message(e))}finally{pending.current.busy=false;setBusy(false)}}
-  return <section className={`${styles.root} card`} aria-labelledby="charge-editor-title"><h2 id="charge-editor-title">{operationsCopy.withdrawals.addACharge}</h2><p>{operationsCopy.withdrawals.classifyEventChargesAsTheMainEventTravelFeeOrAnExtraSuchAsLunchOutstandingCredit}</p><form className="form-grid" onSubmit={e=>void submit(e)}>
-    <label>{operationsCopy.withdrawals.eventLabel} <NativeSelect value={eventId} disabled={busy} onChange={e=>{changed();setEventId(e.target.value)}}><NativeSelectOption value="">{operationsCopy.withdrawals.standaloneCharge}</NativeSelectOption>{events?.map(row=><NativeSelectOption key={row.event._id} value={row.event._id}>{row.event.name}</NativeSelectOption>)}</NativeSelect></label>
-    {eventId && <label>{operationsCopy.withdrawals.feeCategory} <NativeSelect value={category} disabled={busy} onChange={e=>{changed();setCategory(e.target.value as typeof category)}}><NativeSelectOption value="main">{operationsCopy.withdrawals.mainEventTravel}</NativeSelectOption><NativeSelectOption value="extra">{operationsCopy.withdrawals.extra}</NativeSelectOption></NativeSelect></label>}
-    <label>{operationsCopy.withdrawals.chargeLabel} <Input value={label} disabled={busy} maxLength={150} onChange={e=>{changed();setLabel(e.target.value)}} required placeholder={operationsCopy.withdrawals.lunch}/></label>
-    <label>{operationsCopy.withdrawals.amountUsd} <Input type="text" inputMode="decimal" value={amount} disabled={busy} onChange={e=>{changed();setAmount(e.target.value)}} required placeholder="0.00"/></label>
-    <label>{operationsCopy.withdrawals.priority} <Input type="number" step="1" value={priority} disabled={busy} onChange={e=>{changed();setPriority(e.target.value)}} required/></label>
-    <label>{dueDateCopy.label} <Input type="date" value={dueDate} disabled={busy} aria-invalid={dueInvalid} onChange={e=>{changed();setDueDate(e.target.value)}}/></label>
-    {dueInvalid && <p role="alert">{dueDateCopy.invalid}</p>}
-    <Button className="button button-primary" type="submit" disabled={busy||!valid}>{busy?operationsCopy.withdrawals.saving:operationsCopy.withdrawals.addCharge}</Button>
-    {saved && <p role="status">{operationsCopy.withdrawals.chargeRecorded}</p>}{error && <p role="alert" className="open-text">{error}</p>}
-  </form></section>
+  const text=chargeAdministrationCopy.addFee
+  const events=useQuery(api.app.listEvents,{})
+  const create=useMutation(api.finance.createCharge)
+  const client=useConvex()
+  const signedUp=useQuery(api.finance.signedUpEventIds,{studentId})
+  const [stepIndex,setStepIndex]=useState(0)
+  const [backToReview,setBackToReview]=useState(false)
+  // null until the person chooses: nothing is preselected, so a fee is never added to the wrong place by default.
+  const [forEvent,setForEvent]=useState<boolean|null>(null)
+  const pickingEvent=forEvent===true
+  const [nameEdited,setNameEdited]=useState(false)
+  const [eventId,setEventId]=useState<string|null>(null)
+  const [category,setCategory]=useState<'main'|'extra'|null>(null)
+  const [paidCents,setPaidCents]=useState(0)
+  const [label,setLabel]=useState('')
+  const [amount,setAmount]=useState('')
+  const [dueDate,setDueDate]=useState('')
+  const [busy,setBusy]=useState(false)
+  const [error,setError]=useState('')
+  const [saved,setSaved]=useState(false)
+  const [clock]=useState(()=>Date.now())
+  const pending=useRef<{key:string|null;busy:boolean}>({key:null,busy:false})
+  const changed=()=>{pending.current.key=null;setError('')}
+  const step=feeSteps[stepIndex]
+  const last=stepIndex===feeSteps.length-1
+  const money=parseMoneyInput(amount)
+  const cents=money.ok?money.cents:null
+  const dueAt=dueAtFromInput(dueDate)
+  const dueInvalid=Number.isNaN(dueAt)
+  const amountProblem=amount.trim()!==''&&!money.ok?money.message:null
+  const pickerEvents=(events??[]).map(row=>({_id:row.event._id as string,name:row.event.name,startsAt:row.event.startsAt,endsAt:row.event.endsAt}))
+  const eventName=pickerEvents.find(event=>event._id===eventId)?.name
+  const ready:Record<FeeStep,boolean>={
+    what:forEvent!==null&&label.trim().length>0&&!(pickingEvent&&!eventId)&&!(eventId&&!category),
+    amount:cents!==null&&!dueInvalid,
+    review:forEvent!==null&&label.trim().length>0&&cents!==null&&!dueInvalid&&!(pickingEvent&&!eventId)&&!(eventId&&!category),
+  }
+  const whatProblem=forEvent===null?text.chooseWhetherEvent:pickingEvent&&!eventId?text.chooseEventFirst:eventId&&!category?text.chooseKind:!label.trim()?text.enterName:null
+  const amountMissing=cents===null&&!amountProblem?text.enterAmount:null
+  const submit=async()=>{
+    if(!ready.review||cents===null||pending.current.busy)return
+    const idempotencyKey=pending.current.key??key()
+    pending.current.key=idempotencyKey;pending.current.busy=true;setBusy(true);setError('')
+    try{
+      const chargeId=await create({studentId,...(eventId&&category?{eventId:eventId as Id<'events'>,category}:{}),label:label.trim(),amountCents:cents,...(dueAt!==null?{dueAt}:{}),idempotencyKey})
+      let paid=0
+      if(chargeId){try{paid=await client.query(api.finance.feePaidSoFar,{chargeId})}catch{paid=0}}
+      pending.current.key=null;setPaidCents(paid);setSaved(true)
+    }catch(e){setError(message(e))}
+    finally{pending.current.busy=false;setBusy(false)}
+  }
+  const reset=()=>{pending.current.key=null;setSaved(false);setStepIndex(0);setBackToReview(false);setForEvent(null);setNameEdited(false);setEventId(null);setCategory(null);setPaidCents(0);setLabel('');setAmount('');setDueDate('');setError('')}
+  const goTo=(target:FeeStep)=>{setError('');setBackToReview(true);setStepIndex(feeSteps.indexOf(target))}
+  const next=()=>{
+    if(last){void submit();return}
+    setError('')
+    setStepIndex(backToReview?feeSteps.length-1:stepIndex+1)
+    setBackToReview(false)
+  }
+  const back=stepIndex>0?()=>{setError('');setBackToReview(false);setStepIndex(stepIndex-1)}:undefined
+  if(saved)return <section className={`${styles.root} card`} aria-labelledby="charge-editor-title"><h2 id="charge-editor-title">{text.title}</h2><p role="status">{paidCents>0?text.addedPaid(usd(paidCents)):text.added}</p><Button type="button" variant="outline" onClick={reset}>{text.another}</Button></section>
+  const content=(()=>{
+    switch(step){
+      case 'what':return <>
+        <div role="group" aria-label={text.event} className="flex flex-wrap gap-2">
+          <Button type="button" variant={forEvent===false?'default':'outline'} aria-pressed={forEvent===false} disabled={busy} onClick={()=>{changed();setForEvent(false);setEventId(null);setCategory(null)}}>{text.notForEvent}</Button>
+          <Button type="button" variant={pickingEvent?'default':'outline'} aria-pressed={pickingEvent} disabled={busy} onClick={()=>{changed();setForEvent(true)}}>{text.forEvent}</Button>
+        </div>
+        {pickingEvent&&(events===undefined||signedUp===undefined?<p role="status">{text.loadingEvents}</p>:<EventPicker events={pickerEvents} allowedIds={signedUp} emptyText={text.noSignedUpEvents} value={eventId} onChange={id=>{changed();setEventId(id);if(!nameEdited)setLabel(pickerEvents.find(event=>event._id===id)?.name??'')}} asOf={clock} label={text.chooseEvent} collapseWhenChosen/>)}
+        {eventId&&<div role="group" aria-label={text.kind} className="flex flex-wrap gap-2">
+          <Button type="button" variant={category==='main'?'default':'outline'} aria-pressed={category==='main'} disabled={busy} onClick={()=>{changed();setCategory('main')}}>{text.main}</Button>
+          <Button type="button" variant={category==='extra'?'default':'outline'} aria-pressed={category==='extra'} disabled={busy} onClick={()=>{changed();setCategory('extra')}}>{text.extra}</Button>
+        </div>}
+        <label>{text.name} <span className="muted">{text.required}</span> <Input value={label} disabled={busy} maxLength={150} onChange={e=>{changed();setNameEdited(true);setLabel(e.target.value)}} required aria-describedby="add-fee-name-hint" placeholder={text.namePlaceholder}/></label>
+        <p id="add-fee-name-hint" className="muted">{text.nameHint}</p>
+        {whatProblem&&!(pickingEvent&&!eventId&&signedUp?.length===0)&&<p role="status" className="muted">{whatProblem}</p>}
+      </>
+      case 'amount':return <>
+        <label>{text.amount} <span className="muted">{text.required}</span> <Input type="text" inputMode="decimal" value={amount} disabled={busy} onChange={e=>{changed();setAmount(e.target.value)}} required placeholder="0.00" aria-invalid={!!amountProblem} aria-describedby="add-fee-amount-hint"/></label>
+        <p id="add-fee-amount-hint" role={amountProblem?'alert':undefined} className={amountProblem?undefined:'muted'}>{amountProblem??text.amountExample}</p>
+        <label>{dueDateCopy.label} <Input type="date" value={dueDate} disabled={busy} aria-invalid={dueInvalid} onChange={e=>{changed();setDueDate(e.target.value)}}/></label>
+        {dueInvalid&&<p role="alert">{dueDateCopy.invalid}</p>}
+        {amountMissing&&<p className="muted">{amountMissing}</p>}
+      </>
+      case 'review':return <dl className="m-0 grid">
+        {eventName&&<ReviewRow label={text.event} value={eventName} onEdit={()=>goTo('what')} disabled={busy}/>}
+        {eventId&&category&&<ReviewRow label={text.kind} value={category==='main'?text.main:text.extra} onEdit={()=>goTo('what')} disabled={busy}/>}
+        <ReviewRow label={text.name} value={label.trim()} onEdit={()=>goTo('what')} disabled={busy}/>
+        <ReviewRow label={text.amount} value={cents===null?'—':usd(cents)} onEdit={()=>goTo('amount')} disabled={busy}/>
+        <ReviewRow label={dueDateCopy.heading} value={dueAt!==null&&!dueInvalid?dueDateCopy.full(dueAt):text.noDue} onEdit={()=>goTo('amount')} disabled={busy}/>
+      </dl>
+    }
+  })()
+  return <section className={`${styles.root} card`} aria-labelledby="charge-editor-title"><h2 id="charge-editor-title">{text.title}</h2><p>{text.intro}</p>
+    <StepWizard title={text.title} step={stepIndex+1} total={feeSteps.length} heading={text.steps[step]} nextLabel={last?(busy?text.adding:text.add):text.next} nextDisabled={!ready[step]} onNext={next} onBack={back} busy={busy} error={error}
+      onCancel={reset}>{content}</StepWizard>
+  </section>
 }

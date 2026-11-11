@@ -9,12 +9,15 @@ import { financeRow } from "./lib/financeRow";
 import { boundedFinancePage } from "./financeAdmin";
 import { enrollmentPending } from "./lib/eventEnrollmentState";
 import { firstStatus } from "./firstRegistration";
+import { coverageFor, permissionAccepted } from "./lib/permissionCoverage";
 
 const nullableMoney = v.union(v.number(), v.null());
 const balanceValidator = v.object({ state: v.union(v.literal("ready"), v.literal("updating"), v.literal("failed"), v.literal("uninitialized")), dueCents: nullableMoney, personalAvailableCents: nullableMoney, fundraisingAvailableCents: nullableMoney, updatedAt: nullableMoney });
 const accountValidator = v.object({ linkage: v.union(v.literal("linked"), v.literal("unlinked"), v.literal("unavailable")), access: v.union(v.literal("active"), v.literal("inactive"), v.literal("unknown")) });
 const eventValidator = v.union(v.null(), v.object({ eventId: v.id("events"), name: v.string(), startsAt: v.number(), participation: v.union(v.literal("confirmed"), v.literal("pending"), v.literal("waitlist"), v.literal("withdrawn"), v.null()), state: v.union(v.literal("ready"), v.literal("open"), v.literal("unknown")), open: v.array(v.string()) }));
-const rowValidator = v.object({ studentId: v.id("students"), name: v.string(), subteam: v.string(), travelTeam: v.boolean(), active: v.boolean(), profileRevision: v.number(), fundraiserConnected: v.boolean(), firstRegistrationState: v.union(v.literal("needsCompletion"),v.literal("awaitingVerification"),v.literal("verified")), account: accountValidator, balance: balanceValidator, nextEvent: eventValidator, readinessCoverage: v.union(v.literal("complete"), v.literal("unknown"), v.literal("notApplicable")), missingSummary: v.array(v.string()) });
+/** Permission form for the next event that has one, shown only while Parent signing is on. */
+const permissionValidator = v.object({ state: v.union(v.literal("closed"), v.literal("noForm"), v.literal("signed"), v.literal("review"), v.literal("notSigned")), eventName: v.union(v.string(), v.null()) });
+const rowValidator = v.object({ studentId: v.id("students"), name: v.string(), subteam: v.string(), travelTeam: v.boolean(), active: v.boolean(), profileRevision: v.number(), fundraiserConnected: v.boolean(), firstRegistrationState: v.union(v.literal("needsCompletion"),v.literal("awaitingVerification"),v.literal("verified")), account: accountValidator, balance: balanceValidator, nextEvent: eventValidator, readinessCoverage: v.union(v.literal("complete"), v.literal("unknown"), v.literal("notApplicable")), missingSummary: v.array(v.string()), permission: permissionValidator });
 const directoryRowValidator = v.object({studentId:v.id("students"), name:v.string(), lastName:v.string(), subteam:v.string(), travelTeam:v.boolean(), active:v.boolean(), connected:v.boolean(), grade:v.union(v.string(),v.null()), secondarySubteam:v.union(v.string(),v.null()), leadership:v.boolean()});
 
 /** A bounded page of minimal roster data; the client completes these pages before sorting. */
@@ -50,7 +53,7 @@ export const rowsByIds=query({
     const season=await activeSeason(ctx);
     const students=await Promise.all(args.studentIds.map(id=>ctx.db.get(id)));
     if(students.some(student=>!student||student.seasonId!==season._id)) throw new ConvexError("This student is no longer in the current season. Reload to see the current roster.");
-    const upcoming=await upcomingEvents(ctx,season._id,args.asOf);
+    const upcoming=await upcomingEvents(ctx,season,args.asOf);
     return await Promise.all((students as Doc<"students">[]).map(student=>rosterRow(ctx,student,upcoming)));
   },
 });
@@ -87,16 +90,29 @@ async function accountStatus(ctx: QueryCtx, student: Doc<"students">) {
   return { linkage: "linked" as const, access: account.active ? "active" as const : "inactive" as const };
 }
 
-type Upcoming = { events: Doc<"events">[]; truncated: boolean };
-async function upcomingEvents(ctx: QueryCtx, seasonId: Doc<"seasons">["_id"], asOf: number): Promise<Upcoming> {
+type Upcoming = { events: Doc<"events">[]; truncated: boolean; signingOpen: boolean };
+async function upcomingEvents(ctx: QueryCtx, season: Doc<"seasons">, asOf: number): Promise<Upcoming> {
+  const seasonId = season._id;
   const page = await ctx.db.query("events").withIndex("by_seasonId_and_startsAt", q => q.eq("seasonId", seasonId).gte("startsAt", asOf)).take(11);
-  return { events: page.slice(0, 10).filter(event => !event.archived), truncated: page.length > 10 };
+  return { // Canceled and archived events are never a student's next event and never feed a reminder.
+  events: page.slice(0, 10).filter(event => !event.archived && !event.cancelled), truncated: page.length > 10, signingOpen: season.permissionSigningPaused === false };
 }
 
-async function nextEvent(ctx: QueryCtx, student: Doc<"students">, upcoming: Upcoming, financeState: string) {
+type ParticipantLookup = (eventId: Doc<"events">["_id"]) => Promise<Doc<"participants"> | null>;
+/** One participant read per event per student, shared by the next-event and permission lookups. */
+function participantLookup(ctx: QueryCtx, student: Doc<"students">): ParticipantLookup {
+  const cache = new Map<string, Promise<Doc<"participants"> | null>>();
+  return eventId => {
+    let found = cache.get(eventId);
+    if (!found) { found = ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", eventId).eq("studentId", student._id)).unique(); cache.set(eventId, found); }
+    return found;
+  };
+}
+
+async function nextEvent(ctx: QueryCtx, student: Doc<"students">, upcoming: Upcoming, financeState: string, participantFor: ParticipantLookup) {
   if (!student.active) return { nextEvent: null, readinessCoverage: "notApplicable" as const, knownFirstStatus: undefined };
   for (const event of upcoming.events) {
-    const participant = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
+    const participant = await participantFor(event._id);
     if (enrollmentPending(event) && event.assignmentScope === "wholeTeam") return { nextEvent: { eventId: event._id, name: event.name, startsAt: event.startsAt, participation: participant?.status ?? null, state: "unknown" as const, open: ["Whole Team signups are not finished yet"] }, readinessCoverage: "unknown" as const, knownFirstStatus: undefined };
     if (!participant || participant.status === "withdrawn") continue;
     if (participant.status !== "confirmed") return { nextEvent: { eventId: event._id, name: event.name, startsAt: event.startsAt, participation: participant.status, state: "open" as const, open: ["Signup not confirmed yet"] }, readinessCoverage: "complete" as const, knownFirstStatus: undefined };
@@ -107,12 +123,27 @@ async function nextEvent(ctx: QueryCtx, student: Doc<"students">, upcoming: Upco
   return { nextEvent: null, readinessCoverage: upcoming.truncated ? "unknown" as const : "complete" as const, knownFirstStatus: undefined };
 }
 
+async function permissionStatus(ctx: QueryCtx, student: Doc<"students">, upcoming: Upcoming, participantFor: ParticipantLookup) {
+  if (!upcoming.signingOpen) return { state: "closed" as const, eventName: null };
+  if (!student.active) return { state: "noForm" as const, eventName: null };
+  for (const event of upcoming.events) {
+    if (event.cancelled || !event.permissionRequired) continue;
+    const participant = await participantFor(event._id);
+    if (participant?.status !== "confirmed" && participant?.status !== "pending") continue;
+    if (await permissionAccepted(ctx, student._id, event._id)) return { state: "signed" as const, eventName: event.name };
+    const coverage = await coverageFor(ctx, student._id, event._id);
+    return { state: coverage?.state === "pending" ? "review" as const : "notSigned" as const, eventName: event.name };
+  }
+  return { state: "noForm" as const, eventName: null };
+}
+
 async function rosterRow(ctx: QueryCtx, student: Doc<"students">, upcoming: Upcoming) {
   const firstStatusPromise = upcoming.events.some(event => !event.archived && event.type === "Competition") ? null : firstStatus(ctx, student._id);
-  const [finance, account] = await Promise.all([financeRow(ctx, student._id), accountStatus(ctx, student)]);
-  const { knownFirstStatus, ...event } = await nextEvent(ctx, student, upcoming, finance.state);
+  const participantFor = participantLookup(ctx, student);
+  const [finance, account, permission] = await Promise.all([financeRow(ctx, student._id), accountStatus(ctx, student), permissionStatus(ctx, student, upcoming, participantFor)]);
+  const { knownFirstStatus, ...event } = await nextEvent(ctx, student, upcoming, finance.state, participantFor);
   const firstRegistrationState = knownFirstStatus ?? await (firstStatusPromise ?? firstStatus(ctx, student._id));
-  return { studentId: student._id, name: student.legalName || student.preferredName, subteam: student.subteam, travelTeam: student.travelTeam, active: student.active, profileRevision: student.profileRevision ?? 0, fundraiserConnected: !!student.fundraiserUrl, firstRegistrationState, account, balance: { state: finance.state, dueCents: finance.dueCents, personalAvailableCents: finance.personalAvailableCents, fundraisingAvailableCents: finance.fundraisingAvailableCents, updatedAt: finance.updatedAt }, ...event, missingSummary: missingInformation(student) };
+  return { studentId: student._id, name: student.legalName || student.preferredName, subteam: student.subteam, travelTeam: student.travelTeam, active: student.active, profileRevision: student.profileRevision ?? 0, fundraiserConnected: !!student.fundraiserUrl, firstRegistrationState, account, balance: { state: finance.state, dueCents: finance.dueCents, personalAvailableCents: finance.personalAvailableCents, fundraisingAvailableCents: finance.fundraisingAvailableCents, updatedAt: finance.updatedAt }, ...event, missingSummary: missingInformation(student), permission };
 }
 
 export const list = query({
@@ -128,7 +159,7 @@ export const list = query({
         ? ctx.db.query("students").withIndex("by_seasonId_and_active_and_userId", q => q.eq("seasonId", season._id).eq("active", args.active ?? true).gt("userId", undefined))
         : ctx.db.query("students").withIndex("by_seasonId_and_active", q => q.eq("seasonId", season._id).eq("active", args.active ?? true));
     const page = await students.paginate(boundedFinancePage(args.paginationOpts));
-    const upcoming = await upcomingEvents(ctx, season._id, args.asOf);
+    const upcoming = await upcomingEvents(ctx, season, args.asOf);
     return { ...page, page: await Promise.all(page.page.map(student => rosterRow(ctx, student, upcoming))), seasonId: season._id };
   },
 });
@@ -142,7 +173,7 @@ export const detail = query({
     const season = await activeSeason(ctx);
     const student = await ctx.db.get(args.studentId);
     if (!student || student.seasonId !== season._id) throw new ConvexError("This student is no longer in the current season. Reload to see the current roster.");
-    const row = await rosterRow(ctx, student, await upcomingEvents(ctx, season._id, args.asOf));
+    const row = await rosterRow(ctx, student, await upcomingEvents(ctx, season, args.asOf));
     const links = await ctx.db.query("familyLinks").withIndex("by_studentId", q => q.eq("studentId", student._id)).take(21);
     const parents = await Promise.all(links.slice(0,20).filter(link => !link.seasonId || link.seasonId === season._id).map(async link => {
       const parent = await ctx.db.get(link.parentUserId);

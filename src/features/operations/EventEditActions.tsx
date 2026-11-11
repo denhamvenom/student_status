@@ -64,7 +64,7 @@ export function EventEditActions({ event, isCoach, seriesEnd }: { event: Editabl
       <Button type="button" disabled={!!blocker} aria-describedby={blocker ? `${id}-blocked` : undefined} onClick={openEdit}>{copy.edit}</Button>
       {series
         ? <Button type="button" variant="outline" disabled={!!blocker} aria-describedby={blocker ? `${id}-blocked` : undefined} onClick={() => setSeriesChange({ kind: 'cancel' })}>{copy.cancel}</Button>
-        : <ConfirmAction disabled={!!blocker} description={copy.cancelConfirm} onConfirm={async () => { await update({ eventId, expectedRevision, cancelled: true }); toast.success(copy.canceled) }}>{copy.cancel}</ConfirmAction>}
+        : <ConfirmAction title="Cancel this event?" disabled={!!blocker} description={copy.cancelConfirm} onConfirm={async () => { await update({ eventId, expectedRevision, cancelled: true }); toast.success(copy.canceled) }}>{copy.cancel}</ConfirmAction>}
       {series && seriesEnd && <ChangeSeriesEndDate seriesId={event.seriesId!} details={seriesEnd} blocker={endBlocker} describedBy={`${id}-blocked`} />}
     </div>
     {(blocker ?? endBlocker) && <p id={`${id}-blocked`} className="muted">{blocker ?? endBlocker}</p>}

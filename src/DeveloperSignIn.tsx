@@ -67,7 +67,10 @@ function DeveloperSignInPanel() {
       <Input ref={input} id="developer-signin-key" type="password" autoComplete="off" value={key} onChange={e => { setKey(e.target.value); setError('') }} disabled={!!busy}/>
     </div>
     <div className="review-links" style={{ marginTop: 12 }} role="group" aria-label="Fictional accounts">
-      {personas.map(persona => <Button key={persona.id} type="button" variant="outline" className="button button-outline" title={persona.description} disabled={!!busy} onClick={() => void choose(persona.id)}>{busy === persona.id ? 'Signing in…' : persona.label}</Button>)}
+      {personas.map(persona => <div key={persona.id} className="flex min-w-[min(100%,14rem)] flex-1 flex-col gap-1">
+        <Button type="button" variant="outline" className="button button-outline h-auto min-h-11 whitespace-normal py-2 text-center" aria-describedby={`developer-signin-${persona.id}-description`} disabled={!!busy} onClick={() => void choose(persona.id)}>{busy === persona.id ? 'Signing in…' : persona.label}</Button>
+        <p id={`developer-signin-${persona.id}-description`} className="text-sm text-muted-foreground">{persona.description}</p>
+      </div>)}
     </div>
     <p role="status" className="sr-only">{label ? `Signing in as ${label}…` : ''}</p>
     {error && <p role="alert" className="open-text">{error}</p>}

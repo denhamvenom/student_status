@@ -28,12 +28,18 @@ Accepted deferrals are listed in [KNOWN_GAPS.md](KNOWN_GAPS.md); consult them on
   - Coach team-wide Mentor overview (who is going to what, across events).
   - Store the creator's role label at creation time (Created by currently reads the creator's role now).
   - Theme flash on load.
+- Usability audit follow-ups (November 9, 2026, `feat/usability-audit`, unreleased):
+  - Sign-in session length: decided November 10, 2026 (owner): stays at 30 days. No action.
+  - Real-phone checks for installed-app sign-in on an iPhone and an Android phone (remembered email-code step, persistent storage request); not yet run on physical devices.
+  - Mentor "Required meetings attended" may read "Not counted yet" if `attendanceMeetings` is empty; verify on live data.
+  - The Home vs Money balance fix assumes charges missing the outstanding flag; verify on development data.
+  - Event Readiness and roster first-load query cost has not been measured.
 - Roster bulk edit and assigning CAD/Leadership from the roster subteam dropdown.
 - Student Home wording: carousel, FIRST registration/Consent & Release jargon, doubled "optional" label on open signups.
 - Owner decision: whether Travel Leads keep adding/removing Mentor invitations on Coach-only required events (current policy allows it).
 - Put back fee (owner, November 7, 2026): decide the rule (Coach confirms a suggested amount vs automatic). Until then Put back on event and Undo leave charges unchanged and the Coach adds the fee by hand; see [DECISIONS.md](DECISIONS.md). This is a money change; read DECISIONS.md first.
 - Remind my parent (owner, October 27): a Student Home button that emails the linked parent about a FIRST registration, permission form or payment waiting on them, through the existing parent email service.
-- Carried over from earlier HANDOFF entries (November 8, 2026 trim): the "My attendance" month arrows report (likely disabled by design when the season starts in the current or a future month, but disabled arrows are only `opacity-60` and look broken; production season `startsAt` unverified); Inbox items have no Urgent badge; owner decision on sign-in session length; slow `signUp` (about 10 s on development); DSHS STEM Center address and drop-off note not added.
+- Carried over from earlier HANDOFF entries (November 8, 2026 trim): the "My attendance" month arrows report (likely disabled by design when the season starts in the current or a future month, but disabled arrows are only `opacity-60` and look broken; production season `startsAt` unverified); Inbox items have no Urgent badge; (sign-in session length decided November 10, 2026: stays at 30 days); slow `signUp` (about 10 s on development); DSHS STEM Center address and drop-off note not added.
 - Persona findings, observed 2026-11-08 on development with synthetic data:
   - A Student cannot see their own consent-form status; there is no student-side path and `/permissions` is staff-only.
   - Student Home: the Balance due card sits at the bottom of a long page and does not say what the charge is for.

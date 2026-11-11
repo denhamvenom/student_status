@@ -16,12 +16,12 @@ describe('staff navigation', () => {
 
   it('lists Join requests for Travel Leads and labels a Parent profile for the student', () => {
     expect(menu.travelLead).toContainEqual(['Join requests', '/enroll'])
-    expect(menu.parent).toContainEqual(['Student profile', '/profile'])
-    expect(menu.coach).toContainEqual(['Archived records', '/retention'])
+    expect(menu.parent).toContainEqual(['Profile', '/profile'])
+    expect(menu.coach).toContainEqual(['Record review', '/retention'])
   })
 
   it('opens the Mentor profile first and keeps its report separate from operational staff', () => {
-    expect(menu.mentor).toEqual([['Profile', '/'], ['Invitations', '/invited'], ['Report', '/report'], ['Settings', '/settings']])
+    expect(menu.mentor).toEqual([['Profile', '/'], ['Invitations', '/invited'], ['Team report', '/report'], ['Settings', '/settings']])
     expect(menu.coach[0]).toEqual(['Team', '/'])
     expect(menu.travelLead[0]).toEqual(['Team', '/'])
     expect(menu.coach.some(([, path]) => path === '/report')).toBe(false)

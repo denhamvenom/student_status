@@ -85,7 +85,7 @@ export const retryMapping = mutation({
     const actor = await viewer(ctx); requireRole(actor, "coach"); const season = await activeSeason(ctx);
     if (args.reason.trim().length < 8 || args.reason.length > 1000) throw new ConvexError("Provide a reason of at least eight characters.");
     const job = await ctx.db.get(args.jobId); const control = await ctx.db.query("seasonFinanceControls").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).unique();
-    if (!job || job.state !== "failed" || job.seasonId !== season._id || control?.mappingJobId !== job._id) throw new ConvexError("There is no stopped fee matching to retry. Reload to see the latest.");
+    if (!job || job.state !== "failed" || job.seasonId !== season._id || control?.mappingJobId !== job._id) throw new ConvexError("No stopped fee matching is waiting to try again. Reload to see the latest.");
     const state = job.phase === "drain" ? "draining" as const : "applying" as const;
     await ctx.db.patch(job._id, { actorId: actor._id, state, lastError: undefined, updatedAt: Date.now() });
     await ctx.db.patch(control._id, { state, updatedAt: Date.now() });

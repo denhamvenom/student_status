@@ -17,7 +17,9 @@ const testLimiter = new RateLimiter(components.rateLimiter, {
   notificationTest: { kind: "fixed window", rate: 1, period: 60_000 },
 });
 
-const notificationView = v.object({ _id: v.id("notifications"), title: v.string(), body: v.string(), url: v.string(), category: notificationCategoryValidator, urgent: v.boolean(), createdAt: v.number(), readAt: v.union(v.number(), v.null()) });
+const notificationView = v.object({ _id: v.id("notifications"), title: v.string(), body: v.string(), url: v.string(), category: notificationCategoryValidator, urgent: v.boolean(), createdAt: v.number(), readAt: v.union(v.number(), v.null()),
+  /** When the event this notice links to ends (null when it links elsewhere; 0 when the event no longer exists, so it counts as past); the Inbox files notices for past events under Older. */
+  eventEndsAt: v.union(v.number(), v.null()) });
 
 export const listMine = query({
   args: { paginationOpts: paginationOptsValidator },
@@ -27,7 +29,13 @@ export const listMine = query({
     if (!user) return { page: [], isDone: true, continueCursor: "" };
     const paginationOpts = { ...args.paginationOpts, numItems: Math.min(args.paginationOpts.numItems, MAX_PAGE) };
     const result = await ctx.db.query("notifications").withIndex("by_userId_and_createdAt", q => q.eq("userId", user._id)).order("desc").paginate(paginationOpts);
-    return { ...result, page: result.page.map(row => ({ _id: row._id, title: row.title, body: row.body, url: row.url, category: row.category, urgent: row.urgent, createdAt: row.createdAt, readAt: row.readAt ?? null })) };
+    const page = [];
+    for (const row of result.page) {
+      const eventId = row.url.startsWith("/events/") ? ctx.db.normalizeId("events", row.url.slice("/events/".length).split(/[/?#]/)[0]) : null;
+      const event = eventId ? await ctx.db.get(eventId) : null;
+      page.push({ _id: row._id, title: row.title, body: row.body, url: row.url, category: row.category, urgent: row.urgent, createdAt: row.createdAt, readAt: row.readAt ?? null, eventEndsAt: eventId ? (event ? event.endsAt : 0) : null });
+    }
+    return { ...result, page };
   },
 });
 

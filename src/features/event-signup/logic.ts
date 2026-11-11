@@ -47,7 +47,7 @@ export function toggleShift<I extends string>(shiftId: I, selected: readonly I[]
 
 /** A problem with the whole choice, worded for the Student, or null when it can be sent. */
 export function shiftChoiceIssue(count: number, bounds: ShiftBounds): string | null {
-  if (count < bounds.min) return signupCopy.shifts.pickMore(bounds.min - count)
+  if (count < bounds.min) return signupCopy.shifts.pickMore(bounds.min - count, count)
   if (bounds.max !== null && count > bounds.max) return signupCopy.shifts.tooMany(bounds.max)
   return null
 }
@@ -145,4 +145,13 @@ export const reconcileShifts = <I extends string>(selected: readonly I[], offere
 /** Required questions without a saved answer. */
 export function unansweredRequired<I extends string>(questions: readonly Question<I>[], saved: readonly { questionId: I }[]) {
   return questions.filter(q => q.required && !saved.some(a => a.questionId === q.questionId))
+}
+
+/** Home's "Pick your shifts" link adds ?pick=shifts to the event page; the page opens the shift picker once. */
+export const PICK_PARAM = 'pick'
+export const PICK_SHIFTS = 'shifts'
+/** The event page address that opens the shift picker. `href` is the server's `/events/<id>#my-signup`. */
+export const shiftPickerHref = (href: string) => {
+  const [path, hash = 'my-signup'] = href.split('#')
+  return `${path}${path.includes('?') ? '&' : '?'}${PICK_PARAM}=${PICK_SHIFTS}#${hash}`
 }

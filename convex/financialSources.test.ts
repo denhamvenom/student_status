@@ -108,7 +108,7 @@ describe("source financial foundation", () => {
     await f.t.run(ctx => ctx.db.patch(actor.user, { active: false }));
     await f.t.mutation(makeFunctionReference<"mutation">("financialAllocation:run"), { jobId: pending.allocationJobId });
     expect(await f.t.run(ctx => financialAccount(ctx, f.ids.student))).toMatchObject({ state: "failed", paidCents: pending.paidCents });
-    await expect(f.coach.mutation(rebuild, { studentId: f.ids.student })).rejects.toThrow("existing financial job");
+    await expect(f.coach.mutation(rebuild, { studentId: f.ids.student })).rejects.toThrow("stopped money update");
     await f.coach.mutation(makeFunctionReference<"mutation">("financialAllocation:retry"), { studentId: f.ids.student, reason: "Coach resumes validated signup allocation" });
     for (let i = 0; i < 20; i++) {
       const job = await f.t.run(ctx => ctx.db.get(pending.allocationJobId!));

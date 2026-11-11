@@ -41,7 +41,7 @@ describe("server boundaries", () => {
     await f.coach.mutation(api.permissions.setSigningPaused,{paused:false});
     await f.t.run(ctx => ctx.db.patch(f.ids.event, {permissionRequired: true}));
     const initialParent = await f.parent.query(api.app.studentDashboard, {studentId: f.ids.student});
-    expect(initialParent.todos.map(item => item.label)).toContain("Finish the health and contact profile");
+    expect(initialParent.todos.map(item => item.label)).toContain("Finish health information");
     expect(initialParent.todos.some(item => item.eventId === f.ids.event)).toBe(false);
     const initialStudent = await f.student.query(api.app.studentDashboard, {studentId: f.ids.student});
     expect(initialStudent.todos).toEqual(expect.arrayContaining([expect.objectContaining({eventId: null, responsible: "student", href: "/setup", blocked: false}), expect.objectContaining({eventId: null, responsible: "parent", href: null, blocked: true}), expect.objectContaining({eventId: null, eventName: "FIRST registration and Consent & Release"})]));

@@ -7,9 +7,9 @@
 .root h3{font-size:var(--text-lg)}
 .note{display:block;margin:0;color:var(--text-muted);font-size:var(--text-sm);overflow-wrap:anywhere}
 .desktop{min-width:0;max-width:100%;border:1px solid var(--border-default);border-radius:var(--radius-md);background:var(--surface-card);overflow:hidden}
-.desktop [data-slot="table-container"]{max-width:100%;max-height:70vh;overflow:auto;scrollbar-gutter:stable}
+.desktop [data-slot="table-container"]{max-width:100%;overflow-x:auto;overflow-y:visible}
 .desktop table{min-width:900px}
-.desktop th{position:sticky;top:0;z-index:1;background:var(--surface-card)}
+.desktop th{background:var(--surface-card)}
 .desktop th{color:var(--text-muted);text-transform:uppercase;font-size:var(--text-xs)}
 .desktop td,.desktop th{padding:var(--space-3)}
 .money{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -24,3 +24,5 @@
 @media(max-width:767px){.desktop{display:none}.mobile{display:grid;gap:var(--space-3)}}
 
 .name{padding:0;min-height:44px;color:var(--text-link);white-space:normal;text-align:left;font-weight:600;justify-content:flex-start}
+
+.search{display:grid;gap:var(--space-1);max-width:24rem}

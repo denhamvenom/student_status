@@ -4,7 +4,7 @@ import { useLocation } from 'react-router'
 import { api } from '../convex/_generated/api'
 import SignIn from './SignIn'
 import { liveCopy } from './lib/live-copy'
-import { AUTH_RETURN_GRACE_MS, authReturnPhase, browserIntentStorage, clearSignInIntent, hasOAuthCode, withoutOAuthCode } from './lib/authReturn'
+import { AUTH_RETURN_GRACE_MS, authReturnPhase, browserIntentStorage, clearEmailCodeStep, clearSignInIntent, hasOAuthCode, withoutOAuthCode } from './lib/authReturn'
 
 const LiveApp = lazy(() => import('./LiveApp'))
 /** Captured at module load, before the auth provider's mount effect consumes and strips `?code` from the URL. */
@@ -37,7 +37,7 @@ export default function LiveEntry() {
   useEffect(() => {
     if (!signedIn) return
     const storage = browserIntentStorage()
-    if (storage) clearSignInIntent(storage)
+    if (storage) { clearSignInIntent(storage); clearEmailCodeStep(storage) }
     setReturnedWithCode(false)
   }, [signedIn])
 

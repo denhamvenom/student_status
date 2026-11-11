@@ -51,7 +51,7 @@ export async function requireNoFinancialJob(ctx: Ctx, account: FinancialAccount)
   for (const jobId of [account.allocationJobId, account.operationJobId, account.fundraiserJobId]) {
     if (!jobId) continue;
     const job = await ctx.db.get(jobId);
-    if (!job || job.state !== "complete") throw new Error("Finish or retry the existing financial job before rebuilding or recording another transaction.");
+    if (!job || job.state !== "complete") throw new Error("Finish the stopped money update, or try it again, before making another money change.");
   }
 }
 

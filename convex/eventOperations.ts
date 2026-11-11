@@ -7,7 +7,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { activeSeason, audit, viewer, isCoachOrTravelLead } from "./lib/access";
 import { addCharge } from "./lib/money";
 import { requireEnrollmentComplete } from "./lib/eventEnrollmentState";
-import { activeQuestions, activeShifts, clearShifts } from "./lib/eventSignupExtras";
+import { RESERVED_REQUIREMENT_KEYS, activeQuestions, activeShifts, clearShifts, requirementKey } from "./lib/eventSignupExtras";
 import { notifySignupDecision } from "./lib/notificationTriggers";
 import { activeApprovedWithdrawal, recentWithdrawals } from "./lib/withdrawalState";
 
@@ -142,26 +142,43 @@ export const updateSettings = mutation({
   },
 });
 
+/**
+ * Adds a requirement (no key: the short name is made from the display name, unique for the event) or edits one (its key).
+ * kind "info" ("Something to know") is a note only and has no due date; "checkoff" (also when omitted on a new one) is
+ * checked off by a Coach or Travel Lead. Editing without kind keeps the saved kind.
+ */
 export const saveRequirement = mutation({
-  args: { eventId: v.id("events"), key: v.string(), label: v.string(), instructions: v.optional(v.string()), url: v.optional(v.string()), dueAt: v.optional(v.union(v.number(), v.null())) }, returns: v.null(),
+  args: { eventId: v.id("events"), key: v.optional(v.string()), label: v.string(), instructions: v.optional(v.string()), url: v.optional(v.string()), dueAt: v.optional(v.union(v.number(), v.null())), kind: v.optional(v.union(v.literal("info"), v.literal("checkoff"))) }, returns: v.object({ key: v.string() }),
   handler: async (ctx, args) => {
     const user = await viewer(ctx); if (user.role !== "coach") throw new ConvexError("Only a Coach can edit requirements.");
     const event = await currentEvent(ctx, args.eventId);
     requireEnrollmentComplete(event);
-    const key = args.key.trim(); const label = args.label.trim();
-    if (!/^[a-zA-Z0-9_-]{1,32}$/.test(key) || ["pay", "perm", "room", "first"].includes(key) || !label || label.length > 100 || (args.instructions?.length ?? 0) > 1000 || (args.url?.length ?? 0) > 500) throw new ConvexError("Check the requirement. Short name: up to 32 letters, numbers, - or _ (not pay, perm, room or first). Display name: up to 100 characters. Instructions: up to 1,000. Link: up to 500.");
+    const label = args.label.trim();
+    if (!label || label.length > 100 || (args.instructions?.length ?? 0) > 1000 || (args.url?.length ?? 0) > 500) throw new ConvexError("Check the requirement. What it says: up to 100 characters. Instructions: up to 1,000. Link: up to 500.");
     if (args.dueAt !== undefined && args.dueAt !== null && !Number.isFinite(args.dueAt)) throw new ConvexError("Enter a valid due date.");
     if (args.url && !/^https:\/\//i.test(args.url)) throw new ConvexError("Requirement links must start with https://.");
-    const prior = await ctx.db.query("requirements").withIndex("by_eventId_and_key", q => q.eq("eventId", event._id).eq("key", key)).unique();
-    const values = { label, instructions: args.instructions?.trim() || undefined, url: args.url?.trim() || undefined, dueAt: args.dueAt ?? undefined };
-    if (prior) await ctx.db.patch(prior._id, values);
-    else {
-      const existing = await ctx.db.query("requirements").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(101);
-      if (existing.length >= 100) throw new ConvexError("This event already has 100 requirements. Remove one before adding another.");
-      await ctx.db.insert("requirements", { eventId: event._id, key, ...values });
+    const existing = await ctx.db.query("requirements").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(101);
+    const editKey = args.key?.trim();
+    const prior = editKey ? existing.find(r => r.key === editKey) ?? await ctx.db.query("requirements").withIndex("by_eventId_and_key", q => q.eq("eventId", event._id).eq("key", editKey)).unique() : null;
+    if (editKey && !prior) throw new ConvexError("This requirement was removed. Reload to see the event's current requirements.");
+    const kind = args.kind ?? prior?.kind ?? "checkoff";
+    if (kind === "info" && prior && prior.kind !== "info") {
+      // A requirement some students already have checked off keeps its records, so it can't become a note.
+      const done = await ctx.db.query("requirementCompletions").withIndex("by_eventId_and_studentId_and_key", q => q.eq("eventId", event._id)).take(501);
+      if (done.length > 500) throw new ConvexError("This requirement has too many student records to change here. Contact a Coach.");
+      if (done.some(c => c.key === prior.key)) throw new ConvexError("Some students already have this checked off, so it can't become something to know. Add a new requirement instead.");
     }
-    await audit(ctx, user, "requirements", `${event._id}:${key}`, prior ? "update" : "create", prior ?? null, values);
-    return null;
+    const values = { label, instructions: args.instructions?.trim() || undefined, url: args.url?.trim() || undefined, dueAt: kind === "info" ? undefined : args.dueAt ?? undefined, kind };
+    if (prior) {
+      await ctx.db.patch(prior._id, values);
+      await audit(ctx, user, "requirements", `${event._id}:${prior.key}`, "update", prior, values);
+      return { key: prior.key };
+    }
+    if (existing.length >= 100) throw new ConvexError("This event already has 100 requirements. Remove one before adding another.");
+    const key = requirementKey(label, [...existing.map(r => r.key), ...RESERVED_REQUIREMENT_KEYS]);
+    await ctx.db.insert("requirements", { eventId: event._id, key, ...values });
+    await audit(ctx, user, "requirements", `${event._id}:${key}`, "create", null, values);
+    return { key };
   },
 });
 

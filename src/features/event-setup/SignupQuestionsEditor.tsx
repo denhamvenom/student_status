@@ -68,7 +68,7 @@ export function SignupQuestionsEditor({ eventId, questionCount }: { eventId: Id<
           <Button variant="outline" disabled={busy || i === questions.length - 1} aria-label={copy.moveDown(q.prompt)} onClick={() => move(i, 1)}>{copy.down}</Button>
           <Button variant="outline" disabled={busy} onClick={() => { setError(''); setSuccess(''); setDraft({ questionId: q.questionId, kind: q.kind, prompt: q.prompt, options: q.options ?? ['', ''], required: q.required, locked: answers > 0 }); document.getElementById(`${id}-prompt`)?.focus() }}>{copy.edit}</Button>
           {answers > 0
-            ? <ConfirmAction disabled={busy} description={copy.removeConfirm(q.prompt)} onConfirm={async () => { await remove({ questionId: q.questionId }); if (draft.questionId === q.questionId) setDraft(blank); setError(''); setSuccess(copy.archived) }}>{copy.remove}</ConfirmAction>
+            ? <ConfirmAction title="Remove this question?" disabled={busy} description={copy.removeConfirm(q.prompt)} onConfirm={async () => { await remove({ questionId: q.questionId }); if (draft.questionId === q.questionId) setDraft(blank); setError(''); setSuccess(copy.archived) }}>{copy.remove}</ConfirmAction>
             : <Button variant="outline" disabled={busy} onClick={() => void act(async () => { const result = await remove({ questionId: q.questionId }); if (draft.questionId === q.questionId) setDraft(blank); return result === 'archived' ? copy.archived : copy.deleted }, copy.deleted)}>{copy.remove}</Button>}
         </span>
       </li>

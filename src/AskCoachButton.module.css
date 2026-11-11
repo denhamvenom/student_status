@@ -1,0 +1,6 @@
+.form{display:grid;gap:16px}
+.field{display:grid;gap:6px;font-weight:600}
+.field select,.field textarea{width:100%;font-weight:400}
+.count{font-size:12px;font-weight:400;color:var(--text-muted,inherit);justify-self:end}
+.actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+.done{padding:12px;background:var(--go-bg);color:var(--go-dot);border-radius:4px}

@@ -51,6 +51,12 @@ Write every new or changed user-facing string to this page. Rewrite screen by sc
 | Putting a student on an event | Sign up (verb), signup (noun); Signed up, Waitlisted, Waiting for approval, Not signed up | Signups | registered (for events), enrollment, Participants |
 | Joining the team | Join the team; invitation code (6 digits) | Join requests; invitation code | individual code, team code vs student code, enroll |
 | Hotel rooms | Rooms (page); Room type (Boys / Girls); Room choice | Rooming; Room type | Rooming category |
+| Readiness signups | {n} signed up ({m} needed); No students yet (readiness picker) | | |
+| Returning students (season transition) | All returning students; Use these choices for all returning students | | |
+| Mentor Join filter | Show only my subteams; Whole team | | |
+| Student room page | Room invitations; Leave room group | Invitations; Leave group | |
+| Fee details button | Details and history for {fee} (accessible name of each fee's button) | | |
+| Record payment | Balance due: $X (shown on Record payment) | | |
 | Leaving an event | Withdraw from this event; withdrawal request (statuses say refunded, moved to Available funds, or still owed) | Withdrawal requests | Financial work complete, Returned to travel accounts |
 | Ended events | Past events | Past events; Record review (the `/retention` page) | Archived, retention |
 | What a student still needs | What's left (Home); requirements | Event readiness | Readiness (alone), Open Readiness |
@@ -62,6 +68,19 @@ Write every new or changed user-facing string to this page. Rewrite screen by sc
 | Signing in | sign in (verb), sign-in (noun) | Same | log in, login |
 | Team reports | (not shown) | Reports (Coach, Travel Lead); Team report (Mentor); menu label matches heading | Report (alone) |
 | Attendance | Attendance; meetings | Attendance; meetings | sessions, practices, Attendance fixes (as a menu name) |
+| Messaging the Coach (November 9) | Ask a Coach (button/form; topic and message) | (not shown) | Contact admin (that is Coach-only setup errors) |
+| Changing a recorded payment (November 9) | (not shown) | Edit payment (reason required) | Fix payment, Reverse |
+| Roster bulk actions (November 9) | (not shown) | Copy reminder (text only, nothing sent); Export list | Send reminder |
+| Open-only filter (November 9) | Show only open | Show only open | Hide closed |
+| Mentor subteam scope (November 9) | (not shown) | Showing: {subteam} · Show all subteams | |
+| Calendar progress (November 9) | (not shown) | Adding to Team Calendar… | |
+| Wrong Google account (November 9) | Use a different Google account | Same | Use another account (for the generic sign-in switch only) |
+| View-only money screens (November 9) | (not shown) | "A Coach or a Travel Lead with Money editing access can record and edit payments." | grant, capability |
+| Custom event requirement kinds (November 10) | Something to know (information only) | Something to know; Checked off by a Coach or Travel Lead | task (for an information-only note), Info, Checkoff |
+| Unfinished Parent setup (November 10) | Finish setup (Home card, opens the setup wizard on Home) | Same | Complete setup, Continue setup |
+| Season transition (November 10) | (not shown) | Mark all as Returning | Set all Returning |
+| Fees on Money (November 10) | (not shown) | Add a fee (a fee on one student's account; replaces "Add a charge") | Add a charge |
+| Recording payments (November 10) | (not shown) | Record another; Choose how it was paid | |
 
 ## Student Home (October 27)
 

@@ -84,7 +84,7 @@ Use the [backend handoff](TIMECLOCK_BACKEND_HANDOFF.md) for commands and API con
 
 ## Developer sign-in
 
-The development deployment can sign in to six fixed fictional accounts (Coach, Mentor, Travel Lead, Parent, Parent with staff access, Student) without Google, so every role can be tested by the owner, Claude and automated browser checks. Policy and guards: [DECISIONS.md](DECISIONS.md#developer-sign-in).
+The development deployment can sign in to seven fixed fictional accounts (Coach, Mentor, Travel Lead, Travel Lead with Money editing access, Parent, Parent with staff access, Student) without Google, so every role can be tested by the owner, Claude and automated browser checks. Travel Lead with Money editing access exists to test fees and payments; it is development only and uses the same guards. After a development sync, run `bunx convex run --deployment dev developerSignIn:ensurePersonas` once so a newly added account appears. Policy and guards: [DECISIONS.md](DECISIONS.md#developer-sign-in).
 
 It works only on `third-bandicoot-18`, only while both server settings are present, and only in a local development build (`bun run dev`); the panel appears below the normal sign-in card. Any production build fails if any of it reaches the bundle (a Vite build check). Setup, once per development deployment:
 

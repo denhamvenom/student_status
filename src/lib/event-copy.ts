@@ -5,10 +5,10 @@ import { uiCopy } from './ui-copy'
 export const eventCopy = {
   enrollment: {
     running: 'Adding the Whole Team',
-    failed: 'Team enrollment needs attention',
+    failed: 'Team signups need attention',
     description: 'Students and event fees are being added. The rest of the event page will open when this is done.',
     progress: (processed: number, assigned: number) => `${processed} profiles reviewed · ${assigned} members assigned`,
-    retry: 'Retry enrollment', retrying: 'Retrying…', retryError: 'Enrollment could not be restarted.',
+    retry: 'Try again', retrying: 'Trying again…', retryError: 'Team signups could not be restarted. Try again, or contact a Coach.',
   },
   title: 'New event',
   description: 'Set up a competition, outreach event, team activity or fundraiser.',
@@ -40,7 +40,7 @@ export const eventCopy = {
     coachOnly: 'Only a Coach can add the Travel Team or Whole Team automatically. Use Open Registration so students can sign up.',
   },
   notes: {
-    fee: 'Charged when a signup is confirmed.',
+    fee: 'The fee is added when a signup is confirmed.',
     /** Event page Travel section for an at-our-shop event (no longer shown in New event, which asks Where once). */
     onsite: 'On-site events happen at the DSHS STEM Center, so there is no transportation or overnight stay to plan.',
     requiredPayment: 'Required payment is tracked because this event has a fee.',

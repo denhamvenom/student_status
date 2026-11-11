@@ -83,7 +83,7 @@ export type MentorMeetingFields = {
  */
 export function mentorMeetingLimitError(fields: MentorMeetingFields): string | null {
   if (fields.type !== "Team") return "Mentors can create Team meetings only.";
-  if (fields.audienceKind === undefined) return "Choose who the meeting is for: Everyone, Subteams, specific students or Mentors only.";
+  if (fields.audienceKind === undefined) return "Choose who the meeting is for: Whole team, Subteams, specific students or Mentors only.";
   if (fields.mandatory === true || fields.assignmentScope !== undefined || (fields.signupMode === "assigned" && fields.audienceKind !== "mentorsOnly")) return "Mentors can't create required meetings. Ask a Coach to make a meeting required.";
   if (fields.signupMode === "approval") return "Mentors can't create meetings that need approval. Choose open signup.";
   if (fields.feeCents !== 0) return "Mentors can't add fees to a meeting. Ask a Coach.";
@@ -296,7 +296,7 @@ export function requireAnswers(event: QuestionFields, answers: MentorAnswers): M
 /** One-line audience description shown to Mentors. */
 export function audienceSummary(event: Doc<"events">): { kind: "everyone" | "subteams" | "students" | "mentorsOnly"; subteams: string[]; required: boolean; text: string } {
   const audience = resolveAudience(event);
-  const text = audience.kind === "everyone" ? "Everyone" : audience.kind === "subteams" ? `Subteams: ${audience.subteams.map(canonicalSubteam).join(", ") || "none chosen"}` : audience.kind === "students" ? "Specific students" : "Mentors only";
+  const text = audience.kind === "everyone" ? "Whole team" : audience.kind === "subteams" ? `Subteams: ${audience.subteams.map(canonicalSubteam).join(", ") || "none chosen"}` : audience.kind === "students" ? "Specific students" : "Mentors only";
   return { kind: audience.kind, subteams: audience.subteams.map(canonicalSubteam), required: audience.mandatory, text: audience.mandatory ? `${text} (required)` : text };
 }
 

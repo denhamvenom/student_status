@@ -25,6 +25,10 @@ vi.mock('convex/react', () => ({
   useConvex: () => ({query: vi.fn()}),
 }))
 
+vi.mock('@convex-dev/auth/react', () => ({
+  useAuthActions: () => ({signIn: vi.fn(), signOut: vi.fn()}),
+}))
+
 beforeEach(() => { mock.queries = {}; mock.pages = {} })
 
 const html = (element: ReturnType<typeof createElement>) => renderToStaticMarkup(element)
@@ -39,9 +43,9 @@ describe('synthetic review states', () => {
     }
     const view = html(createElement(FinanceOperations,{studentId}))
     expect(view).toContain('Needs Coach review')
-    expect(view).toContain('Amount already saved: $1.00 of $2.00')
+    expect(view).toContain('Saved so far: $1.00 of $2.00')
     expect(view).toContain('The rest is still waiting to finish')
-    expect(view).toContain('Retry remaining work')
+    expect(view).toContain('Try again')
     expect(view).toContain('Synthetic processing stopped')
   })
 
@@ -49,9 +53,9 @@ describe('synthetic review states', () => {
     mock.queries['withdrawals:withdrawalPreview'] = {status:'confirmed',allowWithdrawal:true,requestStatus:'processing',eventName:'Synthetic event',progress:{jobId:'synthetic-job',state:'failed',committedCents:100,totalCents:200,lastError:'Synthetic return failed'}}
     const view = html(createElement(StudentWithdrawal,{eventId,studentId}))
     expect(view).toContain('Needs Coach review')
-    expect(view).toContain('Returned to travel accounts: $1.00 of $2.00')
-    expect(view).toContain('Participation and room placement remain unchanged')
-    expect(view).not.toContain('Retry remaining withdrawal work')
+    expect(view).toContain('Moved to Available funds: $1.00 of $2.00')
+    expect(view).toContain('Your place and room stay the same')
+    expect(view).not.toContain('Try again')
   })
 
   it('offers a guarded retry to a Coach when withdrawal processing fails', () => {
@@ -61,15 +65,15 @@ describe('synthetic review states', () => {
       'withdrawals:withdrawalPreview': {studentName:'Synthetic student',eventName:'Synthetic event',requestStatus:'processing',canRetry:true,progress:{jobId:'synthetic-job',state:'failed',committedCents:100,totalCents:200,lastError:'Synthetic return failed'}},
     }
     const view = html(createElement(WithdrawalQueue))
-    expect(view).toContain('Retry remaining withdrawal work')
-    expect(view).toContain('Reason for retry (at least 8 characters)')
-    expect(view).toMatch(/<button[^>]*disabled[^>]*>Retry remaining withdrawal work<\/button>/)
+    expect(view).toContain('Try again')
+    expect(view).toContain('Reason for trying again (at least 8 characters)')
+    expect(view).toMatch(/<button[^>]*disabled[^>]*>Try again<\/button>/)
   })
 
   it('shows failed attendance recalculation with an available retry action', () => {
     mock.queries['attendanceReportMaintenance:status'] = {state:'failed',processed:3,lastError:'Synthetic attendance job stopped'}
     const view = html(createElement(AttendanceReportRebuild))
-    expect(view).toContain('Attendance needs review. Sessions checked: 3')
+    expect(view).toContain('Attendance needs review. Meetings checked: 3')
     expect(view).toContain('Synthetic attendance job stopped')
     expect(view).toContain('Recalculate attendance')
   })
@@ -88,13 +92,13 @@ describe('synthetic review states', () => {
     expect(view).toContain(state==='held'?'Some amounts need Coach review':'Posting stopped; a Coach needs to review it')
     expect(view).toContain('1 saved · 1 need review · 2 checked')
     expect(view).toContain(state==='held'?'Amounts on hold have not changed':'Remaining rows have not been posted yet')
-    expect(view).toContain('Retry remaining rows')
-    expect(view).toContain('Reason for retry')
+    expect(view).toContain('Try remaining rows again')
+    expect(view).toContain('Reason for trying again')
   })
 
   it('keeps sign-out and individual invitation entry available on Join and Waiting', () => {
     for (const submitted of [false,true]) {
-      const view = html(createElement(PendingJoinView,{submitted,busy:false,signOutError:'',onSignOut:vi.fn(),children:createElement('p',null,'Synthetic join form')}))
+      const view = html(createElement(PendingJoinView,{submitted,children:createElement('p',null,'Synthetic join form')}))
       expect(view).toContain(submitted?'Waiting':'Join the team')
       expect(view).toContain('Sign out')
       expect(view).toContain('Google account')

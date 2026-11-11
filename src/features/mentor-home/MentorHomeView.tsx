@@ -2,6 +2,7 @@ import { useId, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { ArrowRight, Pin, X } from 'lucide-react'
 import { cn } from 'cn'
+import { AskCoachButton } from '@/AskCoachButton'
 import { DashboardTile } from '@/components/dashboard/DashboardTile'
 import { StatusBadge } from '@/components/dashboard/StatusBadge'
 import { TileError, TileErrorBoundary } from '@/components/dashboard/TileErrorBoundary'
@@ -91,12 +92,10 @@ function ComingUp({ rows }: { rows: ReturnType<typeof homeView>['comingUp'] }) {
   </DashboardTile>
 }
 
-/** One tile: "12 events you could help with →", opening Schedule › Join. Hidden when there is nothing to join. */
-function HelpTile({ count }: { count: number }) {
+/** A small link: "12 events you could help with", opening Schedule › Join. Hidden when there is nothing to join. */
+function HelpLink({ count }: { count: number }) {
   if (count <= 0) return null
-  return <Link to="/invited#join" className={cn('flex min-h-12 items-center justify-between gap-3 rounded-[14px] border border-vs-border-subtle bg-vs-compact px-4 py-3 text-[15px] font-semibold text-vs-text! no-underline! shadow-vs-compact hover:brightness-95 dark:hover:brightness-125', focusRing)}>
-    <span>{copy.helpTile(count)}</span><ArrowRight size={18} aria-hidden="true" className="shrink-0 text-vs-accent-text" />
-  </Link>
+  return <Link to="/invited#join" className="inline-flex min-h-11 items-center gap-1 self-start text-[13px] font-semibold">{copy.helpTile(count)}<ArrowRight size={14} aria-hidden="true" /></Link>
 }
 
 export type MentorHomeBlocksProps = {
@@ -105,13 +104,15 @@ export type MentorHomeBlocksProps = {
   data: MentorHomeData | Error | undefined
   handlers: MentorHomeHandlers
   here: HereState
+  /** The sign-in email, passed to Ask a Coach so a reply reaches the Mentor. */
+  email?: string
 }
 
 /**
  * The Mentor Home blocks, in order: Next event, Who's here now, Needs your answer (only when something waits), Coming up (the
  * next three) and the events-you-could-help-with tile. Shared by Mentor Home and the Travel Lead's My schedule.
  */
-export function MentorHomeBlocks({ now, data, handlers, here }: MentorHomeBlocksProps) {
+export function MentorHomeBlocks({ now, data, handlers, here }: Omit<MentorHomeBlocksProps, 'email'>) {
   const loading = data === undefined
   const failed = data instanceof Error
   const view = loading || failed ? null : homeView(data, now)
@@ -124,7 +125,7 @@ export function MentorHomeBlocks({ now, data, handlers, here }: MentorHomeBlocks
     <TileErrorBoundary title={copy.here.title} message={copy.states.failed(copy.here.title)} retryLabel={copy.states.tryAgain} onRetry={here.retry}><WhoIsHere data={here.data} onRetry={here.retry} /></TileErrorBoundary>
     {view && guard(copy.answer.title, <NeedsAnswer items={view.needsAnswer} actions={handlers} />)}
     {view && guard(copy.comingUp.title, <ComingUp rows={view.comingUp} />)}
-    {view && <HelpTile count={view.joinCount} />}
+    {view && <HelpLink count={view.joinCount} />}
     {!loading && !failed && data.truncated && <p className="m-0 text-[13px] text-vs-muted">{copy.states.truncated}</p>}
   </>
 }
@@ -139,10 +140,11 @@ export type MentorHomeViewProps = MentorHomeBlocksProps & {
  * Mentor Home, phone first: an optional pinned-announcement banner, the date and greeting, then the Home blocks. Tablet and
  * desktop keep the same single column, at most 720px wide.
  */
-export function MentorHomeView({ name, banner, ...blocks }: MentorHomeViewProps) {
+export function MentorHomeView({ name, banner, email, ...blocks }: MentorHomeViewProps) {
   return <div className="flex min-w-0 flex-col gap-3 pb-24 font-sans text-vs-text md:mx-auto md:w-full md:max-w-[720px] lg:pb-6">
     {banner}
     <h1 className="m-0! font-sans! text-[14px]! leading-normal! font-semibold! text-vs-text-2">{copy.greeting(formatShortDate(blocks.now), name)}</h1>
     <MentorHomeBlocks {...blocks} />
+    <div className="flex flex-wrap items-center gap-2 pt-1 text-[13px] text-vs-muted"><span>{copy.askCoach}</span><AskCoachButton email={email} /></div>
   </div>
 }

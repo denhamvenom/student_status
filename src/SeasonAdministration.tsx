@@ -3,9 +3,10 @@ import { useRef, useState, type FormEvent } from 'react'
 import { useMutation, usePaginatedQuery, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
 import type { Id } from '../convex/_generated/dataModel'
+import { ConfirmAction } from './ConfirmAction'
 import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
-import { seasonAdminCopy as copy } from './lib/season-admin-copy'
+import { seasonAdminCopy as copy, subteamLabel } from './lib/season-admin-copy'
 import styles from './SeasonAdministration.module.css'
 import { SeasonReviewSteps, SeasonTransitionProgress, SeasonHistory } from './SeasonReviewSteps'
 
@@ -13,7 +14,7 @@ type Plan = { id: Id<'seasonTransitionPlans'>; targetName: string; targetCompeti
 const message = (error: unknown) => userFacingError(error, copy.retry)
 const steps = [copy.newSeason, copy.returningStudents, copy.archiveDeparting, copy.balances, copy.retainReset, copy.confirm]
 
-function DraftForm({plan, sourceYear}: {plan: Plan | null; sourceYear: number}) {
+function DraftForm({plan, sourceYear, onSaved, onDiscarded}: {plan: Plan | null; sourceYear: number; onSaved: () => void; onDiscarded: () => void}) {
   const create = useMutation(api.seasonAdmin.createDraft)
   const update = useMutation(api.seasonAdmin.updateDraft)
   const discard = useMutation(api.seasonAdmin.discardDraft)
@@ -44,13 +45,14 @@ function DraftForm({plan, sourceYear}: {plan: Plan | null; sourceYear: number}) 
         setBaseRevision(revision)
       } else await create({ ...values, idempotencyKey: key.current })
       setSaved(copy.saved)
+      onSaved()
     } catch (cause) { setError(message(cause)) } finally { setBusy(false) }
   }
   const remove = async () => {
     if (!plan || busy || stale) return
     setBusy(true); setError(''); setSaved('')
-    try { await discard({ planId: plan.id, expectedRevision: baseRevision ?? plan.revision, reason: discardReason }); key.current = crypto.randomUUID() }
-    catch (cause) { setError(message(cause)) } finally { setBusy(false) }
+    try { await discard({ planId: plan.id, expectedRevision: baseRevision ?? plan.revision, reason: discardReason }); key.current = crypto.randomUUID(); onDiscarded() }
+    finally { setBusy(false) }
   }
   return <form className={styles.section} onSubmit={event => void submit(event)}>
     <h2>{copy.newSeason}</h2>
@@ -64,8 +66,8 @@ function DraftForm({plan, sourceYear}: {plan: Plan | null; sourceYear: number}) 
     {plan && <label className={styles.field}>{copy.discardReason}<Input value={discardReason} onChange={event => setDiscardReason(event.target.value)} maxLength={500} disabled={busy || stale} /></label>}
     {error && <p className={styles.error} role="alert">{error}</p>}{saved && <p role="status">{saved}</p>}
     <div className={styles.actions}>
-      {plan && <Button type="button" variant="outline" disabled={busy || stale || discardReason.trim().length < 8} onClick={() => void remove()}>{copy.discardDraft}</Button>}
-      <Button type="submit" disabled={busy || stale || !name.trim() || !year || !startDate || !endDate}>{plan ? copy.saveDraft : copy.createDraft}</Button>
+      {plan && <ConfirmAction title="Discard this season draft?" disabled={busy || stale || discardReason.trim().length < 8} description={copy.discardConfirm(discardReason)} onConfirm={remove}>{copy.discardDraft}</ConfirmAction>}
+      <Button type="submit" disabled={busy || stale || !name.trim() || !year || !startDate || !endDate}>{plan ? copy.saveAndContinue : copy.createDraft}</Button>
     </div>
   </form>
 }
@@ -108,8 +110,9 @@ function RosterReview({ plan }: { plan: Plan }) {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [savedId, setSavedId] = useState<string | null>(null)
+  const [bulkBusy, setBulkBusy] = useState(false)
   const pick = async (row: typeof rows.results[number], choice: 'return' | 'depart' | null) => {
-    if (busyId) return
+    if (busyId || bulkBusy) return
     setBusyId(row.studentId); setError(''); setSavedId(null)
     try {
       await save({ planId: plan.id, studentId: row.studentId, choice, expectedPlanRevision: plan.revision,
@@ -117,15 +120,35 @@ function RosterReview({ plan }: { plan: Plan }) {
       setSavedId(row.studentId)
     } catch (cause) { setError(message(cause)) } finally { setBusyId(null) }
   }
+  const [bulk, setBulk] = useState('')
+  const markAll = async () => {
+    if (busyId || bulkBusy) return
+    const targets = rows.results.filter(row => row.choice !== 'return')
+    if (targets.length === 0) { setBulk(copy.markAllNone); return }
+    setBulkBusy(true); setError(''); setSavedId(null)
+    let revision = plan.revision
+    let done = 0
+    try {
+      for (const row of targets) {
+        setBulk(copy.markAllProgress(done + 1, targets.length))
+        const result = await save({ planId: plan.id, studentId: row.studentId, choice: 'return', expectedPlanRevision: revision,
+          expectedStudentFingerprint: row.studentFingerprint, expectedDecisionRevision: row.decisionRevision })
+        revision = result.planRevision; done += 1
+      }
+      setBulk(copy.markAllDone(done))
+    } catch (cause) { setBulk(''); setError(copy.markAllStopped(done, targets.length, message(cause))) } finally { setBulkBusy(false) }
+  }
   return <section className={styles.section} aria-labelledby="season-returning-title">
-    <h2 id="season-returning-title">{copy.returningStudents}</h2><p className={styles.muted}>{copy.rosterDescription}</p>
+    <h2 id="season-returning-title">{copy.returningStudents}</h2><p className={styles.muted}>{copy.rosterDescription} {copy.choicesSaveAsYouGo}</p>
     {rows.status === 'LoadingFirstPage' && <p role="status">{copy.loadingRoster}</p>}
+    {rows.results.length > 0 && <div className={styles.choices}><Button type="button" variant="outline" disabled={busyId !== null || bulkBusy} onClick={() => void markAll()}>{copy.markAllReturning}</Button><p className={styles.muted}>{copy.markAllHelp}</p></div>}
+    {bulk && <p role="status">{bulk}</p>}
     {rows.results.length > 0 && <div className={styles.roster}>{rows.results.map(row => <article className={styles.student} key={row.studentId}>
-      <div><strong>{row.legalName || row.preferredName}</strong><small>{row.subteam}</small>{row.decisionStale && <small className={styles.error}>{copy.staleDecision}</small>}</div>
+      <div><strong>{row.legalName || row.preferredName}</strong><small>{subteamLabel(row.subteam)}</small>{row.decisionStale && <small className={styles.error}>{copy.staleDecision}</small>}</div>
       <div className={styles.choices} role="group" aria-label={`${row.legalName || row.preferredName} season decision`}>
-        <Button type="button" variant={row.choice === 'return' ? 'default' : 'outline'} aria-pressed={row.choice === 'return'} disabled={busyId !== null} onClick={() => void pick(row, 'return')}>{copy.returning}</Button>
-        <Button type="button" variant={row.choice === 'depart' ? 'default' : 'outline'} aria-pressed={row.choice === 'depart'} disabled={busyId !== null} onClick={() => void pick(row, 'depart')}>{copy.departing}</Button>
-        <Button type="button" variant={row.choice === null ? 'default' : 'outline'} aria-pressed={row.choice === null} disabled={busyId !== null} onClick={() => void pick(row, null)}>{copy.undecided}</Button>
+        <Button type="button" variant={row.choice === 'return' ? 'default' : 'outline'} aria-pressed={row.choice === 'return'} disabled={busyId !== null || bulkBusy} onClick={() => void pick(row, 'return')}>{copy.returning}</Button>
+        <Button type="button" variant={row.choice === 'depart' ? 'default' : 'outline'} aria-pressed={row.choice === 'depart'} disabled={busyId !== null || bulkBusy} onClick={() => void pick(row, 'depart')}>{copy.departing}</Button>
+        <Button type="button" variant={row.choice === null ? 'default' : 'outline'} aria-pressed={row.choice === null} disabled={busyId !== null || bulkBusy} onClick={() => void pick(row, null)}>{copy.undecided}</Button>
       </div>{savedId === row.studentId && <small role="status">{copy.saved}</small>}
     </article>)}</div>}
     {rows.status === 'Exhausted' && rows.results.length === 0 && <p>{copy.noStudents}</p>}
@@ -137,25 +160,38 @@ function RosterReview({ plan }: { plan: Plan }) {
 /** Six-step Coach season transition. */
 export function SeasonAdministration() {
   const [step, setStep] = useState(0)
+  const [furthest, setFurthest] = useState(0)
+  const [focus, setFocus] = useState<Id<'students'> | null>(null)
   const completedSource = useRef<string | null>(null)
   const view = useQuery(api.seasonAdmin.overview, {})
   if (view === undefined) return <p role="status">{copy.loading}</p>
   const plan = view.plan as Plan | null
   if (plan && plan.state !== "draft") completedSource.current = view.source.id
   const completed = completedSource.current !== null && completedSource.current !== view.source.id
+  const goTo = (next: number, studentId?: Id<'students'>) => { setFocus(studentId ?? null); setStep(next); setFurthest(current => Math.max(current, next)) }
+  const isDraft = plan?.state === 'draft'
+  const finished = steps.map((label, index) => ({ label, index })).filter(item => item.index < furthest && item.index !== step)
   return <div className={styles.page}>
     {completed && <p role="status">Season transition complete. {view.source.name} is now active; historical records remain preserved.</p>}
     <header className={styles.heading}><h1>{copy.title}</h1><p>{copy.description}</p></header>
     <BuildHoursTarget key={view.source.id} current={view.source.buildHoursTarget} />
     <p className={styles.notice}>Save each choice before you confirm. Old records stay with the season they came from.</p>
-    <nav className={styles.steps} aria-label="Season transition steps">{steps.map((label, index) => <Button key={label} type="button" variant={step === index ? 'default' : 'outline'} disabled={!plan && index > 0 || !!plan && plan.state !== 'draft'} onClick={() => setStep(index)}>{index + 1}. {label}</Button>)}</nav>
     <p className={styles.muted}>{copy.activeSeason}: {view.source.name}</p>
-    {step === 0 && (!plan || plan.state === 'draft') && <DraftForm key={plan?.id ?? 'new'} plan={plan} sourceYear={view.source.year} />}
+    {(!plan || isDraft) && <div role="group" aria-label={copy.stepsLabel} className={styles.section}>
+      <ol aria-hidden="true" className={styles.progress}>{steps.map((label, index) => <li key={label} data-done={index <= step} />)}</ol>
+      <p className={styles.stepLabel}>{copy.stepOf(step + 1, steps.length)}: {steps[step]}</p>
+      {isDraft && finished.length > 0 && <nav aria-label={copy.doneSteps} className={styles.choices}>{finished.map(item => <Button key={item.label} type="button" variant="outline" onClick={() => goTo(item.index)}>{item.index + 1}. {item.label}</Button>)}</nav>}
+    </div>}
+    {step === 0 && (!plan || isDraft) && <DraftForm key={plan?.id ?? 'new'} plan={plan} sourceYear={view.source.year} onSaved={() => goTo(1)} onDiscarded={() => { setStep(0); setFurthest(0) }} />}
     {view.kickoff?.state === 'verified' && <p>{copy.verifiedKickoff(view.kickoff.kickoffDate)}</p>}
     {view.kickoff?.state === 'unavailable' && <p className={styles.notice}>{copy.unverifiedKickoff}</p>}
-    {plan?.state === 'draft' && step === 1 && <RosterReview plan={plan} />}
-    {plan?.state === 'draft' && step >= 2 && <SeasonReviewSteps plan={plan} step={step} />}
-    {plan && plan.state !== 'draft' && <SeasonTransitionProgress plan={plan} onReview={setStep} />}
+    {isDraft && step === 1 && <RosterReview plan={plan} />}
+    {isDraft && step >= 2 && <SeasonReviewSteps key={`${step}:${focus ?? ''}`} plan={plan} step={step} focusStudentId={focus} onFix={goTo} onContinue={() => goTo(step + 1)} />}
+    {isDraft && step >= 1 && <div className={styles.wizardNav}>
+      <Button type="button" variant="outline" onClick={() => goTo(step - 1)}>{copy.back}</Button>
+      {step <= 3 && <Button type="button" onClick={() => goTo(step + 1)}>{copy.continue}</Button>}
+    </div>}
+    {plan && plan.state !== 'draft' && <SeasonTransitionProgress plan={plan} onReview={goTo} />}
     <SeasonHistory />
   </div>
 }

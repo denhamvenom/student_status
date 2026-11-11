@@ -13,3 +13,6 @@
 .selectorBar{width:min(100%,760px);display:grid;gap:12px;margin:20px auto;padding:0 16px}.selectorBar>.card{box-shadow:none}
 .firstActions{display:flex;flex-wrap:wrap;gap:10px}.firstActions a,.firstActions button{min-height:44px;max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:center}.section button{max-width:100%;white-space:normal;overflow-wrap:anywhere}.summary{display:grid;gap:10px}.summary p{margin:0}
 @media(max-width:640px){.page{padding:20px 12px 56px}.card{padding:18px}.fields{grid-template-columns:1fr}.actions{align-items:stretch}.actions button{flex:1 1 140px}.spacer{display:none}.stepHead h2{font-size:24px}}
+.embeddedTitle{margin:0;font-size:20px}.reviewHead{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}.summaryList{display:grid;gap:10px;margin:0}.summaryList div{display:grid;gap:2px;min-width:0}.summaryList dt{color:var(--text-muted);font-size:13px;font-weight:700}.summaryList dd{margin:0;overflow-wrap:anywhere}
+
+.choices{display:grid;gap:8px}.choice{display:flex;align-items:center;gap:12px;min-height:44px;padding:8px 12px;border:1px solid var(--border-default);border-radius:6px;background:var(--surface-card);cursor:pointer}.choice input{width:20px;height:20px;flex:none}.choice:has(input:checked){border-color:var(--purple-700);background:var(--purple-100)}

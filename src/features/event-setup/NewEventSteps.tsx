@@ -22,7 +22,7 @@ type Invalid = { field: string | null; message: string }
 
 /** Skip always either advances (nothing to discard) or opens the in-app confirm that names how many unfinished items go. */
 export function SkipButton({ onSkip, skipCount }: { onSkip: () => void; skipCount: number }) {
-  return <div>{skipCount > 0 ? <ConfirmAction description={copy.skipConfirm(skipCount)} onConfirm={async () => onSkip()}>{copy.skip}</ConfirmAction> : <Button type="button" variant="outline" onClick={onSkip}>{copy.skip}</Button>}</div>
+  return <div>{skipCount > 0 ? <ConfirmAction title={copy.skipConfirmTitle} description={copy.skipConfirm(skipCount)} onConfirm={async () => onSkip()}>{copy.skip}</ConfirmAction> : <Button type="button" variant="outline" onClick={onSkip}>{copy.skip}</Button>}</div>
 }
 
 /** Time slots: generate several back-to-back slots, add or remove single ones, and set how many a student picks. Nothing is saved until Create event. */
@@ -157,11 +157,15 @@ export function RequirementsStep({ requirements, onRequirements, invalid, onSkip
     {requirements.map((r, i) => {
       const fieldId = `new-event-requirement-${r.id}`, bad = invalid.field === fieldId, name = r.label || copy.requirementItem(i + 1)
       return <section key={r.id} className={styles.panel} aria-label={copy.requirementItem(i + 1)}>
+        <fieldset className={styles.options}>
+          <legend>{copy.requirementKind}</legend>
+          {(['checkoff', 'info'] as const).map(k => <label key={k}><input type="radio" name={`new-event-requirement-kind-${r.id}`} checked={(r.kind ?? 'checkoff') === k} onChange={() => change(r.id, k === 'info' ? { kind: k, dueAt: '' } : { kind: k })} /> {k === 'info' ? copy.requirementKindInfo : copy.requirementKindCheckoff}<span className="open-text"> {k === 'info' ? copy.requirementKindInfoHint : copy.requirementKindCheckoffHint}</span></label>)}
+        </fieldset>
         <label>{copy.requirementName}<Input id={fieldId} aria-invalid={bad} aria-describedby={bad ? `${fieldId}-error` : undefined} value={r.label} maxLength={100} placeholder={copy.requirementNamePlaceholder} onChange={e => change(r.id, { label: e.target.value })} /></label>
         <label>{copy.requirementInstructions}<Input value={r.instructions} maxLength={1000} onChange={e => change(r.id, { instructions: e.target.value })} /></label>
         <div className={styles.fields}>
           <label>{copy.requirementLink}<Input type="url" inputMode="url" value={r.url} maxLength={500} onChange={e => change(r.id, { url: e.target.value })} /></label>
-          <label>{copy.requirementDueLabel}<Input type="datetime-local" min={dateTimeBounds.min} max={dateTimeBounds.max} value={r.dueAt} onChange={e => change(r.id, { dueAt: e.target.value })} /></label>
+          {r.kind !== 'info' && <label>{copy.requirementDueLabel}<Input type="datetime-local" min={dateTimeBounds.min} max={dateTimeBounds.max} value={r.dueAt} onChange={e => change(r.id, { dueAt: e.target.value })} /></label>}
         </div>
         {bad && <p id={`${fieldId}-error`} className="open-text">{invalid.message}</p>}
         <div className={styles.formActions}><Button type="button" variant="outline" aria-label={copy.removeItem(name)} onClick={() => onRequirements(requirements.filter(x => x.id !== r.id))}>{copy.remove}</Button></div>

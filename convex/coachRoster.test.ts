@@ -148,6 +148,35 @@ describe("Coach student roster and record",()=>{
     expect(invalidSource).toMatchObject({ state: "failed", chargedCents: null, personalAppliedCents: null, fundraisingAppliedCents: null, dueCents: null, personalAvailableCents: null, fundraisingAvailableCents: null, updatedAt: null, canRecord: false });
     expect((await f.coach.query(detail, { studentId: f.ids.student, asOf: 100 })).balance).toEqual(invalidRoster.balance);
   });
+  it("shows the permission form for the next event that has one only while signing is open",async()=>{
+    const f=await fixture();
+    const eventId=await f.t.run(async ctx=>{
+      const id=await ctx.db.insert("events",{seasonId:f.ids.season,name:"Synthetic trip",type:"Competition",startsAt:300,endsAt:301,destination:"Synthetic",travel:"Bus",overnight:false,roomingEnabled:false,feeCents:0,signupMode:"assigned",allowWithdrawal:false,permissionRequired:true,firstRequired:false,archived:false});
+      await ctx.db.insert("participants",{eventId:id,studentId:f.ids.student,status:"confirmed",createdAt:1,updatedAt:1});
+      return id;
+    });
+    const permission=async()=>(await f.coach.query(list,page)).page[0].permission;
+    expect(await permission()).toEqual({state:"closed",eventName:null});
+    await f.t.run(ctx=>ctx.db.patch(f.ids.season,{permissionSigningPaused:false}));
+    expect(await permission()).toEqual({state:"notSigned",eventName:"Synthetic trip"});
+    await f.t.run(ctx=>ctx.db.insert("permissionCoverage",{seasonId:f.ids.season,studentId:f.ids.student,eventId,state:"pending",revision:1,updatedAt:1,updatedBy:f.ids.coach}));
+    expect(await permission()).toEqual({state:"review",eventName:"Synthetic trip"});
+    await f.t.run(ctx=>ctx.db.patch(f.ids.student,{active:false}));
+    expect((await f.coach.query(list,{...page,active:false})).page[0].permission).toEqual({state:"noForm",eventName:null});
+    await expect(f.t.query(list,page)).rejects.toThrow();
+  });
+  it("skips canceled events when choosing a student's next event",async()=>{
+    const f=await fixture();
+    const fields={seasonId:f.ids.season,type:"Team" as const,endsAt:401,destination:"Synthetic",travel:"None",overnight:false,roomingEnabled:false,feeCents:0,signupMode:"assigned" as const,allowWithdrawal:false,permissionRequired:false,firstRequired:false,archived:false};
+    await f.t.run(async ctx=>{
+      const canceled=await ctx.db.insert("events",{...fields,name:"Canceled meeting",startsAt:200,cancelled:true});
+      const real=await ctx.db.insert("events",{...fields,name:"Real meeting",startsAt:300});
+      for(const id of [canceled,real])await ctx.db.insert("participants",{eventId:id,studentId:f.ids.student,status:"confirmed",createdAt:1,updatedAt:1});
+    });
+    const row=(await f.coach.query(list,page)).page[0];
+    expect(row.nextEvent?.name).toBe("Real meeting");
+    expect(row.nextEvent?.participation).toBe("confirmed");
+  });
   it("marks pending Whole Team enrollment and truncated event coverage unknown",async()=>{
     const f=await fixture();
     const eventFields={seasonId:f.ids.season,type:"Team" as const,endsAt:202, destination:"Synthetic",travel:"None",overnight:false,roomingEnabled:false,feeCents:0,signupMode:"assigned" as const,assignmentScope:"wholeTeam" as const,wholeTeamParticipantCount:0,enrollmentState:"running" as const,allowWithdrawal:false,permissionRequired:false,firstRequired:false,archived:false};

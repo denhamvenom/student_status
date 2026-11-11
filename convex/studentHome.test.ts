@@ -352,7 +352,8 @@ describe("Student Home summary", () => {
     const custom = await f.event({ name: "Custom requirement", firstRequired: true });
     const competition = await f.event({ name: "Competition", type: "Competition" });
     const approval = await f.event({ name: "Approval event", signupMode: "approval" });
-    for (const id of [payment, form, review, custom, competition]) await f.join(id, f.ids.riley, "confirmed");
+    const shifts = await f.event({ name: "Shift event", shiftsEnabled: true, minShiftsPerStudent: 2 });
+    for (const id of [payment, form, review, custom, competition, shifts]) await f.join(id, f.ids.riley, "confirmed");
     await f.join(approval, f.ids.riley, "pending");
     await f.t.run(async ctx => {
       await ctx.db.insert("charges", { eventId: payment, studentId: f.ids.riley, label: "Synthetic fee", amountCents: 2500, appliedCents: 0, priority: 1, createdBy: f.ids.coach, createdAt: 1 });
@@ -360,6 +361,12 @@ describe("Student Home summary", () => {
       await ctx.db.insert("requirements", { eventId: custom, key: "packing", label: "Packing list", dueAt });
       await ctx.db.insert("requirements", { eventId: custom, key: "done", label: "Already done" });
       await ctx.db.insert("requirementCompletions", { eventId: custom, studentId: f.ids.riley, key: "done", completedBy: f.ids.coach, completedAt: 1 });
+      // Something to know is a note only: never a What's left item.
+      await ctx.db.insert("requirements", { eventId: custom, key: "shirt", label: "Wear team shirt", kind: "info" });
+      // One shift of a minimum of two is not enough.
+      const first = await ctx.db.insert("eventShifts", { eventId: shifts, startsAt: START, endsAt: START + HOUR });
+      await ctx.db.insert("eventShifts", { eventId: shifts, startsAt: START + HOUR, endsAt: START + 2 * HOUR });
+      await ctx.db.insert("shiftSignups", { eventId: shifts, shiftId: first, studentId: f.ids.riley, createdAt: 1 });
     });
     const shape = (home: Awaited<ReturnType<typeof summary>>) => home.whatsLeft.map(item => [item.key, item.kind, item.owner, item.label, item.dueAt, item.href]);
     expect(shape(await summary(f.riley))).toEqual([
@@ -369,11 +376,12 @@ describe("Student Home summary", () => {
       [`requirement:${custom}:first`, "requirement", "student", "FIRST registration", START, `/events/${custom}`],
       [`requirement:${custom}:packing`, "requirement", "student", "Packing list", dueAt, `/events/${custom}`],
       [`signupApproval:${approval}`, "signupApproval", "coach", null, START, null],
+      [`shifts:${shifts}`, "requirement", "student", "Pick your shifts", START, `/events/${shifts}#my-signup`],
     ]);
     // Records being updated add one quiet Coach item per confirmed event, never duplicates.
     await f.t.run(async ctx => { const account = await ctx.db.query("financialAccounts").withIndex("by_studentId", q => q.eq("studentId", f.ids.riley)).unique(); await ctx.db.patch(account!._id, { state: "rebuilding" }); });
     const updating = await summary(f.riley);
-    expect(updating.whatsLeft.filter(item => item.kind === "staffReview").map(item => [item.key, item.owner])).toEqual([payment, form, review, custom, competition].map(id => [`staffReview:${id}`, "coach"]));
+    expect(updating.whatsLeft.filter(item => item.kind === "staffReview").map(item => [item.key, item.owner])).toEqual([payment, form, review, custom, competition, shifts].map(id => [`staffReview:${id}`, "coach"]));
     expect(new Set(updating.whatsLeft.map(item => item.key)).size).toBe(updating.whatsLeft.length);
   });
 
@@ -472,5 +480,33 @@ describe("signup availability", () => {
       return ctx.db.insert("events", { seasonId, name: "Last season's event", type: "Team", startsAt: START, endsAt: START + HOUR, destination: "Synthetic venue", travel: "Bus", overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "open", allowWithdrawal: true, permissionRequired: false, firstRequired: false, archived: false });
     });
     for (const eventId of [removed, earlier]) await expect(f.riley.query(api.participation.signupAvailability, { eventId })).rejects.toThrow("no longer available");
+  });
+});
+
+// November 10 owner decisions: Something to know never counts; fewer shifts than the minimum keeps a student from being ready.
+describe("event readiness for one student", () => {
+  it("ignores Something to know and counts shifts against the event minimum", async () => {
+    const f = await fixture();
+    await settle(f, f.ids.riley);
+    const readiness = async (eventId: Id<"events">) => (await f.riley.query(api.app.eventDetail, { eventId, studentId: f.ids.riley })).readiness;
+    const info = await f.event({ name: "Info only" });
+    const shiftEvent = await f.event({ name: "Pancake breakfast", shiftsEnabled: true, minShiftsPerStudent: 1 });
+    const optional = await f.event({ name: "Optional shifts", shiftsEnabled: true, minShiftsPerStudent: 0 });
+    for (const id of [info, shiftEvent, optional]) await f.join(id, f.ids.riley, "confirmed");
+    const shiftIds = await f.t.run(async ctx => {
+      await ctx.db.insert("requirements", { eventId: info, key: "shirt", label: "Wear team shirt", kind: "info" });
+      const ids = [];
+      for (const eventId of [shiftEvent, optional]) ids.push(await ctx.db.insert("eventShifts", { eventId, startsAt: START, endsAt: START + HOUR }));
+      return ids;
+    });
+    expect(await readiness(info)).toMatchObject({ state: "ready", open: [] });
+    expect(await readiness(shiftEvent)).toMatchObject({ state: "open", open: ["Shifts"] });
+    expect(await readiness(optional)).toMatchObject({ state: "ready", open: [] });
+    await f.t.run(ctx => ctx.db.insert("shiftSignups", { eventId: shiftEvent, shiftId: shiftIds[0], studentId: f.ids.riley, createdAt: 1 }));
+    expect(await readiness(shiftEvent)).toMatchObject({ state: "ready", open: [] });
+    // A removed shift no longer counts toward the minimum.
+    await f.t.run(ctx => ctx.db.patch(shiftIds[0], { archived: true }));
+    await f.t.run(ctx => ctx.db.insert("eventShifts", { eventId: shiftEvent, startsAt: START + HOUR, endsAt: START + 2 * HOUR }));
+    expect(await readiness(shiftEvent)).toMatchObject({ state: "open", open: ["Shifts"] });
   });
 });

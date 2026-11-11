@@ -30,6 +30,9 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
       return userId ? { userId } : null;
     },
   }), Google({
+    // Always show Google's account chooser, so someone signed in to the wrong Google account can pick another one
+    // instead of Google silently reusing it. Applies to every `signIn("google")` path (sign-in, invitations, switching).
+    authorization: { params: { prompt: "select_account" } },
     profile(profile) {
       if (profile.email_verified !== true || !profile.email) throw new Error("A verified Google email is required.");
       requireMaintenanceAccess(profile.email);

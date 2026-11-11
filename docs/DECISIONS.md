@@ -14,7 +14,8 @@ Read this before changing parent linking, consent/PDF, finance, rooms/waitlists 
 
 ## Developer sign-in
 
-- October 25 owner decision: the development deployment (`third-bandicoot-18`) offers a developer sign-in so the owner and Claude can test every role without Google. It signs in only to fixed fictional accounts on the reserved `developer.example.invalid` domain: Coach, Mentor, Travel Lead, Parent, Parent with staff access, and Student. It never signs in, creates, links or changes a real account.
+- October 25 owner decision: the development deployment (`third-bandicoot-18`) offers a developer sign-in so the owner and Claude can test every role without Google. It signs in only to fixed fictional accounts on the reserved `developer.example.invalid` domain: Coach, Mentor, Travel Lead, Parent, Parent with staff access, and Student (a seventh, Travel Lead with Money editing access, was added November 9). It never signs in, creates, links or changes a real account.
+- November 9, 2026 owner decision: a seventh fictional account, Travel Lead with Money editing access, is added for testing fees and payments. It is development only and has the same guards as the others; it has no Health export access.
 - It works only when all of these hold: the backend is the hard-coded development URL, the server switch `DEVELOPER_SIGN_IN_ENABLED=true` is set, and the request carries the server-held `DEVELOPER_SIGN_IN_KEY`. Reserved-domain sessions are refused whenever those conditions stop holding. The sign-in panel exists only in local development builds; the production build fails if any of it is bundled.
 - Never set the switch or key on production. Fictional accounts and their family links hold synthetic data only. Real Google and parent-email sign-in still need a human check before releases that touch authentication.
 
@@ -33,6 +34,10 @@ Read this before changing parent linking, consent/PDF, finance, rooms/waitlists 
 - An internal withdrawal return is not a cash payout. Cancel unpaid extras; keep unpaid main debt unless explicitly cancelled; reallocate returned funds away from the withdrawn event.
 - Fundraising credits cannot be paid to a family.
 - Coach-reviewed departing personal funds may move to team with explicit source, amount, reason and audit. A separate family authorization is not required; archival/season close never sweeps funds automatically.
+- November 9, 2026 owner decisions (usability audit, branch `feat/usability-audit`, not yet released):
+  - **Edit payment.** A Coach, or a Travel Lead with Money editing access (checked on the server), can edit a recorded payment's amount, method, check/receipt number or student, with a required reason. The original is never overwritten. An amount change is a recorded correction re-applied in fee order. Moving a payment to another student zeroes the original and records it on the new student. Setting the amount to $0 undoes a mistaken payment. Every edit keeps who, when, why, before and after, and shows in Recent changes. Carried-over payments and payments already moved can't be edited. A move records the payment on the new student only after the original is corrected to $0, in the same step. If an edit stops partway, the payment shows that it stopped, with Try again and Cancel this move (Cancel this edit when the student isn't changing) for a Coach or a Travel Lead with Money editing access. Cancelling needs a reason. It keeps the payment at its original amount on the original student, puts any money already released back on that student's fees in order, and unlocks the account. The cancel shows in the payment's changes and Recent changes with who, when and why. Each edit adds one line in Recent changes per student it touches.
+  - **Overpayment check.** Recording a payment asks for confirmation when it would leave a student $1,000 or more over Balance due. Cash payments and cash money returned need no check/receipt number.
+  - **Fee payment order.** A new fee with no payment order goes after the existing fees.
 - Special family refund requests require separate review.
 - Available same-season fundraising transfers require Coach authority or Travel Lead plus the finance grant.
 - If original award credits are insufficient, hold a proposed reduction; do not silently create debt or claw credits back.
@@ -102,7 +107,36 @@ November 6–7, 2026 owner decisions (release candidate `feat/mentor-home`, not 
 - **Separate "Meetings and events" notification category** (November 6). New events a Mentor can sign up for (M4) and activity on meetings a Mentor created (M5) use their own Mentor-only category, on by default, in the 5 PM summary; the Staff setting no longer controls them.
 - **Competitions & trips** (November 7). On the Mentor Join list this group holds competitions and overnight trips only; Fundraisers, Outreach and Team meetings stay under Meetings & events even when they involve travel. Competitions and trips are for the whole team, never marked "for your subteam".
 - **Team meetings default to one-time and optional** (November 7). `+ Team meeting` starts as a one-time, optional meeting; a Coach can still choose Required or Repeat (a repeating meeting still defaults to end May 31).
+- **The `+ Team meeting` sheet stays a single screen** (November 9). Owner decision: it is an approved exception to the step-by-step wizard rule because it is a fast path, and More options opens the full New event wizard.
 - **Simplified Mentor Home** (November 7), per the approved mockup: the next event, Who's here now (students of the Mentor's subteams clocked in now) and what needs an answer. Full lists live on the Schedule page (Going, Join, Created by me). Coaches and Travel Leads see who created an event and a "Mentor meeting" tag.
+
+## Usability audit (November 9, 2026)
+
+November 9, 2026 owner decisions from the usability audit (branch `feat/usability-audit`, not merged or released).
+
+- **Ask a Coach.** Signed-in Parents, Students and Mentors can send a short message (topic and message) to coach@team8044.org. The recipient is fixed on the server and Reply-To is the sender. The email includes the sender's name, role, sign-in email and the names of students they already have access to, never health or money data. Limits: 3 per hour and 10 per day per account. Messages are emailed and not kept in app tables; Convex keeps the send record (with the message) for about a week. Coaches and Travel Leads don't see it.
+- **Event Readiness** lists only events with requirements to complete (or team transport). Columns that don't apply are hidden. Permission form status shows only while signing is open. Shifts count toward readiness (changed November 10; this replaces the November 9 "shifts are information only" rule): a confirmed student below the event's minimum shifts is not ready, in Event readiness, the Team roster and the Parent and Student views. The page shows each student's signed-up count against the minimum and links to the signups. While signing is paused, an unsigned required form still keeps a student from being ready and keeps the event listed; the response carries only an event-level count for the "not marked ready" note, not a per-student reason. The list reads at most 100 events (25 requirements and 25 charges each), about 5,100 documents against Convex's 32,000 limit.
+- **Ask a Coach delivery failures.** The sender sees "Sent" once the message is queued. If the email service later rejects it, or retries run out, the failure is logged (account id and attempt only, never the message or contact details) and the message is not retried further. No status is shown to the sender. Surfacing failures in the app is a possible later change.
+- **Sign-in email code step.** It keeps the sign-in email in this browser for up to 15 minutes, never the code. It is cleared on success or Back.
+- **Team roster.** Requirements chips: Needs attention, FIRST registration, Permission form (while open), Balance due, Missing profile information. Needs attention (November 10 definition, replacing the November 9 one) means a student who is confirmed for their next event and still has an open item on it: a payment, permission form, FIRST registration, shifts, room choice or another requirement. "Something to know" notes never count, and students who are only pending or waitlisted don't count. Balance due, Permission form and Missing profile information keep their own chips. Bulk select offers Copy reminder (text only, nothing is sent) and Export list.
+- **Mentor scope.** Who's here now lists names and clock-in times for the Mentor's subteams only. Join defaults to the Mentor's subteams plus whole-team items, with Show all subteams. Team report defaults to the Mentor's subteams and shows no health, money or contact data. The Mentor Team report shows up to 40 students and says so when the list is cut off. Mentor "New meeting" notices go only for whole-team or the Mentor's-subteam meetings, not specific-students audiences.
+- **Google sign-in** always shows the account chooser, and wrong-account screens offer "Use a different Google account".
+
+## Usability audit follow-up (November 10, 2026)
+
+November 10, 2026 owner decisions, implemented on `feat/usability-audit` (not merged or released). Where they conflict with the November 9 lines above, these win.
+
+- **Two kinds of custom event requirement.** "Something to know" is information only: it is never a task and never counts toward ready. "Checked off by a Coach or Travel Lead" is a requirement the staff member marks done (it can have a due date). Students and Parents never check requirements off. Existing requirements default to checked off. The New event and event page wizards ask for the kind first.
+- **Shifts count toward readiness.** A confirmed student below the event's minimum shifts is not ready, in Event readiness, the Team roster and the family views. Students pick shifts on the event page; Parents see them but cannot pick for the Student.
+- **Parent setup lands on Home.** A Parent with unfinished setup is no longer sent to the setup page. Home shows a "Finish setup" card (and a What's left item) that opens the complete setup wizard there; `/setup` still works as a link. Students still land on setup until their profile is done.
+- **Session length stays at 30 days** (owner, November 10). Sign-in sessions end 30 days after sign-in; no change.
+- **Recording a payment.** There is no default payment method: the person chooses how it was paid. After recording, "Record another" asks whether the next payment is for the same student or someone else.
+- **Season transition.** "Mark all as Returning" sets every listed student not already Returning; each can be changed afterward.
+- **Past events un-archives.** An archived event whose end moves into the future is un-archived and returns to the live event lists.
+- **Mentor Join order.** Chosen-students items appear after subteam and whole-team items.
+- **Inbox Older.** Any notice whose linked event has ended goes under Older.
+- **Money reasons.** A reason for a money action needs at least 8 characters everywhere.
+- **Record payment** is 3 steps; the note is entered on Review.
 
 ## Attendance breakdown
 

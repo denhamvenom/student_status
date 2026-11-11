@@ -85,7 +85,7 @@ export function ZeffySync() {
         {exceptions.results.length > 0 && <section aria-label="Zeffy items needing review" className={styles.review}>
           <h3>Needs Coach review</h3>
           <ul>{exceptions.results.map(item => <li key={item._id}>{item.message}{item.paymentId ? <span className={styles.rowNote}>Zeffy payment reference: {item.paymentId}</span> : item.campaignId ? <span className={styles.rowNote}>Zeffy campaign reference: {item.campaignId}</span> : null}</li>)}</ul>
-          {exceptions.status === 'CanLoadMore' && <Button type="button" variant="outline" onClick={() => exceptions.loadMore(50)}>Load more review items</Button>}
+          {exceptions.status === 'CanLoadMore' && <Button type="button" variant="outline" onClick={() => exceptions.loadMore(50)}>Show more review items</Button>}
           {exceptions.status === 'LoadingMore' && <p role="status">Loading more review items…</p>}
           <p className={styles.muted}>Unmatched donations, changed payments and refunds stay in review. Financial records are not changed for these items.</p>
         </section>}
@@ -93,8 +93,8 @@ export function ZeffySync() {
           <Button type="button" variant="outline" disabled={busy || !status.configured} onClick={() => void review()}>{busy ? 'Working…' : 'Preview donations'}</Button>
           {status.enabled ? <>
             <Button type="button" disabled={busy || status.running || !previewReady} onClick={() => void checkNow()}>Check now</Button>
-            <ConfirmAction disabled={busy} description="Turn off Zeffy automatic donation checks? Future 7 AM and 7 PM checks will stop. Existing financial records stay as they are." onConfirm={() => toggle(false)}>Turn off automatic checks</ConfirmAction>
-          </> : <ConfirmAction disabled={busy || !status.configured || !previewReady} description="Turn on automatic Zeffy donation checks at 7 AM and 7 PM Central time? Only matched, eligible donations can be recorded automatically. Items needing review will not change financial records." onConfirm={() => toggle(true)}>Turn on automatic checks</ConfirmAction>}
+            <ConfirmAction title="Turn off automatic checks?" disabled={busy} description="Turn off Zeffy automatic donation checks? Future 7 AM and 7 PM checks will stop. Existing financial records stay as they are." onConfirm={() => toggle(false)}>Turn off automatic checks</ConfirmAction>
+          </> : <ConfirmAction title="Turn on automatic checks?" disabled={busy || !status.configured || !previewReady} description="Turn on automatic Zeffy donation checks at 7 AM and 7 PM Central time? Only matched, eligible donations can be recorded automatically. Items needing review will not change financial records." onConfirm={() => toggle(true)}>Turn on automatic checks</ConfirmAction>}
         </div>
       </>}
       {preview && <section aria-label="Donation preview" className={styles.review}>

@@ -5,6 +5,7 @@ import { chicagoDateString, TEAM_TIME_ZONE } from '../../../shared/chicago-time'
 const formatter = (options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('en-US', { timeZone: TEAM_TIME_ZONE, ...options })
 const longDate = formatter({ weekday: 'long', month: 'short', day: 'numeric' })
 const shortDate = formatter({ weekday: 'short', month: 'short', day: 'numeric' })
+const deadlineTime = formatter({ hour: 'numeric', minute: '2-digit' })
 const monthDay = formatter({ month: 'short', day: 'numeric' })
 const weekday = formatter({ weekday: 'short' })
 const dateParts = formatter({ month: 'short', day: 'numeric', year: 'numeric' })
@@ -13,6 +14,13 @@ const dateParts = formatter({ month: 'short', day: 'numeric', year: 'numeric' })
 export const formatLongDate = (epoch: number) => longDate.format(epoch)
 /** "Mon, Nov 9" */
 export const formatShortDate = (epoch: number) => shortDate.format(epoch)
+/** "Fri, Jan 8 · 5 PM" or "Fri, Jan 8 · 5:30 PM" */
+export function formatDeadline(epoch: number) {
+  const parts = deadlineTime.formatToParts(epoch)
+  const get = (type: string) => parts.find(item => item.type === type)?.value ?? ''
+  const minute = get('minute')
+  return `${shortDate.format(epoch)} · ${get('hour')}${minute === '00' ? '' : ':' + minute} ${get('dayPeriod')}`
+}
 /** "Nov 6" */
 export const formatMonthDay = (epoch: number) => monthDay.format(epoch)
 /** "Fri" */

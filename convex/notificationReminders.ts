@@ -80,7 +80,8 @@ export const run = internalMutation({
         if (event.roomingEnabled && event.roomDeadline !== undefined && deadlineReminderDue(args.now, event.roomDeadline)) await start(String(event.roomDeadline));
       } else if (args.kind === "r5RequirementDue") {
         const requirements = await ctx.db.query("requirements").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(REQUIREMENTS_PER_EVENT);
-        for (const requirement of requirements) if (requirement.dueAt !== undefined && deadlineReminderDue(args.now, requirement.dueAt)) await start(String(requirement.dueAt), requirement._id);
+        // "Something to know" requirements are notes, not tasks, so they never send a due reminder.
+        for (const requirement of requirements) if (requirement.kind !== "info" && requirement.dueAt !== undefined && deadlineReminderDue(args.now, requirement.dueAt)) await start(String(requirement.dueAt), requirement._id);
       }
     }
     if (!page.isDone) await ctx.scheduler.runAfter(0, runRef, { ...args, cursor: page.continueCursor });
@@ -127,7 +128,7 @@ export const runEvent = internalMutation({
       if (userIds.length) await notifyUsers(ctx, { userIds, category: "travel", url: `${url}/rooming`, dedupeKey: `r4:${event._id}:${args.tag}`, title: `Choose a room: ${event.name}`, body: `Room choices close ${formatChicagoDay(event.roomDeadline!)} at ${formatChicagoTime(event.roomDeadline!)}.` });
     } else if (args.kind === "r5RequirementDue" && args.requirementId) {
       const requirement = await ctx.db.get(args.requirementId);
-      if (!requirement || requirement.eventId !== event._id || requirement.dueAt === undefined) return null;
+      if (!requirement || requirement.eventId !== event._id || requirement.dueAt === undefined || requirement.kind === "info") return null;
       const open: Id<"students">[] = [];
       for (const studentId of studentIds) if (!await ctx.db.query("requirementCompletions").withIndex("by_eventId_and_studentId_and_key", q => q.eq("eventId", event._id).eq("studentId", studentId).eq("key", requirement.key)).first()) open.push(studentId);
       const userIds = [...await studentUserIds(ctx, open), ...await parentUserIdsForStudents(ctx, open)];

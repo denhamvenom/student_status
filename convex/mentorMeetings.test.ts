@@ -5,6 +5,7 @@ import { api, internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { MAX_DIGEST_USERS } from "./lib/digest";
+import { mentorDisplayName } from "./mentorMeetings";
 import { listMeetingMentors } from "./lib/mentorMeetings";
 import { MAX_INLINE_PARENT_MENTORS, OPEN_DIGEST_PAGE_SIZE, openDigestPageSize, queueMentorMeetingOpenDigestPage } from "./lib/notificationTriggers";
 import { MAX_SUBTEAM_MENTOR_LIST, mentorsForSubteams, TOO_MANY_SUBTEAM_MENTORS_MESSAGE } from "./lib/createEventCore";
@@ -282,6 +283,16 @@ describe("Mentor meeting projection", () => {
     await f.t.run(ctx => ctx.db.insert("participants", { eventId, studentId: f.ids.student, status: "confirmed", createdAt: 1, updatedAt: 1 }));
     return eventId;
   }
+
+  it("names a Mentor with a blank account name 'A Mentor' on the going list", async () => {
+    const f = await fixture();
+    const eventId = await f.seedEvent({ createdBy: f.ids.mentorB.id });
+    await f.t.run(ctx => ctx.db.patch(f.ids.mentorB.id, { name: "  " }));
+    const view = await f.as(f.ids.mentorA).query(api.mentorMeetings.view, { eventId, asOf: Date.now() });
+    expect(view.mentors.map(mentor => mentor.name)).toEqual(["A Mentor"]);
+    expect(mentorDisplayName({ name: " Sam " })).toBe("Sam");
+    expect(mentorDisplayName(null)).toBe("Mentor account unavailable");
+  });
 
   it("shows minimized fields, students only to the creator or an accepted Mentor, and never restricted data", async () => {
     const f = await fixture();
@@ -834,5 +845,28 @@ describe("Mentor meetings on Team Calendar (owner decision, Nov 7 2026)", () => 
     await expect(f.as(f.ids.mentorA).mutation(api.mentorMeetings.editMeeting, { eventId, expectedRevision: 1, name: "Changed" })).rejects.toThrow("only Team meetings you created");
     const view = await f.as(f.ids.mentorA).query(api.mentorMeetings.view, { eventId, asOf: Date.now() });
     expect(view.meeting).toMatchObject({ isCreator: false, canManage: false });
+  });
+});
+
+describe("New meeting notices (owner decision, Nov 9 2026)", () => {
+  async function recipients(f: Fixture, name: string, extra: Partial<Doc<"events">>) {
+    const eventId = await f.seedEvent({ createdBy: f.ids.coach.id, name, ...extra });
+    await f.t.run(ctx => queueMentorMeetingOpenDigestPage(ctx, { eventId, cursor: null }));
+    for (let i = 0; i < 3; i++) { await new Promise(resolve => setTimeout(resolve, 20)); await f.t.finishInProgressScheduledFunctions(); }
+    return new Set(await f.t.run(async ctx => (await ctx.db.query("notifications").take(1000)).filter(row => row.title === `New meeting: ${name}`).map(row => row.userId)));
+  }
+
+  it("notifies Mentors only for their subteams or the whole team, never for specific students", async () => {
+    const f = await fixture();
+    const { mentorA, mentorB } = f.ids;
+    const students = await recipients(f, "Chosen students", { audienceKind: "students" });
+    expect(students.has(mentorA.id)).toBe(false);
+    expect(students.has(mentorB.id)).toBe(false);
+    const build = await recipients(f, "Build only", { audienceKind: "subteams", audienceSubteams: ["Build"] });
+    expect(build.has(mentorA.id)).toBe(true);
+    expect(build.has(mentorB.id)).toBe(false);
+    const everyone = await recipients(f, "Whole team", {});
+    expect(everyone.has(mentorA.id)).toBe(true);
+    expect(everyone.has(mentorB.id)).toBe(true);
   });
 });

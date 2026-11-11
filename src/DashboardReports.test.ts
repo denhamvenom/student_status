@@ -26,13 +26,13 @@ describe('financial report currency', () => {
 })
 
 it('names earned fundraising separately from spendable credit and explains unknown gross', () => {
-  expect(reportCopy.travelShare).toBe('Earned from fundraisers')
+  expect(reportCopy.travelShare).toBe('Fundraising credit earned')
   expect(reportCopy.earned).toBe(reportCopy.travelShare)
-  expect(reportCopy.fundraising).toBe('Available fundraising credit')
+  expect(reportCopy.fundraising).toBe('Fundraising credit')
   expect(reportCopy.earned).not.toBe(reportCopy.fundraising)
   expect(reportCopy.grossUnavailable).toBe("Older fundraising credits don't include the full amount raised. Transfers and carried-over credit are not counted as money raised.")
   expect(reportCopy.teamGrossUnavailable).toBe(reportCopy.grossUnavailable)
   const amounts = fundraisingReportValues(0, 625)
-  expect(amounts.earned).toEqual({label:'Earned from fundraisers',value:'$0.00'})
-  expect(amounts.available).toEqual({label:'Available fundraising credit',value:'$6.25'})
+  expect(amounts.earned).toEqual({label:'Fundraising credit earned',value:'$0.00'})
+  expect(amounts.available).toEqual({label:'Fundraising credit',value:'$6.25'})
 })

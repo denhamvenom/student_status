@@ -7,7 +7,7 @@ import { visibleAnnouncements } from '../student-home/logic'
 import { announcementsCopy as copy } from './copy'
 
 /**
- * Pinned Mentors & staff and Everyone messages, shown above the staff Home. Renders nothing until there is one to show.
+ * Pinned Mentors and Travel Leads and Everyone messages, shown above the staff Home. Renders nothing until there is one to show.
  * Home lists only pinned messages, so it is labeled Pinned and links to the Inbox, which lists every message.
  */
 export function StaffHomeAnnouncements() {

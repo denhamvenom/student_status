@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { CLEANUP_TIMEOUT_MS, SIGN_OUT_TIMEOUT_MS, DEVELOPER_KEY_STORAGE, forceLocalSignOut, signOutSafely } from './useSignOut'
+import { CLEANUP_TIMEOUT_MS, SIGN_OUT_TIMEOUT_MS, DEVELOPER_KEY_STORAGE, forceLocalSignOut, localClearer, signOutSafely } from './useSignOut'
 
 const never = () => new Promise<never>(() => {})
 const fail = () => Promise.reject(new Error('boom'))
@@ -84,5 +84,32 @@ describe('forceLocalSignOut', () => {
     data.set('__convexAuthRefreshToken_late', 'z')
     forceLocalSignOut(storage, restart, { removeItem: key => { session.delete(key) } })
     expect(restart).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('localClearer', () => {
+  it('runs onForced (invitation token cleanup) only when sign-out was forced', () => {
+    const clearAuth = vi.fn(), clearKey = vi.fn(), onForced = vi.fn()
+    localClearer(false, onForced, clearAuth, clearKey)
+    expect(onForced).not.toHaveBeenCalled(); expect(clearAuth).not.toHaveBeenCalled(); expect(clearKey).toHaveBeenCalledTimes(1)
+    localClearer(true, onForced, clearAuth, clearKey)
+    expect(onForced).toHaveBeenCalledTimes(1); expect(clearAuth).toHaveBeenCalledTimes(1)
+  })
+  it('forgets the saved email-code step on both normal and forced sign-out', () => {
+    for (const forced of [false, true]) {
+      const clearStep = vi.fn()
+      localClearer(forced, undefined, () => {}, () => {}, clearStep)
+      expect(clearStep).toHaveBeenCalledTimes(1)
+    }
+  })
+  it('still clears everything when onForced throws', () => {
+    const clearAuth = vi.fn(), clearKey = vi.fn()
+    expect(() => localClearer(true, () => { throw new Error('x') }, clearAuth, clearKey)).not.toThrow()
+    expect(clearKey).toHaveBeenCalledTimes(1)
+  })
+  it('wired into signOutSafely: a stalled sign-out discards the saved token before the restart', async () => {
+    const order: string[] = []
+    await signOutSafely({ cleanup: ok, signOut: fail, clearLocal: f => localClearer(f, () => order.push('token'), () => {}, () => {}), forceLocal: () => order.push('restart') })
+    expect(order).toEqual(['token', 'restart'])
   })
 })

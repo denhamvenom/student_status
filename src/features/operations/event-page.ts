@@ -29,6 +29,12 @@ export function audienceDisplayLabel(event: AudienceEventFields, fallback: strin
   return event.audienceKind === undefined ? legacyAudienceLabel(event) ?? fallback : fallback
 }
 
+/** Parents see signups view-only, so their line says who signs up and where they can see it. */
+export const parentSignupMeaning = {
+  required: 'Required — your student is signed up automatically',
+  optional: 'Optional — your student signs up in Venom Status. You can see the signup here but cannot change it.',
+}
+
 /** Required / Optional with what it means for this reader, or null for a mentors-only or audience-less event. */
 export function requiredMeaning(row: object, reader: 'student' | 'parent'): string | null {
   // Reads a loosely typed event row (eventDetail returns a union that includes the Mentor projection).
@@ -36,7 +42,7 @@ export function requiredMeaning(row: object, reader: 'student' | 'parent'): stri
   if (!event.signupMode) return null
   const audience = resolveAudience(event as AudienceEventFields)
   if (audience.kind === 'mentorsOnly') return null
-  const copy = uiCopy.event.signupMeaning[reader]
+  const copy = reader === 'parent' ? parentSignupMeaning : uiCopy.event.signupMeaning[reader]
   return audience.mandatory ? copy.required : copy.optional
 }
 
@@ -49,12 +55,14 @@ export function costLabel(feeCents: number | undefined): string {
 export const calendarChipCopy = {
   on: 'On Team Calendar',
   off: 'Not on Team Calendar',
+  adding: 'Adding to Team Calendar…',
+  notSent: 'Not added to Team Calendar',
   attention: 'Needs attention',
   failed: 'The last change did not reach Team Calendar.',
-  conflict: 'The entry was changed in Team Calendar. Retry keeps the Team Calendar version.',
-  unavailable: 'Team Calendar is not connected for this app.',
-  retry: 'Retry',
-  retrying: 'Retry requested.',
+  conflict: 'The entry was changed in Team Calendar. Try again keeps the Team Calendar version.',
+  unavailable: 'Team Calendar updates are turned off in this copy of Venom Status, so this event was not sent. Nothing is wrong with the event.',
+  retry: 'Try again',
+  retrying: 'Trying again…',
 } as const
 
 /** Id of the event page's Team Calendar section (EventCalendarOperations); Home's Team Calendar alert links to it as a hash. */
@@ -68,10 +76,11 @@ export function calendarChip(status: { state: string; calendarEventId?: string |
     case 'synced': return { label: calendarChipCopy.on, tone: 'ready', reason: null, canRetry: false }
     case 'pending': return status.calendarEventId
       ? { label: calendarChipCopy.on, tone: 'ready', reason: null, canRetry: false }
-      : { label: calendarChipCopy.off, tone: 'neutral', reason: null, canRetry: false }
+      : { label: calendarChipCopy.adding, tone: 'neutral', reason: null, canRetry: false }
     case 'failed': return { label: calendarChipCopy.attention, tone: 'attention', reason: shortReason(status.error) ?? calendarChipCopy.failed, canRetry: true }
     case 'conflict': return { label: calendarChipCopy.attention, tone: 'attention', reason: calendarChipCopy.conflict, canRetry: true }
-    case 'disabled': return { label: calendarChipCopy.off, tone: 'neutral', reason: calendarChipCopy.unavailable, canRetry: false }
+    // A Coach or Travel Lead asked for this entry, but Calendar updates are off here: say it was not sent, not that it was never wanted.
+    case 'disabled': return { label: calendarChipCopy.notSent, tone: 'neutral', reason: calendarChipCopy.unavailable, canRetry: false }
     default: return { label: calendarChipCopy.off, tone: 'neutral', reason: null, canRetry: false }
   }
 }

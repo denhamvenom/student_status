@@ -1,6 +1,6 @@
 export const transportationOptions = ["Charter Bus", "School Bus", "Team Carpool", "Provide your Own"] as const;
 // Stored values stay as above so existing events keep working; only the shown text differs.
-const transportationLabels: Record<string, string> = { "Provide your Own": "Provide your Own Ride" };
+const transportationLabels: Record<string, string> = { "Provide your Own": "Own transport" };
 export const transportationLabel = (travel: string) => transportationLabels[travel] ?? travel;
 
 /** On-site events happen at the DSHS STEM Center: no destination, transport or overnight stay. */

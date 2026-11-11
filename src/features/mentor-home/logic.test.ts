@@ -4,7 +4,7 @@ import { at } from '../student-home/fixtures'
 import { eventEditValues, draftFrom } from '../operations/event-edit'
 import { clockedIn, homeData, joinEntry, meeting, NOW } from './fixtures'
 import type { Id } from '../../../convex/_generated/dataModel'
-import { clockLabel, COMING_UP_LIMIT, comingUpTags, createdList, editableMeeting, eventTags, goingList, hereGroups, homeView, joinEntryLines, joinSections, meetingPlace, myPartLabel, needsAnswer, pinKey, seriesStatus, showsSubteamTag, subteamsLine, tabFromHash, typeLabel, unreadPinned } from './logic'
+import { audienceTag, clockLabel, joinScopeLine, COMING_UP_LIMIT, comingUpTags, createdList, editableMeeting, eventTags, goingList, hereGroups, homeView, joinEntryLines, joinInScope, joinSections, meetingPlace, myPartLabel, needsAnswer, pinKey, seriesStatus, subteamsLine, tabFromHash, typeLabel, unreadPinned } from './logic'
 
 const HOUR = 3_600_000
 const titles = (rows: readonly { title: string }[]) => rows.map(row => row.title)
@@ -12,7 +12,7 @@ const going = { myStatus: 'accepted', mySource: 'individual', canWithdraw: true 
 const askDrive = { askDrive: true, askHotel: false }
 const askBoth = { askDrive: true, askHotel: true }
 const skippedSignup = { scope: 'all', count: null, coversThisMeeting: false, skippedThisMeeting: true } as const
-const everyone = { kind: 'everyone' as const, subteams: [], required: false, text: 'Everyone' }
+const everyone = { kind: 'everyone' as const, subteams: [], required: false, text: 'Whole team' }
 
 describe('which Home blocks show', () => {
   it('shows only Next event (empty) and Who’s here now for a new Mentor: no Needs your answer, Coming up or join tile', () => {
@@ -76,7 +76,7 @@ describe('Needs your answer', () => {
 describe('Coming up tags', () => {
   const subteams = (list: string[]) => ({ kind: 'subteams' as const, subteams: list, required: false, text: 'Subteams' })
   it.each([
-    { name: 'plain meeting for Everyone', row: { questions: { askDrive: false, askHotel: false }, audience: everyone }, tags: [] },
+    { name: 'plain meeting for the whole team', row: { questions: { askDrive: false, askHotel: false }, audience: everyone }, tags: [] },
     { name: 'trip', row: { questions: askDrive, audience: everyone }, tags: [copy.tags.travel] },
     { name: 'overnight only', row: { questions: { askDrive: false, askHotel: true }, audience: everyone }, tags: [copy.tags.travel] },
     { name: 'the Mentor’s subteam (any case)', row: { questions: { askDrive: false, askHotel: false }, audience: subteams(['programming']) }, tags: [copy.join.yourSubteam] },
@@ -142,13 +142,50 @@ describe('Schedule › Join', () => {
     expect(titles(sections.meetings)).toEqual(['meeting soon', 'meeting later'])
   })
 
+  it('lists chosen-students and Mentors-only events after whole-team and subteam ones, even when sooner', () => {
+    const forAudience = (name: string, kind: 'students' | 'mentorsOnly' | 'everyone', at: number) => joinEntry(meeting(name, at, { canSignUp: true, audience: { kind, subteams: [], required: false, text: name } }))
+    const entries = [forAudience('chosen', 'students', NOW + HOUR), forAudience('mentors', 'mentorsOnly', NOW + 2 * HOUR), forAudience('whole team', 'everyone', NOW + 5 * HOUR)]
+    expect(titles(joinSections(entries, NOW).meetings)).toEqual(['whole team', 'chosen', 'mentors'])
+  })
+
+  it('leaves out meetings for other subteams until widened, and always keeps whole-team and own-subteam ones', () => {
+    const forSubteam = (name: string, subteam: string) => joinEntry(meeting(name, NOW + HOUR, { canSignUp: true, audience: { kind: 'subteams', subteams: [subteam], required: false, text: subteam } }))
+    const entries = [forSubteam('mine', 'Programming'), forSubteam('other', 'Mechanical'), joinEntry(meeting('whole team', NOW + 2 * HOUR, { canSignUp: true }))]
+    expect(titles(joinSections(entries, NOW, ['programming']).meetings)).toEqual(['mine', 'whole team'])
+    expect(joinSections(entries, NOW, ['Programming']).hidden).toBe(1)
+    expect(titles(joinSections(entries, NOW, ['Programming'], true).meetings)).toEqual(['mine', 'other', 'whole team'])
+    expect(joinSections(entries, NOW).hidden).toBe(0)
+    expect(joinInScope(entries[1], [])).toBe(false)
+  })
+
+  it('drops a series from Home’s could-help-with count once the Mentor signs up for it', () => {
+    const next = meeting('series', NOW + HOUR, { canSignUp: true, seriesId: 'fixture_series_a' as Id<'eventSeries'> })
+    expect(homeView(homeData({ joinable: [joinEntry(next)] }), NOW).joinCount).toBe(1)
+    expect(homeView(homeData({ joinable: [joinEntry(next, { hasSeriesSignup: true })] }), NOW).joinCount).toBe(0)
+  })
+
   it.each([
-    ['a meeting for the Mentor’s subteam', 'meetings', true, true],
-    ['a meeting for Everyone', 'meetings', false, false],
-    // Never on a Competition or trip, even if the server marked it.
-    ['a competition', 'competitionsAndTrips', true, false],
-  ] as const)('shows the Your subteam tag on %s: %s', (_, category, forYourSubteam, shown) => {
-    expect(showsSubteamTag({ category, forYourSubteam })).toBe(shown)
+    ['everyone', { kind: 'everyone', subteams: [] }, 'Whole team'],
+    ['one subteam, legacy name', { kind: 'subteams', subteams: ['Mechanical'] }, 'Build'],
+    ['two subteams', { kind: 'subteams', subteams: ['Programming', 'CAD'] }, 'Programming, CAD'],
+    ['chosen students', { kind: 'students', subteams: [] }, 'Chosen students'],
+    ['Mentors only', { kind: 'mentorsOnly', subteams: [] }, 'Mentors only'],
+  ] as const)('tags a row for %s', (_, audience, tag) => {
+    expect(audienceTag(audience)).toBe(tag)
+  })
+
+  it('treats a legacy subteam name as the same subteam the server does', () => {
+    const entry = joinEntry(meeting('build night', NOW + HOUR, { canSignUp: true, audience: { kind: 'subteams', subteams: ['Mechanical'], required: false, text: 'Build' } }))
+    expect(joinInScope(entry, ['Build'])).toBe(true)
+    expect(joinInScope(entry, ['Programming'])).toBe(false)
+  })
+
+  it.each([
+    [['Programming', 'CAD'], false, 'Showing: Programming, CAD and whole-team items'],
+    [[], false, 'Showing: whole-team items'],
+    [['Programming'], true, 'Showing: all subteams'],
+  ] as const)('scope line for %j (widened %s)', (subteams, showAll, line) => {
+    expect(joinScopeLine(subteams, showAll)).toBe(line)
   })
 
   it('describes a repeating series once, with its schedule, how often and how many are coming up', () => {
@@ -165,11 +202,14 @@ describe('Schedule › Join', () => {
 })
 
 describe('Who’s here now', () => {
-  it('gives one line per subteam with how many are clocked in, and their names', () => {
-    expect(hereGroups(clockedIn({ Programming: ['Avery N.', 'Jordan W.'], CAD: [] }))).toEqual([
-      { subteam: 'Programming', count: 2, names: ['Avery N.', 'Jordan W.'], label: 'Programming · 2 clocked in' },
-      { subteam: 'CAD', count: 0, names: [], label: 'CAD · 0 clocked in' },
+  it('lists each student with the time they clocked in, and says plainly when a subteam is empty', () => {
+    const groups = hereGroups(clockedIn({ Programming: ['Avery N.', 'Jordan W.'], CAD: [] }))
+    expect(groups.map(group => [group.label, group.students.map(student => student.name)])).toEqual([
+      ['Programming · 2 clocked in', ['Avery N.', 'Jordan W.']],
+      ['CAD · nobody clocked in', []],
     ])
+    // NOW is 12:00 PM Central; the fixtures clock students in 10 and 20 minutes earlier.
+    expect(groups[0].students.map(student => student.since)).toEqual(['since 11:50 AM', 'since 11:40 AM'])
   })
 })
 

@@ -1,7 +1,7 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { CoachFinanceTable, type FinanceStudentRow } from './CoachFinanceTable'
+import { arrangeRows, availableFundsCents, CoachFinanceTable, type FinanceStudentRow } from './CoachFinanceTable'
 
 const row: FinanceStudentRow = { studentId: 'fictional', name: 'Fictional member', state: 'ready', chargedCents: 10001, personalAppliedCents: 2500, fundraisingAppliedCents: 5000, dueCents: 2501, fundraisingAvailableCents: 731, updatedAt: null, canRecord: false }
 const render = (rows: FinanceStudentRow[], loading = false) => renderToStaticMarkup(createElement(CoachFinanceTable, { rows, loading, loadingMore: false, hasMore: false, onMore: () => undefined, onOpen: () => undefined, onRecord: () => undefined }))
@@ -31,5 +31,49 @@ describe('Coach finance source columns', () => {
     expect(render([], true)).not.toContain('No active student accounts')
     expect(render([])).toContain('No active student accounts')
     expect(render([{ ...row, chargedCents: Number.MAX_SAFE_INTEGER + 1 }])).toContain('Unavailable')
+  })
+})
+
+describe('Money table Available funds, sort and filter', () => {
+  const due = (id: string, dueCents: number | null, state: FinanceStudentRow['state'] = 'ready') => ({ ...row, studentId: id, name: id, dueCents, state })
+  it('adds unused payments and fundraising credit, the same total Reports shows', () => {
+    expect(availableFundsCents({ personalAvailableCents: 100, fundraisingAvailableCents: 731 })).toBe(831)
+    expect(availableFundsCents({ personalAvailableCents: null, fundraisingAvailableCents: 731 })).toBeNull()
+    expect(availableFundsCents({ fundraisingAvailableCents: 731 })).toBeNull()
+    const html = render([{ ...row, personalAvailableCents: 100 }])
+    expect(html).toContain('Available funds')
+    expect(html).toContain('$8.31')
+    expect(html).toContain('$7.31')
+  })
+  it('sorts by Balance due with accounts that are not ready last, keeping the original order for ties', () => {
+    const rows = [due('a', 0), due('b', 500), due('c', null, 'updating'), due('d', 500), due('e', 900)]
+    expect(arrangeRows(rows, { sortByDue: true, dueOnly: false }).map(r => r.studentId)).toEqual(['e', 'b', 'd', 'a', 'c'])
+    expect(arrangeRows(rows, { sortByDue: false, dueOnly: false }).map(r => r.studentId)).toEqual(['a', 'b', 'c', 'd', 'e'])
+  })
+  it('Balance due only keeps just the students who owe money', () => {
+    const rows = [due('a', 0), due('b', 500), due('c', null, 'updating'), due('e', 900)]
+    expect(arrangeRows(rows, { sortByDue: false, dueOnly: true }).map(r => r.studentId)).toEqual(['b', 'e'])
+    expect(arrangeRows(rows, { sortByDue: true, dueOnly: true }).map(r => r.studentId)).toEqual(['e', 'b'])
+  })
+  it('offers Add a fee only where the viewer can edit a ready account', () => {
+    expect(render([row])).not.toContain('Add a fee for')
+    expect(render([{ ...row, canRecord: true }])).toContain('Add a fee for Fictional member')
+    expect(render([{ ...row, canRecord: true, state: 'updating' }])).not.toContain('Add a fee for')
+  })
+})
+
+describe('Money table name search', () => {
+  const named = (name: string, dueCents: number | null = 0) => ({ ...row, studentId: name, name, dueCents })
+  const list = [named('Ada Lovelace', 500), named('Grace Hopper', 0), named('Ada Hopper', 900)]
+  it.each([['', 3], ['ada', 2], ['  HOPPER ', 2], ['ada hopper', 1], ['zzz', 0]])('query %j keeps %i students', (query, count) => {
+    expect(arrangeRows(list, { sortByDue: false, dueOnly: false, query })).toHaveLength(count)
+  })
+  it('combines with Balance due only and sorting', () => {
+    expect(arrangeRows(list, { sortByDue: true, dueOnly: true, query: 'hopper' }).map(item => item.name)).toEqual(['Ada Hopper'])
+  })
+  it('says which sort is on', () => {
+    const html = render([row])
+    expect(html).toContain('Sort by Balance due')
+    expect(html).toContain('Search students')
   })
 })

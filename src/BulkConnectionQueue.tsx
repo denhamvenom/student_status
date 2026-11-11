@@ -24,8 +24,8 @@ export function BulkConnectionQueue() {
       <td data-label="Google account"><strong>{request.googleName}</strong><p className="open-text">{request.googleEmail}</p></td>
       <td data-label="Requested">{new Date(request.createdAt).toLocaleDateString()}</td>
       <td data-label="Actions"><div className="action-row">
-        <ConfirmAction disabled={busy} description={`Approve ${request.googleEmail} as ${request.studentName}? This Google account will gain access to the existing student record.`} onConfirm={() => act(request.requestId, true)}>Approve connection</ConfirmAction>
-        <ConfirmAction disabled={busy} description={`Decline the connection from ${request.googleEmail} to ${request.studentName}? The account will not be connected.`} onConfirm={() => act(request.requestId, false)}>Decline connection</ConfirmAction>
+        <ConfirmAction title="Approve this connection?" disabled={busy} description={`Approve ${request.googleEmail} as ${request.studentName}? This Google account will gain access to the existing student record.`} onConfirm={() => act(request.requestId, true)}>Approve connection</ConfirmAction>
+        <ConfirmAction title="Decline this connection?" disabled={busy} description={`Decline the connection from ${request.googleEmail} to ${request.studentName}? The account will not be connected.`} onConfirm={() => act(request.requestId, false)}>Decline connection</ConfirmAction>
       </div></td>
     </tr>)}</tbody></table></div>}
     {notice && <p role="status">{notice}</p>}

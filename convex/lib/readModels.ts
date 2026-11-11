@@ -7,9 +7,14 @@ import { calculateStudentFinance } from "./financeSummaries";
 import { permissionAccepted } from "./permissionCoverage";
 import { feeMaintenanceProjection } from "./seasonFinance";
 import { firstStatus } from "../firstRegistration";
+import { activeShifts, checkoffRequirements, shiftMinimum, studentShiftSignups } from "./eventSignupExtras";
 export { permissionAccepted } from "./permissionCoverage";
 
 type Ctx = QueryCtx | MutationCtx;
+
+/** Built-in open items whose wording other screens match on. A custom requirement's own label is never one of these. */
+export const READINESS_PERMISSION = "Permission form";
+export const READINESS_SHIFTS = "Shifts";
 
 export async function financeFor(ctx: Ctx, studentId: Id<"students">) {
   const account = await ctx.db.query("financialAccounts").withIndex("by_studentId", q => q.eq("studentId", studentId)).unique();
@@ -29,6 +34,8 @@ export type ReadinessPreload = {
   /** Must be read with take(101) so the over-100 review check still works. */
   requirements?: Doc<"requirements">[];
   room?: RoomSelectionState;
+  /** The event's active shifts (activeShifts) and this student's shift places (studentShiftSignups). */
+  shifts?: { offered: Doc<"eventShifts">[]; places: Doc<"shiftSignups">[] };
 };
 export type RoomSelectionState = { membership: Doc<"roomMemberships"> | null; request: Doc<"roomRequests"> | null; group: Doc<"roomGroups"> | null; members: Doc<"roomMemberships">[] };
 
@@ -60,15 +67,27 @@ export async function studentReadiness(ctx: Ctx, event: Doc<"events">, student: 
   if (eventCharges.length > 100) open.push("Event financial records require review");
   if (eventCharges.some(x => x.appliedCents < effectiveChargeCents(x))) open.push("Required payment");
   const permissionStatus = !event.permissionRequired ? "notRequired" as const : await permissionAccepted(ctx, student._id, event._id) ? "accepted" as const : "missing" as const;
-  if (permissionStatus === "missing") open.push("Permission accepted");
+  if (permissionStatus === "missing") open.push(READINESS_PERMISSION);
   const completions = known.completions ?? await ctx.db.query("requirementCompletions").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).take(101);
   if (event.type === "Competition") { if (firstRegistrationState !== "verified") open.push("FIRST registration and Consent & Release"); }
   else if (event.firstRequired && !completions.some(x => x.key === "first")) open.push("FIRST registration");
   const custom = known.requirements ?? await ctx.db.query("requirements").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(101);
   if (completions.length > 100 || custom.length > 100) open.push("Event requirements require review");
-  for (const requirement of custom) if (!completions.some(x => x.key === requirement.key)) open.push(requirement.label);
+  // "Something to know" requirements are notes only and never open.
+  for (const requirement of checkoffRequirements(custom)) if (!completions.some(x => x.key === requirement.key)) open.push(requirement.label);
   if (event.overnight && event.roomingEnabled && !roomSelectionComplete(known.room ?? await roomSelectionState(ctx, event._id, student._id))) open.push("Room selection");
+  // November 10 owner decision: a confirmed student with fewer shifts than the event's minimum is not ready.
+  const shifts = event.shiftsEnabled ? await shiftProgress(ctx, event, student._id, known.shifts) : null;
+  if (shifts && shifts.count < shifts.minimum) open.push(READINESS_SHIFTS);
   return { state: open.length ? "open" as const : "ready" as const, open, participation: participant.status, permissionStatus, firstRegistrationState };
+}
+
+/** How many of the event's active shifts the student holds, against the minimum needed to be ready. */
+export async function shiftProgress(ctx: Ctx, event: Doc<"events">, studentId: Id<"students">, known?: ReadinessPreload["shifts"]) {
+  const offered = known?.offered ?? await activeShifts(ctx, event._id);
+  const places = known?.places ?? await studentShiftSignups(ctx, event._id, studentId);
+  const count = places.filter(place => place.studentId === studentId && offered.some(shift => shift._id === place.shiftId)).length;
+  return { count, minimum: shiftMinimum(event, offered.length), offered: offered.length };
 }
 
 export async function attendanceFor(ctx: Ctx, student: Doc<"students">, seasonMeetings?: Doc<"attendanceMeetings">[]) {

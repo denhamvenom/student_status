@@ -193,7 +193,7 @@ describe("durable prepared custom fees", () => {
     await f.t.mutation(makeFunctionReference<"mutation">("financialOperationsWorker:run"), { jobId: row!.correctionJobId });
     await f.t.mutation(makeFunctionReference<"mutation">("feeBulkWorker:run"), { jobId });
     const alternate = f.t.withIdentity({ subject: `${evidence.auth}|session` });
-    await expect(alternate.mutation(makeFunctionReference<"mutation">("financialSources:rebuild"), { studentId: f.ids.students[0] })).rejects.toThrow("existing financial job");
+    await expect(alternate.mutation(makeFunctionReference<"mutation">("financialSources:rebuild"), { studentId: f.ids.students[0] })).rejects.toThrow("stopped money update");
     await expect(alternate.mutation(makeFunctionReference<"mutation">("finance:recordFunds"), { studentId: f.ids.students[0], kind: "payment", amountCents: 1, reason: "Blocked during partial release", idempotencyKey: "blocked-release-key" })).rejects.toThrow("Season fees");
     await alternate.mutation(makeFunctionReference<"mutation">("financialOperationsWorker:retry"), { jobId: row!.correctionJobId, reason: "Coach resumed exact partial cancellation" });
     await f.t.mutation(makeFunctionReference<"mutation">("financialOperationsWorker:run"), { jobId: row!.correctionJobId });

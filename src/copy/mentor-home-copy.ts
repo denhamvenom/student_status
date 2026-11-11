@@ -1,6 +1,6 @@
 // Plain words for Mentor Home, Schedule, the Mentor event page and the Mentor version of the New meeting wizard.
 export const mentorHomeCopy = {
-  nav: { home: 'Home', create: 'Create', schedule: 'Schedule', report: 'Student report', profile: 'Edit my profile', settings: 'Settings' },
+  nav: { home: 'Home', create: 'Create', schedule: 'Schedule', report: 'Team report', profile: 'Profile', settings: 'Settings' },
   /** "Sat, Nov 7 · Hi, Sam". */
   greeting: (date: string, name: string) => `${date} · ${name.trim() ? `Hi, ${name.trim().split(/\s+/)[0]}` : 'Hi there'}`,
   states: {
@@ -42,6 +42,8 @@ export const mentorHomeCopy = {
   },
   /** The Home tile that opens Schedule › Join. */
   helpTile: (count: number) => count === 1 ? '1 event you could help with' : `${count} events you could help with`,
+  /** Quiet spot at the bottom of Mentor Home. */
+  askCoach: 'Need something else?',
   schedule: {
     title: 'Schedule',
     tabs: { going: 'Going', join: 'Join', created: 'Created by me' } as Record<'going' | 'join' | 'created', string>,
@@ -50,16 +52,19 @@ export const mentorHomeCopy = {
     skipping: 'Skipping this one',
     joinHint: 'Sign up once for a repeating series and you’re on every upcoming date. You can skip single dates later.',
     createdNone: 'You haven’t created any upcoming meetings.',
-    createHint: { mentor: 'To make something new, tap Create in the bottom bar.', travelLead: 'To make something new, use New event on the Events page.' },
+    createHint: { mentor: 'To make something new, use Create at the top or bottom of the screen.', travelLead: 'To make something new, use New event on the Events page.' },
   },
   join: {
-    none: 'Nothing to join right now. New events and meetings for Everyone or your subteams show up here.',
+    none: 'Nothing to join right now. New events and meetings for the whole team or your subteams show up here.',
     /** Grouped sections (owner decision, Nov 7 2026): competitions and trips first, then meetings and events. */
     competitions: 'Competitions & trips',
     meetings: 'Meetings & events',
     noCompetitions: 'No competitions or trips to join right now.',
     noMeetings: 'No meetings or events to join right now.',
     yourSubteam: 'Your subteam',
+    wholeTeam: 'Whole team',
+    someStudents: 'Chosen students',
+    mentorsOnly: 'Mentors only',
     /** "Mondays at 6:00 PM · Repeats weekly". */
     seriesLine: (schedule: string, repeat: string) => `${schedule} · ${repeat}`,
     upcoming: (count: number) => count === 1 ? '1 upcoming' : `${count} upcoming`,
@@ -68,6 +73,9 @@ export const mentorHomeCopy = {
     signUp: 'Sign up',
     signUpLabel: (title: string) => `Sign up for ${title}`,
     withdraw: 'I can’t go anymore',
+    withdrawTitle: (title: string) => `Leave ${title}?`,
+    withdrawDetail: (title: string) => `You’ll be taken off ${title}. You can sign up again from Schedule › Join if it’s still open.`,
+    withdrawConfirm: 'Yes, take me off',
     withdrew: (title: string) => `You’re off ${title}.`,
     withdrawFailed: 'You are still signed up. Please try again.',
   },
@@ -87,6 +95,19 @@ export const mentorHomeCopy = {
     count: (subteam: string, count: number) => `${subteam} · ${count} clocked in`,
     noSubteams: 'A Coach sets your subteams. Then you’ll see who from them is clocked in.',
     truncated: 'Some clocked-in students may be missing. Check Timeclock for the full list.',
+    /** A subteam with nobody clocked in; and the line above the list. */
+    nobody: (subteam: string) => `${subteam} · nobody clocked in`,
+    nobodyAll: 'Nobody from your subteams is clocked in right now.',
+    since: (time: string) => `since ${time}`,
+    showing: (list: string) => `Showing: ${list}`,
+  },
+  /** Subteam scope on Schedule › Join: your subteams and whole-team items until widened. */
+  scope: {
+    showing: (list: string) => `Showing: ${list} and whole-team items`,
+    all: 'Show all subteams',
+    mine: 'Show only my subteams',
+    showingAll: 'Showing: all subteams',
+    showingNone: 'Showing: whole-team items',
   },
   /** About you, in the Mentor's More menu. */
   about: {
@@ -94,8 +115,8 @@ export const mentorHomeCopy = {
     subteams: (list: string) => `Your subteams: ${list}`,
     noSubteams: 'No subteams yet. A Coach sets your subteams.',
     loading: 'Loading your subteams…',
-    profile: 'Edit my profile',
-    report: 'Student report',
+    profile: 'Profile',
+    report: 'Team report',
   },
   /** Event types, in Mentor words. */
   types: { Team: 'Team meeting', Competition: 'Competition', Outreach: 'Outreach', Fundraiser: 'Fundraiser' } as Record<string, string>,
@@ -132,7 +153,7 @@ export const mentorHomeCopy = {
     decline: 'No, I can’t make it',
     close: 'Close',
     back: 'Back',
-    next: 'Next',
+    next: 'Continue',
     saving: 'Saving…',
     loading: 'Loading…',
     loadFailed: 'This event could not load. Close this and try again.',
@@ -153,7 +174,7 @@ export const mentorHomeCopy = {
       pick: 'Choose which meetings you’ll come to.',
       countInvalid: 'Choose a number from 1 to 52.',
       changeNote: 'Changing this doesn’t take you off meetings already on your schedule. Use Skip this one or Leave all for that.',
-      oneUnavailable: 'To go to just this one, leave all meetings in this series first, then sign up for this one.',
+      oneUnavailable: 'To switch to just this one, choose Leave all meetings in this series, then sign up again.',
     },
     drive: {
       title: 'Can you drive students?',
@@ -253,11 +274,11 @@ export const mentorHomeCopy = {
     inviteNeedsSubteams: 'To invite other Mentors, choose Subteams above.',
     invitesLegend: 'Invite other Mentors (optional)',
     invitesBySubteam: 'Mentors of the chosen subteams',
-    mentorsOnlyUnavailable: 'A Mentors-only meeting needs at least one invited Mentor, and inviting Mentors one by one isn’t available yet. Choose Everyone, Subteams or specific students.',
+    mentorsOnlyUnavailable: 'A Mentors-only meeting needs at least one invited Mentor, and inviting Mentors one by one isn’t available yet. Choose Whole team, Subteams or specific students.',
     created: 'Meeting created.',
     seriesCreated: 'Repeating meeting created.',
     addToCalendar: 'Add to Team Calendar',
-    addToCalendarNote: 'Everyone on the team can see it on the shared Team Calendar.',
+    addToCalendarNote: 'Everyone on the team can see it.',
     repeatingOffCalendar: 'Repeating meetings aren’t added to Team Calendar.',
     onCalendar: 'Added to Team Calendar',
     offCalendar: 'Not added to Team Calendar',

@@ -176,7 +176,7 @@ function Steps({ meeting, mode, actions, onBusyChange, onClose }: { meeting: Men
       <form id={formId} noValidate onSubmit={submit} className="flex flex-col gap-4">
         {counted && <div aria-hidden="true" className="flex gap-1">{steps.map((s, i) => <span key={s} className={cn('h-1.5 flex-1 rounded-full', i <= index ? 'bg-vs-accent-text' : 'bg-vs-border')} />)}</div>}
         <h3 ref={headingRef} id={headingId} tabIndex={-1} className="m-0! flex flex-col gap-1 text-[22px]! leading-tight! font-bold text-vs-heading focus:outline-none">
-          {counted && <span className="text-[13px] leading-normal font-semibold text-vs-muted">{copy.stepOf(index + 1, steps.length)}<span className="sr-only">:</span></span>}
+          {counted && <span className="text-[13px] leading-normal font-semibold text-vs-muted">{copy.stepOf(index + 1, steps.length)}</span>}
           <span>{stepTitle[step]}</span>
         </h3>
         {help && <p id={`${idPrefix}-help`} className="m-0 text-[15px] text-vs-text-2">{help}</p>}

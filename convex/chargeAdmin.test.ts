@@ -74,7 +74,7 @@ describe("charge obligation administration", () => {
     expect(await f.t.run(ctx => ctx.db.query("chargeRevisions").withIndex("by_chargeId_and_recordedAt", q => q.eq("chargeId", f.ids.charge)).first())).toBeNull();
     await f.t.run(ctx => ctx.db.patch(f.ids.coach.id, { active: false }));
     await f.t.mutation(makeFunctionReference<"mutation">("financialOperationsWorker:run"), { jobId: result.jobId });
-    await expect(f.alternate.mutation(makeFunctionReference<"mutation">("financialSources:rebuild"), { studentId: f.ids.student })).rejects.toThrow("existing financial job");
+    await expect(f.alternate.mutation(makeFunctionReference<"mutation">("financialSources:rebuild"), { studentId: f.ids.student })).rejects.toThrow("stopped money update");
     await f.alternate.mutation(makeFunctionReference<"mutation">("financialOperationsWorker:retry"), { jobId: result.jobId, reason: "Alternate Coach reviewed continuation" });
     const job = await f.t.run(ctx => ctx.db.get(result.jobId)); if (!job) throw new Error("Missing job");
     await f.t.mutation(worker, { jobId: job._id, step: job.step }); await f.t.mutation(worker, { jobId: job._id, step: job.step });

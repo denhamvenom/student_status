@@ -16,6 +16,7 @@ November 8, 2026 | main `18ffc06`
 
 ## In progress
 
+- Usability audit: PR #88 (`feat/usability-audit`, `9aa78a8`) is a release candidate, not merged or deployed. Receipt: docs/releases/RELEASE_2026-11-10_USABILITY_AUDIT.md.
 - No open pull requests as of `18ffc06`. The shared checkout `student-status-app` is clean and detached at `5971124` (behind main); work happens in worktrees per docs/REPOSITORY.md. Worktrees `wt-calendar-team-meetings` and `wt-handoff-fix` hold already-merged work.
 
 ## Owner decisions

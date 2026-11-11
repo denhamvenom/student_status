@@ -11,6 +11,7 @@ import { userFacingError } from '@/lib/error-message'
 import { canTurnOnInSettings, thisDeviceState } from './deviceStatus'
 import { needsHomeScreen } from './EnableNotifications'
 import { relativeTime } from './format'
+import { groupInbox, tidyDates, type InboxEntry } from './inboxGroups'
 import { internalPath, opensInPlace } from './inboxItem'
 import { usePushDevice } from './usePushDevice'
 
@@ -30,22 +31,48 @@ function TurnOnHint() {
   </p>
 }
 
-type Item = { _id: Id<'notifications'>; title: string; body: string; url: string; category: keyof typeof NOTIFICATION_CATEGORY_INFO; createdAt: number; readAt: number | null }
+type Item = { _id: Id<'notifications'>; title: string; body: string; url: string; category: keyof typeof NOTIFICATION_CATEGORY_INFO; createdAt: number; readAt: number | null; eventEndsAt: number | null }
 
-function ItemContent({ item, now, expanded, toggle }: { item: Item; now: number; expanded: boolean; toggle?: ReactNode }) {
-  const isUnread = item.readAt === null
+function ItemContent({ entry, now, expanded, toggle }: { entry: InboxEntry<Item>; now: number; expanded: boolean; toggle?: ReactNode }) {
+  const { item } = entry
+  const isUnread = entry.unread
   return <>
     <span aria-hidden="true" className={`mt-2 size-2.5 shrink-0 rounded-full ${isUnread ? 'bg-[var(--purple-700)]' : 'bg-transparent'}`}/>
     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
       <span className="flex flex-wrap items-baseline justify-between gap-x-3 text-xs">
         <span className="font-bold uppercase tracking-wide text-[var(--accent-text)]">{NOTIFICATION_CATEGORY_INFO[item.category].label}{isUnread && <span className="sr-only">, {copy.unread}</span>}</span>
-        <time dateTime={new Date(item.createdAt).toISOString()} className="muted font-normal">{relativeTime(item.createdAt, now)}</time>
+        <span className="flex items-baseline gap-2">
+          {isUnread && <span aria-hidden="true" className="rounded-full bg-[var(--purple-700)] px-2 py-px text-[11px] font-bold uppercase tracking-wide text-white">{copy.new}</span>}
+          <time dateTime={new Date(item.createdAt).toISOString()} className="muted font-normal">{relativeTime(item.createdAt, now)}</time>
+        </span>
       </span>
-      <span className={isUnread ? 'font-bold' : 'font-normal'}>{item.title}</span>
-      <span className={`muted text-sm font-normal whitespace-pre-line ${expanded ? '' : 'line-clamp-2'}`}>{item.body}</span>
+      <span className={isUnread ? 'font-bold' : 'font-normal'}>{tidyDates(item.title)}</span>
+      <span className={`muted text-sm font-normal whitespace-pre-line ${expanded ? '' : 'line-clamp-2'}`}>{tidyDates(item.body)}{entry.count > 1 && <> · {copy.repeated(entry.count)}</>}</span>
       {toggle}
     </span>
   </>
+}
+
+function EntryList({ entries, now, open, toggle, markEntryRead }: { entries: InboxEntry<Item>[]; now: number; open: ReadonlySet<string>; toggle: (entry: InboxEntry<Item>) => void; markEntryRead: (entry: InboxEntry<Item>) => void }) {
+  return <ul className="card m-0 flex list-none flex-col p-0">
+    {entries.map(entry => {
+      const { item } = entry
+      const highlight = entry.unread ? 'bg-[var(--gold-100)]/40' : 'bg-transparent'
+      if (opensInPlace(item)) {
+        const expanded = open.has(item._id)
+        return <li key={item._id} className="border-b border-[var(--border-default)] last:border-b-0">
+          <button type="button" aria-expanded={expanded} onClick={() => toggle(entry)} className={`${rowClass} ${highlight}`}>
+            <ItemContent entry={entry} now={now} expanded={expanded} toggle={<span className="mt-1 inline-flex items-center gap-1 text-sm font-bold text-[var(--accent-text)]">{expanded ? copy.showLess : copy.showMore}<ChevronDown size={16} aria-hidden="true" className={expanded ? 'rotate-180' : ''}/></span>}/>
+          </button>
+        </li>
+      }
+      return <li key={item._id} className="border-b border-[var(--border-default)] last:border-b-0">
+        <Link to={internalPath(item.url)} onClick={() => markEntryRead(entry)} className={`${rowClass} ${highlight}`} style={{ textDecoration: 'none' }}>
+          <ItemContent entry={entry} now={now} expanded/>
+        </Link>
+      </li>
+    })}
+  </ul>
 }
 
 /** The signed-in person's messages, newest first. The app icon badge is cleared while this page is open (useNotificationSync). */
@@ -57,6 +84,7 @@ export function Inbox() {
   const [now] = useState(Date.now)
   const [marking, setMarking] = useState(false)
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set())
+  const [showOlder, setShowOlder] = useState(false)
   const [error, setError] = useState('')
   const markAll = async () => {
     setMarking(true); setError('')
@@ -64,36 +92,27 @@ export function Inbox() {
     catch (cause) { setError(userFacingError(cause, copy.markFailed)) }
     finally { setMarking(false) }
   }
-  const markIfUnread = (item: Item) => { if (item.readAt === null) void markRead({ notificationId: item._id }).catch(() => {}) }
-  const toggle = (item: Item) => {
+  const markEntryRead = (entry: InboxEntry<Item>) => { if (entry.unread) for (const id of entry.ids) void markRead({ notificationId: id as Id<'notifications'> }).catch(() => {}) }
+  const toggle = (entry: InboxEntry<Item>) => {
     const next = new Set(open)
-    if (next.has(item._id)) next.delete(item._id)
-    else { next.add(item._id); markIfUnread(item) }
+    if (next.has(entry.item._id)) next.delete(entry.item._id)
+    else { next.add(entry.item._id); markEntryRead(entry) }
     setOpen(next)
   }
+  const groups = groupInbox(messages.results, now)
   if (messages.status === 'LoadingFirstPage') return <div className="card"><p role="status" className="m-0">{copy.loading}</p></div>
   if (!messages.results.length) return <div className="card flex flex-col items-center gap-3 py-10 text-center"><InboxIcon size={40} aria-hidden="true" className="text-[var(--text-muted)]"/><p className="m-0 max-w-sm">{copy.empty}</p><TurnOnHint/></div>
   return <>
     {!!unread && <p className="action-row"><Button type="button" variant="outline" disabled={marking} onClick={() => void markAll()}><CheckCheck aria-hidden="true"/>{marking ? copy.marking : copy.markAll}</Button></p>}
     {error && <p role="alert" className="open-text">{error}</p>}
-    <ul className="card m-0 flex list-none flex-col p-0">
-      {messages.results.map(item => {
-        const highlight = item.readAt === null ? 'bg-[var(--gold-100)]/40' : 'bg-transparent'
-        if (opensInPlace(item)) {
-          const expanded = open.has(item._id)
-          return <li key={item._id} className="border-b border-[var(--border-default)] last:border-b-0">
-            <button type="button" aria-expanded={expanded} onClick={() => toggle(item)} className={`${rowClass} ${highlight}`}>
-              <ItemContent item={item} now={now} expanded={expanded} toggle={<span className="mt-1 inline-flex items-center gap-1 text-sm font-bold text-[var(--accent-text)]">{expanded ? copy.showLess : copy.showMore}<ChevronDown size={16} aria-hidden="true" className={expanded ? 'rotate-180' : ''}/></span>}/>
-            </button>
-          </li>
-        }
-        return <li key={item._id} className="border-b border-[var(--border-default)] last:border-b-0">
-          <Link to={internalPath(item.url)} onClick={() => markIfUnread(item)} className={`${rowClass} ${highlight}`} style={{ textDecoration: 'none' }}>
-            <ItemContent item={item} now={now} expanded/>
-          </Link>
-        </li>
-      })}
-    </ul>
+    <EntryList entries={groups.recent} now={now} open={open} toggle={toggle} markEntryRead={markEntryRead}/>
+    {groups.older.length > 0 && <section className="mt-4 flex flex-col gap-2">
+      <button type="button" aria-expanded={showOlder} onClick={() => setShowOlder(value => !value)} className="flex min-h-11 w-full items-center justify-between gap-2 border-0 bg-transparent px-1 text-left text-sm font-bold text-[var(--accent-text)]">
+        <span>{copy.older(groups.older.length)}<span className="muted font-normal"> · {copy.olderHint}</span></span>
+        <ChevronDown size={16} aria-hidden="true" className={showOlder ? 'rotate-180' : ''}/>
+      </button>
+      {showOlder && <EntryList entries={groups.older} now={now} open={open} toggle={toggle} markEntryRead={markEntryRead}/>}
+    </section>}
     {messages.status !== 'Exhausted' && <p className="action-row mt-4"><Button type="button" variant="outline" disabled={messages.status !== 'CanLoadMore'} onClick={() => messages.loadMore(PAGE)}>{messages.status === 'LoadingMore' ? copy.loadingMore : copy.loadMore}</Button></p>}
   </>
 }

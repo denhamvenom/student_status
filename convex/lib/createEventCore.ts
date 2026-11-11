@@ -21,7 +21,7 @@ export type MentorInvite = { mentorUserId: Id<"appUsers">; source: "individual" 
 
 export type CreateEventCoreInput = {
   eventFields: NewEventFields;
-  requirements: { key: string; label: string; instructions?: string; url?: string; dueAt?: number }[];
+  requirements: { key: string; label: string; instructions?: string; url?: string; dueAt?: number; kind?: "info" | "checkoff" }[];
   shifts: ReturnType<typeof cleanShift>[];
   questions: ReturnType<typeof cleanQuestion>[];
   calendarChoice?: { kind: "create" } | { kind: "link"; eventId: string };

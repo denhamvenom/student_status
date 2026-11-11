@@ -189,6 +189,33 @@ describe("inbox", () => {
     expect(page.page.map(r => r._id)).toEqual([forA2, forA1]);
   });
 
+  it("tells the Inbox when the event a notice links to ends, and null for other links", async () => {
+    vi.setSystemTime(OPEN_NOW);
+    const f = await fixture();
+    const endsAt = OPEN_NOW - 86_400_000;
+    const eventId = await f.t.run(async ctx => {
+      const seasonId = await ctx.db.insert("seasons", { name: "Synthetic", year: 2026, status: "active", startsAt: 0, permissionVersion: "DRAFT", createdBy: f.ids.a });
+      return await ctx.db.insert("events", { seasonId, name: "Past meeting", type: "Team", startsAt: endsAt - 3_600_000, endsAt, destination: "Lab", travel: "None", overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "open", allowWithdrawal: true, permissionRequired: false, firstRequired: false, archived: false });
+    });
+    await f.t.run(ctx => notifyUsers(ctx, { ...base, userIds: [f.ids.a], url: `/events/${eventId}`, title: "New meeting: Past meeting" }));
+    await f.t.run(ctx => notifyUsers(ctx, { ...base, userIds: [f.ids.a], url: "/events/not-an-event-id", title: "Elsewhere" }));
+    await f.t.run(ctx => notifyUsers(ctx, { ...base, userIds: [f.ids.a], url: "/", title: "Announcement" }));
+    const page = (await f.a.query(api.notifications.listMine, { paginationOpts: { numItems: 10, cursor: null } })).page;
+    expect(Object.fromEntries(page.map(row => [row.title, row.eventEndsAt]))).toEqual({ "New meeting: Past meeting": endsAt, Elsewhere: null, Announcement: null });
+  });
+
+  it("still gives the end time for an archived event, and 0 for a deleted one, so both count as past", async () => {
+    vi.setSystemTime(OPEN_NOW);
+    const f = await fixture();
+    const eventId = await f.t.run(async ctx => {
+      const seasonId = await ctx.db.insert("seasons", { name: "Synthetic", year: 2026, status: "active", startsAt: 0, permissionVersion: "DRAFT", createdBy: f.ids.a });
+      return await ctx.db.insert("events", { seasonId, name: "Old meeting", type: "Team", startsAt: 1, endsAt: 2, destination: "Lab", travel: "None", overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "open", allowWithdrawal: true, permissionRequired: false, firstRequired: false, archived: true });
+    });
+    await f.t.run(ctx => notifyUsers(ctx, { ...base, userIds: [f.ids.a], url: `/events/${eventId}`, title: "Archived notice" }));
+    const page = (await f.a.query(api.notifications.listMine, { paginationOpts: { numItems: 10, cursor: null } })).page;
+    expect(page.find(r => r.title === "Archived notice")?.eventEndsAt).toBe(2);
+  });
+
   it("preferences list only categories for the viewer's role, and sendTestToMe is rate limited", async () => {
     vi.setSystemTime(OPEN_NOW);
     const f = await fixture();

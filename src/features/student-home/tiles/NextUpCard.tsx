@@ -29,10 +29,10 @@ function WeekRow({ event }: { event: AgendaEvent }) {
   </li>
 }
 
-export function ThisWeekList({ events, className }: { events: AgendaEvent[]; className?: string }) {
+export function ThisWeekList({ events, className, title = copy.thisWeek }: { events: AgendaEvent[]; className?: string; title?: string }) {
   const id = useId()
   return <div className={cn('flex flex-col gap-1', className)}>
-    <p id={id} className={cn(eyebrow, 'm-0')}>{copy.thisWeek}</p>
+    <p id={id} className={cn(eyebrow, 'm-0')}>{title}</p>
     {events.length
       ? <ul aria-labelledby={id} className={cn(inset, 'm-0 flex list-none flex-col p-1')}>{events.map(event => <WeekRow key={event.eventId} event={event} />)}</ul>
       : <p className="m-0 text-[13px] text-vs-muted">{copy.nothingThisWeek}</p>}

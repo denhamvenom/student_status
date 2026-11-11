@@ -6,7 +6,6 @@ import { PendingJoinView } from './PendingJoinView'
 import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { liveCopy } from './lib/live-copy'
-import { useSignOut } from './notifications/useSignOut'
 
 const joinCopy = {
   code: 'Invitation code',
@@ -15,7 +14,8 @@ const joinCopy = {
   continue: 'Continue',
   checking: 'Checking…',
   nameIntro: 'Code accepted. Enter your first and last name to ask to join the team.',
-  differentCode: 'Use a different code',
+  back: 'Back',
+  step: (step: number) => `Step ${step} of 2`,
   noMatch: 'That invitation code didn’t work. It may be mistyped, expired or revoked. Check it and try again, or ask a Coach for a new code. After 5 wrong codes, you’ll need to wait 15 minutes.',
   tooManyAttempts: 'Too many codes were tried. Wait 15 minutes, then try again.',
   codeStopped: 'That invitation code no longer works. Ask a Coach for a new code.',
@@ -32,11 +32,10 @@ export function PendingJoin() {
   const request = useMutation(api.app.requestJoin)
   const redeem = useMutation(api.bulkInvites.redeem)
   const checkCode = useMutation(api.bulkInvites.checkInvitationCode)
-  const signOut = useSignOut()
   const [code, setCode] = useState(''), [first, setFirst] = useState(''), [last, setLast] = useState('')
   // Set only after the server confirms a team code; the name is asked for only then.
   const [teamCode, setTeamCode] = useState<string | null>(null)
-  const [error, setError] = useState(''), [signOutError, setSignOutError] = useState(''), [busy, setBusy] = useState(false)
+  const [error, setError] = useState(''), [busy, setBusy] = useState(false)
   const [sentId, setSentId] = useState<string | null>(null)
   const [asOf, setAsOf] = useState(() => Date.now())
   useEffect(() => { const timer = window.setInterval(() => setAsOf(Date.now()), 60_000); return () => window.clearInterval(timer) }, [])
@@ -76,24 +75,22 @@ export function PendingJoin() {
     finally { setBusy(false) }
   }
   function changeCode() { setTeamCode(null); setError('') }
-  async function exit() {
-    setBusy(true); setSignOutError('')
-    try { await signOut() } catch (cause) { setSignOutError(userFacingError(cause, liveCopy.join.signOutFailed)) } finally { setBusy(false) }
-  }
   if (!joinStatus || !connections) return <section className="card"><p>Checking your join request…</p></section>
   const connectionWaiting = pending || sent
-  return <PendingJoinView waitingTitle={connectionWaiting ? joinCopy.waitingCoach : joinCopy.waitingCoachOrTravelLead} waitingDetail={connectionWaiting ? joinCopy.connectionWaiting : undefined} declined={declined} submitted={submitted} busy={busy} signOutError={signOutError} onSignOut={() => void exit()}>
+  return <PendingJoinView waitingTitle={connectionWaiting ? joinCopy.waitingCoach : joinCopy.waitingCoachOrTravelLead} waitingDetail={connectionWaiting ? joinCopy.connectionWaiting : undefined} declined={declined} submitted={submitted}>
     {connectionWaiting ? <section className="card"><h2>{joinCopy.connectionTitle}</h2><p role="status">{joinCopy.connectionDetail}</p></section> : <section className="card">
       {declined && latest?.status === 'declined' && <p>{joinCopy.connectionDeclined}</p>}
       <h2>{submitted || declined ? joinCopy.another : liveCopy.join.heading}</h2>
       {teamCode ? <form className="form-grid" onSubmit={event => void submitName(event)}>
+        <p className="eyebrow">{joinCopy.step(2)}</p>
         <p role="status">{joinCopy.nameIntro}</p>
         <label>{liveCopy.join.first} <Input value={first} disabled={busy} onChange={event => setFirst(event.target.value)} autoComplete="given-name" required /></label>
         <label>{liveCopy.join.last} <Input value={last} disabled={busy} onChange={event => setLast(event.target.value)} autoComplete="family-name" required /></label>
         <p className="muted">{liveCopy.join.studentNote}</p>
         <Button className="button button-primary" type="submit" disabled={busy}>{liveCopy.join.submit}</Button>
-        <Button type="button" variant="outline" disabled={busy} onClick={changeCode}>{joinCopy.differentCode}</Button>
+        <Button type="button" variant="outline" disabled={busy} onClick={changeCode}>{joinCopy.back}</Button>
       </form> : <form className="form-grid" onSubmit={event => void submitCode(event)}>
+        <p className="eyebrow">{joinCopy.step(1)}</p>
         <p>{joinCopy.intro}</p>
         <label>{joinCopy.code} <Input value={code} disabled={busy} onChange={event => { setCode(event.target.value); setError('') }} autoComplete="off" required /></label>
         <Button className="button button-primary" type="submit" disabled={busy || !code.trim()}>{busy ? joinCopy.checking : joinCopy.continue}</Button>

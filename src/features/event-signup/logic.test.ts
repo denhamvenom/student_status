@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { answerIssue, answersToSend, draftFromSaved, reconcileDrafts, reconcileShifts, shiftBlock, shiftBounds, shiftChoiceIssue, shiftRuleText, toggleShift, unansweredRequired, type ShiftBounds } from './logic'
+import { answerIssue, answersToSend, draftFromSaved, reconcileDrafts, reconcileShifts, shiftBlock, shiftBounds, shiftChoiceIssue, shiftPickerHref, shiftRuleText, toggleShift, unansweredRequired, type ShiftBounds } from './logic'
+import { signupCopy } from './copy'
 
 const hour = 60 * 60 * 1000
 const shift = (shiftId: string, from: number, to: number, spotsLeft: number | null = 5) => ({ shiftId, startsAt: from * hour, endsAt: to * hour, spotsLeft })
@@ -36,7 +37,8 @@ describe('shift choice rules (match checkShifts)', () => {
   })
 
   it.each([
-    [0, { min: 1, max: 2 }, 'Pick 1 more shift.'],
+    [0, { min: 1, max: 2 }, 'Pick 1 shift.'],
+    [1, { min: 2, max: 2 }, 'Pick 1 more shift.'],
     [1, { min: 3, max: null }, 'Pick 2 more shifts.'],
     [3, { min: 1, max: 2 }, 'You can pick up to 2 shifts. Remove one.'],
     [0, { min: 0, max: 2 }, null],
@@ -103,4 +105,16 @@ describe('live questions and shifts', () => {
   it('drops picked shifts that are no longer offered', () => {
     expect(reconcileShifts(['a', 'z'], [{ shiftId: 'a' }, { shiftId: 'b' }])).toEqual(['a'])
   })
+})
+
+describe('shift wording and picker link', () => {
+  it('To do and the wizard say the same thing for the same count', () => {
+    expect(signupCopy.todo.pick(1, 0)).toBe('Pick 1 shift.')
+    expect(signupCopy.todo.pick(1, 1)).toBe(shiftChoiceIssue(1, { min: 2, max: null }))
+    expect(signupCopy.todo.pick(2, 0)).toBe(shiftChoiceIssue(0, { min: 2, max: null }))
+  })
+  it.each([
+    ['/events/e1#my-signup', '/events/e1?pick=shifts#my-signup'],
+    ['/events/e1', '/events/e1?pick=shifts#my-signup'],
+  ])('%s opens the picker at %s', (href, expected) => expect(shiftPickerHref(href)).toBe(expected))
 })

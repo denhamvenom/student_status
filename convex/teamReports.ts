@@ -4,6 +4,9 @@ import { query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { activeSeason, viewer, isCoachOrTravelLead } from "./lib/access";
+import { attendanceFor } from "./lib/readModels";
+import { studentMatchesSubteams } from "./lib/eventAudienceRules";
+import { canonicalSubteam } from "../src/lib/subteams";
 import { financeRow } from "./lib/financeRow";
 import { teamReportAttendanceGate, teamReportAttendanceRow } from "./lib/teamReportAttendance";
 import { studentReadiness } from "./lib/readModels";
@@ -84,5 +87,49 @@ export const list = query({
     if (page.page.length>10) throw new ConvexError("Too many students to show at once. Reload the report to see them 10 at a time.");
     const eventIds=eventPage.length>50?null:new Set(eventPage.filter(e=>!e.archived).map(e=>String(e._id)));
     return {...page,page:await Promise.all(page.page.map(student=>reportRow(ctx,student,attendance,event,eventIds))),seasonId:season._id,attendance,event:event?{eventId:event._id,name:event.name,startsAt:event.startsAt,type:event.type}:null,eventsCoverage:eventIds?"complete" as const:"unknown" as const};
+  },
+});
+
+/**
+ * Worst case per shown student is 200 participant rows plus 500 attendance records (attendanceFor), 700 reads. Convex stops a
+ * query at 32,000 documents read, and the query also reads up to 200 events and 500 meetings. 40 students x 700 = 28,000, plus
+ * 700 shared = 28,700, which stays under the limit. One extra student is read to tell whether the list is complete.
+ */
+const MENTOR_REPORT_MAX_STUDENTS = 40;
+/** Active students read to find the Mentor's own; student documents carry no per-student reads. */
+const MENTOR_REPORT_ROSTER_BOUND = 600;
+const mentorRow = v.object({studentId:v.id("students"),name:v.string(),subteam:v.string(),travelTeam:v.boolean(),requiredPercent:nullableNumber,thursdayAttended:v.number(),events:v.array(v.string())});
+
+/**
+ * Mentor student report. Minimal projection (no health, money, contact or parent data): name, subteam, Travel Team, the share of
+ * required meetings attended, other meetings and the events the student is confirmed for. Defaults to the Mentor's own subteams
+ * (primary, secondary or Leadership); `allSubteams` widens it to every active student, which Mentors could already see here.
+ */
+export const mentorList = query({
+  args:{allSubteams:v.boolean()},
+  returns:v.object({subteams:v.array(v.string()),scope:v.union(v.literal("mine"),v.literal("all")),totalStudents:v.number(),studentsComplete:v.boolean(),rows:v.array(mentorRow)}),
+  handler:async(ctx,args)=>{
+    const user=await viewer(ctx);
+    if (user.role!=="mentor") throw new ConvexError("Only a Mentor can open the Mentor student report.");
+    const season=await activeSeason(ctx);
+    const mine=[...new Set((user.subteams??[]).map(canonicalSubteam))].filter(Boolean);
+    // Events are read newest-ending first so a long season keeps its upcoming and recent events.
+    const [students,events,meetings]=await Promise.all([
+      ctx.db.query("students").withIndex("by_seasonId_and_active",q=>q.eq("seasonId",season._id).eq("active",true)).take(MENTOR_REPORT_ROSTER_BOUND+1),
+      ctx.db.query("events").withIndex("by_seasonId_and_archived_and_endsAt",q=>q.eq("seasonId",season._id).eq("archived",false)).order("desc").take(200),
+      ctx.db.query("attendanceMeetings").withIndex("by_seasonId_and_startsAt",q=>q.eq("seasonId",season._id)).take(500),
+    ]);
+    // Filter to the Mentor's subteams first (student documents are cheap); the cap applies only to the costly per-student reads.
+    const rosterComplete=students.length<=MENTOR_REPORT_ROSTER_BOUND;
+    const matching=students.slice(0,MENTOR_REPORT_ROSTER_BOUND).filter(student=>args.allSubteams||studentMatchesSubteams(student,mine));
+    const studentsComplete=rosterComplete&&matching.length<=MENTOR_REPORT_MAX_STUDENTS;
+    // Sort by name before taking the cap so the first 40 are the first 40 alphabetically, not an arbitrary 40.
+    const shown=[...matching].sort((a,b)=>(a.preferredName||a.legalName).localeCompare(b.preferredName||b.legalName)).slice(0,MENTOR_REPORT_MAX_STUDENTS);
+    const current=events.filter(event=>!event.cancelled).sort((a,b)=>a.startsAt-b.startsAt);
+    const rows=await Promise.all(shown.map(async student=>{
+      const [participation,attendance]=await Promise.all([ctx.db.query("participants").withIndex("by_studentId",q=>q.eq("studentId",student._id)).take(200),attendanceFor(ctx,student,meetings)]);
+      return {studentId:student._id,name:student.preferredName||student.legalName,subteam:student.subteam,travelTeam:student.travelTeam,requiredPercent:attendance.tuesdayPercent,thursdayAttended:attendance.thursdayAttended,events:current.filter(event=>participation.some(p=>p.eventId===event._id&&p.status==="confirmed")).map(event=>event.name)};
+    }));
+    return {subteams:mine,scope:args.allSubteams?"all" as const:"mine" as const,totalStudents:matching.length,studentsComplete,rows};
   },
 });

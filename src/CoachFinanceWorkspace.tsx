@@ -6,7 +6,7 @@ import { api } from '../convex/_generated/api'
 import { Button } from './components/ui/button'
 import { CoachFinanceTable } from './CoachFinanceTable'
 import { FinanceRecentChanges } from './FinanceRecentChanges'
-import { financeWorkspaceCopy as copy } from './lib/finance-admin-copy'
+import { financeAdminCopy, financeWorkspaceCopy as copy } from './lib/finance-admin-copy'
 import styles from './CoachFinanceTable.module.css'
 
 class FinanceSectionBoundary extends Component<{ children: ReactNode; onRetry: () => void }, { error: unknown }> {
@@ -38,7 +38,7 @@ function Accounts({ onOpen, onRecord }: { onOpen: (id: string, name: string) => 
   }
   return <section className={styles.root}>
     {status?.maintenance && status.maintenance.state !== 'ready' && <p role={status.maintenance.state === 'failed' ? 'alert' : 'status'}>{status.maintenance.state === 'failed' ? copy.maintenanceFailed : copy.maintenance}</p>}
-    <CoachFinanceTable rows={page.results} loading={page.status === 'LoadingFirstPage'} loadingMore={page.status === 'LoadingMore'} hasMore={page.status === 'CanLoadMore'} onMore={() => page.loadMore(20)} onOpen={onOpen} onRecord={onRecord} onRebuild={id => void prepareAccount(id)} rebuildingId={rebuildingId}/>
+    <CoachFinanceTable rows={page.results} loading={page.status === 'LoadingFirstPage'} loadingMore={page.status === 'LoadingMore'} hasMore={page.status === 'CanLoadMore'} onMore={() => page.loadMore(20)} onOpen={onOpen} onRecord={onRecord} onRebuild={id => void prepareAccount(id)} rebuildingId={rebuildingId} canEdit={status?.canEdit ?? true}/>
     {error && <p role="alert">{error}</p>}{saved && <p role="status">{copy.accountRequested}</p>}
   </section>
 }
@@ -61,6 +61,7 @@ function Changes() {
     finally { pending.current = false; setBusy(false) }
   }
   return <section className={styles.root}>
+    {status && !status.canEdit && <p className={styles.note}>{financeAdminCopy.whoCanAct}</p>}
     <FinanceRecentChanges rows={page.results} loading={page.status === 'LoadingFirstPage'} loadingMore={page.status === 'LoadingMore'} hasMore={page.status === 'CanLoadMore'} coverage={status?.coverage ?? null} onMore={() => page.loadMore(20)}/>
     {status?.canPrepareHistory && <details><summary>More options</summary><Button type="button" variant="outline" disabled={busy} onClick={() => void start()}>{busy ? copy.preparingHistory : copy.prepareHistory}</Button></details>}
     {error && <p role="alert">{error}</p>}{saved && <p role="status">{copy.preparationStarted}</p>}

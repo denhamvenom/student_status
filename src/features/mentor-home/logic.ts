@@ -2,7 +2,7 @@
 // Pure (no Convex or React) so the rules are tested directly; the backend decides what a Mentor may see and do.
 import { onsiteLocation } from '../../../convex/lib/transportation'
 import { mentorHomeCopy } from '@/copy/mentor-home-copy'
-import { subteamDisplay } from '@/lib/subteams'
+import { canonicalSubteam, subteamDisplay } from '@/lib/subteams'
 import { formatWhen } from '../student-home/agenda'
 import { repeatSummary } from '../event-setup/audience/repeat'
 import type { RepeatValue } from '../event-setup/audience/types'
@@ -88,7 +88,8 @@ export const COMING_UP_LIMIT = 3
 /** At most this many tags on a Coming up row. */
 export const MAX_TAGS = 2
 
-const sameSubteam = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+/** Same subteam under the server's rule: legacy names are canonicalized (Mechanical = Build), then compared without case. */
+const sameSubteam = (a: string, b: string) => canonicalSubteam(a).toLowerCase() === canonicalSubteam(b).toLowerCase()
 
 /** Coming up tags, at most two: Travel (it asks about driving or a hotel room), then Your subteam (for one of the Mentor's subteams). */
 export function comingUpTags(meeting: Pick<MentorMeeting, 'questions' | 'audience'>, subteams: readonly string[]): string[] {
@@ -112,7 +113,8 @@ export type HomeView = {
 /** Mentor Home in one pass: Next event, Needs your answer, Coming up and how many events the Mentor could help with. */
 export function homeView(data: Pick<MentorHomeData, 'scheduled' | 'created' | 'pendingInvites' | 'joinable' | 'subteams'>, now: number): HomeView {
   const [next = null, ...rest] = myUpcoming(data, now)
-  const join = joinSections(data.joinable, now)
+  // Series the Mentor already signed up for are not "could help with" anymore, so the count drops when they sign up.
+  const join = joinSections(data.joinable.filter(entry => !entry.hasSeriesSignup), now, data.subteams)
   return {
     next,
     needsAnswer: needsAnswer(data, now),
@@ -134,23 +136,55 @@ export function goingList(data: Pick<MentorHomeData, 'scheduled' | 'created' | '
 /** Still open to this Mentor: upcoming, not canceled, not their own meeting and not a series meeting they skipped. */
 const openToJoin = (row: MentorMeeting, now: number) => !row.cancelled && row.canSignUp && !row.isCreator && !isSkipped(row) && row.endsAt > now
 
-export type JoinSections = { competitions: JoinEntry[]; meetings: JoinEntry[] }
+export type JoinSections = { competitions: JoinEntry[]; meetings: JoinEntry[]; /** Entries left out because they are for other subteams (0 when widened). */ hidden: number }
+
+/**
+ * An entry is in the Mentor's scope when it is for the whole team or for one of their subteams. Only a meeting restricted to
+ * other subteams is out of scope (the server already refuses those; this keeps the screen right if it ever returns them).
+ */
+export function joinInScope(entry: Pick<JoinEntry, 'next'>, subteams: readonly string[]): boolean {
+  const audience = entry.next.audience
+  if (audience.kind !== 'subteams') return true
+  return audience.subteams.some(item => subteams.some(mine => sameSubteam(item, mine)))
+}
 
 /**
  * Schedule › Join, grouped (owner decision, Nov 7 2026): one entry per repeating series or one-time event, Competitions &
  * trips first, then Meetings & events, each soonest first. An entry is dropped when its next meeting is the Mentor's own,
- * canceled, over or skipped (a skipped meeting shows on Going instead).
+ * canceled, over or skipped (a skipped meeting shows on Going instead). With `subteams` given, entries for other subteams are
+ * left out and counted in `hidden` until the Mentor widens (`showAll`).
  */
-export function joinSections(entries: readonly JoinEntry[], now: number): JoinSections {
-  const open = entries.filter(entry => openToJoin(entry.next, now)).sort((a, b) => a.nextStartsAt - b.nextStartsAt || a.title.localeCompare(b.title))
+export function joinSections(entries: readonly JoinEntry[], now: number, subteams?: readonly string[], showAll = false): JoinSections {
+  const openEntries = entries.filter(entry => openToJoin(entry.next, now))
+  const scoped = subteams && !showAll ? openEntries.filter(entry => joinInScope(entry, subteams)) : openEntries
+  // Mentors can sign up for chosen-students and Mentors-only events too (DECISIONS: Mentor self sign-up), but they come after
+  // whole-team and subteam items in each group.
+  const narrow = (entry: JoinEntry) => entry.next.audience.kind === 'students' || entry.next.audience.kind === 'mentorsOnly' ? 1 : 0
+  const open = [...scoped].sort((a, b) => narrow(a) - narrow(b) || a.nextStartsAt - b.nextStartsAt || a.title.localeCompare(b.title))
   return {
     competitions: open.filter(entry => entry.category === 'competitionsAndTrips'),
     meetings: open.filter(entry => entry.category !== 'competitionsAndTrips'),
+    hidden: openEntries.length - scoped.length,
   }
 }
 
-/** "Your subteam" is only for meetings, never for a Competition or trip (those are for the whole team). */
-export const showsSubteamTag = (entry: Pick<JoinEntry, 'category' | 'forYourSubteam'>) => entry.category === 'meetings' && entry.forYourSubteam
+/** Who an event is for, as a small row tag: "Whole team", its subteams ("Programming, CAD"), or the narrower audiences. */
+export function audienceTag(audience: { kind: MentorMeeting['audience']['kind']; subteams: readonly string[] }): string {
+  if (audience.kind === 'subteams') {
+    const list = subteamsList(audience.subteams)
+    return list || copy.join.wholeTeam
+  }
+  if (audience.kind === 'students') return copy.join.someStudents
+  if (audience.kind === 'mentorsOnly') return copy.join.mentorsOnly
+  return copy.join.wholeTeam
+}
+
+/** The always-on scope line for Schedule › Join: "Showing: Programming and whole-team items" (or all subteams once widened). */
+export function joinScopeLine(subteams: readonly string[], showAll: boolean): string {
+  if (showAll) return copy.scope.showingAll
+  const list = subteamsList(subteams)
+  return list ? copy.scope.showing(list) : copy.scope.showingNone
+}
 
 /**
  * How a join entry is described. A series: "Mondays at 6:00 PM · Repeats weekly", then "4 upcoming · Next: Mon Nov 9,
@@ -181,16 +215,28 @@ export function unreadPinned<T extends Pinned>(messages: readonly T[], dismissed
   return messages.filter(item => (item.showUntil === null || item.showUntil > now) && !dismissed.has(pinKey(item))).sort((a, b) => b.pinnedAt - a.pinnedAt)[0] ?? null
 }
 
-export type HereGroup = { subteam: string; count: number; names: string[]; label: string }
+export type HereStudent = { name: string; since: string }
+export type HereGroup = { subteam: string; count: number; students: HereStudent[]; label: string }
 
-/** Who's here now, one line per Mentor subteam in the order a Coach set them: "Programming · 3 clocked in" and the names. */
+const timeFormat = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' })
+
+/** "4:05 PM" in Central Time. */
+export const clockedInTime = (at: number) => timeFormat.format(at)
+
+/** Who's here now, one group per Mentor subteam in the order a Coach set them: the students clocked in, with the time they clocked in. */
 export function hereGroups(data: Pick<ClockedInData, 'subteams'>): HereGroup[] {
   return data.subteams.map(group => {
     const subteam = subteamDisplay(group.subteam)
-    const names = group.students.map(student => student.displayName.trim()).filter(Boolean)
-    return { subteam, count: group.count, names, label: copy.here.count(subteam, group.count) }
+    const students = group.students.map(student => ({ name: student.displayName.trim(), since: copy.here.since(clockedInTime(student.clockedInAt)) })).filter(student => student.name)
+    return { subteam, count: group.count, students, label: group.count === 0 ? copy.here.nobody(subteam) : copy.here.count(subteam, group.count) }
   })
 }
+
+/** "Programming, CAD": the Mentor's subteams in display form, once each. */
+export const subteamsList = (subteams: readonly string[]) => [...new Set(subteams.filter(item => item.trim()).map(subteamDisplay))].join(', ')
+
+/** "Showing: Programming, CAD" for Who's here now (the Mentor's subteams only). */
+export const hereScopeLine = (subteams: readonly string[]) => copy.here.showing(subteamsList(subteams))
 
 /** "Team meeting", "Competition", "Outreach", "Fundraiser". */
 export const typeLabel = (meeting: Pick<MentorMeeting, 'type'>) => copy.types[meeting.type] ?? meeting.type

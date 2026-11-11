@@ -64,11 +64,11 @@ export const move = mutation({
 export const retry = mutation({
   args: { jobId: v.id("feePriorityJobs"), reason: v.string() }, returns: v.null(),
   handler: async (ctx, args) => {
-    const actor = await viewer(ctx); if (actor.role !== "coach") throw new ConvexError("Only a Coach can retry the fee order update.");
+    const actor = await viewer(ctx); if (actor.role !== "coach") throw new ConvexError("Only a Coach can try the fee order update again.");
     if (args.reason.trim().length < 8 || args.reason.length > 1000) throw new ConvexError("Provide a reason of at least eight characters.");
     const season = await activeSeason(ctx); const job = await ctx.db.get(args.jobId);
     const control = await ctx.db.query("seasonFinanceControls").withIndex("by_seasonId", q => q.eq("seasonId", season._id)).unique();
-    if (!job || job.seasonId !== season._id || job.state !== "failed" || control?.priorityJobId !== job._id) throw new ConvexError("There is no stopped fee order update to retry. Reload to see the latest.");
+    if (!job || job.seasonId !== season._id || job.state !== "failed" || control?.priorityJobId !== job._id) throw new ConvexError("No stopped fee order update is waiting to try again. Reload to see the latest.");
     await ctx.db.patch(job._id, { actorId: actor._id, state: job.phase === "drain" ? "draining" : "applying", lastError: undefined, updatedAt: Date.now() });
     await ctx.db.patch(control._id, { state: job.phase === "drain" ? "draining" : "applying", updatedAt: Date.now() });
     await ctx.db.insert("audit", { actorId: actor._id, entity: "feePriorityJobs", entityId: job._id, action: "retry", reason: args.reason.trim(), beforeJson: JSON.stringify({ actorId: job.actorId, step: job.step }), afterJson: JSON.stringify({ actorId: actor._id, step: job.step }), at: Date.now() });

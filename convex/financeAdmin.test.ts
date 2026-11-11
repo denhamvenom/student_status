@@ -6,7 +6,7 @@ import schema from "./schema";
 import { addCharge } from "./lib/money";
 import { ensureFinancialAccount, financialAccount, recordChargeChange, recordProjectedEntry } from "./lib/financialSources";
 import { refreshStudentFinance } from "./lib/financeSummaries";
-import { recordLedgerChange } from "./lib/financeChanges";
+import { paymentEditDetail, recordLedgerChange } from "./lib/financeChanges";
 const modules = import.meta.glob("./**/*.ts");
 const rows = makeFunctionReference<"query">("financeAdmin:students");
 const feed = makeFunctionReference<"query">("financeAdmin:recentChanges");
@@ -206,3 +206,15 @@ await f.t.run(async ctx => { const evidence = await ctx.db.query("financeChangeE
     expect(await f.t.run(ctx => ctx.db.get(ids.charge))).toMatchObject({ priority: 2, appliedCents: 0 });
     expect(await f.t.run(ctx => ctx.db.query("studentFinanceSummaries").withIndex("by_studentId", q => q.eq("studentId", f.ids.student)).unique())).toMatchObject({ version: 3 });
   });});
+
+describe("payment edit detail", () => {
+  const side = { studentId: "s1" as never, amountCents: 112500, method: "check" as const, reference: null }
+  it.each([
+    [{}, null],
+    [{ method: "cash" as const }, "Method: Check → Cash"],
+    [{ studentId: "s2" as never }, "Moved to Synthetic Two"],
+    [{ method: null, reference: "1042" }, "Method: Check → None · Reference changed"],
+  ])("describes %j", (change, expected) => {
+    expect(paymentEditDetail(side, { ...side, ...change }, () => "Synthetic Two")).toBe(expected)
+  })
+})

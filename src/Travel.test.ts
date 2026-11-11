@@ -1,7 +1,7 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import { EventTransport, IndependentTravel } from './Travel'
+import { driverStepIssue, withoutFieldPrefix, EventTransport, IndependentTravel } from './Travel'
 
 const state = vi.hoisted(() => ({ enabled: false }))
 vi.mock('convex/react', () => ({
@@ -29,5 +29,32 @@ describe('transportation controls', () => {
     const html = renderToStaticMarkup(createElement(EventTransport, { id: 'synthetic-event' }))
     expect(html).toContain('type="number"')
     expect(renderToStaticMarkup(createElement(IndependentTravel, { id: 'synthetic-event', student: 'synthetic-student' }))).toContain('My student will travel on their own')
+  })
+})
+
+describe('driver wizard steps', () => {
+  const vehicleMessage = 'Enter the vehicle, like “Gray minivan”, so a Coach or Travel Lead can tell it apart.'
+  const seatsMessage = 'Enter passenger seats as a whole number from 1 to 100. A driver who carries no students does not need to be added.'
+  const ok = { name: 'Sam Driver', email: 'sam@example.org', phone: '555-0100', vehicleName: 'Gray minivan', seats: '6', approved: false, towCapable: false, active: true }
+  it.each([
+    [0, { name: ' ' }, 'Enter the driver’s name.'],
+    [0, { email: 'sam' }, 'Enter a full email address, like name@example.org.'],
+    [0, { phone: '' }, 'Enter a phone number.'],
+    [0, { phone: '555-01' }, 'Enter a 10-digit phone number, with an optional leading 1.'],
+    [0, { phone: 'call me' }, 'Enter a 10-digit phone number, with an optional leading 1.'],
+    [0, { phone: '(555) 010-0100' }, ''],
+    [1, { vehicleName: '  ' }, vehicleMessage],
+    [1, { seats: '' }, seatsMessage],
+    [1, { seats: '0' }, seatsMessage],
+    [1, { seats: '101' }, seatsMessage],
+    [1, { seats: '2.5' }, seatsMessage],
+    [1, { vehicleName: 'Gray minivan', seats: '1' }, ''],
+    [2, {}, ''],
+  ])('step %i with %o -> %s', (step, change, expected) => {
+    expect(driverStepIssue(step, { ...ok, ...change })).toBe(expected)
+  })
+  it('keeps an unchanged saved phone valid and drops the server field prefix', () => {
+    expect(driverStepIssue(0, { ...ok, phone: 'ext 12' }, 'ext 12')).toBe('')
+    expect(withoutFieldPrefix('Driver phone: enter a 10-digit phone number, with an optional leading 1.')).toBe('enter a 10-digit phone number, with an optional leading 1.')
   })
 })

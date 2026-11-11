@@ -21,6 +21,14 @@ export function MentorMeetingTag({ createdBy }: { createdBy?: { mentorMeeting: b
   return createdBy?.mentorMeeting ? <p className={styles.meta}><span className="badge badge-pending">{eventCreatorCopy.mentorMeeting}</span></p> : null
 }
 
+/** A card's event name as a link to the event, so tapping the title opens it. */
+export function EventTitleLink({ eventId, name }: { eventId: string; name: string }) {
+  return <Link to={`/events/${eventId}`} className={styles.titleLink}>{name}</Link>
+}
+
+/** Accessible name for a card's "View event →" link: it says which event it opens. */
+export const viewEventLabel = (label: string, name: string) => `${label.replace(/s*→s*$/, '')}: ${name}`
+
 /** Solid "Canceled" pill; also for the page's own event cards. */
 export function CanceledBadge() {
   return <span className={styles.canceledBadge}>{copy.canceled}</span>
@@ -52,14 +60,14 @@ export function EventListSections<R extends Row>({ rows, types, sectionTitle, re
     const summary = item.kind === 'series' ? copy.allMeetings(item.total, item.hiddenCanceled) : copy.meetings(item.rows.length)
     return <section key={item.key} className={`card ${styles.series}${item.kind === 'canceledSeries' ? ` ${styles.canceledSeries}` : ''}`} aria-label={lead.event.name}>
       <span className="eyebrow">{eventTypeLabel(lead.event.type)}</span>
-      <h3>{lead.event.name}</h3>
+      <h3>{item.kind === 'series' ? <EventTitleLink eventId={item.next.event._id} name={lead.event.name} /> : lead.event.name}</h3>
       {renderSeriesExtras(lead)}
       {item.kind === 'canceledSeries'
         ? <p className={styles.meta}><CanceledBadge /><span>{copy.allCanceled}</span></p>
         : <p>{seriesPattern(item.rows)} · {copy.next}: {eventSchedule(item.next.event)}</p>}
       <p className="muted">{eventLocation(lead.event)}</p>
       {family && item.kind === 'series' && <p className={styles.meta}><span className="badge badge-pending">{familyParticipationLabel(item.next.participation)}</span></p>}
-      {item.kind === 'series' && <Link className="button button-outline" to={`/events/${item.next.event._id}`}>{copy.viewNext}</Link>}
+      {item.kind === 'series' && <Link className="button button-outline" to={`/events/${item.next.event._id}`} aria-label={viewEventLabel(copy.viewNext, lead.event.name)}>{copy.viewNext}</Link>}
       <details><summary>{summary}</summary><ul className="simple-list">
         {item.rows.map(row => <li key={row.event._id}><Link to={`/events/${row.event._id}`}>{eventSchedule(row.event)}</Link>{row.event.cancelled && <CanceledBadge />}</li>)}
       </ul></details>

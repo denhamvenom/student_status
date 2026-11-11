@@ -2,7 +2,7 @@ import { getFunctionName } from 'convex/server'
 import { createElement, type ChangeEvent, type ComponentProps } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { TeamReports } from './TeamReports'
+import { MentorStudentReport, mentorHasAttendance, TeamReports } from './TeamReports'
 
 const mocks = vi.hoisted(() => ({
   useQuery: vi.fn(), usePaginatedQuery: vi.fn(), attendanceState: 'ready',
@@ -60,14 +60,14 @@ describe('team report scope without a selected event', () => {
     expect(html).toContain('Choose an event to see who is ready and what is still to do.')
     expect(html).toContain('Showing all 1 student.')
     expect(html).toMatch(/data-label="Still to do">—<\/td>/)
-    expect(html).toMatch(/data-label="Readiness">—<\/td>/)
-    expect(html).not.toContain('Load more students')
+    expect(html).toMatch(/data-label="Event readiness">—<\/td>/)
+    expect(html).not.toContain('Show more students')
   })
   it('keeps partial results scoped and offers more rows', () => {
     const html=render('CanLoadMore')
-    expect(html).toContain('Showing 1 student so far. Press Load more to see more. Filters and the CSV file use only the students shown.')
+    expect(html).toContain('Showing 1 student so far. Press Show more to see more. Filters and the CSV file use only the students shown.')
     expect(html).not.toContain('Showing all 1 student.')
-    expect(html).toContain('Load more students')
+    expect(html).toContain('Show more students')
   })
   it('counts visible rows when loaded students are filtered', () => {
     const results = [row, { ...row, studentId: 'other-student', name: 'Other Member', subteam: 'Electrical' }]
@@ -75,16 +75,43 @@ describe('team report scope without a selected event', () => {
     expect(mocks.changeSubteam).not.toBeNull()
     mocks.changeSubteam!({ target: { value: 'Build' } } as ChangeEvent<HTMLSelectElement>)
     const html = render('CanLoadMore', results)
-    expect(html).toContain('Showing 1 of 2 loaded students for these filters. Press Load more to see more. Filters and the CSV file use only the students shown.')
+    expect(html).toContain('Showing 1 of 2 loaded students for these filters. Press Show more to see more. Filters and the CSV file use only the students shown.')
     expect(html).toContain('Fictional Member')
     expect(html).not.toContain('Other Member</button>')
   })
   it('labels attendance before kickoff as not counted yet, then shows a recorded zero', () => {
     mocks.attendanceState = 'unknownKickoff'
     const before = render('Exhausted')
-    expect(before).toContain('data-label="Tuesday meetings">Not counted yet</td>')
+    expect(before).toContain('data-label="Required meetings">Not counted yet</td>')
     mocks.attendanceState = 'ready'
     const after = render('Exhausted', [{ ...row, attendance: { offTuesday: 0, offThursday: 0, offOutreach: 0, buildWeekday: 0, buildSaturday: 0, buildSunday: 0, buildOutreach: 0 } }])
-    expect(after).toContain('data-label="Tuesday meetings">0</td>')
+    expect(after).toContain('data-label="Required meetings">0</td>')
+  })
+})
+describe('Mentor student report cap', () => {
+  const renderMentor = (studentsComplete: boolean) => {
+    mocks.stateCursor = 0
+    mocks.useQuery.mockReset().mockReturnValue({ subteams: ['Build'], scope: 'mine', totalStudents: 52, studentsComplete, rows: Array.from({ length: 40 }, (_, n) => ({ studentId: `s${n}`, name: `Student ${n}`, subteam: 'Build', travelTeam: false, requiredPercent: null, thursdayAttended: 0, events: [] })) })
+    return renderToStaticMarkup(createElement(MentorStudentReport))
+  }
+  it('says how many of the students are shown when the list is cut off', () => {
+    expect(renderMentor(false)).toContain('Showing the first 40 of 52 students. Ask a Coach for the full list.')
+    expect(renderMentor(true)).not.toContain('Showing the first 40')
+  })
+})
+describe('Mentor student report before kickoff', () => {
+  it('has attendance once any student has a counted percentage or a Thursday', () => {
+    expect(mentorHasAttendance([{ requiredPercent: null, thursdayAttended: 0 }, { requiredPercent: null, thursdayAttended: 0 }])).toBe(false)
+    expect(mentorHasAttendance([{ requiredPercent: null, thursdayAttended: 0 }, { requiredPercent: 0, thursdayAttended: 0 }])).toBe(true)
+    expect(mentorHasAttendance([{ requiredPercent: null, thursdayAttended: 2 }])).toBe(true)
+  })
+  it('hides the attendance columns and says when they appear when no one has any', () => {
+    mocks.stateCursor = 0
+    mocks.useQuery.mockReset().mockReturnValue({ subteams: ['Build'], scope: 'mine', totalStudents: 1, studentsComplete: true, rows: [{ studentId: 's1', name: 'Fictional Member', subteam: 'Build', travelTeam: false, requiredPercent: null, thursdayAttended: 0, events: [] }] })
+    const html = renderToStaticMarkup(createElement(MentorStudentReport))
+    expect(html).toContain('Fictional Member')
+    expect(html).not.toContain('Not counted yet')
+    expect(html).not.toContain('Required meetings (% attended)')
+    expect(html).toContain('Attendance appears after kickoff.')
   })
 })

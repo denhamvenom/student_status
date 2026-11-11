@@ -178,6 +178,7 @@ export const recordRequirement = mutation({
     if (args.key !== "first") {
       const requirement = await ctx.db.query("requirements").withIndex("by_eventId_and_key", q => q.eq("eventId", event._id).eq("key", args.key)).unique();
       if (!requirement) throw new ConvexError("This requirement was removed. Reload to see the event's current requirements.");
+      if (requirement.kind === "info") throw new ConvexError("This requirement is something to know, so there is nothing to check off. Reload to see the event's current requirements.");
     }
     const prior = await ctx.db.query("requirementCompletions").withIndex("by_eventId_and_studentId_and_key", q => q.eq("eventId", event._id).eq("studentId", student._id).eq("key", args.key)).unique();
     if (args.complete && !prior) await ctx.db.insert("requirementCompletions", { eventId: event._id, studentId: student._id, key: args.key, completedAt: Date.now(), completedBy: user._id });

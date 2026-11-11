@@ -18,3 +18,14 @@ export function adultInvitationLandingUrl(pathname: string, search: string, toke
   return `${pathname}${search}${token ? `#token=${encodeURIComponent(token)}` : ''}`
 }
 export function clearAdultInvitationOAuth(storage: TokenStorage) {storage.removeItem(adultInvitationOAuthKey)}
+
+/** Parent invitation tokens cross OAuth the same way (tab-only session storage, 64 hex characters). */
+export const parentInvitationOAuthKey = 'student-status-parent-invite-oauth'
+export const parentInvitationPath = '/invite-parent'
+export const adultInvitationPath = '/invite-adult'
+export function prepareParentInvitationOAuth(token: string, storage: TokenStorage) {
+  if (!/^[0-9a-f]{64}$/.test(token)) throw new Error('Invitation token is invalid.')
+  storage.setItem(parentInvitationOAuthKey, token)
+  return parentInvitationPath
+}
+export function clearParentInvitationOAuth(storage: TokenStorage) {storage.removeItem(parentInvitationOAuthKey)}

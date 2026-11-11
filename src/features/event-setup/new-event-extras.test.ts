@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_REQUIREMENTS, shiftReviewText, addLater, reviewDetails, extrasIssue, extrasIssues, newDraftId, questionIssue, withoutInvalid, requirementArgs, shiftArgs, type DraftQuestion } from './new-event-extras'
+import { MAX_REQUIREMENTS, shiftReviewText, addLater, reviewDetails, extrasIssue, extrasIssues, newDraftId, questionIssue, requirementIssue, withoutInvalid, requirementArgs, shiftArgs, type DraftQuestion } from './new-event-extras'
 
 const hour = 3_600_000
 const event = { startsAt: Date.parse('2026-11-07T15:00:00Z'), endsAt: Date.parse('2026-11-07T23:00:00Z') }
@@ -23,6 +23,16 @@ describe('new event optional steps', () => {
   it('makes unique, allowed short names for requirements', () => {
     const r = (label: string) => ({ id: label, label, instructions: '', url: '', dueAt: '' })
     expect(requirementArgs([r('Waiver'), r('waiver!'), r('Pay'), r('???')]).map(x => x.key)).toEqual(['waiver', 'waiver-2', 'requirement-3', 'requirement-4'])
+  })
+
+  it('sends Something to know without a due date and checked-off items with one', () => {
+    const base = { instructions: '', url: '', dueAt: '2026-11-05T17:00' }
+    const [note, check] = requirementArgs([{ id: 'a', label: 'Shirt', ...base, kind: 'info' }, { id: 'b', label: 'Waiver', ...base, kind: 'checkoff' }])
+    expect(note).toMatchObject({ kind: 'info' })
+    expect(note).not.toHaveProperty('dueAt')
+    expect(check).toHaveProperty('dueAt')
+    expect(check).not.toHaveProperty('kind')
+    expect(requirementIssue({ id: 'a', label: 'Shirt', ...base, dueAt: 'nonsense', kind: 'info' })).toBeNull()
   })
 
   it('flags a time slot left outside the event after the event dates change', () => {
@@ -73,6 +83,7 @@ describe('reviewDetails', () => {
     expect(d.questions[1]).toBe('Size? · Short answer · Required')
     expect(d.requirements[0]).toMatch(/^Waiver · due /)
     expect(d.requirements[1]).toBe('Photo · no due date')
+    expect(reviewDetails({ shifts: [], questions: [], requirements: [{ id: 'n', label: 'Wear a shirt', instructions: '', url: '', dueAt: '2026-11-05T17:00', kind: 'info' }] }).requirements[0]).toBe('Wear a shirt · Something to know')
   })
 })
 

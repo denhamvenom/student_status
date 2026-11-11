@@ -75,7 +75,7 @@ describe("fundraiser source posting", () => {
     });
     await f.t.mutation(makeFunctionReference<"mutation">("fundraiserPosting:run"), { jobId });
     const coach = f.t.withIdentity({ subject: `${alternate}|session` });
-    await expect(coach.mutation(makeFunctionReference<"mutation">("financialSources:rebuild"), { studentId: f.ids.student })).rejects.toThrow("existing financial job");
+    await expect(coach.mutation(makeFunctionReference<"mutation">("financialSources:rebuild"), { studentId: f.ids.student })).rejects.toThrow("stopped money update");
     await coach.mutation(makeFunctionReference<"mutation">("fundraiserPosting:retry"), { jobId, rows: [], reason: "Alternate Coach authorizes continuation" });
     const job = await f.t.run(ctx => ctx.db.get(jobId)); if (!job) throw new Error("Missing job");
     await f.t.mutation(page, { jobId, cursor: job.cursor });

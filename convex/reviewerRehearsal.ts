@@ -105,7 +105,7 @@ export const ensure = internalMutation({
       }
       await refreshStudentFinance(ctx, studentId);
     }
-    for (const i of [0, 1]) await addCharge(ctx, coach, studentIds[i], `${PREFIX} Review charge (separate from zero-fee trip)`, 10000, 0, `${MARKER}:${season._id}:${i}:charge`);
+    for (const i of [0, 1]) await addCharge(ctx, coach, studentIds[i], `${PREFIX} Review charge ${i + 1} (separate from zero-fee trip)`, 10000, 0, `${MARKER}:${season._id}:${i}:charge`);
     // Reuse existing attendance history; never fabricate past activity before this future test season.
     const eventIds = [eventId, outreachEventId];
     await audit(ctx, coach, MARKER, season._id, "createFictionalReviewFixtures", null, { studentIds, eventIds, roomId, driverId }, REASON);

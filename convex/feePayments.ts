@@ -28,7 +28,7 @@ function receiptMetadata(reference: string, occurredAt: number, exportId: string
   return reference.trim() || `Fee CSV ${exportId}`;
 }
 function rowShape(item: ImportRow) {
-  token(item.rowKey, "row key");
+  token(item.rowKey, "row ID");
   if (!Number.isSafeInteger(item.amountCents) || item.amountCents <= 0 || !Number.isSafeInteger(item.expectedChargeRevision) || item.expectedChargeRevision < 0 || !Number.isSafeInteger(item.expectedFinancialGeneration) || item.expectedFinancialGeneration < 1 || !Number.isSafeInteger(item.expectedFinancialRevision) || item.expectedFinancialRevision < 0) throw new ConvexError("A payment row has an invalid amount. Fix the amount in the file, then try again.");
 }
 async function selectedFee(ctx: Ctx, feeDefinitionId: Doc<"feeDefinitions">["_id"]) {
@@ -77,7 +77,7 @@ export const previewRows = query({
   args: { feeDefinitionId: v.id("feeDefinitions"), exportId: v.string(), rows: v.array(row) },
   returns: v.array(v.object({ rowKey: v.string(), state: v.union(v.literal("ready"), v.literal("recorded"), v.literal("stale"), v.literal("invalid")), message: v.union(v.string(), v.null()), studentName: v.union(v.string(), v.null()), chargedCents: v.union(v.number(), v.null()), appliedCents: v.union(v.number(), v.null()), owedCents: v.union(v.number(), v.null()) })),
   handler: async (ctx, args) => {
-    editor(await viewer(ctx)); token(args.exportId, "export batch ID");
+    editor(await viewer(ctx)); token(args.exportId, "download ID");
     if (!args.rows.length || args.rows.length > 20 || new Set(args.rows.map(item => item.rowKey)).size !== args.rows.length) throw new ConvexError("Preview 1 to 20 distinct payment rows.");
     const { fee } = await selectedFee(ctx, args.feeDefinitionId);
     const batch = await ctx.db.query("feePaymentBatches").withIndex("by_seasonId_and_exportId", q => q.eq("seasonId", fee.seasonId).eq("exportId", args.exportId.trim())).unique();
@@ -103,7 +103,7 @@ export const beginBatch = mutation({
     const actor = await viewer(ctx); editor(actor);
     const { season, fee } = await selectedFee(ctx, args.feeDefinitionId);
     await requireSeasonFinanceReady(ctx, season._id);
-    const exportId = token(args.exportId, "export batch ID");
+    const exportId = token(args.exportId, "download ID");
     const reference = receiptMetadata(args.reference, args.occurredAt, exportId);
     if (!args.rows.length || args.rows.length > 500) throw new ConvexError("Confirm 1 to 500 payment rows per file.");
     for (const item of args.rows) rowShape(item);

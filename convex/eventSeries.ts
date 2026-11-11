@@ -275,7 +275,7 @@ export const enrollPage = internalMutation({
     if (event?.cancelled) return stopCancelledJob(ctx, event);
     const subteamEvent = !!event && isSubteamMandatory(event);
     if (!event || event.archived || event.seasonId !== season._id || event.signupMode !== "assigned" || (!subteamEvent && event.assignmentScope !== "wholeTeam")) throw new Error("Whole Team event is unavailable; Coach review is required.");
-    if (!actor?.active || actor.role !== "coach") throw new Error("Enrollment actor is unavailable; a Coach must retry.");
+    if (!actor?.active || actor.role !== "coach") throw new Error("This signup update could not run. A Coach needs to try again.");
     const page = await ctx.db.query("eventEnrollmentMembers").withIndex("by_jobId", q => q.eq("jobId", job._id)).paginate({ cursor: job.cursor, numItems: 25 });
     for (const member of page.page) {
       const student = await ctx.db.get(member.studentId);
