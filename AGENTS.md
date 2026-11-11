@@ -89,14 +89,14 @@ Optional vendor guidance can be installed with `npx convex ai-files install`; re
 
 - As of October 25, 2026, the main Claude Code session (see CLAUDE.md) is the project lead and integration owner. Codex and other sessions are helpers unless I say otherwise.
 - Follow the branch/workflow I request; otherwise consult `docs/REPOSITORY.md`. The integration owner is the current main session; parallel or helper sessions must not sync the backend or write to Git unless I explicitly say so.
-- Parallel sessions: each chat or feature works in its own Git worktree (`git worktree add ../wt-<feature> -b feat/<feature> origin/main`, or a Claude Code worktree). Never switch branches, stash, reset or restore files in the shared `student-status-app` folder.
+- Parallel sessions: each chat or feature works in its own Git worktree (`git worktree add ../wt-<feature> -b feat/<feature> origin/main`, or a Claude Code worktree). Do not switch branches, stash, reset, restore or clean in the shared `student-status-app` folder unless I approve the guard hook's prompt for that exact command.
 - Development Convex sync (`convex dev`, `bun run dev:backend`, `start.ps1 -Mode Dev`) runs only from a worktree with a clean tree whose branch includes current origin/main. Announce the deployment first, run one sync at a time, and expect each sync to replace whatever was synced last.
 - Production (`convex deploy`, merging to main) needs my explicit approval each time and goes one feature at a time from an up-to-date main after the PR is merged: merge PR -> pull main -> deploy main -> notify. Never deploy a feature branch to production.
 - After a production deploy, other sessions rebase or merge origin/main before their next development sync.
 - Retarget stacked PRs to main before deleting their base branch; otherwise GitHub closes them and refuses to reopen them.
 - `convex codegen` prints "Uploading functions to Convex" but deploys nothing; check what a deployment runs with `bunx convex function-spec`, and never treat codegen as a sync.
 - Stage explicit paths only; never commit another session's files.
-- In Claude Code, `.claude/hooks/parallel-work-guard.mjs` enforces the worktree and Convex sync/deploy rules; see `docs/REPOSITORY.md` (Parallel sessions).
+- In Claude Code, `.claude/hooks/parallel-work-guard.mjs` blocks unsafe Convex sync/deploy; shared-checkout Git rewrites now prompt the owner for approval (owner decision November 11, 2026; set `STUDENT_STATUS_GUARD_NO_ASK=1` to block them instead); see `docs/REPOSITORY.md` (Parallel sessions).
 - Review staged content for private data and secrets; preserve published history and verify pushes before claiming remote backup.
 - Main is connected to automatic frontend builds. Permission to edit or commit locally is not permission to push main, merge, publish or deploy.
 - Keep release scope, validation limitations and rollback evidence in `docs/releases/`; do not duplicate progress narratives across old trackers.
