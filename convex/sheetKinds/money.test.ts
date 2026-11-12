@@ -28,7 +28,7 @@ describe("Money file", () => {
     const totals = (pick: (row: (typeof rows)[number]) => number) => rows.reduce((sum, row) => sum + pick(row), 0);
     const balance: MoneyBalance = { name: "Ann Student", chargedCents: totals(r => r.effectiveCents), paidCents: totals(r => r.personalAppliedCents + r.fundraisingAppliedCents), personalAppliedCents: totals(r => r.personalAppliedCents), fundraisingAppliedCents: totals(r => r.fundraisingAppliedCents), dueCents: totals(r => r.dueCents), personalAvailableCents: rows[0].personalAvailableCents, fundraisingAvailableCents: rows[0].fundraisingAvailableCents };
     const [balances, fees] = moneyTabs({ balances: [balance], fees: rows.map(r => ({ student: r.studentName, fee: r.label, event: r.eventName ?? "", amountCents: r.effectiveCents, paidCents: r.effectiveCents - r.dueCents, dueCents: r.dueCents, status: "x" })), fundraising: [] });
-    expect(balances.rows[0]).toEqual(["Student", "Total fees", "Paid so far", "Paid from payments", "Paid from fundraising credit", "Balance due", "Unused payments", "Fundraising credit", "Available funds"]);
+    expect(balances.rows[0]).toEqual(["Student", "Total fees", "Paid so far", "Paid with payments", "Paid from fundraising credit", "Balance due", "Unused payments", "Fundraising credit", "Available funds"]);
     expect(balances.rows[1]).toEqual(["Ann Student", 155.5, 85.5, 65.5, 20, 70, 7, 2.5, 9.5]);
     expect(balances.rows[2]).toEqual(["Total", 155.5, 85.5, 65.5, 20, 70, 7, 2.5, 9.5]);
     expect(fees.rows.at(-1)).toEqual(["Total", "", "", 155.5, 85.5, 70, ""]);

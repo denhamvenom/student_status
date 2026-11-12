@@ -1,7 +1,8 @@
 import { ConvexError, v } from "convex/values";
 import { internal } from "../_generated/api";
 import { internalQuery } from "../_generated/server";
-import { attendanceNamespace, reportAggregate, studentAttendanceNamespace } from "../lib/reportAggregates";
+import { attendanceNamespace, reportAggregate, studentAttendanceNamespace, studentBuildMinutesNamespace } from "../lib/reportAggregates";
+import { kickoffBoundaryForCompetitionYear } from "../lib/seasonCalendar";
 import { weekStartKey } from "../lib/sheetAttendance";
 import type { SheetLoader } from "../lib/sheetKinds";
 import { teamReportAttendanceGate } from "../lib/teamReportAttendance";
@@ -33,10 +34,14 @@ export const gate = internalQuery({
 export const studentPage = internalQuery({
   args: { seasonId: v.id("seasons"), cursor: v.union(v.string(), v.null()) },
   returns: v.object({
-    rows: v.array(v.object({ name: v.string(), subteam: v.string(), required: v.number(), other: v.number(), outreach: v.number(), totalMs: v.number(), weeks: v.array(v.object({ week: v.string(), ms: v.number() })) })),
+    rows: v.array(v.object({ name: v.string(), subteam: v.string(), required: v.number(), other: v.number(), outreach: v.number(), buildMinutes: v.number(), totalMs: v.number(), weeks: v.array(v.object({ week: v.string(), ms: v.number() })) })),
     isDone: v.boolean(), cursor: v.union(v.string(), v.null()),
   }),
   handler: async (ctx, args) => {
+    const season = await ctx.db.get(args.seasonId);
+    if (!season) throw new ConvexError("This season no longer exists.");
+    // Build hours are the app's: whole minutes at Build-day sessions from kickoff on (zero while kickoff is not verified).
+    const kickoff = kickoffBoundaryForCompetitionYear(season.year);
     const page = await ctx.db.query("students").withIndex("by_seasonId_and_active", q => q.eq("seasonId", args.seasonId).eq("active", true)).paginate({ numItems: STUDENTS_PER_PAGE, cursor: args.cursor });
     const rows = await Promise.all(page.page.map(async student => {
       const attended = async (category: "Required" | "Other" | "Outreach") => await reportAggregate.count(ctx, { namespace: studentAttendanceNamespace(args.seasonId, student._id, category) });
@@ -53,7 +58,8 @@ export const studentPage = internalQuery({
         const week = weekStartKey(row.scheduledStart);
         weeks.set(week, (weeks.get(week) ?? 0) + row.totalMs);
       }
-      return { name: student.legalName || student.preferredName, subteam: student.subteam, required: await attended("Required"), other: await attended("Other"), outreach: await attended("Outreach"), totalMs, weeks: [...weeks].map(([week, ms]) => ({ week, ms })) };
+      const buildMinutes = kickoff.state === "verified" ? await reportAggregate.sum(ctx, { namespace: studentBuildMinutesNamespace(args.seasonId, student._id), bounds: { lower: { key: kickoff.kickoffAt, inclusive: true } } }) : 0;
+      return { name: student.legalName || student.preferredName, subteam: student.subteam, required: await attended("Required"), other: await attended("Other"), outreach: await attended("Outreach"), buildMinutes, totalMs, weeks: [...weeks].map(([week, ms]) => ({ week, ms })) };
     }));
     return { rows, isDone: page.isDone, cursor: page.isDone ? null : page.continueCursor };
   },

@@ -1,6 +1,6 @@
 import { v, type Infer } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
-import { rosterGrade, type SheetCell } from "./sheetRows";
+import { dateText, rosterGrade, type SheetCell } from "./sheetRows";
 
 /**
  * Pure helpers for the Health spreadsheets (the team Health file and each event's Travel emergency file). The data is assembled
@@ -93,12 +93,12 @@ function availabilityText(state: "provided" | "none" | "unavailable", provided: 
   return state === "provided" ? provided ?? "" : state === "none" ? "None reported" : "Information unavailable";
 }
 
-export const STUDENT_HEALTH_HEADERS = ["Name", "Grade", "Date of birth", "Emergency contact name", "Emergency contact relationship", "Emergency contact phone", "Allergies", "Medications", "Medicine permissions", "Insurance provider", "Insurance policy number", "Physician name", "Physician phone"];
+export const STUDENT_HEALTH_HEADERS = ["Student", "Grade", "Date of birth", "Emergency contact name", "Emergency contact relationship", "Emergency contact phone", "Allergies", "Medications", "Medicine permissions", "Insurance provider", "Insurance policy number", "Physician name", "Physician phone"];
 
 /** The health columns of one student row (each file adds its permission-form columns after these). */
 export function studentHealthCells(student: HealthStudent): SheetCell[] {
   return [
-    student.legalName || student.preferredName, rosterGrade(student.grade), student.dateOfBirth ?? "",
+    student.legalName || student.preferredName, rosterGrade(student.grade), dateText(student.dateOfBirth),
     student.emergencyName ?? "", student.emergencyRelationship ?? "", student.emergencyPhone ?? "",
     reportText(student.allergies), reportText(student.medications), medicinePermissionText(student.otcAuthorization),
     student.insurance ? availabilityText(student.insurance.state, student.insurance.provider) : "", student.insurance?.state === "provided" ? student.insurance.policy ?? "" : "",

@@ -1,5 +1,13 @@
 import { parseDriveFolderId } from '../../../convex/lib/driveLinks'
 
+const day = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'short', day: 'numeric', year: 'numeric' })
+
+/** An event's start date in team time, "Dec 2, 2026"; blank when the event is gone (start unknown). */
+export const eventDateLabel = (startsAt: number) => (startsAt > 0 ? day.format(startsAt) : '')
+
+/** The newest update time among an event's files, or null when none has been written yet. */
+export const latestUpdate = (files: readonly { updatedAt: number | null }[]) => files.reduce<number | null>((latest, file) => (file.updatedAt !== null && (latest === null || file.updatedAt > latest) ? file.updatedAt : latest), null)
+
 const stamp = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 
 /** "Nov 12, 5:00 AM" in team time. */
@@ -10,13 +18,12 @@ export type RunStatus = { state: 'running' | 'done' | 'partial' | 'stopped'; tot
 /** A run counts as in progress only while its lease has not run out; an abandoned run never blocks the button. */
 export const runInProgress = (run: RunStatus, now: number) => !!run && run.state === 'running' && run.leaseExpiresAt > now
 
-export type FolderKey = 'general' | 'money' | 'health' | 'events' | 'archive'
-export const folderSteps: FolderKey[] = ['general', 'money', 'health', 'events', 'archive']
+export type FolderKey = 'general' | 'money' | 'health' | 'events'
+export const folderSteps: FolderKey[] = ['general', 'money', 'health', 'events']
 export type FolderInputs = Record<FolderKey, string>
 
-/** A step's link is acceptable when it holds a Drive folder link; the Archive link may also be left blank. */
-export function folderInputProblem(key: FolderKey, value: string): boolean {
-  if (!value.trim()) return key !== 'archive'
+/** A step's link is acceptable only when it holds a Drive folder link. (Past seasons go into an Archive folder made inside each folder.) */
+export function folderInputProblem(value: string): boolean {
   return parseDriveFolderId(value) === null
 }
 

@@ -7,10 +7,10 @@ import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { googleRetry } from "./lib/googleSheets";
-import { ARCHIVE_OFF_NOTE, NO_ARCHIVE_FOLDER_NOTE } from "./sheetArchive";
+import { ARCHIVE_OFF_NOTE } from "./sheetArchive";
 
 const modules = import.meta.glob("./**/*.ts");
-const FOLDERS = { general: "folderGeneral0001", money: "folderMoney000002", health: "folderHealth00003", events: "folderEvents000008", archive: "folderArchive00009" };
+const FOLDERS = { general: "folderGeneral0001", money: "folderMoney000002", health: "folderHealth00003", events: "folderEvents000008" };
 const DRIVE = "sharedDrive0000001";
 
 /** In-memory stand-in for Google Drive: files and folders with parents. Counts folder creations and moves. Nothing reaches a real service. */
@@ -63,18 +63,20 @@ beforeEach(async () => {
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
-/** An old season with one file per folder (the Events file belongs to an event), a new active season with a General file, and Drive set up. */
-async function seed(options: { archiveFolder?: boolean } = {}) {
+/** An old (archived) season with one file per folder (the Events file belongs to an event), a new active season with a General file, and Drive set up. */
+async function seed() {
   const t = createTest(schema, modules);
   rateLimiter.register(t);
   const ids = await t.run(async ctx => {
     const auth = await ctx.db.insert("users", { email: "coach@example.invalid" });
     const coach = await ctx.db.insert("appUsers", { authUserId: auth, email: "coach@example.invalid", name: "Casey Coach", role: "coach", active: true, travelLead: false, financialEdit: false });
+    const leadAuth = await ctx.db.insert("users", { email: "lead@example.invalid" });
+    await ctx.db.insert("appUsers", { authUserId: leadAuth, email: "lead@example.invalid", name: "Jordan Lead", role: "mentor", active: true, travelLead: true, financialEdit: false });
     const oldSeason = await ctx.db.insert("seasons", { name: "2026–27", year: 2026, status: "archived", startsAt: 0, permissionVersion: "v1", createdBy: coach });
     const newSeason = await ctx.db.insert("seasons", { name: "2027–28", year: 2027, status: "active", startsAt: 1, permissionVersion: "v1", createdBy: coach });
-    await ctx.db.insert("sheetExportSettings", { driveId: DRIVE, generalFolderId: FOLDERS.general, moneyFolderId: FOLDERS.money, healthFolderId: FOLDERS.health, eventsFolderId: FOLDERS.events, ...(options.archiveFolder === false ? {} : { archiveFolderId: FOLDERS.archive }), setBy: coach, setAt: 1 });
+    await ctx.db.insert("sheetExportSettings", { driveId: DRIVE, generalFolderId: FOLDERS.general, moneyFolderId: FOLDERS.money, healthFolderId: FOLDERS.health, eventsFolderId: FOLDERS.events, setBy: coach, setAt: 1 });
     const event = await ctx.db.insert("events", { seasonId: oldSeason, name: "Synthetic Regional", type: "Competition", startsAt: 1, endsAt: 2, destination: "Synthetic Arena", travel: "Bus", overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "open", allowWithdrawal: true, permissionRequired: false, firstRequired: false, archived: false });
-    return { auth, coach, oldSeason, newSeason, event };
+    return { auth, leadAuth, coach, oldSeason, newSeason, event };
   });
   const file = async (seasonId: Id<"seasons">, kind: "studentRoster" | "money" | "health" | "event", folder: "general" | "money" | "health" | "events", eventId?: Id<"events">) => {
     const spreadsheetId = `file-${kind}-${seasonId}`;
@@ -83,11 +85,12 @@ async function seed(options: { archiveFolder?: boolean } = {}) {
   };
   const old = { roster: await file(ids.oldSeason, "studentRoster", "general"), money: await file(ids.oldSeason, "money", "money"), health: await file(ids.oldSeason, "health", "health"), event: await file(ids.oldSeason, "event", "events", ids.event) };
   const current = await file(ids.newSeason, "studentRoster", "general");
-  return { t, ids, old, current, coach: t.withIdentity({ subject: `${ids.auth}|session` }) };
+  return { t, ids, old, current, coach: t.withIdentity({ subject: `${ids.auth}|session` }), lead: t.withIdentity({ subject: `${ids.leadAuth}|session` }) };
 }
+type Seed = Awaited<ReturnType<typeof seed>>;
 
 /** Runs archive steps by hand until the job stops (each step does one file). */
-async function runJob(f: Awaited<ReturnType<typeof seed>>) {
+async function runJob(f: Seed) {
   const archive = (await f.t.run(ctx => ctx.db.query("sheetArchives").first()))!;
   for (let i = 0; i < 12; i++) {
     await f.t.action(internal.sheetArchiveActions.archiveStep, { archiveId: archive._id });
@@ -95,21 +98,23 @@ async function runJob(f: Awaited<ReturnType<typeof seed>>) {
   }
   return (await f.t.run(ctx => ctx.db.get(archive._id)))!;
 }
+const named = (name: string, parent: string) => [...drive.items].find(([, item]) => item.folder && item.name === name && item.parents.includes(parent))?.[0];
+/** The <folder>/Archive/<season> folder in the fake drive. */
+const archiveOf = (liveFolder: string, season = "2026–27") => { const archive = named("Archive", liveFolder); return archive ? named(season, archive) : undefined; };
 
 describe("archiving a season's spreadsheets", () => {
-  it("moves every old file into the right Archive subfolder once, and a second run does nothing", async () => {
+  it("moves every old file into an Archive folder inside its own folder once, and a second run does nothing", async () => {
     const f = await seed();
     expect(await f.t.mutation(internal.sheetArchive.archiveSeasonNow, { seasonId: f.ids.oldSeason })).toBe("started");
     const row = await runJob(f);
     expect(row).toMatchObject({ state: "done", moved: 4, label: "2026–27" });
-    const named = (name: string, parent: string) => [...drive.items].find(([, item]) => item.folder && item.name === name && item.parents.includes(parent))?.[0];
-    const season = named("2026–27", FOLDERS.archive)!;
-    expect(season).toBeTruthy();
-    expect(drive.stats.folderCreates).toBe(5);
-    const expected = { roster: "General", money: "Money", health: "Health", event: "Events" } as const;
+    // One Archive folder and one season folder inside each of the four folders.
+    expect(drive.stats.folderCreates).toBe(8);
+    const expected = { roster: FOLDERS.general, money: FOLDERS.money, health: FOLDERS.health, event: FOLDERS.events } as const;
     for (const [name, id] of Object.entries(f.old) as [keyof typeof expected, Id<"sheetExportFiles">][]) {
       const stored = (await f.t.run(ctx => ctx.db.get(id)))!;
-      const folder = named(expected[name], season)!;
+      const folder = archiveOf(expected[name])!;
+      expect(folder).toBeTruthy();
       expect(drive.items.get(stored.spreadsheetId)!.parents).toEqual([folder]);
       expect(stored).toMatchObject({ archiveFolderId: folder, frozen: true });
       expect(stored.archivedAt).toBeTypeOf("number");
@@ -125,7 +130,24 @@ describe("archiving a season's spreadsheets", () => {
     expect(drive.stats).toEqual(before);
   });
 
-  it("continues after a failure without making folders again", async () => {
+  it("refuses to archive a season that is still active", async () => {
+    const f = await seed();
+    expect(await f.t.mutation(internal.sheetArchive.archiveSeasonNow, { seasonId: f.ids.newSeason })).toBe("notArchived");
+    expect(await f.t.run(ctx => ctx.db.query("sheetArchives").first())).toBeNull();
+    expect(drive.stats).toEqual({ folderCreates: 0, moves: 0 });
+  });
+
+  it("records the start and the finish with counts in the audit trail", async () => {
+    const f = await seed();
+    await f.t.mutation(internal.sheetArchive.archiveSeasonNow, { seasonId: f.ids.oldSeason });
+    await runJob(f);
+    const rows = await f.t.run(ctx => ctx.db.query("audit").collect());
+    expect(rows.map(row => [row.entity, row.action, row.actorId])).toEqual([["sheetArchives", "archiveStartManual", f.ids.coach], ["sheetArchives", "archiveFinish", f.ids.coach]]);
+    expect(JSON.parse(rows[1].afterJson!)).toEqual({ state: "done", moved: 4, trigger: "manual" });
+    expect(JSON.stringify(rows)).not.toContain(FOLDERS.general);
+  });
+
+  it("continues after a failure without making folders again, and tells only a Coach it stopped partway", async () => {
     const f = await seed();
     await f.t.mutation(internal.sheetArchive.archiveSeasonNow, { seasonId: f.ids.oldSeason });
     const archive = (await f.t.run(ctx => ctx.db.query("sheetArchives").first()))!;
@@ -134,26 +156,57 @@ describe("archiving a season's spreadsheets", () => {
     vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => String(input).includes("oauth2") ? new Response(JSON.stringify({ access_token: "t" })) : new Response("{}", { status: 400 })));
     await f.t.action(internal.sheetArchiveActions.archiveStep, { archiveId: archive._id });
     expect(await f.t.run(ctx => ctx.db.get(archive._id))).toMatchObject({ state: "partial", moved: 1 });
+    expect((await f.coach.query(api.sheetExports.status, {})).archive).toEqual({ label: "2026–27", state: "partial" });
+    expect((await f.lead.query(api.sheetExports.status, {})).archive).toBeNull();
     vi.stubGlobal("fetch", vi.fn(drive.handler));
     const folders = drive.stats.folderCreates;
     await f.t.mutation(internal.sheetArchive.archiveSeasonNow, { seasonId: f.ids.oldSeason });
     expect(await runJob(f)).toMatchObject({ state: "done", moved: 4 });
-    expect(drive.stats.folderCreates).toBe(folders);
+    // Only the three folders not reached before the failure get their Archive and season folders.
+    expect(drive.stats.folderCreates).toBe(folders + 6);
     expect(drive.stats.moves).toBe(4);
+    expect((await f.lead.query(api.sheetExports.status, {})).archive).toEqual({ label: "2026–27", state: "done" });
   });
 
-  it("does nothing but leave a note when updates are off or no Archive folder is connected", async () => {
+  it("uses the folders set now when the move is started again", async () => {
+    const f = await seed();
+    await f.t.mutation(internal.sheetArchive.archiveSeasonNow, { seasonId: f.ids.oldSeason });
+    const archive = (await f.t.run(ctx => ctx.db.query("sheetArchives").first()))!;
+    await f.t.run(ctx => ctx.db.patch(archive._id, { state: "partial" }));
+    const newMoney = "folderMoneyNew0010";
+    await f.t.run(async ctx => { const settings = (await ctx.db.query("sheetExportSettings").first())!; await ctx.db.patch(settings._id, { moneyFolderId: newMoney }); });
+    await f.t.mutation(internal.sheetArchive.archiveSeasonNow, { seasonId: f.ids.oldSeason });
+    await runJob(f);
+    const money = (await f.t.run(ctx => ctx.db.get(f.old.money)))!;
+    expect(drive.items.get(money.spreadsheetId)!.parents).toEqual([archiveOf(newMoney)]);
+    expect(archiveOf(FOLDERS.money)).toBeUndefined();
+  });
+
+  it("does nothing but leave a note when updates are off, shown only to a Coach", async () => {
     const off = await seed();
     vi.stubEnv("GOOGLE_SHEETS_EXPORT_ENABLED", "false");
     expect(await off.t.mutation(internal.sheetArchive.archiveSeasonNow, { seasonId: off.ids.oldSeason })).toBe("skipped");
     expect(await off.t.run(ctx => ctx.db.query("sheetArchives").first())).toMatchObject({ state: "skipped", note: ARCHIVE_OFF_NOTE });
-    vi.stubEnv("GOOGLE_SHEETS_EXPORT_ENABLED", "true");
-    const none = await seed({ archiveFolder: false });
-    expect(await none.t.mutation(internal.sheetArchive.archiveSeasonNow, { seasonId: none.ids.oldSeason })).toBe("skipped");
-    expect(await none.t.run(ctx => ctx.db.query("sheetArchives").first())).toMatchObject({ state: "skipped", note: NO_ARCHIVE_FOLDER_NOTE });
-    expect(drive.stats.moves).toBe(0);
-    expect(drive.stats.folderCreates).toBe(0);
-    expect((await none.t.run(ctx => ctx.db.get(none.old.roster)))?.archivedAt).toBeUndefined();
+    expect(drive.stats).toEqual({ folderCreates: 0, moves: 0 });
+    expect((await off.t.run(ctx => ctx.db.get(off.old.roster)))?.archivedAt).toBeUndefined();
+    expect((await off.coach.query(api.sheetExports.status, {})).archive).toEqual({ label: "2026–27", state: "skipped" });
+    expect((await off.lead.query(api.sheetExports.status, {})).archive).toBeNull();
+  });
+
+  it("stops an update of the old season and waits until its last step lets go before moving anything", async () => {
+    const f = await seed();
+    const now = Date.now();
+    const run = await f.t.run(ctx => ctx.db.insert("sheetExportRuns", { seasonId: f.ids.oldSeason, trigger: "server", startedAt: now, leaseExpiresAt: now + 10 * 60_000, pending: ["studentRoster", "money"], total: 2, done: 0, failed: 0, state: "running" }));
+    expect(await f.t.mutation(internal.sheetArchive.archiveSeasonNow, { seasonId: f.ids.oldSeason })).toBe("started");
+    expect(await f.t.run(ctx => ctx.db.get(run))).toMatchObject({ state: "stopped" });
+    const archive = (await f.t.run(ctx => ctx.db.query("sheetArchives").first()))!;
+    // A step of the stopped run may still be working: the archive waits and moves nothing.
+    await f.t.action(internal.sheetArchiveActions.archiveStep, { archiveId: archive._id });
+    expect(drive.stats).toEqual({ folderCreates: 0, moves: 0 });
+    expect(await f.t.run(ctx => ctx.db.get(archive._id))).toMatchObject({ state: "running", moved: 0 });
+    // That step ends (it finds its run stopped) and lets go at once; the archive then goes on.
+    await f.t.mutation(internal.sheetExports.completeOne, { runId: run, kind: "studentRoster" });
+    expect(await runJob(f)).toMatchObject({ state: "done", moved: 4 });
   });
 
   it("keeps archived files out of later runs and the current lists, and tells the card where they went", async () => {
@@ -161,18 +214,17 @@ describe("archiving a season's spreadsheets", () => {
     await f.t.mutation(internal.sheetArchive.archiveSeasonNow, { seasonId: f.ids.oldSeason });
     await runJob(f);
     const now = Date.now();
+    // A run of the old season (left over from before the switch) stops without any Google call; saving is refused.
     const run = await f.t.run(ctx => ctx.db.insert("sheetExportRuns", { seasonId: f.ids.oldSeason, trigger: "server", startedAt: now, leaseExpiresAt: now + 60_000, pending: ["studentRoster"], total: 1, done: 0, failed: 0, state: "running" }));
-    // A run that still names an archived file drops it without any Google call; saving it is refused.
     expect(await f.t.mutation(internal.sheetExports.claimNext, { runId: run })).toBeNull();
-    expect(await f.t.run(ctx => ctx.db.get(run))).toMatchObject({ state: "done" });
-    const run2 = await f.t.run(ctx => ctx.db.insert("sheetExportRuns", { seasonId: f.ids.oldSeason, trigger: "server", startedAt: now + 1, leaseExpiresAt: now + 60_000, pending: ["studentRoster"], total: 1, done: 0, failed: 0, state: "running" }));
+    expect(await f.t.run(ctx => ctx.db.get(run))).toMatchObject({ state: "stopped" });
     const old = (await f.t.run(ctx => ctx.db.get(f.old.roster)))!;
-    expect(await f.t.mutation(internal.sheetExports.saveFile, { runId: run2, seasonId: f.ids.oldSeason, kind: "studentRoster", folder: "general", folderId: FOLDERS.general, name: "x", spreadsheetId: old.spreadsheetId, tabs: [], checkedAt: 5, frozen: false, recreated: null })).toBe(false);
+    expect(await f.t.mutation(internal.sheetExports.saveFile, { runId: run, seasonId: f.ids.oldSeason, kind: "studentRoster", folder: "general", folderId: FOLDERS.general, name: "x", spreadsheetId: old.spreadsheetId, tabs: [], checkedAt: 5, frozen: false, recreated: null })).toBe(false);
     // Changing the Drive folders does not forget archived files.
-    await f.t.mutation(internal.sheetExports.saveSettings, { driveId: DRIVE, generalFolderId: "otherGeneral00001", moneyFolderId: FOLDERS.money, healthFolderId: FOLDERS.health, eventsFolderId: FOLDERS.events, archiveFolderId: FOLDERS.archive, setBy: f.ids.coach, now: 9 });
+    await f.t.mutation(internal.sheetExports.saveSettings, { driveId: DRIVE, generalFolderId: "otherGeneral00001", moneyFolderId: FOLDERS.money, healthFolderId: FOLDERS.health, eventsFolderId: FOLDERS.events, setBy: f.ids.coach, now: 9 });
     expect((await f.t.run(ctx => ctx.db.get(f.old.roster)))?.archivedAt).toBeTypeOf("number");
     const status = await f.coach.query(api.sheetExports.status, {});
-    expect(status.archive).toEqual({ label: "2026–27" });
-    expect(status.eventFiles).toEqual([]);
+    expect(status.archive).toEqual({ label: "2026–27", state: "done" });
+    expect(status.events).toEqual([]);
   });
 });

@@ -22,7 +22,7 @@ export function moneyTabs(data: Data): SheetTab[] {
     {
       title: "Balances",
       rows: [
-        ["Student", "Total fees", "Paid so far", "Paid from payments", "Paid from fundraising credit", "Balance due", "Unused payments", "Fundraising credit", "Available funds"],
+        ["Student", "Total fees", "Paid so far", "Paid with payments", "Paid from fundraising credit", "Balance due", "Unused payments", "Fundraising credit", "Available funds"],
         ...balances.map(b => [b.name, dollars(b.chargedCents), dollars(b.paidCents), dollars(b.personalAppliedCents), dollars(b.fundraisingAppliedCents), dollars(b.dueCents), dollars(b.personalAvailableCents), dollars(b.fundraisingAvailableCents), dollars(b.personalAvailableCents + b.fundraisingAvailableCents)]),
         ["Total", dollars(sum(balances, b => b.chargedCents)), dollars(sum(balances, b => b.paidCents)), dollars(sum(balances, b => b.personalAppliedCents)), dollars(sum(balances, b => b.fundraisingAppliedCents)), dollars(sum(balances, b => b.dueCents)), dollars(sum(balances, b => b.personalAvailableCents)), dollars(sum(balances, b => b.fundraisingAvailableCents)), dollars(sum(balances, b => b.personalAvailableCents + b.fundraisingAvailableCents))],
       ],

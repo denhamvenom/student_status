@@ -149,10 +149,14 @@ November 10, 2026 owner decisions, implemented on `feat/usability-audit` (not me
 
 - The Student roster spreadsheet keeps parent or guardian name, relationship, phone and email and the linked parent accounts. It lives in the General folder, so Coaches and Travel Leads (and anyone the owner shares General with) can see them. This intentionally widens guardian contact access beyond the app's Coach-only roster detail.
 - Links to Money spreadsheets show in the app to any Coach or Travel Lead (a Parent acting as Travel Lead included), the same rule as the app's money views, not only to people with Money editing access. Health links stay with Coaches and Travel Leads who have Health export access.
-- Sharing model: only the owner and the Venom Status service account are members of the shared drive. Each folder (General, Money, Health, Events, Archive) is shared individually with the people who need it. The parent folder (Venom Status Reports) is not shared.
-- Events folder (owner decision, November 12, 2026): a fifth folder, **Events**, holds every per-event spreadsheet (built in later stages), because Events will be shared more widely than General. Links to it show to any Coach or Travel Lead, like General. Lead's default, pending owner override: each event's Fees file stays in the Money folder and its travel emergency file stays in the Health folder. The Events link is required when connecting Drive; Archive stays optional.
+- Sharing model: only the owner and the Venom Status service account are members of the shared drive. Each folder (General, Money, Health, Events) is shared individually with the people who need it. The parent folder (Venom Status Reports) is not shared.
+- Events folder: a fourth required folder, **Events**, holds every per-event spreadsheet, because Events will be shared more widely than General. Links to it show to any Coach or Travel Lead, like General. Each event's Fees file is in the Money folder and its Travel emergency file is in the Health folder (owner-confirmed November 12, 2026).
+- Season archive (owner decision, November 12, 2026): when a season ends, its spreadsheets move into an Archive folder inside their own folder (General/Archive/<season>, Money/Archive/<season>, Health/Archive/<season>, Events/Archive/<season>), so who can open them never changes. The separate top-level Archive folder is no longer used; the setup wizard no longer asks for it.
+- Travel emergency files only for events with team travel, an overnight stay or a required permission form (owner decision, November 12, 2026).
+- Event question answers stay in the Events folder; the owner will avoid health questions on event signups (owner decision, November 12, 2026).
+- Readiness has no money items. The Adult roster includes Parents, in a separate Parents tab. Attendance shows Build hours (matching the app) and All clocked hours (owner decisions, November 12, 2026).
+- Rollout (owner decision, November 12, 2026): deploy to production with `GOOGLE_SHEETS_EXPORT_ENABLED` off; turn updates on only after the owner confirms the sharing of the General, Money, Health and Events folders.
 - Drive files and their version history are part of the yearly retention review (see Retention).
-- Season archiving (Archive > Year on a season switch) remains a later build stage.
 
 ## Retention
 

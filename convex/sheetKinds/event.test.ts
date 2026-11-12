@@ -20,7 +20,7 @@ describe("event spreadsheet tabs", () => {
     const tabs = eventTabs({ ...base, participants: [person("a", "Ann", "confirmed"), person("b", "Bo", "confirmed", { ready: false, missing: ["Permission form"] }), person("c", "Cy", "waitlist", { missing: ["Signup not confirmed yet"] }), person("d", "Di", "withdrawn")] });
     const summary = new Map(tabs[0].rows.map(r => [r[0], r[1]]));
     expect([summary.get("Signed up"), summary.get("Confirmed"), summary.get("Ready (not counting fees)"), summary.get("Waitlisted"), summary.get("Withdrew"), summary.get("Fee")]).toEqual([3, 2, 1, 1, 1, "See the Money folder"]);
-    expect(tabs[1].rows.map(r => r[0])).toEqual(["Name", "Ann", "Bo", "Cy", "Di"]);
+    expect(tabs[1].rows.map(r => r[0])).toEqual(["Student", "Ann", "Bo", "Cy", "Di"]);
     expect(tabs[1].rows[2]).toEqual(["Bo", "Build", "Confirmed", "No", "Permission form"]);
     expect(summary.has("Showed up")).toBe(false);
   });
@@ -28,7 +28,7 @@ describe("event spreadsheet tabs", () => {
   it("writes one answer column per question, marking removed questions", () => {
     const tabs = eventTabs({ ...base, questions: [{ id: "q1", prompt: "Shirt size", archived: false }, { id: "q2", prompt: "Diet", archived: true }], participants: [person("a", "Ann", "confirmed", { answers: [{ questionId: "q1", value: "M" }, { questionId: "q2", value: ["Nuts", "Dairy"] }] }), person("b", "Bo", "pending")] });
     const tab = tabs.find(t => t.title === "Question answers")!;
-    expect(tab.rows[0]).toEqual(["Name", "Status", "Shirt size", "Diet (removed)"]);
+    expect(tab.rows[0]).toEqual(["Student", "Status", "Shirt size", "Diet (removed)"]);
     expect(tab.rows[1]).toEqual(["Ann", "Confirmed", "M", "Nuts; Dairy"]);
     expect(tab.rows[2].slice(2)).toEqual(["", ""]);
   });
@@ -42,7 +42,8 @@ describe("event spreadsheet tabs", () => {
     });
     expect(tabs.map(t => t.title)).toEqual(["Summary", "Who's going", "Mentors", "Rooming", "Rides"]);
     expect(tabs[2].rows[1]).toEqual(["Moe", "Accepted", "Yes", ""]);
-    expect(tabs[3].rows.slice(1).map(r => [r[0], r[5]])).toEqual([["Ann", "In a room"], ["Zed", "Asked to be assigned"]]);
+    expect(tabs[3].rows[0]).toEqual(["Student", "Room", "Final room", "Needs review", "Status"]);
+    expect(tabs[3].rows.slice(1).map(r => [r[0], r[4]])).toEqual([["Ann", "In a room"], ["Zed", "Asked to be assigned"]]);
     expect(tabs[4].rows.map(r => r[0])).toEqual(["Type", "Driver", "Own transport", "Seats available", "Seats needed", "Still open"]);
   });
 
@@ -56,7 +57,8 @@ describe("event spreadsheet tabs", () => {
       ] },
     });
     const att = tabs.find(t => t.title === "Attendance")!;
-    expect(att.rows[0]).toHaveLength(9);
+    expect(att.rows[0]).toEqual(["Student", "Subteam", "Signed up", "Clocked in", "Time in", "Time out", "Total hours", "Times fixed by a Coach", "Note"]);
+    expect(tabs[0].rows[0]).toEqual(["Detail", "Answer"]);
     expect(att.rows.slice(1).map(r => [r[0], r[2], r[3], r[6], r[7], r[8]])).toEqual([["Ann", "Yes", "Yes", 1.5, 2, ""], ["Bo", "Yes", "No", "", 0, "No-show"], ["Zed", "No", "Yes", 1, 1, "Walk-in"]]);
     const summary = new Map(tabs[0].rows.map(r => [r[0], r[1]]));
     expect([summary.get("Showed up"), summary.get("No-shows"), summary.get("Walk-ins")]).toEqual([2, 1, 1]);
@@ -81,6 +83,6 @@ describe("event spreadsheet tabs", () => {
 describe("event spreadsheet file", () => {
   it("is an Events file named after the event and its date", () => {
     const title = definition.title({ seasonName: "Synthetic 2027", event: { name: "Synthetic Open", startsAt: T0 } });
-    expect([definition.folder, definition.scope, definition.ready, title]).toEqual(["events", "event", true, "Synthetic Open - Jan 15, 2027"]);
+    expect([definition.folder, definition.scope, definition.ready, title]).toEqual(["events", "event", true, "2027-01-15 Synthetic Open"]);
   });
 });

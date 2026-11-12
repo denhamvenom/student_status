@@ -18,6 +18,6 @@ describe("travel emergency file", () => {
 
   it("is a Health event file named after the event", () => {
     expect([definition.folder, definition.scope, definition.ready]).toEqual(["health", "event", true]);
-    expect(definition.title({ seasonName: "S", event: { name: "Synthetic Regional", startsAt: Date.UTC(2027, 2, 5, 18) } })).toBe("Synthetic Regional - Mar 5, 2027 - Travel emergency");
+    expect(definition.title({ seasonName: "S", event: { name: "Synthetic Regional", startsAt: Date.UTC(2027, 2, 5, 18) } })).toBe("2027-03-05 Synthetic Regional - Travel emergency");
   });
 });

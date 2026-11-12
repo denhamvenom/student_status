@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { parseDriveFolderId } from "./driveLinks";
 import { buildBatch } from "./googleSheets";
 import { folderVisible } from "./sheetKinds";
-import { guardianFor, safeCell, rosterGrade } from "./sheetRows";
+import { dateText, guardianFor, safeCell, rosterGrade } from "./sheetRows";
 
 describe("shared row helpers", () => {
   it.each([[undefined, ""], ["  ", ""], ["10th", "Sophomore"]])("grade %j shows %j", (grade, shown) => expect(rosterGrade(grade)).toBe(shown));
@@ -61,6 +61,15 @@ describe("writing a spreadsheet", () => {
   });
   it("leaves ordinary text, phone numbers and numbers as they are", () => {
     expect([safeCell("Dev"), safeCell("5 - 7"), safeCell(-5), safeCell(""), safeCell("+1 555-0100"), safeCell("(202) 555-0123"), safeCell("-5"), safeCell("+15550100")]).toEqual(["Dev", "5 - 7", -5, "", "+1 555-0100", "(202) 555-0123", "-5", "+15550100"]);
+  });
+  it.each(["-2+3+cmd|' /C calc'!A0", "+1 555-0100 ext cmd", "-5 apples", "=1+1", "@SUM(1)", "\t1", "\r1", "+", "-"])("prefixes %j, which is not entirely a number or phone", text => {
+    expect(safeCell(text)).toBe(`'${text}`);
+  });
+  it.each(["+1 555-0100", "-5", "(202) 555-0123", "+15550100", "555.0100", "1/2"])("leaves the phone-like text %j alone", text => {
+    expect(safeCell(text)).toBe(text);
+  });
+  it("writes dates as Apr 5, 2009 and leaves other text alone", () => {
+    expect([dateText("2009-04-05"), dateText("2009-12-25"), dateText(null), dateText(""), dateText("sometime")]).toEqual(["Apr 5, 2009", "Dec 25, 2009", "", "", "sometime"]);
   });
   it("deletes tabs it no longer produces, after the tabs it keeps, and never a protection twice", () => {
     const existing = [{ sheetId: 0, title: "Counts", protected: true }, { sheetId: 7, title: "Old tab", protected: false }, { sheetId: 8, title: "Details", protected: false }];

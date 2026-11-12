@@ -1,10 +1,10 @@
 import { RateLimiter } from "@convex-dev/rate-limiter";
-import { ConvexError, v } from "convex/values";
+import { ConvexError, v, type Infer } from "convex/values";
 import { components, internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { env, internalMutation, internalQuery, query, mutation, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { audit, isCoachOrTravelLead, requireRole, viewer } from "./lib/access";
-import { MAX_FILES_PER_RUN, eventQualifies, eventWindowEnds } from "./lib/sheetEvents";
+import { MAX_FILES_PER_RUN, eventKindApplies, eventQualifies, eventWindowEnds } from "./lib/sheetEvents";
 import { folderVisible, sheetFileKind, sheetFolder, type SheetFileKind, type SheetFolder } from "./lib/sheetKinds";
 import { readySheetKinds, sheetKind } from "./lib/sheetRegistry";
 import { sheetUpdateDue } from "./lib/sheetSchedule";
@@ -52,13 +52,14 @@ export async function qualifyingEvents(ctx: QueryCtx, seasonId: Id<"seasons">, n
 }
 
 /**
- * Every file a run writes: ready team kinds, then each ready event kind for every qualifying event (soonest first). At most
- * MAX_FILES_PER_RUN; the rest are counted as skipped so the card can say so. Kinds with `ready: false` are never listed.
+ * Every file a run writes: ready team kinds, then each ready event kind that applies (the Travel emergency file only for events with travel,
+ * an overnight stay or a permission form) for every qualifying event, soonest first. At most MAX_FILES_PER_RUN; the rest (the events
+ * furthest away) are counted as skipped so the card can say so. Kinds with `ready: false` are never listed.
  */
 export async function planRun(ctx: QueryCtx, seasonId: Id<"seasons">, now: number): Promise<{ pending: RunItem[]; skipped: number }> {
   const items: RunItem[] = readySheetKinds("team").map(definition => definition.kind);
   const eventKinds = readySheetKinds("event");
-  if (eventKinds.length) for (const event of await qualifyingEvents(ctx, seasonId, now)) for (const definition of eventKinds) items.push({ kind: definition.kind, eventId: event._id });
+  if (eventKinds.length) for (const event of await qualifyingEvents(ctx, seasonId, now)) for (const definition of eventKinds) if (eventKindApplies(definition.kind, event)) items.push({ kind: definition.kind, eventId: event._id });
   return { pending: items.slice(0, MAX_FILES_PER_RUN), skipped: Math.max(0, items.length - MAX_FILES_PER_RUN) };
 }
 
@@ -129,23 +130,23 @@ export const requireCoach = internalQuery({
 });
 
 export const getSettings = internalQuery({
-  args: {}, returns: v.union(v.null(), v.object({ driveId: v.string(), generalFolderId: v.string(), moneyFolderId: v.string(), healthFolderId: v.string(), eventsFolderId: v.union(v.string(), v.null()), archiveFolderId: v.union(v.string(), v.null()) })),
+  args: {}, returns: v.union(v.null(), v.object({ driveId: v.string(), generalFolderId: v.string(), moneyFolderId: v.string(), healthFolderId: v.string(), eventsFolderId: v.union(v.string(), v.null()) })),
   handler: async ctx => {
     const row = await ctx.db.query("sheetExportSettings").first();
-    return row ? { driveId: row.driveId, generalFolderId: row.generalFolderId, moneyFolderId: row.moneyFolderId, healthFolderId: row.healthFolderId, eventsFolderId: row.eventsFolderId ?? null, archiveFolderId: row.archiveFolderId ?? null } : null;
+    return row ? { driveId: row.driveId, generalFolderId: row.generalFolderId, moneyFolderId: row.moneyFolderId, healthFolderId: row.healthFolderId, eventsFolderId: row.eventsFolderId ?? null } : null;
   },
 });
 
 /** Coach only (checked by the setup action). Files made in a folder that has changed are forgotten; the next update makes new ones. */
 export const saveSettings = internalMutation({
-  args: { driveId: v.string(), generalFolderId: v.string(), moneyFolderId: v.string(), healthFolderId: v.string(), eventsFolderId: v.string(), archiveFolderId: v.optional(v.string()), setBy: v.id("appUsers"), now: v.number() },
+  args: { driveId: v.string(), generalFolderId: v.string(), moneyFolderId: v.string(), healthFolderId: v.string(), eventsFolderId: v.string(), setBy: v.id("appUsers"), now: v.number() },
   returns: v.null(),
   handler: async (ctx, args) => {
     const { now, ...fields } = args;
     const actor = await ctx.db.get(args.setBy);
     const existing = await ctx.db.query("sheetExportSettings").first();
     // Which folders changed (names only; folder links are not written to the audit trail).
-    const keys = { general: "generalFolderId", money: "moneyFolderId", health: "healthFolderId", events: "eventsFolderId", archive: "archiveFolderId" } as const;
+    const keys = { general: "generalFolderId", money: "moneyFolderId", health: "healthFolderId", events: "eventsFolderId" } as const;
     const changed = (Object.keys(keys) as (keyof typeof keys)[]).filter(name => existing?.[keys[name]] !== fields[keys[name]]);
     if (existing) await ctx.db.replace(existing._id, { ...fields, setAt: now });
     else await ctx.db.insert("sheetExportSettings", { ...fields, setAt: now });
@@ -163,10 +164,19 @@ export const takeCheckAttempt = internalMutation({
   handler: async (ctx, args) => (await limiter.limit(ctx, "sheetAccessCheck", { key: args.actorId })).ok,
 });
 
-/** True while this run still holds the update (it has not finished and was not taken over). Checked before every Google write. */
+/** Whether a run may still write: it is running, its hold has not run out, and its season is still the active one. */
+async function runHolds(ctx: QueryCtx, run: Doc<"sheetExportRuns"> | null, now: number): Promise<boolean> {
+  if (run?.state !== "running" || run.leaseExpiresAt <= now) return false;
+  return (await ctx.db.get(run.seasonId))?.status === "active";
+}
+
+/**
+ * True while this run still holds the update (it has not finished, was not taken over, and its season is still active). Checked before
+ * every create and Google write, so a run whose season was just archived stops before it makes anything in the live folders.
+ */
 export const runCurrent = internalQuery({
   args: { runId: v.id("sheetExportRuns") }, returns: v.boolean(),
-  handler: async (ctx, args) => { const run = await ctx.db.get(args.runId); return run?.state === "running" && run.leaseExpiresAt > Date.now(); },
+  handler: async (ctx, args) => runHolds(ctx, await ctx.db.get(args.runId), Date.now()),
 });
 
 export const setupActor = internalQuery({
@@ -177,24 +187,29 @@ export const setupActor = internalQuery({
 const claimValidator = v.union(v.null(), v.object({
   kind: sheetFileKind, eventId: v.union(v.id("events"), v.null()), event: v.union(v.null(), v.object({ name: v.string(), startsAt: v.number() })),
   seasonId: v.id("seasons"), seasonName: v.string(), driveId: v.string(), folder: sheetFolder, folderId: v.string(),
-  file: v.union(v.null(), v.object({ spreadsheetId: v.string(), tabs: v.array(v.object({ title: v.string(), sheetId: v.number() })), fingerprint: v.union(v.string(), v.null()), folderId: v.string(), hadError: v.boolean() })),
+  file: v.union(v.null(), v.object({ spreadsheetId: v.string(), name: v.string(), tabs: v.array(v.object({ title: v.string(), sheetId: v.number() })), fingerprint: v.union(v.string(), v.null()), folderId: v.string(), hadError: v.boolean() })),
 }));
 
 /**
- * The next file of a run, with its lease extended. Null when the run is over, replaced, or Google writes are off. A file that no longer
- * belongs in the run (its kind was turned off, or its event was deleted, canceled or left the window, so its file is frozen) is dropped
- * without any Google call.
+ * The next file of a run, with its lease extended. Null when the run is over, replaced, or Google writes are off. A run whose season is no
+ * longer active is stopped. A file that no longer belongs in the run (its kind was turned off, or its event was deleted, canceled, left the
+ * window or no longer needs that file, so its file is frozen) is dropped without any Google call. A stop here releases the hold at once:
+ * no step of this run is still working.
  */
 export const claimNext = internalMutation({
   args: { runId: v.id("sheetExportRuns") }, returns: claimValidator,
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.runId);
     const now = Date.now();
-    if (!run || run.state !== "running" || !run.pending.length) return null;
-    if (!exportEnabled() || !credentialsConfigured()) { await ctx.db.patch(run._id, { state: "stopped", finishedAt: now }); return null; }
+    if (!run) return null;
+    // A run stopped between steps (its season was archived): the next step finds it stopped and lets go of the hold at once.
+    if (run.state !== "running") { if (run.leaseExpiresAt > now) await ctx.db.patch(run._id, { leaseExpiresAt: now }); return null; }
+    if (!run.pending.length) return null;
+    const stop = async () => { await ctx.db.patch(run._id, { state: "stopped", finishedAt: now, leaseExpiresAt: now }); return null; };
+    if (!exportEnabled() || !credentialsConfigured()) return stop();
     const settings = await ctx.db.query("sheetExportSettings").first();
     const season = await ctx.db.get(run.seasonId);
-    if (!settings || !season) { await ctx.db.patch(run._id, { state: "stopped", finishedAt: now }); return null; }
+    if (!settings || !season || season.status !== "active") return stop();
     let pending = run.pending;
     let total = run.total;
     for (; pending.length; pending = pending.slice(1), total--) {
@@ -202,20 +217,20 @@ export const claimNext = internalMutation({
       const definition = sheetKind(kind).definition;
       if (!definition.ready || (definition.scope === "event") !== (eventId !== undefined)) continue;
       const event = eventId ? await ctx.db.get(eventId) : null;
-      if (eventId && (!event || event.seasonId !== run.seasonId || !eventQualifies(event, now))) continue;
+      if (eventId && (!event || event.seasonId !== run.seasonId || !eventQualifies(event, now) || !eventKindApplies(kind, event))) continue;
       const folderId = { general: settings.generalFolderId, money: settings.moneyFolderId, health: settings.healthFolderId, events: settings.eventsFolderId }[definition.folder];
-      if (!folderId) { await ctx.db.patch(run._id, { state: "stopped", finishedAt: now }); return null; }
+      if (!folderId) return stop();
       const stored = await ctx.db.query("sheetExportFiles").withIndex("by_seasonId_and_kind_and_eventId", q => q.eq("seasonId", run.seasonId).eq("kind", kind).eq("eventId", eventId)).first();
       if (stored?.archivedAt) continue;
       await ctx.db.patch(run._id, { leaseExpiresAt: now + LEASE_MS, ...(pending !== run.pending ? { pending, total } : {}) });
       return {
         kind, eventId: eventId ?? null, event: event ? { name: event.name, startsAt: event.startsAt } : null,
         seasonId: run.seasonId, seasonName: season.name, driveId: settings.driveId, folder: definition.folder, folderId,
-        file: stored ? { spreadsheetId: stored.spreadsheetId, tabs: stored.tabs, fingerprint: stored.fingerprint ?? null, folderId: stored.folderId, hadError: stored.lastError !== undefined } : null,
+        file: stored ? { spreadsheetId: stored.spreadsheetId, name: stored.name, tabs: stored.tabs, fingerprint: stored.fingerprint ?? null, folderId: stored.folderId, hadError: stored.lastError !== undefined } : null,
       };
     }
     // Nothing left that belongs in this run.
-    await ctx.db.patch(run._id, { pending: [], total, state: run.failed ? "partial" : "done", finishedAt: now });
+    await ctx.db.patch(run._id, { pending: [], total, state: run.failed ? "partial" : "done", finishedAt: now, leaseExpiresAt: now });
     return null;
   },
 });
@@ -229,7 +244,8 @@ export const saveFile = internalMutation({
   returns: v.boolean(),
   handler: async (ctx, args) => {
     const { runId, recreated, ...fields } = args;
-    if ((await ctx.db.get(runId))?.state !== "running") return false;
+    const run = await ctx.db.get(runId);
+    if (run?.state !== "running" || (await ctx.db.get(run.seasonId))?.status !== "active") return false;
     const existing = await ctx.db.query("sheetExportFiles").withIndex("by_seasonId_and_kind_and_eventId", q => q.eq("seasonId", args.seasonId).eq("kind", args.kind).eq("eventId", args.eventId)).first();
     // A file moved into the Archive is never written again.
     if (existing?.archivedAt) return false;
@@ -246,16 +262,58 @@ export const completeOne = internalMutation({
   args: { runId: v.id("sheetExportRuns"), kind: sheetFileKind, eventId: v.optional(v.id("events")), error: v.optional(v.string()) }, returns: v.null(),
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.runId);
-    if (!run || run.state !== "running" || !sameItem(run.pending[0], args.kind, args.eventId)) return null;
+    const now = Date.now();
+    if (!run) return null;
+    // A step that finishes after its run was stopped releases the hold, so a waiting season archive goes on at once.
+    if (run.state !== "running") { if (run.leaseExpiresAt > now) await ctx.db.patch(run._id, { leaseExpiresAt: now }); return null; }
+    if (!sameItem(run.pending[0], args.kind, args.eventId)) return null;
     const pending = run.pending.slice(1);
     const failed = run.failed + (args.error ? 1 : 0);
     const problems = args.error ? [...(run.problems ?? []), { kind: args.kind, ...(args.eventId ? { eventId: args.eventId } : {}), message: args.error }] : run.problems;
-    const now = Date.now();
     if (args.error) {
       const file = await ctx.db.query("sheetExportFiles").withIndex("by_seasonId_and_kind_and_eventId", q => q.eq("seasonId", run.seasonId).eq("kind", args.kind).eq("eventId", args.eventId)).first();
       if (file) await ctx.db.patch(file._id, { lastError: args.error });
     }
-    await ctx.db.patch(run._id, { pending, done: run.done + (args.error ? 0 : 1), failed, problems, leaseExpiresAt: now + LEASE_MS, ...(pending.length ? {} : { state: failed ? "partial" as const : "done" as const, finishedAt: now }) });
+    await ctx.db.patch(run._id, { pending, done: run.done + (args.error ? 0 : 1), failed, problems, leaseExpiresAt: pending.length ? now + LEASE_MS : now, ...(pending.length ? {} : { state: failed ? "partial" as const : "done" as const, finishedAt: now }) });
+    if (pending.length) await ctx.scheduler.runAfter(1000, internal.sheetExportActions.runOne, { runId: run._id });
+    return null;
+  },
+});
+
+/**
+ * A step that lost its hold (its run was stopped or replaced, its season was archived, or its file was archived) closes out at once instead
+ * of leaving the run held for 15 minutes. A spreadsheet the step had just made but could not save is recorded, so it is never left untracked
+ * in a live folder: a season archive that is waiting moves it, or the next update finds and rewrites it. A running run whose file was
+ * archived drops that file and goes on with the next.
+ */
+export const abandonStep = internalMutation({
+  args: {
+    runId: v.id("sheetExportRuns"), kind: sheetFileKind, eventId: v.optional(v.id("events")),
+    made: v.optional(v.object({ seasonId: v.id("seasons"), folder: sheetFolder, folderId: v.string(), name: v.string(), spreadsheetId: v.string(), checkedAt: v.number() })),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    if (args.made) {
+      const made = args.made;
+      const existing = await ctx.db.query("sheetExportFiles").withIndex("by_seasonId_and_kind_and_eventId", q => q.eq("seasonId", made.seasonId).eq("kind", args.kind).eq("eventId", args.eventId)).first();
+      const row = { ...made, tabs: [], fingerprint: undefined, frozen: false };
+      if (!existing) await ctx.db.insert("sheetExportFiles", { ...row, kind: args.kind, ...(args.eventId ? { eventId: args.eventId } : {}) });
+      else if (existing.spreadsheetId !== made.spreadsheetId) {
+        if (!existing.archivedAt) await ctx.db.patch(existing._id, row);
+        else console.warn("Spreadsheet made after its file was archived", { kind: args.kind, eventId: args.eventId ?? null });
+      }
+    }
+    const run = await ctx.db.get(args.runId);
+    if (!run) return null;
+    if (run.state === "running" && (await ctx.db.get(run.seasonId))?.status !== "active") {
+      await ctx.db.patch(run._id, { state: "stopped", finishedAt: now, leaseExpiresAt: now });
+      return null;
+    }
+    if (run.state !== "running") { if (run.leaseExpiresAt > now) await ctx.db.patch(run._id, { leaseExpiresAt: now }); return null; }
+    if (run.leaseExpiresAt <= now || !sameItem(run.pending[0], args.kind, args.eventId)) return null;
+    const pending = run.pending.slice(1);
+    await ctx.db.patch(run._id, { pending, total: run.total - 1, leaseExpiresAt: pending.length ? now + LEASE_MS : now, ...(pending.length ? {} : { state: run.failed ? "partial" as const : "done" as const, finishedAt: now }) });
     if (pending.length) await ctx.scheduler.runAfter(1000, internal.sheetExportActions.runOne, { runId: run._id });
     return null;
   },
@@ -263,15 +321,30 @@ export const completeOne = internalMutation({
 
 const fileFields = { kind: sheetFileKind, title: v.string(), folder: sheetFolder, name: v.union(v.string(), v.null()), link: v.union(v.string(), v.null()), updatedAt: v.union(v.number(), v.null()), problem: v.union(v.string(), v.null()), note: v.union(v.string(), v.null()) };
 const fileStatus = v.object(fileFields);
-/** One event's file. `current` is false once the event left the window: the file is frozen (kept in Drive, no longer updated). */
-const eventFileStatus = v.object({ ...fileFields, eventId: v.id("events"), eventName: v.string(), eventStartsAt: v.number(), current: v.boolean() });
+/**
+ * One event with its files (Event, Fees, Travel emergency, in that order; only the ones the person may see and the event has). `current`
+ * is false once the event left the window: its files are frozen (kept in Drive, no longer updated).
+ */
+const eventStatus = v.object({ eventId: v.id("events"), eventName: v.string(), eventStartsAt: v.number(), current: v.boolean(), files: v.array(fileStatus) });
+type FileStatus = Infer<typeof fileStatus>;
 
-/** Most event files the card lists (current events first, then the most recent frozen ones). */
-const EVENT_FILES_SHOWN = 100;
+/** Most events the card lists (current events first, then the most recent frozen ones). */
+const EVENTS_LISTED = 60;
 /** Most stored files read per event kind for the card. */
 const EVENT_FILES_READ = 200;
 
 const recreatedNote = (file: Doc<"sheetExportFiles"> | null) => (file?.recreatedAt ? (file.recreatedWhy === "moved" ? "This spreadsheet was no longer in its folder, so Venom Status made a new one there. The old one is still in Google Drive." : "This spreadsheet was missing in Google Drive, so Venom Status made it again.") : null);
+
+/**
+ * The last season archive for the card. Everyone sees a finished move; only a Coach (who can do something about it) sees that a move
+ * stopped partway or was skipped.
+ */
+function archiveStatus(row: Doc<"sheetArchives"> | null, coach: boolean): { label: string; state: "done" | "partial" | "skipped" } | null {
+  if (!row) return null;
+  if (row.state === "done") return row.moved > 0 ? { label: row.label, state: "done" } : null;
+  if (coach && (row.state === "partial" || row.state === "skipped")) return { label: row.label, state: row.state };
+  return null;
+}
 
 /** What the Reports card shows. Files in folders a person can't see (Money, Health) are omitted entirely; kinds that aren't ready are never listed. */
 export const status = query({
@@ -279,9 +352,10 @@ export const status = query({
   returns: v.object({
     canUpdate: v.boolean(), canSetUp: v.boolean(), enabled: v.boolean(), connected: v.boolean(),
     serviceAccountEmail: v.union(v.string(), v.null()), credentialsReady: v.boolean(),
-    folders: v.union(v.null(), v.object({ general: v.string(), money: v.string(), health: v.string(), events: v.union(v.string(), v.null()), archive: v.union(v.string(), v.null()) })),
+    folders: v.union(v.null(), v.object({ general: v.string(), money: v.string(), health: v.string(), events: v.union(v.string(), v.null()) })),
     run: v.union(v.null(), v.object({ state: v.union(v.literal("running"), v.literal("done"), v.literal("partial"), v.literal("stopped")), total: v.number(), finished: v.number(), skipped: v.number(), leaseExpiresAt: v.number() })),
-    archive: v.union(v.null(), v.object({ label: v.string() })), lastSuccessAt: v.union(v.number(), v.null()), lastTriedAt: v.union(v.number(), v.null()), files: v.array(fileStatus), eventFiles: v.array(eventFileStatus),
+    archive: v.union(v.null(), v.object({ label: v.string(), state: v.union(v.literal("done"), v.literal("partial"), v.literal("skipped")) })),
+    lastSuccessAt: v.union(v.number(), v.null()), lastTriedAt: v.union(v.number(), v.null()), files: v.array(fileStatus), events: v.array(eventStatus),
   }),
   handler: async ctx => {
     const actor = await viewer(ctx);
@@ -294,12 +368,12 @@ export const status = query({
     const lastDone = await ctx.db.query("sheetExportRuns").withIndex("by_state_and_startedAt", q => q.eq("state", "done")).order("desc").first();
     const lastArchive = await ctx.db.query("sheetArchives").withIndex("by_startedAt").order("desc").first();
     const runProblem = (kind: SheetFileKind, eventId: Id<"events"> | undefined) => latest?.problems?.find(item => item.kind === kind && item.eventId === eventId)?.message ?? null;
-    const describe = (definition: { kind: SheetFileKind; label: string; folder: SheetFolder }, file: Doc<"sheetExportFiles"> | null, eventId?: Id<"events">) => ({
+    const describe = (definition: { kind: SheetFileKind; label: string; folder: SheetFolder }, file: Doc<"sheetExportFiles"> | null, eventId?: Id<"events">): FileStatus => ({
       kind: definition.kind, title: definition.label, folder: definition.folder, name: file?.name ?? null, link: file ? spreadsheetLink(file.spreadsheetId) : null,
       updatedAt: file?.updatedAt ?? null, problem: file?.lastError ?? runProblem(definition.kind, eventId), note: recreatedNote(file),
     });
-    const files = [];
-    const eventFiles = [];
+    const files: FileStatus[] = [];
+    const events: Infer<typeof eventStatus>[] = [];
     if (season) {
       for (const definition of readySheetKinds("team").filter(item => folderVisible(item.folder, actor))) {
         const found = await ctx.db.query("sheetExportFiles").withIndex("by_seasonId_and_kind_and_eventId", q => q.eq("seasonId", season._id).eq("kind", definition.kind).eq("eventId", undefined)).first();
@@ -309,30 +383,39 @@ export const status = query({
       const eventKinds = readySheetKinds("event").filter(item => folderVisible(item.folder, actor));
       if (eventKinds.length) {
         const current = await qualifyingEvents(ctx, season._id, now);
-        const events = new Map<Id<"events">, Doc<"events"> | null>(current.map(event => [event._id, event]));
+        const docs = new Map<Id<"events">, Doc<"events"> | null>(current.map(event => [event._id, event]));
+        const stored = new Map<SheetFileKind, Map<Id<"events">, Doc<"sheetExportFiles">>>();
         for (const definition of eventKinds) {
-          const stored = await ctx.db.query("sheetExportFiles").withIndex("by_seasonId_and_kind_and_eventId", q => q.eq("seasonId", season._id).eq("kind", definition.kind).gt("eventId", undefined)).take(EVENT_FILES_READ);
-          const byEvent = new Map(stored.filter(file => file.eventId !== undefined && !file.archivedAt).map(file => [file.eventId!, file] as const));
-          for (const eventId of new Set([...current.map(event => event._id), ...byEvent.keys()])) {
-            if (!events.has(eventId)) events.set(eventId, await ctx.db.get(eventId));
-            const event = events.get(eventId) ?? null;
-            const file = byEvent.get(eventId) ?? null;
-            // A deleted event's file is still listed (frozen) under the name it was saved with.
-            eventFiles.push({ ...describe(definition, file, eventId), eventId, eventName: event?.name ?? file?.name ?? definition.label, eventStartsAt: event?.startsAt ?? 0, current: !!event && eventQualifies(event, now) });
-          }
+          const rows = await ctx.db.query("sheetExportFiles").withIndex("by_seasonId_and_kind_and_eventId", q => q.eq("seasonId", season._id).eq("kind", definition.kind).gt("eventId", undefined)).take(EVENT_FILES_READ);
+          stored.set(definition.kind, new Map(rows.filter(file => file.eventId !== undefined && !file.archivedAt).map(file => [file.eventId!, file] as const)));
         }
-        // Current events soonest first, then frozen ones newest first; each event's files stay together, in kind order.
-        const order = new Map(eventKinds.map((definition, index) => [definition.kind, index]));
-        eventFiles.sort((a, b) => (a.current === b.current ? 0 : a.current ? -1 : 1) || (a.current ? a.eventStartsAt - b.eventStartsAt : b.eventStartsAt - a.eventStartsAt) || a.eventId.localeCompare(b.eventId) || order.get(a.kind)! - order.get(b.kind)!);
+        const ids = new Set<Id<"events">>([...current.map(event => event._id), ...[...stored.values()].flatMap(byEvent => [...byEvent.keys()])]);
+        for (const eventId of ids) {
+          if (!docs.has(eventId)) docs.set(eventId, await ctx.db.get(eventId));
+          const event = docs.get(eventId) ?? null;
+          const isCurrent = !!event && eventQualifies(event, now);
+          const eventFiles: FileStatus[] = [];
+          let savedName: string | null = null;
+          for (const definition of eventKinds) {
+            const file = stored.get(definition.kind)?.get(eventId) ?? null;
+            savedName ??= file?.name ?? null;
+            // A current event lists the files it gets (made or not yet); any event lists the files already made.
+            if (file || (isCurrent && event && eventKindApplies(definition.kind, event))) eventFiles.push(describe(definition, file, eventId));
+          }
+          // A deleted event's files are still listed (frozen) under the name they were saved with.
+          if (eventFiles.length) events.push({ eventId, eventName: event?.name ?? savedName ?? "Event", eventStartsAt: event?.startsAt ?? 0, current: isCurrent, files: eventFiles });
+        }
+        // Current events soonest first, then frozen ones newest first.
+        events.sort((a, b) => (a.current === b.current ? 0 : a.current ? -1 : 1) || (a.current ? a.eventStartsAt - b.eventStartsAt : b.eventStartsAt - a.eventStartsAt) || a.eventId.localeCompare(b.eventId));
       }
     }
     return {
       canUpdate: true, canSetUp, enabled: exportEnabled(), connected: !!settings,
       serviceAccountEmail: canSetUp ? env.GOOGLE_SHEETS_SERVICE_ACCOUNT_EMAIL ?? null : null, credentialsReady: credentialsConfigured(),
-      folders: canSetUp && settings ? { general: settings.generalFolderId, money: settings.moneyFolderId, health: settings.healthFolderId, events: settings.eventsFolderId ?? null, archive: settings.archiveFolderId ?? null } : null,
+      folders: canSetUp && settings ? { general: settings.generalFolderId, money: settings.moneyFolderId, health: settings.healthFolderId, events: settings.eventsFolderId ?? null } : null,
       run: latest ? { state: latest.state, total: latest.total, finished: latest.done + latest.failed, skipped: latest.skipped ?? 0, leaseExpiresAt: latest.leaseExpiresAt } : null,
-      archive: lastArchive?.state === "done" && lastArchive.moved > 0 ? { label: lastArchive.label } : null,
-      lastSuccessAt: lastDone?.finishedAt ?? null, lastTriedAt: latest?.finishedAt ?? null, files, eventFiles: eventFiles.slice(0, EVENT_FILES_SHOWN),
+      archive: archiveStatus(lastArchive, canSetUp),
+      lastSuccessAt: lastDone?.finishedAt ?? null, lastTriedAt: latest?.finishedAt ?? null, files, events: events.slice(0, EVENTS_LISTED),
     };
   },
 });

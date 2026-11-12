@@ -25,6 +25,7 @@ function fakeGoogle(folders: Record<string, FolderSpec>) {
     files: new Map<string, { key: string; name: string; trashed: boolean; parents: string[] }>(), creates: 0, ids: 0, calls: [] as string[], batches: [] as { id: string; requests: any[] }[],
     createMode: "ok" as "ok" | "lostAnswer", batchStatuses: [] as number[], batchAttempts: 0, batchDrop: false, missingSheets: new Set<string>(), scopes: [] as string[], onToken: null as null | (() => Promise<void>),
     sheets: new Map<string, { sheetId: number; title: string }[]>(), sheetsNotYet: 0, trashWhenReady: false, driveForbidden: [] as string[], createStatus: 0,
+    renames: [] as { id: string; name: string }[], onCreate: null as null | (() => Promise<void>),
   };
   const json = (status: number, body: unknown = {}) => new Response(JSON.stringify(body), { status });
   const handler = async (input: string | URL | Request, init?: RequestInit) => {
@@ -51,10 +52,20 @@ function fakeGoogle(folders: Record<string, FolderSpec>) {
       state.creates++;
       const newId = `sheet${++state.ids}`;
       state.files.set(newId, { key: body.appProperties.venomStatusKey, name: body.name, trashed: false, parents: body.parents });
+      await state.onCreate?.();
       if (state.createMode === "lostAnswer") { state.createMode = "ok"; return json(500); }
       return json(200, { id: newId });
     }
     const fileMatch = /^\/drive\/v3\/files\/([^/]+)$/.exec(url.pathname);
+    if (fileMatch && method === "PATCH") {
+      const id = decodeURIComponent(fileMatch[1]);
+      const file = state.files.get(id);
+      if (!file) return json(404);
+      const name = JSON.parse(String(init?.body)).name;
+      file.name = name;
+      state.renames.push({ id, name });
+      return json(200, { id, name });
+    }
     if (fileMatch && method === "GET") {
       const id = decodeURIComponent(fileMatch[1]);
       if (state.driveForbidden.length) return json(403, { error: { errors: [{ reason: state.driveForbidden.shift() }] } });
@@ -553,7 +564,7 @@ describe("checking access", () => {
     const { events: _events, ...withoutEvents } = FOLDERS;
     await expect(f.coach.action(api.sheetExportActions.checkAccess, withoutEvents as never)).rejects.toThrow();
     expect(await f.coach.action(api.sheetExportActions.checkAccess, FOLDERS)).toEqual({ ok: true });
-    expect(await f.t.query(internal.sheetExports.getSettings, {})).toMatchObject({ eventsFolderId: FOLDERS.events, archiveFolderId: null });
+    expect(await f.t.query(internal.sheetExports.getSettings, {})).toMatchObject({ eventsFolderId: FOLDERS.events });
   });
   it("refuses a General folder that holds the Money folder (the outer folder is the one named last)", async () => {
     google = fakeGoogle({ ...allFolders, [FOLDERS.general]: { driveId: DRIVE, parents: [FOLDERS.money] } });
@@ -620,18 +631,20 @@ describe("per-event spreadsheets", () => {
   const NOW = Date.parse("2026-11-12T18:00:00Z");
   const kinds = [SHEET_REGISTRY.event.definition, SHEET_REGISTRY.eventFees.definition, SHEET_REGISTRY.eventTravelEmergency.definition];
   const saved = kinds.map(definition => ({ ready: definition.ready, build: definition.build }));
-  /** Turns event kinds on for one test with a tiny synthetic tab (their real builders are written in later stages). */
+  /** Turns event kinds on for one test with a tiny synthetic tab (their real builders run in sheetExportsAll.test.ts). */
   const enable = (...which: typeof kinds) => { for (const definition of which) Object.assign(definition, { ready: true, build: () => [{ title: "People", rows: [["Name"], ["Dev"]] }] }); };
   afterEach(() => { kinds.forEach((definition, index) => Object.assign(definition, saved[index])); });
   beforeEach(() => { vi.setSystemTime(NOW); });
 
   const addEvent = (f: Fixture, name: string, startDays: number, over: Partial<Doc<"events">> = {}) => f.t.run(ctx => ctx.db.insert("events", {
-    seasonId: f.ids.season, name, type: "Competition", startsAt: NOW + startDays * DAY, endsAt: NOW + (startDays + 2) * DAY, destination: "Synthetic Arena", travel: "Bus",
+    seasonId: f.ids.season, name, type: "Competition", startsAt: NOW + startDays * DAY, endsAt: NOW + (startDays + 2) * DAY, destination: "Synthetic Arena", travel: "Charter Bus",
     overnight: true, roomingEnabled: false, feeCents: 0, signupMode: "open", allowWithdrawal: true, permissionRequired: false, firstRequired: false, archived: false, ...over,
   }));
   const template = { type: "Outreach" as const, destination: "Shop", travel: "", overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "open" as const, allowWithdrawal: true, permissionRequired: false, firstRequired: false };
+  const eventFiles = (status: { events: { eventId: Id<"events">; eventName: string; current: boolean; files: { kind: string; name: string | null; link: string | null }[] }[] }) =>
+    status.events.flatMap(event => event.files.map(file => ({ ...file, eventId: event.eventId, eventName: event.eventName, current: event.current })));
 
-  it("writes one file per qualifying event into the Events folder, named after the event, and nothing for other events", async () => {
+  it("writes one file per qualifying event into the Events folder, named date first, and nothing for other events", async () => {
     enable(SHEET_REGISTRY.event.definition);
     const f = await fixture();
     const regional = await addEvent(f, "Synthetic Regional", 20);
@@ -645,11 +658,29 @@ describe("per-event spreadsheets", () => {
     expect((await latestRun(f))!.pending).toEqual(["studentRoster", "shirtSizes", { kind: "event", eventId: regional }]);
     expect(await finishRun(f)).toMatchObject({ state: "done", done: 3 });
     const eventFile = (await files(f)).find(file => file.eventId === regional)!;
-    expect(eventFile).toMatchObject({ kind: "event", folder: "events", folderId: FOLDERS.events, name: "Synthetic Regional - Dec 2, 2026" });
-    expect([...google.state.files.values()].find(file => file.name === "Synthetic Regional - Dec 2, 2026")!.key).toBe(`${f.ids.season}:event:${regional}`);
+    expect(eventFile).toMatchObject({ kind: "event", folder: "events", folderId: FOLDERS.events, name: "2026-12-02 Synthetic Regional" });
+    expect([...google.state.files.values()].find(file => file.name === "2026-12-02 Synthetic Regional")!.key).toBe(`${f.ids.season}:event:${regional}`);
     const status = await f.lead.query(api.sheetExports.status, {});
     expect(status.files.map(file => file.kind)).toEqual(["studentRoster", "shirtSizes"]);
-    expect(status.eventFiles).toEqual([expect.objectContaining({ kind: "event", eventId: regional, eventName: "Synthetic Regional", name: "Synthetic Regional - Dec 2, 2026", current: true, link: expect.stringContaining("docs.google.com") })]);
+    expect(status.events).toEqual([expect.objectContaining({ eventId: regional, eventName: "Synthetic Regional", current: true, files: [expect.objectContaining({ kind: "event", name: "2026-12-02 Synthetic Regional", link: expect.stringContaining("docs.google.com") })] })]);
+  });
+
+  it("renames the Drive file when the event's name or date changes, without making a new one", async () => {
+    enable(SHEET_REGISTRY.event.definition);
+    const f = await fixture();
+    const regional = await addEvent(f, "Synthetic Regional", 20);
+    await press(f);
+    const sheet = (await files(f)).find(file => file.eventId === regional)!.spreadsheetId;
+    const creates = google.state.creates;
+    await f.t.run(ctx => ctx.db.patch(regional, { name: "Synthetic District", startsAt: NOW + 21 * DAY }));
+    await press(f);
+    expect(google.state.creates).toBe(creates);
+    expect(google.state.renames).toEqual([{ id: sheet, name: "2026-12-03 Synthetic District" }]);
+    expect(google.state.files.get(sheet)!.name).toBe("2026-12-03 Synthetic District");
+    expect((await files(f)).find(file => file.eventId === regional)).toMatchObject({ spreadsheetId: sheet, name: "2026-12-03 Synthetic District" });
+    // Nothing changed: no rename and no write.
+    await press(f);
+    expect(google.state.renames).toHaveLength(1);
   });
 
   it("freezes an event's file after the event ends: no more writes, still listed and still in Drive", async () => {
@@ -669,7 +700,7 @@ describe("per-event spreadsheets", () => {
     expect(google.state.batches.length).toBe(batches);
     expect(google.state.calls.some(call => call.includes(eventSheet))).toBe(false);
     const status = await f.coach.query(api.sheetExports.status, {});
-    expect(status.eventFiles).toEqual([expect.objectContaining({ eventId: regional, eventName: "Renamed Regional", current: false, name: "Synthetic Regional - Nov 13, 2026" })]);
+    expect(eventFiles(status)).toEqual([expect.objectContaining({ eventId: regional, eventName: "Renamed Regional", current: false, name: "2026-11-13 Synthetic Regional" })]);
     expect(google.state.files.get(eventSheet)!.trashed).toBe(false);
   });
 
@@ -683,41 +714,128 @@ describe("per-event spreadsheets", () => {
     expect((await files(f)).some(file => file.eventId === regional)).toBe(false);
   });
 
-  it("shows Fees files to any Coach or Travel Lead and travel emergency files only with Health access", async () => {
+  it("groups each event's files on one row and shows Fees to any Coach or Travel Lead, travel emergency only with Health access", async () => {
     enable(...kinds);
     const f = await fixture();
     const regional = await addEvent(f, "Synthetic Regional", 10);
     await press(f);
     expect((await files(f)).filter(file => file.eventId === regional).map(file => [file.kind, file.folderId, file.name])).toEqual([
-      ["event", FOLDERS.events, "Synthetic Regional - Nov 22, 2026"],
-      ["eventFees", FOLDERS.money, "Synthetic Regional - Nov 22, 2026 - Fees"],
-      ["eventTravelEmergency", FOLDERS.health, "Synthetic Regional - Nov 22, 2026 - Travel emergency"],
+      ["event", FOLDERS.events, "2026-11-22 Synthetic Regional"],
+      ["eventFees", FOLDERS.money, "2026-11-22 Synthetic Regional - Fees"],
+      ["eventTravelEmergency", FOLDERS.health, "2026-11-22 Synthetic Regional - Travel emergency"],
     ]);
-    const seen = async (who: Fixture["coach"]) => (await who.query(api.sheetExports.status, {})).eventFiles.map(file => file.kind);
-    expect(await seen(f.coach)).toEqual(["event", "eventFees", "eventTravelEmergency"]);
-    expect(await seen(f.lead)).toEqual(["event", "eventFees"]);
-    expect(await seen(f.parentAsLead)).toEqual(["event", "eventFees"]);
+    const seen = async (who: Fixture["coach"]) => (await who.query(api.sheetExports.status, {})).events.map(event => event.files.map(file => file.kind));
+    expect(await seen(f.coach)).toEqual([["event", "eventFees", "eventTravelEmergency"]]);
+    expect(await seen(f.lead)).toEqual([["event", "eventFees"]]);
+    expect(await seen(f.parentAsLead)).toEqual([["event", "eventFees"]]);
     await f.t.run(ctx => ctx.db.patch(f.ids.lead.app, { healthExport: true }));
-    expect(await seen(f.lead)).toEqual(["event", "eventFees", "eventTravelEmergency"]);
+    expect(await seen(f.lead)).toEqual([["event", "eventFees", "eventTravelEmergency"]]);
+  });
+
+  it("makes a travel emergency file only for events with team travel, an overnight stay or a permission form", async () => {
+    enable(...kinds);
+    const f = await fixture();
+    const plain = { travel: "Provide your Own", overnight: false, permissionRequired: false };
+    const local = await addEvent(f, "Local demo", 4, { ...plain, type: "Outreach" });
+    const permission = await addEvent(f, "Museum visit", 5, { ...plain, type: "Outreach", permissionRequired: true });
+    const bus = await addEvent(f, "Day competition", 6, { ...plain, travel: "Charter Bus" });
+    await f.coach.mutation(api.sheetExports.requestUpdate, {});
+    const pending = (await latestRun(f))!.pending.filter(item => typeof item !== "string").map(item => [item.eventId, item.kind]);
+    expect(pending).toEqual([
+      [local, "event"], [local, "eventFees"],
+      [permission, "event"], [permission, "eventFees"], [permission, "eventTravelEmergency"],
+      [bus, "event"], [bus, "eventFees"], [bus, "eventTravelEmergency"],
+    ]);
+    await finishRun(f);
+    expect((await f.coach.query(api.sheetExports.status, {})).events.map(event => event.files.length)).toEqual([2, 3, 3]);
+    // The bus is canceled for a later update: the travel emergency file made already is frozen (kept, no longer written) and still listed.
+    await f.t.run(ctx => ctx.db.patch(bus, { travel: "Provide your Own" }));
+    const batches = google.state.batches.length;
+    await press(f);
+    expect(google.state.batches.length).toBe(batches);
+    expect((await f.coach.query(api.sheetExports.status, {})).events.find(event => event.eventId === bus)!.files.map(file => file.kind)).toEqual(["event", "eventFees", "eventTravelEmergency"]);
   });
 
   it("lists an upcoming event before its first update as not made yet", async () => {
     enable(SHEET_REGISTRY.event.definition);
     const f = await fixture();
     await addEvent(f, "Synthetic Regional", 10);
-    expect((await f.coach.query(api.sheetExports.status, {})).eventFiles).toEqual([expect.objectContaining({ eventName: "Synthetic Regional", link: null, name: null, current: true })]);
+    expect(eventFiles(await f.coach.query(api.sheetExports.status, {}))).toEqual([expect.objectContaining({ eventName: "Synthetic Regional", link: null, name: null, current: true })]);
   });
 
-  it("writes at most 60 files in one update and says how many were left", async () => {
+  it("writes at most 150 files in one update, soonest events first, and says how many were left", async () => {
     enable(SHEET_REGISTRY.event.definition);
     const f = await fixture();
-    for (let index = 0; index < 70; index++) await addEvent(f, `Event ${index}`, 1 + (index % 50));
+    // 160 events, all within the next 60 days; the 12 furthest out don't fit (2 team files + 148 events = 150).
+    await f.t.run(async ctx => {
+      for (let index = 0; index < 160; index++) await ctx.db.insert("events", {
+        seasonId: f.ids.season, name: `Event ${index}`, type: "Competition", startsAt: NOW + DAY + index * 3600_000 * 8, endsAt: NOW + DAY + index * 3600_000 * 8 + 3600_000, destination: "Synthetic Arena", travel: "Charter Bus",
+        overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "open", allowWithdrawal: true, permissionRequired: false, firstRequired: false, archived: false,
+      });
+    });
     await f.coach.mutation(api.sheetExports.requestUpdate, {});
     const run = (await latestRun(f))!;
-    expect(run.pending).toHaveLength(60);
+    expect(run.pending).toHaveLength(150);
     expect(run.pending.slice(0, 2)).toEqual(["studentRoster", "shirtSizes"]);
-    expect([run.total, run.skipped]).toEqual([60, 12]);
-    expect((await f.coach.query(api.sheetExports.status, {})).run).toMatchObject({ total: 60, skipped: 12 });
+    const names = await f.t.run(async ctx => Promise.all(run.pending.slice(2).map(async item => (await ctx.db.get((item as { eventId: Id<"events"> }).eventId))!.name)));
+    expect([names[0], names.at(-1)]).toEqual(["Event 0", "Event 147"]);
+    expect([run.total, run.skipped]).toEqual([150, 12]);
+    expect((await f.coach.query(api.sheetExports.status, {})).run).toMatchObject({ total: 150, skipped: 12 });
+  });
+});
+
+describe("a season switch while an update runs", () => {
+  const archiveSeason = (f: Fixture) => f.t.run(async ctx => {
+    await ctx.db.patch(f.ids.season, { status: "archived" });
+    const run = await ctx.db.query("sheetExportRuns").withIndex("by_startedAt").order("desc").first();
+    if (run?.state === "running") await ctx.db.patch(run._id, { state: "stopped", finishedAt: Date.now() });
+  });
+
+  it("stops a run whose season is no longer active at its next step and lets go of the hold", async () => {
+    const f = await fixture();
+    await f.coach.mutation(api.sheetExports.requestUpdate, {});
+    await f.t.run(ctx => ctx.db.patch(f.ids.season, { status: "archived" }));
+    const run = (await latestRun(f))!;
+    expect(await f.t.mutation(internal.sheetExports.claimNext, { runId: run._id })).toBeNull();
+    const after = (await latestRun(f))!;
+    expect(after.state).toBe("stopped");
+    expect(after.leaseExpiresAt).toBeLessThanOrEqual(Date.now());
+    expect(await f.t.query(internal.sheetExports.runCurrent, { runId: run._id })).toBe(false);
+    expect(google.state.creates).toBe(0);
+  });
+
+  it("makes nothing when the season is archived just before a step would create its file, and closes the step at once", async () => {
+    const f = await fixture();
+    await f.coach.mutation(api.sheetExports.requestUpdate, {});
+    google.state.onToken = async () => { google.state.onToken = null; await archiveSeason(f); };
+    await f.t.action(internal.sheetExportActions.runOne, { runId: (await latestRun(f))!._id });
+    expect(google.state.creates).toBe(0);
+    expect(await files(f)).toEqual([]);
+    const run = (await latestRun(f))!;
+    expect(run.state).toBe("stopped");
+    expect(run.leaseExpiresAt).toBeLessThanOrEqual(Date.now());
+  });
+
+  it("records a file made just as the season was archived, so it is never left untracked in a live folder", async () => {
+    const f = await fixture();
+    await f.coach.mutation(api.sheetExports.requestUpdate, {});
+    google.state.onCreate = async () => { google.state.onCreate = null; await archiveSeason(f); };
+    await f.t.action(internal.sheetExportActions.runOne, { runId: (await latestRun(f))!._id });
+    expect(google.state.creates).toBe(1);
+    const [made] = [...google.state.files.keys()];
+    expect(await files(f)).toEqual([expect.objectContaining({ kind: "studentRoster", spreadsheetId: made, folderId: FOLDERS.general, frozen: false })]);
+    expect(google.state.batches).toHaveLength(0);
+    expect((await latestRun(f))!.leaseExpiresAt).toBeLessThanOrEqual(Date.now());
+  });
+
+  it("drops a file archived during a run and goes on with the next without waiting for the hold to run out", async () => {
+    const f = await fixture();
+    await f.coach.mutation(api.sheetExports.requestUpdate, {});
+    const run = (await latestRun(f))!;
+    await f.t.mutation(internal.sheetExports.abandonStep, { runId: run._id, kind: "studentRoster" });
+    expect(await latestRun(f)).toMatchObject({ state: "running", pending: ["shirtSizes"], total: 1 });
+    await f.t.mutation(internal.sheetExports.abandonStep, { runId: run._id, kind: "shirtSizes" });
+    expect(await latestRun(f)).toMatchObject({ state: "done", pending: [], total: 0 });
   });
 });
 

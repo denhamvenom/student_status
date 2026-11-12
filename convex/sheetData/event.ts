@@ -6,6 +6,7 @@ import { effectiveIntervals } from "../lib/effectiveIntervals";
 import { activeShifts, answerValue } from "../lib/eventSignupExtras";
 import { studentReadiness } from "../lib/readModels";
 import { feeMaintenanceProjection } from "../lib/seasonFinance";
+import { MONEY_ITEMS } from "../lib/sheetRows";
 import type { SheetLoader } from "../lib/sheetKinds";
 import { teamTransportEnabled } from "../lib/transportation";
 import type { Data, EventAttendancePerson, EventParticipantRow, EventRoomRow, EventShiftRow } from "../sheetKinds/event";
@@ -23,8 +24,6 @@ const cursorArg = v.union(v.string(), v.null());
 const nullableString = v.union(v.string(), v.null());
 const personName = (student: Doc<"students">) => student.legalName || student.preferredName;
 
-/** Readiness items that are about fees; they live in the Money folder, never in an Events file. */
-const MONEY_ITEMS = new Set(["Required payment", "Season fee maintenance is not complete", "Financial records require review or are updating", "Event financial records require review"]);
 
 const participantRow = v.object({
   studentId: v.id("students"), name: v.string(), subteam: v.string(), status: v.string(), independentTravel: v.boolean(),
@@ -38,7 +37,7 @@ export const core = internalQuery({
     overnight: v.boolean(), roomingEnabled: v.boolean(), shiftsEnabled: v.boolean(), permissionRequired: v.boolean(),
     questions: v.array(v.object({ id: v.string(), prompt: v.string(), archived: v.boolean() })),
     shiftIds: v.array(v.id("eventShifts")),
-    session: v.union(v.null(), v.object({ id: v.id("timeclockSessions"), state: v.union(v.literal("open"), v.literal("closed")) })),
+    sessions: v.array(v.object({ id: v.id("timeclockSessions"), state: v.union(v.literal("open"), v.literal("closed")) })),
     transport: v.object({ enabled: v.boolean(), state: v.string(), seats: v.number(), demand: v.number(), busSeats: v.number(), open: v.array(v.string()), vehicles: v.array(v.object({ driver: v.string(), vehicle: v.string(), seats: v.number() })) }),
   }),
   handler: async (ctx, args) => {
@@ -47,12 +46,12 @@ export const core = internalQuery({
     const questions = await ctx.db.query("eventQuestions").withIndex("by_eventId_and_order", q => q.eq("eventId", event._id)).take(101);
     if (questions.length > 100) throw new ConvexError("This event has too many questions to show here.");
     const shifts = event.shiftsEnabled ? await activeShifts(ctx, event._id) : [];
-    let session: { id: Id<"timeclockSessions">; state: "open" | "closed" } | null = null;
+    let sessions: { id: Id<"timeclockSessions">; state: "open" | "closed" }[] = [];
     if (event.calendarEventId) {
       const occurrence = await ctx.db.query("timeclockOccurrences").withIndex("by_source_and_sourceKey", q => q.eq("source", "calendar").eq("sourceKey", event.calendarEventId!)).unique();
-      const sessions = occurrence ? await ctx.db.query("timeclockSessions").withIndex("by_occurrenceId", q => q.eq("occurrenceId", occurrence._id)).take(20) : [];
-      const live = sessions.filter((s): s is typeof s & { state: "open" | "closed" } => s.state !== "cancelled").sort((a, b) => b.openedAt - a.openedAt)[0];
-      if (live) session = { id: live._id, state: live.state };
+      const found = occurrence ? await ctx.db.query("timeclockSessions").withIndex("by_occurrenceId", q => q.eq("occurrenceId", occurrence._id)).take(20) : [];
+      // Every session that was not canceled counts, so a multi-day event with several sessions shows all of its clock-ins.
+      sessions = found.filter((s): s is typeof s & { state: "open" | "closed" } => s.state !== "cancelled").sort((a, b) => a.openedAt - b.openedAt).map(s => ({ id: s._id, state: s.state }));
     }
     const enabled = teamTransportEnabled(event);
     const summary = await transportSummary(ctx, event);
@@ -69,7 +68,7 @@ export const core = internalQuery({
       name: event.name, type: event.type, startsAt: event.startsAt, endsAt: event.endsAt, destination: event.destination, capacity: event.capacity ?? null,
       overnight: event.overnight, roomingEnabled: event.roomingEnabled, shiftsEnabled: event.shiftsEnabled === true, permissionRequired: event.permissionRequired,
       questions: questions.map(q => ({ id: q._id as string, prompt: q.prompt, archived: q.archived === true })),
-      shiftIds: shifts.map(s => s._id), session,
+      shiftIds: shifts.map(s => s._id), sessions,
       transport: { enabled, state: summary.state, seats: summary.seats, demand: summary.demand, busSeats: summary.busSeats, open: summary.open, vehicles },
     };
   },
@@ -189,7 +188,8 @@ export const clockBatch = internalQuery({
     const out = [];
     for (const studentId of args.studentIds) {
       const student = await ctx.db.get(studentId);
-      if (!student || student.seasonId !== session.seasonId) continue;
+      // Inactive students stay off the Attendance tab, as they stay off the signup list.
+      if (!student || !student.active || student.seasonId !== session.seasonId) continue;
       const intervals = await effectiveIntervals(ctx, session, studentId, args.asOf);
       const corrections = await ctx.db.query("timeclockCorrections").withIndex("by_sessionId_and_studentId", q => q.eq("sessionId", session._id).eq("studentId", studentId)).take(501);
       out.push({ studentId, name: personName(student), subteam: subteamDisplay(student.subteam), intervals, corrections: corrections.length });
@@ -210,7 +210,7 @@ async function allPages<Row>(read: (cursor: string | null) => Promise<{ rows: Ro
   throw new Error("Too many rows to read");
 }
 
-type CoreResult = Omit<Data["event"], never> & { questions: Data["questions"]; shiftIds: Id<"eventShifts">[]; session: { id: Id<"timeclockSessions">; state: "open" | "closed" } | null; transport: Data["transport"] };
+type CoreResult = Omit<Data["event"], never> & { questions: Data["questions"]; shiftIds: Id<"eventShifts">[]; sessions: { id: Id<"timeclockSessions">; state: "open" | "closed" }[]; transport: Data["transport"] };
 type ClockRow = { studentId: Id<"students">; name: string; subteam: string; intervals: { inAt: number; outAt: number }[]; corrections: number };
 
 export const load: SheetLoader<Data> = async (ctx, args) => {
@@ -234,25 +234,29 @@ export const load: SheetLoader<Data> = async (ctx, args) => {
   }
 
   let attendance: Data["attendance"] = null;
-  if (core.session) {
-    const sessionId = core.session.id;
-    const clocked = new Set<Id<"students">>();
-    for (const kind of ["intervals", "corrections"] as const) {
-      let cursor: string | null = null;
-      for (let i = 0; ; i++) {
-        if (i >= MAX_PAGES) throw new Error("Too many clock-ins to read");
-        const page: { studentIds: Id<"students">[]; isDone: boolean; cursor: string | null } = await ctx.runQuery(internal.sheetData.event.clockedStudentPage, { sessionId, kind, cursor });
-        for (const id of page.studentIds) clocked.add(id);
-        if (page.isDone) break;
-        cursor = page.cursor;
-      }
-    }
-    const ids = [...clocked];
-    const asOf = Date.now();
+  if (core.sessions.length) {
     const times = new Map<string, { name: string; subteam: string; intervals: { inAt: number; outAt: number }[]; corrections: number }>();
-    for (let i = 0; i < ids.length; i += 10) {
-      const batch: ClockRow[] = await ctx.runQuery(internal.sheetData.event.clockBatch, { sessionId, studentIds: ids.slice(i, i + 10), asOf });
-      for (const row of batch) times.set(row.studentId, row);
+    const asOf = Date.now();
+    for (const { id: sessionId } of core.sessions) {
+      const clocked = new Set<Id<"students">>();
+      for (const kind of ["intervals", "corrections"] as const) {
+        let cursor: string | null = null;
+        for (let i = 0; ; i++) {
+          if (i >= MAX_PAGES) throw new Error("Too many clock-ins to read");
+          const page: { studentIds: Id<"students">[]; isDone: boolean; cursor: string | null } = await ctx.runQuery(internal.sheetData.event.clockedStudentPage, { sessionId, kind, cursor });
+          for (const id of page.studentIds) clocked.add(id);
+          if (page.isDone) break;
+          cursor = page.cursor;
+        }
+      }
+      const ids = [...clocked];
+      for (let i = 0; i < ids.length; i += 10) {
+        const batch: ClockRow[] = await ctx.runQuery(internal.sheetData.event.clockBatch, { sessionId, studentIds: ids.slice(i, i + 10), asOf });
+        for (const row of batch) {
+          const before = times.get(row.studentId);
+          times.set(row.studentId, before ? { ...before, intervals: [...before.intervals, ...row.intervals], corrections: before.corrections + row.corrections } : row);
+        }
+      }
     }
     const people: EventAttendancePerson[] = [];
     const seen = new Set<string>();
@@ -264,7 +268,7 @@ export const load: SheetLoader<Data> = async (ctx, args) => {
       people.push({ studentId: p.studentId, name: p.name, subteam: p.subteam, signedUp: p.status !== "withdrawn", confirmed, intervals: t?.intervals ?? [], corrections: t?.corrections ?? 0 });
     }
     for (const [studentId, t] of times) if (!seen.has(studentId)) people.push({ studentId, name: t.name, subteam: t.subteam, signedUp: false, confirmed: false, intervals: t.intervals, corrections: t.corrections });
-    attendance = { sessionState: core.session.state, people };
+    attendance = { sessionState: core.sessions.some(session => session.state === "open") ? "open" : "closed", people };
   }
 
   return {

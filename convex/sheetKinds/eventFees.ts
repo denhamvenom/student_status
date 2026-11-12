@@ -32,10 +32,11 @@ export function eventFeeTabs(data: Data): SheetTab[] {
         ["Fee", "Type", "Amount per student", "Status", "Students charged", "Total charged", "Paid so far", "Balance due"],
         ...fees.map(f => {
           const own = data.charges.filter(c => c.feeId === f.id);
+          const ownStudents = new Set(own.map(c => c.studentId)).size;
           const charged = sum(own, c => c.amountCents), paid = sum(own, c => c.paidCents);
-          return [f.fee, KIND[f.kind], dollars(f.amountCents), f.canceled ? "Canceled" : "Active", own.length, dollars(charged), dollars(paid), dollars(charged - paid)];
+          return [f.fee, KIND[f.kind], dollars(f.amountCents), f.canceled ? "Canceled" : "Active", ownStudents, dollars(charged), dollars(paid), dollars(charged - paid)];
         }),
-        ["Total", "", "", "", data.charges.length, dollars(sum(data.charges, c => c.amountCents)), dollars(sum(data.charges, c => c.paidCents)), dollars(sum(data.charges, c => c.amountCents - c.paidCents))],
+        ["Total", "", "", "", new Set(data.charges.map(c => c.studentId)).size, dollars(sum(data.charges, c => c.amountCents)), dollars(sum(data.charges, c => c.paidCents)), dollars(sum(data.charges, c => c.amountCents - c.paidCents))],
       ],
     },
     {

@@ -19,7 +19,7 @@ const confirmed = { ...legacy, consentProfileV2: profile, consentProfileV2Comple
 describe("health rows", () => {
   it("uses the confirmed profile when present, and ignores the older fields", () => {
     const row = studentHealthCells(healthStudentFor(confirmed, null));
-    expect(row).toEqual(["Dev Student", "Sophomore", "2010-05-06", "New Contact", "Father", "+1 555-0111", "Bees: Severe; Swelling; response: EpiPen", "None reported", "", "Acme Health", "P-1", "Information unavailable", ""]);
+    expect(row).toEqual(["Dev Student", "Sophomore", "May 6, 2010", "New Contact", "Father", "+1 555-0111", "Bees: Severe; Swelling; response: EpiPen", "None reported", "", "Acme Health", "P-1", "Information unavailable", ""]);
   });
 
   it("falls back to the older fields, with profile-only columns blank", () => {

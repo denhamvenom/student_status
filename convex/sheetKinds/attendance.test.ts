@@ -19,26 +19,28 @@ describe("attendance tabs", () => {
   const data: Data = {
     held: { required: 4, other: 2, outreach: 0 },
     students: [
-      { name: "Zed Student", subteam: "Programming", required: 2, other: 0, outreach: 0, totalMs: 2.5 * hour, weeks: [{ week: "2026-10-12", ms: hour }, { week: "2026-11-02", ms: 1.5 * hour }] },
-      { name: "Alex Student", subteam: "Build", required: 4, other: 1, outreach: 0, totalMs: 4 * hour, weeks: [{ week: "2026-10-12", ms: 4 * hour }] },
-      { name: "Bea Student", subteam: "Build", required: 1, other: 1, outreach: 0, totalMs: 0, weeks: [] },
+      { name: "Zed Student", subteam: "Programming", required: 2, other: 0, outreach: 0, buildMinutes: 90, totalMs: 2.5 * hour, weeks: [{ week: "2026-10-12", ms: hour }, { week: "2026-11-02", ms: 1.5 * hour }] },
+      { name: "Alex Student", subteam: "Build", required: 4, other: 1, outreach: 0, buildMinutes: 150, totalMs: 4 * hour, weeks: [{ week: "2026-10-12", ms: 4 * hour }] },
+      { name: "Bea Student", subteam: "Build", required: 1, other: 1, outreach: 0, buildMinutes: 0, totalMs: 0, weeks: [] },
     ],
   };
   const [summary, bySubteam, weekly] = attendanceTabs(data);
 
   it("lists students by name with percents and hours", () => {
     expect(attendanceTabs(data).map(tab => tab.title)).toEqual(["Summary", "By subteam", "Weekly hours"]);
-    expect(summary.rows[0]).toHaveLength(12);
-    expect(summary.rows.slice(1).map(row => row.slice(0, 5))).toEqual([["Alex Student", "Build", 4, 4, 100], ["Bea Student", "Build", 1, 4, 25], ["Zed Student", "Programming", 2, 4, 50]]);
-    expect(summary.rows[1].slice(5)).toEqual([1, 2, 50, 0, 0, "", 4]);
+    expect(summary.rows[0].slice(0, 4)).toEqual(["Student", "Subteam", "Build hours", "All clocked hours"]);
+    expect(summary.rows[0]).toHaveLength(13);
+    expect(summary.rows.slice(1).map(row => row.slice(0, 7))).toEqual([["Alex Student", "Build", 2.5, 4, 4, 4, 100], ["Bea Student", "Build", 0, 0, 1, 4, 25], ["Zed Student", "Programming", 1.5, 2.5, 2, 4, 50]]);
+    expect(summary.rows[1].slice(7)).toEqual([1, 2, 50, 0, 0, ""]);
   });
   it("rolls up each subteam from sums, with average hours per student", () => {
-    expect(bySubteam.rows[1]).toEqual(["Build", 2, 5, 8, 62.5, 2, 4, 50, 0, 0, "", 4, 2]);
-    expect(bySubteam.rows[2].slice(0, 3)).toEqual(["Programming", 1, 2]);
-    expect(bySubteam.rows[2].slice(-2)).toEqual([2.5, 2.5]);
+    expect(bySubteam.rows[0].slice(0, 4)).toEqual(["Subteam", "Students", "Build hours", "All clocked hours"]);
+    expect(bySubteam.rows[1]).toEqual(["Build", 2, 2.5, 4, 5, 8, 62.5, 2, 4, 50, 0, 0, "", 2]);
+    expect(bySubteam.rows[2].slice(0, 4)).toEqual(["Programming", 1, 1.5, 2.5]);
+    expect(bySubteam.rows[2].at(-1)).toBe(2.5);
   });
   it("gives every week between the first and last a column, even with no meetings", () => {
-    expect(weekly.rows[0]).toEqual(["Student", "Subteam", "Week of Oct 12, 2026", "Week of Oct 19, 2026", "Week of Oct 26, 2026", "Week of Nov 2, 2026"]);
+    expect(weekly.rows[0]).toEqual(["Student", "Subteam", "Week of Oct 12, 2026 (all clocked hours)", "Week of Oct 19, 2026 (all clocked hours)", "Week of Oct 26, 2026 (all clocked hours)", "Week of Nov 2, 2026 (all clocked hours)"]);
     expect(weekly.rows[3]).toEqual(["Zed Student", "Programming", 1, 0, 0, 1.5]);
   });
   it("still builds with no students", () => {
@@ -138,6 +140,24 @@ describe("attendance data", () => {
     expect(Object.fromEntries(dev.weeks.map(week => [week.week, week.ms]))).toEqual({ "2026-10-12": 2 * hour, "2026-10-19": 2 * hour, "2026-11-02": 2 * hour });
     const [summary] = attendanceTabs(data);
     expect(summary.rows.map(row => row[0])).toEqual(["Student", "Dev Student", "Jo Student"]);
+  });
+
+  it("Build hours equal the app's Build hours (whole minutes, Build sessions from kickoff only)", async () => {
+    const f = await fixture();
+    await season(f);
+    // Kickoff for 2027 is Jan 9, 2027. A Build session before it does not count; two after it do (the second with a partial minute).
+    await meeting(f, { title: "Build meeting", at: Date.parse("2027-01-05T23:00:00Z"), visits: [{ student: f.ids.dev.id, ms: 2 * hour }] });
+    await meeting(f, { title: "Build meeting", at: Date.parse("2027-01-12T23:00:00Z"), visits: [{ student: f.ids.dev.id, ms: 90 * 60_000 }] });
+    await meeting(f, { title: "Build meeting", at: Date.parse("2027-01-19T23:00:00Z"), visits: [{ student: f.ids.dev.id, ms: 30 * 60_000 + 59_999 }, { student: f.ids.jo.id, ms: hour }] });
+    const data = await loadFrom(f);
+    for (const [who, name] of [[f.ids.dev, "Dev Student"], [f.ids.jo, "Jo Student"]] as const) {
+      const app = await f.as(who).query(api.dashboardReports.homeAttendance, { studentId: who.id });
+      expect(data.students.find(student => student.name === name)!.buildMinutes).toBe(app.buildHours.minutes);
+    }
+    expect(data.students.find(student => student.name === "Dev Student")!.buildMinutes).toBe(120);
+    const [summary] = attendanceTabs(data);
+    expect(summary.rows.find(row => row[0] === "Dev Student")!.slice(2, 4)).toEqual([2, 10]);
+    expect(summary.rows.find(row => row[0] === "Jo Student")!.slice(2, 4)).toEqual([1, 3.5]);
   });
 
   it.each([

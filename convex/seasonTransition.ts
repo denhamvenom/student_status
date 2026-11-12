@@ -86,7 +86,7 @@ export const step = internalMutation({args:{planId},returns:v.null(),handler:asy
  if(p.stage==="calendar"){const page=await advanceTimeclockSeasonBoundary(ctx,p.sourceSeasonId,p.targetSeasonId!,p.cursor??null,p.confirmedAt!);await patch(ctx,p,{cursor:page.isDone?null:page.continueCursor,stage:page.isDone?"activate":"calendar"});return null;}
  if(p.stage==="activate"){
  if(await ctx.db.query("timeclockSessions").withIndex("by_seasonId_and_state",q=>q.eq("seasonId",p.sourceSeasonId).eq("state","open")).first())throw new Error("An open Timeclock session prevents activation.");
- await initializeEmptyAttendanceSeason(ctx,p.targetSeasonId!);await finalizeTimeclockSeasonBoundary(ctx,p.sourceSeasonId);await ctx.db.patch(p.sourceSeasonId,{status:"archived"});await ctx.db.patch(p.targetSeasonId!,{status:"active"});await startSeasonArchive(ctx,p.sourceSeasonId);await patch(ctx,p,{state:"complete",open:false,stage:"complete",revision:p.revision+1});await audit(ctx,actor,"seasonTransitionPlans",p._id,"activate",p.sourceSeasonId,p.targetSeasonId);return null;
+ await initializeEmptyAttendanceSeason(ctx,p.targetSeasonId!);await finalizeTimeclockSeasonBoundary(ctx,p.sourceSeasonId);await ctx.db.patch(p.sourceSeasonId,{status:"archived"});await ctx.db.patch(p.targetSeasonId!,{status:"active"});await startSeasonArchive(ctx,p.sourceSeasonId,{trigger:"auto",actor});await patch(ctx,p,{state:"complete",open:false,stage:"complete",revision:p.revision+1});await audit(ctx,actor,"seasonTransitionPlans",p._id,"activate",p.sourceSeasonId,p.targetSeasonId);return null;
  }
  throw new Error("Unknown transition step.");
 }});

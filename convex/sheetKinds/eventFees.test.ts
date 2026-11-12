@@ -26,7 +26,7 @@ describe("event fees rows", () => {
       ["Registration", "Main fee", 100, "Active", 2, 200, 125, 75],
       ["Old shirt", "Other fee", 10, "Canceled", 0, 0, 0, 0],
     ]);
-    expect(fees.rows[4]).toEqual(["Total", "", "", "", 4, 269.99, 125, 144.99]);
+    expect(fees.rows[4]).toEqual(["Total", "", "", "", 3, 269.99, 125, 144.99]);
   });
   it("adds up each student's fees, includes students without fees and fees without a setting, and totals match", () => {
     expect(students.rows[0]).toEqual(["Student", "Status", "Total fees", "Paid so far", "Balance due"]);

@@ -14,10 +14,11 @@ describe("health file", () => {
       adults: [{ name: "Pat", role: "Mentor", emergencyName: null, emergencyRelationship: null, emergencyPhone: null }, { name: "Ann", role: "Coach", emergencyName: "Bo", emergencyRelationship: "Spouse", emergencyPhone: "555-0150" }],
     });
     expect(students.title).toBe("Students");
+    expect(students.rows[0].slice(0, 3)).toEqual(["Student", "Grade", "Date of birth"]);
     expect(students.rows[0]).toHaveLength(15);
     expect(students.rows[0].slice(-2)).toEqual(["Permission forms accepted", "Permission forms not accepted yet"]);
     expect(students.rows.slice(1).map(row => row[0])).toEqual(["Amy", "Zed"]);
-    expect(students.rows[2]).toEqual(["Zed", "Junior", "2009-01-02", "Em", "Mother", "555-0100", "None reported", "None reported", "", "None reported", "", "Dr Who", "555-0199", 2, 1]);
+    expect(students.rows[2]).toEqual(["Zed", "Junior", "Jan 2, 2009", "Em", "Mother", "555-0100", "None reported", "None reported", "", "None reported", "", "Dr Who", "555-0199", 2, 1]);
     expect(adults.title).toBe("Adults");
     expect(adults.rows[0]).toEqual(["Name", "Role", "Emergency contact name", "Emergency contact relationship", "Emergency contact phone"]);
     expect(adults.rows.slice(1)).toEqual([["Ann", "Coach", "Bo", "Spouse", "555-0150"], ["Pat", "Mentor", "", "", ""]]);

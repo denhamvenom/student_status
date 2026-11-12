@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ensureFolder, googleRetry, moveFile } from "./googleSheets";
+import { ensureFolder, googleRetry, moveFile, renameFile } from "./googleSheets";
 
 type Call = { method: string; url: URL; body: unknown };
 /** A stand-in for Drive's folder endpoints; nothing here reaches Google. */
@@ -67,5 +67,17 @@ describe("moveFile", () => {
     expect(call.method).toBe("PATCH");
     expect(call.url.pathname).toBe("/drive/v3/files/sheet1");
     expect([call.url.searchParams.get("addParents"), call.url.searchParams.get("removeParents"), call.url.searchParams.get("supportsAllDrives")]).toEqual(["archive2027", "general1", "true"]);
+  });
+});
+
+describe("renameFile", () => {
+  it("sets only the name, in the shared drive", async () => {
+    const drive = fakeDrive();
+    vi.stubGlobal("fetch", drive.fetcher);
+    await renameFile("t", { fileId: "sheet1", name: "2027-03-06 Synthetic Regional" });
+    expect(drive.calls).toHaveLength(1);
+    const [call] = drive.calls;
+    expect([call.method, call.url.pathname, call.url.searchParams.get("supportsAllDrives"), call.url.searchParams.get("addParents")]).toEqual(["PATCH", "/drive/v3/files/sheet1", "true", null]);
+    expect(call.body).toEqual({ name: "2027-03-06 Synthetic Regional" });
   });
 });

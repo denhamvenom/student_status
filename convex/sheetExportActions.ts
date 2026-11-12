@@ -4,7 +4,7 @@ import { action, env, internalAction } from "./_generated/server";
 import { hashId } from "./lib/calendarAuth";
 import { parseDriveFolderId } from "./lib/driveLinks";
 import { GoogleKeyError, GoogleTokenError, googleServiceToken } from "./lib/googleAuth";
-import { CHECK_SCOPE, GoogleRequestError, LAYOUT_VERSION, WRITE_SCOPE, batchUpdate, buildBatch, createSpreadsheet, driveAncestors, driveFileState, driveGetFolder, findByKey, getSheets, googleRetry, type FileState } from "./lib/googleSheets";
+import { CHECK_SCOPE, GoogleRequestError, LAYOUT_VERSION, WRITE_SCOPE, batchUpdate, buildBatch, createSpreadsheet, driveAncestors, driveFileState, driveGetFolder, findByKey, getSheets, googleRetry, renameFile, type FileState } from "./lib/googleSheets";
 import { TOO_MANY_CHECKS } from "./sheetExports";
 import { sheetAppKey } from "./lib/sheetKinds";
 import { sheetKind } from "./lib/sheetRegistry";
@@ -26,9 +26,12 @@ export function plainSheetError(error: unknown): string {
   return GENERIC_FAILURE;
 }
 
-/** This run was replaced or ended while it was working; it stops without writing anything more. */
+/** This run was replaced or ended while it was working (or its season was archived); it stops without writing anything more. */
 class LeaseLost extends Error {}
 type SaveFields = { spreadsheetId: string; tabs: { title: string; sheetId: number }[]; fingerprint?: string; updatedAt?: number; checkedAt: number; frozen: boolean; recreated: "missing" | "moved" | null };
+
+/** Errors from Google or the key are already logged where they happen; anything else is logged here (names only, never data values). */
+const loggedElsewhere = (error: unknown) => error instanceof GoogleRequestError || error instanceof GoogleKeyError || error instanceof GoogleTokenError;
 
 /** Does exactly one spreadsheet of a run, then hands over to the next call. */
 export const runOne = internalAction({
@@ -37,6 +40,8 @@ export const runOne = internalAction({
     const claim = await ctx.runMutation(internal.sheetExports.claimNext, { runId: args.runId });
     if (!claim) return null;
     const item = claim.eventId ? { eventId: claim.eventId } : {};
+    // A spreadsheet made by this step that has not been saved yet; recorded if the step loses its hold, so it is never left untracked.
+    const unsaved: { file: { spreadsheetId: string; name: string; checkedAt: number } | null } = { file: null };
     try {
       const email = env.GOOGLE_SHEETS_SERVICE_ACCOUNT_EMAIL!, key = env.GOOGLE_SHEETS_SERVICE_ACCOUNT_PRIVATE_KEY!;
       const entry = sheetKind(claim.kind);
@@ -51,6 +56,7 @@ export const runOne = internalAction({
       const stillMine = async () => { if (!(await ctx.runQuery(internal.sheetExports.runCurrent, { runId: args.runId }))) throw new LeaseLost(); };
       const save = async (fields: SaveFields) => {
         if (!(await ctx.runMutation(internal.sheetExports.saveFile, { ...base, ...fields }))) throw new LeaseLost();
+        unsaved.file = null;
       };
       const appKey = sheetAppKey(claim.seasonId, claim.kind, claim.eventId ?? undefined);
       let spreadsheetId = claim.file?.spreadsheetId;
@@ -64,9 +70,17 @@ export const runOne = internalAction({
         // Nothing changed since the last update: no writes to Google.
         await save({ spreadsheetId, tabs: claim.file.tabs, fingerprint, checkedAt: now, frozen: true, recreated: null });
       } else {
+        // The Drive name each file had when this step began: the stored one, or the new name for a file this step makes. A file found by its key may
+        // carry an older name, so it is treated as unknown and renamed.
+        const knownNames = new Map<string, string>(spreadsheetId && claim.file ? [[spreadsheetId, claim.file.name]] : []);
         const make = async () => {
           await stillMine();
-          return (await findByKey(token, claim.driveId, claim.folderId, appKey)) ?? await createSpreadsheet(token, { name, driveId: claim.driveId, folderId: claim.folderId, key: appKey });
+          const found = await findByKey(token, claim.driveId, claim.folderId, appKey);
+          if (found) { unsaved.file = { spreadsheetId: found, name, checkedAt: now }; return found; }
+          const made = await createSpreadsheet(token, { name, driveId: claim.driveId, folderId: claim.folderId, key: appKey });
+          unsaved.file = { spreadsheetId: made, name, checkedAt: now };
+          knownNames.set(made, name);
+          return made;
         };
         const madeNow = !spreadsheetId;
         spreadsheetId ??= await make();
@@ -90,39 +104,49 @@ export const runOne = internalAction({
         }
         const batch = buildBatch(tabs, sheets, now);
         await stillMine();
+        // A changed title (an event renamed or moved to another day, a season renamed, a new naming rule) renames the Drive file too.
+        if (knownNames.get(spreadsheetId) !== name) await renameFile(token, { fileId: spreadsheetId, name });
         await batchUpdate(token, spreadsheetId, batch.requests);
         await save({ spreadsheetId, tabs: batch.tabs, fingerprint, updatedAt: now, checkedAt: now, frozen: true, recreated });
       }
       await ctx.runMutation(internal.sheetExports.completeOne, { runId: args.runId, kind: claim.kind, ...item });
     } catch (error) {
-      if (error instanceof LeaseLost) return null;
+      if (error instanceof LeaseLost) {
+        // Close the step out now (no 15-minute hold), and record a file this step made but could not save.
+        const made = unsaved.file;
+        await ctx.runMutation(internal.sheetExports.abandonStep, { runId: args.runId, kind: claim.kind, ...item, ...(made ? { made: { ...made, seasonId: claim.seasonId, folder: claim.folder, folderId: claim.folderId } } : {}) });
+        return null;
+      }
+      if (!loggedElsewhere(error)) {
+        const detail = error instanceof ConvexError ? { name: "ConvexError", message: typeof error.data === "string" ? error.data.slice(0, 200) : "(structured)" } : error instanceof Error ? { name: error.name, message: error.message.slice(0, 200) } : { name: typeof error, message: "" };
+        console.warn("Spreadsheet step failed", { kind: claim.kind, eventId: claim.eventId ?? null, ...detail });
+      }
       await ctx.runMutation(internal.sheetExports.completeOne, { runId: args.runId, kind: claim.kind, ...item, error: plainSheetError(error) });
     }
     return null;
   },
 });
 
-const folderLabels = { general: "General", money: "Money", health: "Health", events: "Events", archive: "Archive" } as const;
+const folderLabels = { general: "General", money: "Money", health: "Health", events: "Events" } as const;
 type FolderName = keyof typeof folderLabels;
-const problemValidator = v.object({ folder: v.union(v.literal("general"), v.literal("money"), v.literal("health"), v.literal("events"), v.literal("archive")), message: v.string() });
+const problemValidator = v.object({ folder: v.union(v.literal("general"), v.literal("money"), v.literal("health"), v.literal("events")), message: v.string() });
 
 /**
  * Coach only. Checks the folder links with read-only Google calls (they work before updates are turned on), then saves them.
  * All folders must be distinct, in one shared drive, and writable by Venom Status's Google account.
  */
 export const checkAccess = action({
-  args: { general: v.string(), money: v.string(), health: v.string(), events: v.string(), archive: v.optional(v.string()) },
+  args: { general: v.string(), money: v.string(), health: v.string(), events: v.string() },
   returns: v.union(v.object({ ok: v.literal(true) }), v.object({ ok: v.literal(false), problems: v.array(problemValidator) })),
   handler: async (ctx, args) => {
     const actorId = await ctx.runQuery(internal.sheetExports.setupActor, {});
     const email = env.GOOGLE_SHEETS_SERVICE_ACCOUNT_EMAIL, key = env.GOOGLE_SHEETS_SERVICE_ACCOUNT_PRIVATE_KEY;
     if (!email || !key) throw new ConvexError(`The Venom Status Google account isn't set up yet. Ask ${ASK_OWNER} to finish the Google setup, then try again.`);
     if (!(await ctx.runMutation(internal.sheetExports.takeCheckAttempt, { actorId }))) throw new ConvexError(TOO_MANY_CHECKS);
-    const inputs: [FolderName, string | undefined][] = [["general", args.general], ["money", args.money], ["health", args.health], ["events", args.events], ["archive", args.archive?.trim() ? args.archive : undefined]];
+    const inputs: [FolderName, string][] = [["general", args.general], ["money", args.money], ["health", args.health], ["events", args.events]];
     const problems: { folder: FolderName; message: string }[] = [];
     const ids: Partial<Record<FolderName, string>> = {};
     for (const [folder, input] of inputs) {
-      if (input === undefined) continue;
       const id = parseDriveFolderId(input);
       if (!id) problems.push({ folder, message: "This doesn't look like a Google Drive folder link. Open the folder in Google Drive, copy the link from the address bar and paste it here." });
       else ids[folder] = id;
@@ -157,7 +181,7 @@ export const checkAccess = action({
       throw new ConvexError(error instanceof GoogleKeyError ? `The Venom Status Google key can't be read. Ask ${ASK_OWNER} to check it.` : error instanceof GoogleTokenError ? `Google didn't accept the Venom Status Google account. Ask ${ASK_OWNER} to check its key.` : "Google didn't answer. Wait a minute, then check access again.");
     }
     if (problems.length || !driveId) return { ok: false as const, problems };
-    await ctx.runMutation(internal.sheetExports.saveSettings, { driveId, generalFolderId: ids.general!, moneyFolderId: ids.money!, healthFolderId: ids.health!, eventsFolderId: ids.events!, archiveFolderId: ids.archive, setBy: actorId, now: Date.now() });
+    await ctx.runMutation(internal.sheetExports.saveSettings, { driveId, generalFolderId: ids.general!, moneyFolderId: ids.money!, healthFolderId: ids.health!, eventsFolderId: ids.events!, setBy: actorId, now: Date.now() });
     return { ok: true as const };
   },
 });

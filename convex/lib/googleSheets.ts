@@ -281,3 +281,9 @@ export async function moveFile(token: string, args: { fileId: string; fromParent
   const params = new URLSearchParams({ addParents: args.toParentId, removeParents: args.fromParentId, supportsAllDrives: "true", fields: "id,parents" });
   ok(await googleJson(token, `${DRIVE}/files/${encodeURIComponent(args.fileId)}?${params}`, { method: "PATCH", body: {}, write: true, fn: "moveFile" }), "moveFile");
 }
+
+/** Renames a file in the shared drive (files.update). Setting the same name twice is harmless, so it is retried like a read. */
+export async function renameFile(token: string, args: { fileId: string; name: string }): Promise<void> {
+  const params = new URLSearchParams({ supportsAllDrives: "true", fields: "id,name" });
+  ok(await googleJson(token, `${DRIVE}/files/${encodeURIComponent(args.fileId)}?${params}`, { method: "PATCH", body: { name: args.name }, fn: "renameFile" }), "renameFile");
+}

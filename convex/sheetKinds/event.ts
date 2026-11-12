@@ -48,7 +48,7 @@ export function eventTabs(data: Data): SheetTab[] {
   const confirmed = participants.filter(p => p.status === "confirmed");
 
   const summary: SheetCell[][] = [
-    ["Item", "Value"],
+    ["Detail", "Answer"],
     ["Name", event.name], ["Type", event.type], ["Starts", when(event.startsAt)], ["Ends", when(event.endsAt)], ["Place", event.destination],
     ["Fee", "See the Money folder"],
     ["Capacity", event.capacity ?? "No limit"],
@@ -63,13 +63,13 @@ export function eventTabs(data: Data): SheetTab[] {
   const sorted = [...participants].sort((a, b) => (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9) || byName(a, b));
   tabs.push({
     title: "Who's going", note: "Fees and payments are not shown here. See the Money folder.",
-    rows: [["Name", "Subteam", "Status", "Ready (not counting fees)", "What's missing"], ...sorted.map(p => [p.name, p.subteam, statusLabel(p.status), p.ready === null ? "" : yesNo(p.ready), p.missing.join("; ")])],
+    rows: [["Student", "Subteam", "Status", "Ready (not counting fees)", "What's missing"], ...sorted.map(p => [p.name, p.subteam, statusLabel(p.status), p.ready === null ? "" : yesNo(p.ready), p.missing.join("; ")])],
   });
 
   if (data.questions.length) {
     tabs.push({
       title: "Question answers",
-      rows: [["Name", "Status", ...data.questions.map(q => questionHeading({ questionId: q.id, prompt: q.prompt, archived: q.archived }))],
+      rows: [["Student", "Status", ...data.questions.map(q => questionHeading({ questionId: q.id, prompt: q.prompt, archived: q.archived }))],
         ...sorted.map(p => [p.name, statusLabel(p.status), ...data.questions.map(q => answerText(p.answers.find(a => a.questionId === q.id)?.value))])],
     });
   }
@@ -86,8 +86,8 @@ export function eventTabs(data: Data): SheetTab[] {
     const rooms = [...data.rooming].sort((a, b) => Number(a.requested) - Number(b.requested) || a.room.localeCompare(b.room, "en", { numeric: true }) || a.student.localeCompare(b.student));
     tabs.push({
       title: "Rooming",
-      rows: [["Student", "Room", "Room type", "Final room", "Needs review", "Status"],
-        ...rooms.map(r => [r.student, r.room, r.category, r.requested ? "" : yesNo(r.finalized), r.requested ? "" : yesNo(r.needsReview), r.requested ? "Asked to be assigned" : "In a room"])],
+      rows: [["Student", "Room", "Final room", "Needs review", "Status"],
+        ...rooms.map(r => [r.student, r.room, r.requested ? "" : yesNo(r.finalized), r.requested ? "" : yesNo(r.needsReview), r.requested ? "Asked to be assigned" : "In a room"])],
     });
   }
 
@@ -116,7 +116,7 @@ export function eventTabs(data: Data): SheetTab[] {
       const times = [...person.intervals].sort((a, b) => a.inAt - b.inAt);
       return [person.name, person.subteam, yesNo(person.signedUp), yesNo(clockedIn), clockedIn ? when(times[0].inAt) : "", clockedIn ? when(Math.max(...times.map(t => t.outAt))) : "", clockedIn ? Math.round(clockedMs(times) / 36_000) / 100 : "", person.corrections, flag];
     });
-    tabs.push({ title: "Attendance", rows: [["Name", "Subteam", "Signed up", "Clocked in", "Time in", "Time out", "Total hours", "Corrections", "Flag"], ...rows] });
+    tabs.push({ title: "Attendance", rows: [["Student", "Subteam", "Signed up", "Clocked in", "Time in", "Time out", "Total hours", "Times fixed by a Coach", "Note"], ...rows] });
   }
   return tabs;
 }

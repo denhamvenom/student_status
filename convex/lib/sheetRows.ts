@@ -5,13 +5,25 @@ export type SheetCell = string | number;
 export type SheetTab = { title: string; rows: SheetCell[][]; note?: string };
 
 /**
- * Text that starts with = or @ (or a tab or return) would run as a formula if someone downloads the sheet as CSV and opens it in Excel.
- * So would text starting with + or - unless the next character is a digit, a space or "(" (phone numbers such as +1 555... and plain numbers stay clean).
- * Such text gets a leading apostrophe: still readable, and never executed. Numbers and other text are unchanged.
+ * Text that starts with = + - @ (or a tab or return) would run as a formula if someone downloads the sheet as CSV and opens it in Excel.
+ * Such text gets a leading apostrophe: still readable, and never executed.
+ * The only exception is text that is entirely a number or phone-like (digits, spaces, parentheses, + - . /), such as "+1 555-0100" or "-5".
  */
 export function safeCell(value: SheetCell): SheetCell {
-  return typeof value === "string" && /^(?:[=@\t\r]|[+-](?![\d (]))/.test(value) ? `'${value}` : value;
+  if (typeof value !== "string" || !/^[=+\-@\t\r]/.test(value)) return value;
+  return /^[\d\s()+\-./]+$/.test(value) && /\d/.test(value) && !/^[\t\r]/.test(value) ? value : `'${value}`;
 }
+
+const monthShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** "Apr 5, 2009" for "2009-04-05". Anything that is not a plain ISO date is returned as it is. */
+export function dateText(iso: string | null | undefined): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? "");
+  if (!match || Number(match[2]) < 1 || Number(match[2]) > 12) return iso ?? "";
+  return `${monthShort[Number(match[2]) - 1]} ${Number(match[3])}, ${match[1]}`;
+}
+
+/** Readiness items that are about fees; they live in the Money folder, never in General or Events files. */
+export const MONEY_ITEMS: ReadonlySet<string> = new Set(["Required payment", "Season fee maintenance is not complete", "Financial records require review or are updating", "Event financial records require review"]);
 
 /** Guardian details: the confirmed health-and-consent profile wins; otherwise the older fields on the student (same rule as the Coach roster). */
 export function guardianFor(student: { consentProfileV2?: { guardian: { name: string; relationship: string; phone: string; email: string } }; consentProfileV2CompletedAt?: number; consentProfileV2ConfirmedBy?: unknown; guardianName?: string; guardianRelationship?: string; guardianPhone?: string; guardianEmail?: string }) {

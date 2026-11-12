@@ -4,7 +4,7 @@ import { makeFunctionReference } from "convex/server";
 import { createTest } from "../../testUtils";
 import schema from "../schema";
 import { definition, readinessTabs, type ReadinessStudent } from "./readiness";
-import { balanceDueCents, missingProfileItems, needsAttention, permissionLabel, firstRegistrationLabel } from "../../src/lib/rosterRequirements";
+import { missingProfileItems, needsAttention, permissionLabel, firstRegistrationLabel } from "../../src/lib/rosterRequirements";
 
 const modules = import.meta.glob("../**/*.ts");
 const roster = makeFunctionReference<"query">("coachRoster:list");
@@ -12,20 +12,25 @@ const sheetPage = makeFunctionReference<"query">("sheetData/readiness:page");
 
 const base: ReadinessStudent = {
   studentId: "s1", name: "Ada Student", subteam: "Mechanical", active: true, firstRegistrationState: "needsCompletion",
-  balance: { state: "ready", dueCents: 12550 }, nextEvent: { name: "Synthetic Regional", state: "open", open: ["Permission form", "Payment"], participation: "confirmed" },
+  balance: { state: "ready", dueCents: 12550 }, nextEvent: { name: "Synthetic Regional", state: "open", open: ["Permission form", "Required payment", "Shirt size"], participation: "confirmed" },
   missingSummary: ["Profile setup", "Shirt size", "Room category"], permission: { state: "notSigned", eventName: "Synthetic Regional" },
 };
 
 describe("readiness rows", () => {
   it("writes the roster's own answers, sorted by name", () => {
     const [{ rows }] = readinessTabs([{ ...base, studentId: "s2", name: "Zed Student" }, base]);
-    expect(rows[0]).toEqual(["Student", "Subteam", "Profile complete", "FIRST registration", "Permission form", "Balance due ($)", "Needs attention", "What is left"]);
-    expect(rows[1]).toEqual(["Ada Student", "Build", "No", "Missing", "Not signed", 125.5, "Yes", "Synthetic Regional: Permission form; Payment"]);
+    expect(rows[0]).toEqual(["Student", "Subteam", "Profile complete", "FIRST registration", "Permission form", "Needs attention", "What is left"]);
+    expect(rows[1]).toEqual(["Ada Student", "Build", "No", "Missing", "Not signed", "Yes", "Synthetic Regional: Permission form; Shirt size"]);
     expect(rows[2][0]).toBe("Zed Student");
+  });
+  it("never shows money: no balance column, and fee items are left out of what is left", () => {
+    const [{ rows }] = readinessTabs([{ ...base, nextEvent: { name: "E", state: "open", open: ["Required payment", "Event financial records require review"], participation: "confirmed" } }]);
+    expect(rows[0].join("|")).not.toMatch(/balance|\$/i);
+    expect(rows[1].at(-1)).toBe("");
   });
   it("covers the quiet cases: complete profile, unavailable balance, unconfirmed event", () => {
     const [{ rows }] = readinessTabs([{ ...base, missingSummary: ["Profile setup"], firstRegistrationState: "verified", balance: { state: "updating", dueCents: null }, permission: { state: "closed", eventName: null }, nextEvent: { name: "E", state: "open", open: ["x"], participation: "pending" } }]);
-    expect(rows[1].slice(2)).toEqual(["Yes", "Verified", "Not collecting yet", "Unavailable", "No", ""]);
+    expect(rows[1].slice(2)).toEqual(["Yes", "Verified", "Not collecting yet", "No", ""]);
   });
 });
 
@@ -60,7 +65,7 @@ describe("readiness matches the Team roster", () => {
       expect(mine).toBeDefined();
       expect(line.slice(2)).toEqual([
         missingProfileItems(mine).length === 0 ? "Yes" : "No", firstRegistrationLabel[mine.firstRegistrationState as ReadinessStudent["firstRegistrationState"]], permissionLabel(mine),
-        mine.balance.state === "ready" && mine.balance.dueCents !== null ? balanceDueCents(mine) / 100 : "Unavailable", needsAttention(mine) ? "Yes" : "No", line[7],
+        needsAttention(mine) ? "Yes" : "No", line[6],
       ]);
     }
     expect(rows).toHaveLength(3);
