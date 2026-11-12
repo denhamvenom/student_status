@@ -1,9 +1,15 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
-import { internalQuery } from "./_generated/server";
+import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
+import { internalQuery, type ActionCtx } from "./_generated/server";
 import { guardianFor } from "./lib/sheetRows";
 import { subteamDisplay } from "../src/lib/subteams";
 
+/**
+ * Paged reads shared by several spreadsheet kinds (students, adults). A kind that needs other data adds its own queries in
+ * `convex/sheetData/<kind>.ts` instead of growing this file.
+ */
 const PAGE = 40;
 const cursorArg = v.union(v.string(), v.null());
 
@@ -50,3 +56,39 @@ export const adultPage = internalQuery({
     return { rows, isDone: page.isDone, cursor: page.isDone ? null : page.continueCursor };
   },
 });
+
+export type SheetStudentRow = {
+  preferredName: string; legalName: string; grade: string | null; subteam: string; secondarySubteam: string | null; leadership: boolean; travelTeam: boolean; email: string;
+  guardianName: string | null; guardianRelationship: string | null; guardianPhone: string | null; guardianEmail: string | null; shirtSize: string | null; parentAccounts: string[];
+};
+
+/** Every active student of a season, page by page. Throws rather than silently truncating. */
+export async function readAllStudents(ctx: ActionCtx, seasonId: Id<"seasons">, withParents: boolean): Promise<SheetStudentRow[]> {
+  const rows: SheetStudentRow[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < 200; page++) {
+    const result: { rows: SheetStudentRow[]; isDone: boolean; cursor: string | null } = await ctx.runQuery(internal.sheetExportData.studentPage, { seasonId, cursor, withParents });
+    rows.push(...result.rows);
+    if (result.isDone) return rows;
+    cursor = result.cursor;
+  }
+  throw new Error("Too many students to read");
+}
+
+export type SheetAdultRow = { name: string; subteam: string; shirtSize: string | null };
+
+/** Every active adult who counts as a Mentor (see adultPage), page by page. Throws rather than silently truncating. */
+export async function readAllAdults(ctx: ActionCtx): Promise<SheetAdultRow[]> {
+  const people: SheetAdultRow[] = [];
+  for (const source of ["coach", "mentor", "parentMentor", "parentTravelLead"] as const) {
+    let cursor: string | null = null;
+    for (let page = 0; page < 100; page++) {
+      const result: { rows: SheetAdultRow[]; isDone: boolean; cursor: string | null } = await ctx.runQuery(internal.sheetExportData.adultPage, { source, paginationOpts: { numItems: 50, cursor } });
+      people.push(...result.rows);
+      if (result.isDone) break;
+      cursor = result.cursor;
+      if (page === 99) throw new Error("Too many adults to read");
+    }
+  }
+  return people;
+}

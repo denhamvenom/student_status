@@ -9,6 +9,25 @@ import { spreadsheetCopy as copy } from './copy'
 import { commonProblem, runInProgress, updatedLabel } from './logic'
 import styles from './TeamSpreadsheets.module.css'
 
+/** Event files listed before the rest are folded away. */
+const EVENTS_SHOWN = 5
+
+type FileStatus = { kind: string; title: string; name: string | null; link: string | null; updatedAt: number | null; problem: string | null; note: string | null }
+
+/** One spreadsheet: name, a tap-friendly Open link, when it was updated, and any note or problem. */
+function FileItem({ file, shared, event }: { file: FileStatus; shared: boolean; event?: { name: string; current: boolean } }) {
+  return <li className={styles.file}>
+    <div className={styles.fileHead}>
+      <span className={styles.fileName}>{file.name ?? (event ? `${event.name}: ${file.title}` : file.title)}</span>
+      {file.link ? <a className={styles.open} href={file.link} target="_blank" rel="noopener noreferrer">{copy.open} {file.title}<span className="sr-only">{event ? copy.openFor(event.name) : ''} (opens in a new tab)</span></a> : <span className={styles.muted}>{copy.notMade}</span>}
+    </div>
+    <p className={styles.muted}>{file.updatedAt ? copy.updated(updatedLabel(file.updatedAt)) : copy.neverUpdated}</p>
+    {event && !event.current && <p className={styles.muted}>{copy.eventFrozen}</p>}
+    {file.note && <p className={styles.muted}>{file.note}</p>}
+    {file.problem && <p role="alert" className={styles.problem}>{shared ? copy.notUpdated : file.problem}</p>}
+  </li>
+}
+
 /** The Reports page card: update every team spreadsheet, see where they are, and (Coach) connect Google Drive. */
 export function TeamSpreadsheetsCard({ coach }: { coach: boolean }) {
   const [asOf, setAsOf] = useState(() => Date.now())
@@ -18,6 +37,7 @@ export function TeamSpreadsheetsCard({ coach }: { coach: boolean }) {
   const [wizard, setWizard] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const [allEvents, setAllEvents] = useState(false)
 
   if (!status) return <Card><CardContent><p role="status">{copy.loading}</p></CardContent></Card>
   if (wizard && status.canSetUp) return <ConnectDriveWizard serviceAccountEmail={status.serviceAccountEmail} onClose={() => setWizard(false)} />
@@ -33,7 +53,9 @@ export function TeamSpreadsheetsCard({ coach }: { coach: boolean }) {
       if (result.status !== 'started') setMessage(result.message)
     } catch (error) { setMessage(userFacingError(error, copy.pressFailed)) } finally { setBusy(false) }
   }
-  const shared = commonProblem(status.files)
+  const shared = commonProblem([...status.files, ...status.eventFiles])
+  const shownEvents = allEvents ? status.eventFiles : status.eventFiles.slice(0, EVENTS_SHOWN)
+  const skipped = !running && status.run ? status.run.skipped : 0
   const partial = !running && status.run?.state === 'partial'
 
   return <Card aria-label={copy.title}>
@@ -54,15 +76,16 @@ export function TeamSpreadsheetsCard({ coach }: { coach: boolean }) {
           {!status.enabled && <p role="alert" className={styles.problem}>{copy.notTurnedOn}</p>}
           {message && <p role="status" className={styles.status}>{message}</p>}
           {partial && <p role="alert" className={styles.problem}>{shared ?? copy.someFailed}{status.lastTriedAt ? <span className={styles.muted}> {copy.lastTried(updatedLabel(status.lastTriedAt))}</span> : null}</p>}
-          <ul className={styles.files} aria-label={copy.filesHeading}>{status.files.map(file => <li key={file.kind} className={styles.file}>
-            <div className={styles.fileHead}>
-              <span className={styles.fileName}>{file.name ?? file.title}</span>
-              {file.link ? <a href={file.link} target="_blank" rel="noopener noreferrer">{copy.open} {file.title}<span className="sr-only"> (opens in a new tab)</span></a> : <span className={styles.muted}>{copy.notMade}</span>}
+          <ul className={styles.files} aria-label={copy.filesHeading}>{status.files.map(file => <FileItem key={file.kind} file={file} shared={!!shared} />)}</ul>
+          {skipped > 0 && <p role="status" className={styles.muted}>{copy.tooMany(skipped)}</p>}
+          {status.eventFiles.length > 0 && <section className={styles.group} aria-labelledby="team-spreadsheets-events">
+            <div className={styles.row}>
+              <h3 id="team-spreadsheets-events" className={styles.groupHeading}>{copy.eventsHeading}</h3>
+              <span className={styles.muted}>{copy.eventsCount(status.eventFiles.length)}</span>
             </div>
-            <p className={styles.muted}>{file.updatedAt ? copy.updated(updatedLabel(file.updatedAt)) : copy.neverUpdated}</p>
-            {file.note && <p className={styles.muted}>{file.note}</p>}
-            {file.problem && <p role="alert" className={styles.problem}>{shared ? copy.notUpdated : file.problem}</p>}
-          </li>)}</ul>
+            <ul className={styles.files} aria-label={copy.eventsHeading}>{shownEvents.map(file => <FileItem key={`${file.eventId}:${file.kind}`} file={file} shared={!!shared} event={{ name: file.eventName, current: file.current }} />)}</ul>
+            {status.eventFiles.length > EVENTS_SHOWN && <div className={styles.actions}><Button type="button" variant="outline" aria-expanded={allEvents} onClick={() => setAllEvents(open => !open)}>{allEvents ? copy.showFewerEvents : copy.showAllEvents(status.eventFiles.length)}</Button></div>}
+          </section>}
           {coach && <>
             <p className={styles.muted}>{copy.healthReminder}</p>
             <div className={styles.actions}><Button type="button" variant="outline" onClick={() => setWizard(true)}>{copy.change}</Button></div>

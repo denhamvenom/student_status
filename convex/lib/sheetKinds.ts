@@ -1,24 +1,50 @@
-import { v } from "convex/values";
+import { v, type Infer } from "convex/values";
+import type { Id } from "../_generated/dataModel";
+import type { ActionCtx } from "../_generated/server";
+import type { SheetTab } from "./sheetRows";
 import { isCoachOrTravelLead } from "./staffRule";
 
 /** Drive folders under the team's shared drive. Money and Health files are only linked for people with matching access. */
 export const sheetFolder = v.union(v.literal("general"), v.literal("money"), v.literal("health"), v.literal("events"));
 export type SheetFolder = "general" | "money" | "health" | "events";
 
-/** One spreadsheet kind per file. Later steps add kinds here and a builder in sheetExportActions. */
-export const sheetFileKind = v.union(v.literal("studentRoster"), v.literal("shirtSizes"));
-export type SheetFileKind = "studentRoster" | "shirtSizes";
+/**
+ * Every spreadsheet kind, in the order runs and the Reports card use. A kind is one file per season ("team" scope) or one file per
+ * qualifying event ("event" scope). Each kind has its own two modules, `convex/sheetKinds/<kind>.ts` (what the file looks like) and
+ * `convex/sheetData/<kind>.ts` (how its data is read); `convex/lib/sheetRegistry.ts` lists them all.
+ */
+export const sheetFileKind = v.union(
+  v.literal("studentRoster"), v.literal("shirtSizes"), v.literal("adultRoster"), v.literal("drivers"), v.literal("readiness"), v.literal("attendance"),
+  v.literal("money"), v.literal("health"), v.literal("event"), v.literal("eventFees"), v.literal("eventTravelEmergency"),
+);
+export type SheetFileKind = Infer<typeof sheetFileKind>;
+export const SHEET_KIND_NAMES: readonly SheetFileKind[] = sheetFileKind.members.map(member => member.value);
 
-export const SHEET_KINDS: readonly { kind: SheetFileKind; folder: SheetFolder; title: string }[] = [
-  { kind: "studentRoster", folder: "general", title: "Student roster" },
-  { kind: "shirtSizes", folder: "general", title: "Shirt sizes" },
-];
+export type SheetScope = "team" | "event";
 
-export function sheetKindInfo(kind: SheetFileKind) {
-  const info = SHEET_KINDS.find(item => item.kind === kind);
-  if (!info) throw new Error("Unknown spreadsheet kind");
-  return info;
-}
+/** What a file's name may use. `event` is set only for event-scoped kinds. */
+export type SheetTitleInfo = { seasonName: string; event: { name: string; startsAt: number } | null };
+
+/**
+ * The pure half of a kind (`convex/sheetKinds/<kind>.ts`). `build` turns the loaded data into tabs and must not read the database;
+ * it is unit-tested on its own. `ready: false` keeps the kind out of runs and out of the Reports card.
+ */
+export type SheetKindDefinition<Data> = {
+  kind: SheetFileKind;
+  folder: SheetFolder;
+  scope: SheetScope;
+  ready: boolean;
+  /** Short name on the Reports card, e.g. "Student roster". */
+  label: string;
+  /** The Drive file name. It is part of the fingerprint, so changing it rewrites the file once. */
+  title: (info: SheetTitleInfo) => string;
+  build: (data: Data) => SheetTab[];
+};
+
+/** What the runner passes to a kind's loader. `eventId` is set only for event-scoped kinds. */
+export type SheetLoadArgs = { seasonId: Id<"seasons">; eventId: Id<"events"> | null };
+/** The data half of a kind (`convex/sheetData/<kind>.ts`): reads everything the file needs through bounded internal queries. */
+export type SheetLoader<Data> = (ctx: ActionCtx, args: SheetLoadArgs) => Promise<Data>;
 
 /** Stable key stored on the Drive file so a lost save can be recovered without making a duplicate. */
 export function sheetAppKey(seasonId: string, kind: SheetFileKind, eventId?: string): string {

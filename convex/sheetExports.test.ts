@@ -9,6 +9,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { googleRetry } from "./lib/googleSheets";
 import { folderVisible } from "./lib/sheetKinds";
+import { SHEET_REGISTRY } from "./lib/sheetRegistry";
 
 const modules = import.meta.glob("./**/*.ts");
 const DAY = 86_400_000;
@@ -604,5 +605,127 @@ describe("who sees links to the Events folder", () => {
   });
   it("still keeps Health to a Coach or a Travel Lead with Health export access", () => {
     expect([folderVisible("health", who("mentor", true)), folderVisible("health", who("mentor", true, true)), folderVisible("health", who("coach"))]).toEqual([false, true, true]);
+  });
+});
+
+describe("per-event spreadsheets", () => {
+  const NOW = Date.parse("2026-11-12T18:00:00Z");
+  const kinds = [SHEET_REGISTRY.event.definition, SHEET_REGISTRY.eventFees.definition, SHEET_REGISTRY.eventTravelEmergency.definition];
+  const saved = kinds.map(definition => ({ ready: definition.ready, build: definition.build }));
+  /** Turns event kinds on for one test with a tiny synthetic tab (their real builders are written in later stages). */
+  const enable = (...which: typeof kinds) => { for (const definition of which) Object.assign(definition, { ready: true, build: () => [{ title: "People", rows: [["Name"], ["Dev"]] }] }); };
+  afterEach(() => { kinds.forEach((definition, index) => Object.assign(definition, saved[index])); });
+  beforeEach(() => { vi.setSystemTime(NOW); });
+
+  const addEvent = (f: Fixture, name: string, startDays: number, over: Partial<Doc<"events">> = {}) => f.t.run(ctx => ctx.db.insert("events", {
+    seasonId: f.ids.season, name, type: "Competition", startsAt: NOW + startDays * DAY, endsAt: NOW + (startDays + 2) * DAY, destination: "Synthetic Arena", travel: "Bus",
+    overnight: true, roomingEnabled: false, feeCents: 0, signupMode: "open", allowWithdrawal: true, permissionRequired: false, firstRequired: false, archived: false, ...over,
+  }));
+  const template = { type: "Outreach" as const, destination: "Shop", travel: "", overnight: false, roomingEnabled: false, feeCents: 0, signupMode: "open" as const, allowWithdrawal: true, permissionRequired: false, firstRequired: false };
+
+  it("writes one file per qualifying event into the Events folder, named after the event, and nothing for other events", async () => {
+    enable(SHEET_REGISTRY.event.definition);
+    const f = await fixture();
+    const regional = await addEvent(f, "Synthetic Regional", 20);
+    await addEvent(f, "Tuesday meeting", 1, { type: "Team" });
+    await addEvent(f, "Canceled scrimmage", 3, { cancelled: true });
+    await addEvent(f, "Far-off championship", 90);
+    await addEvent(f, "Old outreach", -20, { type: "Outreach" });
+    const series = await f.t.run(ctx => ctx.db.insert("eventSeries", { seasonId: f.ids.season, createdBy: f.ids.coach.app, createdAt: 1, name: "Build nights", status: "active", origin: "created", template, localStartTime: "18:00", durationMinutes: 120, weekdays: [2], intervalWeeks: 1, startDate: "2026-11-01", timeZone: "America/Chicago", templateRevision: 1 }));
+    await addEvent(f, "Build night", 2, { type: "Outreach", seriesId: series });
+    await f.coach.mutation(api.sheetExports.requestUpdate, {});
+    expect((await latestRun(f))!.pending).toEqual(["studentRoster", "shirtSizes", { kind: "event", eventId: regional }]);
+    expect(await finishRun(f)).toMatchObject({ state: "done", done: 3 });
+    const eventFile = (await files(f)).find(file => file.eventId === regional)!;
+    expect(eventFile).toMatchObject({ kind: "event", folder: "events", folderId: FOLDERS.events, name: "Synthetic Regional - Dec 2, 2026" });
+    expect([...google.state.files.values()].find(file => file.name === "Synthetic Regional - Dec 2, 2026")!.key).toBe(`${f.ids.season}:event:${regional}`);
+    const status = await f.lead.query(api.sheetExports.status, {});
+    expect(status.files.map(file => file.kind)).toEqual(["studentRoster", "shirtSizes"]);
+    expect(status.eventFiles).toEqual([expect.objectContaining({ kind: "event", eventId: regional, eventName: "Synthetic Regional", name: "Synthetic Regional - Dec 2, 2026", current: true, link: expect.stringContaining("docs.google.com") })]);
+  });
+
+  it("freezes an event's file after the event ends: no more writes, still listed and still in Drive", async () => {
+    enable(SHEET_REGISTRY.event.definition);
+    const f = await fixture();
+    const regional = await addEvent(f, "Synthetic Regional", 1);
+    await press(f);
+    expect(google.state.creates).toBe(3);
+    const eventSheet = (await files(f)).find(file => file.eventId === regional)!.spreadsheetId;
+    // Eight days after it ended (it ends two days after it starts), the event is out of the window.
+    vi.setSystemTime(NOW + 11 * DAY);
+    await f.t.run(ctx => ctx.db.patch(regional, { name: "Renamed Regional" }));
+    google.state.calls.length = 0;
+    const batches = google.state.batches.length;
+    const run = await press(f);
+    expect([run.pending, run.total]).toEqual([[], 2]);
+    expect(google.state.batches.length).toBe(batches);
+    expect(google.state.calls.some(call => call.includes(eventSheet))).toBe(false);
+    const status = await f.coach.query(api.sheetExports.status, {});
+    expect(status.eventFiles).toEqual([expect.objectContaining({ eventId: regional, eventName: "Renamed Regional", current: false, name: "Synthetic Regional - Nov 13, 2026" })]);
+    expect(google.state.files.get(eventSheet)!.trashed).toBe(false);
+  });
+
+  it("drops an event file from a run when the event is canceled while the run is under way", async () => {
+    enable(SHEET_REGISTRY.event.definition);
+    const f = await fixture();
+    const regional = await addEvent(f, "Synthetic Regional", 5);
+    await f.coach.mutation(api.sheetExports.requestUpdate, {});
+    await f.t.run(ctx => ctx.db.patch(regional, { cancelled: true }));
+    expect(await finishRun(f)).toMatchObject({ state: "done", done: 2, total: 2, pending: [] });
+    expect((await files(f)).some(file => file.eventId === regional)).toBe(false);
+  });
+
+  it("shows Fees files to any Coach or Travel Lead and travel emergency files only with Health access", async () => {
+    enable(...kinds);
+    const f = await fixture();
+    const regional = await addEvent(f, "Synthetic Regional", 10);
+    await press(f);
+    expect((await files(f)).filter(file => file.eventId === regional).map(file => [file.kind, file.folderId, file.name])).toEqual([
+      ["event", FOLDERS.events, "Synthetic Regional - Nov 22, 2026"],
+      ["eventFees", FOLDERS.money, "Synthetic Regional - Nov 22, 2026 - Fees"],
+      ["eventTravelEmergency", FOLDERS.health, "Synthetic Regional - Nov 22, 2026 - Travel emergency"],
+    ]);
+    const seen = async (who: Fixture["coach"]) => (await who.query(api.sheetExports.status, {})).eventFiles.map(file => file.kind);
+    expect(await seen(f.coach)).toEqual(["event", "eventFees", "eventTravelEmergency"]);
+    expect(await seen(f.lead)).toEqual(["event", "eventFees"]);
+    expect(await seen(f.parentAsLead)).toEqual(["event", "eventFees"]);
+    await f.t.run(ctx => ctx.db.patch(f.ids.lead.app, { healthExport: true }));
+    expect(await seen(f.lead)).toEqual(["event", "eventFees", "eventTravelEmergency"]);
+  });
+
+  it("lists an upcoming event before its first update as not made yet", async () => {
+    enable(SHEET_REGISTRY.event.definition);
+    const f = await fixture();
+    await addEvent(f, "Synthetic Regional", 10);
+    expect((await f.coach.query(api.sheetExports.status, {})).eventFiles).toEqual([expect.objectContaining({ eventName: "Synthetic Regional", link: null, name: null, current: true })]);
+  });
+
+  it("writes at most 60 files in one update and says how many were left", async () => {
+    enable(SHEET_REGISTRY.event.definition);
+    const f = await fixture();
+    for (let index = 0; index < 70; index++) await addEvent(f, `Event ${index}`, 1 + (index % 50));
+    await f.coach.mutation(api.sheetExports.requestUpdate, {});
+    const run = (await latestRun(f))!;
+    expect(run.pending).toHaveLength(60);
+    expect(run.pending.slice(0, 2)).toEqual(["studentRoster", "shirtSizes"]);
+    expect([run.total, run.skipped]).toEqual([60, 12]);
+    expect((await f.coach.query(api.sheetExports.status, {})).run).toMatchObject({ total: 60, skipped: 12 });
+  });
+});
+
+describe("starting an update from the server", () => {
+  it("starts a full update without a signed-in person, and refuses a second while it runs", async () => {
+    const f = await fixture();
+    expect(await f.t.mutation(internal.sheetExports.startNow, {})).toEqual({ status: "started" });
+    expect(await latestRun(f)).toMatchObject({ trigger: "server", pending: ["studentRoster", "shirtSizes"] });
+    expect((await latestRun(f))!.requestedBy).toBeUndefined();
+    expect(await f.t.mutation(internal.sheetExports.startNow, {})).toEqual({ status: "alreadyUpdating" });
+    expect(await finishRun(f)).toMatchObject({ state: "done", done: 2 });
+  });
+  it.each([["off", true], ["notSetUp", false]] as const)("answers %s with the same checks as the button", async (expected, settings) => {
+    if (expected === "off") vi.stubEnv("GOOGLE_SHEETS_EXPORT_ENABLED", "false");
+    const f = await fixture({ settings });
+    expect(await f.t.mutation(internal.sheetExports.startNow, {})).toEqual({ status: expected });
+    expect(await latestRun(f)).toBeNull();
   });
 });

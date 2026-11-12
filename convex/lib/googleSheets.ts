@@ -239,3 +239,37 @@ export async function batchUpdate(token: string, id: string, requests: unknown[]
 }
 
 export const spreadsheetLink = (id: string) => `https://docs.google.com/spreadsheets/d/${id}/edit`;
+
+/**
+ * The non-trashed folder called `name` directly inside `parentId`, made when there is none (for the season archive, e.g. Archive/2027).
+ * When Drive holds several with that name, the first one found is used. A create that ends without a clear answer is looked up again
+ * before it is repeated, so no second folder is made. Returns the folder ID.
+ */
+export async function ensureFolder(token: string, args: { driveId: string; parentId: string; name: string }): Promise<string> {
+  const find = async () => {
+    const q = `name='${quote(args.name)}' and '${quote(args.parentId)}' in parents and trashed=false and mimeType='${FOLDER_TYPE}'`;
+    const params = new URLSearchParams({ q, corpora: "drive", driveId: args.driveId, includeItemsFromAllDrives: "true", supportsAllDrives: "true", fields: "files(id)", pageSize: "10" });
+    const data = obj(ok(await googleJson(token, `${DRIVE}/files?${params}`, { fn: "ensureFolder" }), "ensureFolder"));
+    const first = obj((Array.isArray(data.files) ? data.files : [])[0]).id;
+    return typeof first === "string" ? first : null;
+  };
+  const found = await find();
+  if (found) return found;
+  const result = await googleJson(token, `${DRIVE}/files?supportsAllDrives=true&fields=id`, { method: "POST", body: { name: args.name, mimeType: FOLDER_TYPE, parents: [args.parentId] }, write: true, fn: "ensureFolder" }).catch(async (error: unknown) => {
+    // The create may have been applied before the answer was lost: look again before giving up.
+    const again = await find();
+    if (again) return { status: 200, data: { id: again } };
+    throw error;
+  });
+  const id = obj(ok(result, "ensureFolder")).id;
+  if (typeof id === "string" && id) return id;
+  const again = await find();
+  if (again) return again;
+  throw new GoogleRequestError(0, "Google request failed (no id)");
+}
+
+/** Moves a file (or folder) from one folder to another inside the shared drive. Treated as a write: repeated only on a busy (429) answer. */
+export async function moveFile(token: string, args: { fileId: string; fromParentId: string; toParentId: string }): Promise<void> {
+  const params = new URLSearchParams({ addParents: args.toParentId, removeParents: args.fromParentId, supportsAllDrives: "true", fields: "id,parents" });
+  ok(await googleJson(token, `${DRIVE}/files/${encodeURIComponent(args.fileId)}?${params}`, { method: "PATCH", body: {}, write: true, fn: "moveFile" }), "moveFile");
+}

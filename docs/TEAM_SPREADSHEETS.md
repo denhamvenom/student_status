@@ -64,19 +64,51 @@ This is a separate service account from the Calendar one (`TIMECLOCK_CALENDAR_*`
 - **Interrupted first write:** the file is saved right after it is created, with its fingerprint cleared, so a write that never finished is redone at the next update.
 - **Writing a file:** one `batchUpdate` adds or renames tabs, clears and rewrites every tab, freezes the note and header rows, adds a warning-only protection once, and deletes tabs the builder no longer produces. The fingerprint covers a layout version (`LAYOUT_VERSION` in `convex/lib/googleSheets.ts`; bump it when layout or formatting changes), the file name and the tabs; if it matches, no write is made.
 - **Formulas:** text is sent as text, never as a formula. Text that starts with `=` or `@` (or a tab or return) also gets a leading apostrophe (`safeCell` in `convex/lib/sheetRows.ts`), as does text starting with `+` or `-` unless the next character is a digit, a space or `(`; so a CSV download opened in Excel can't run it. Phone numbers like `+1 555 ...` or `(202) 555-0123` and numbers like `-5` stay clean; the apostrophe shows in Sheets for the rest. This is a deliberate trade for safety.
-- **Moving folders:** saving different folders forgets files made in a changed folder (bounded read of 500 rows); the next update makes new ones. The old files stay in Drive for a person to delete. Saving settings writes an audit row (who, which folders changed by name, no folder links).
+- **Moving folders:** saving different folders forgets files made in a changed folder (bounded read of 1,000 rows); the next update makes new ones. The old files stay in Drive for a person to delete. Saving settings writes an audit row (who, which folders changed by name, no folder links).
 - **Setup check:** read-only calls (scope `drive.metadata.readonly`), so it works before updates are turned on. It requires all folders (General, Money, Health, Events, Archive if set) to be distinct, in one shared drive, writable, and **not nested**: each folder's ancestor chain (up to 30 levels) is walked and a folder inside another configured folder is refused.
 - **Scopes:** writing requests only `https://www.googleapis.com/auth/drive`. Verified against live Google (November 12, 2026, test folder): with that scope alone, `files.create` (without an ID), `spreadsheets.get` and `spreadsheets.batchUpdate` all answer 200; the separate `spreadsheets` scope isn't needed.
+- **Per-event files:** event-scoped kinds get one file per qualifying event. An event qualifies when it is in the active season, not canceled or archived, not a regular Team meeting (type Team) and not an occurrence of a repeating meeting (`seriesId` set), and it starts within the next 60 days or ended within the last 7 (an event in progress counts). Rule and numbers: `convex/lib/sheetEvents.ts`. File names are "{Event name} - {Mon D, YYYY}" (start date, team time), with " - Fees" or " - Travel emergency" for those kinds. The Drive key includes the event, so each event's file is found again after a lost save. A file whose event leaves the window (ended more than 7 days ago, canceled, archived, deleted) is **frozen**: no further writes, it stays in Drive and on the card under Events with a note. An event that leaves the window during an update is dropped from that update without any Google call.
+- **Run size:** each update plans its files when it starts: ready team kinds first, then every ready event kind for each qualifying event, soonest event first. At most 60 files per update (`MAX_FILES_PER_RUN`); any more are counted and the card says how many weren't updated. Each file is still its own short step with the same 15-minute hold, so a long list never makes one step longer.
+- **Starting from the server:** `bunx convex run sheetExports:startNow` starts a full update without a signed-in person (trigger `server`), with the same checks as the button except the per-person limit. It answers `started`, `alreadyUpdating`, `notSetUp`, `noSeason` or `off`. Running it against production needs the owner's approval like any production command.
 - **Roster grade** follows `coachRoster.list`: the setup draft's grade first, else the confirmed health-and-consent profile's.
 
-### Files in build stage 1
+### Files
 
 - **Student roster** (General): Students tab with Preferred name, Legal name, Grade (blank if none saved), Subteam, Second subteam, Leadership role, Travel Team, Student email, Parent or guardian name / relationship / phone / email (confirmed profile first, else the older fields, as the Coach roster does), and Parent accounts (linked). Active students of the current season.
 - **Shirt sizes** (General): Counts (XS to 3XL plus Other; columns Students / Adults / Total; totals row), Details (Name, Student or adult, Subteam, Size) and Missing size. Active students and active adults. "Adult" means an active Coach, Mentor or Travel Lead, or a Parent with Mentor or Travel Lead access; plain Parents are left out. A size outside the app's list is counted under Other and shown as entered.
 
-### Roadmap (build stages 2 to 7)
+### Adding or finishing a spreadsheet kind
 
-Each later stage adds file kinds to `convex/lib/sheetKinds.ts` and a builder in `convex/sheetExportActions.ts`; the run, lease, retry, link-visibility and Reports card behavior is in place.
+Every planned kind is already registered, as a stub with `ready: false` (left out of updates and off the Reports card). Finishing one touches only its own three files; no shared file changes.
+
+1. **`convex/sheetKinds/<kind>.ts`**: the pure definition. Export `type Data` (what the loader returns) and `definition: SheetKindDefinition<Data>` (contract in `convex/lib/sheetKinds.ts`):
+   - `kind`, `folder` (`general`, `money`, `health` or `events`) and `scope` (`team`: one file per season; `event`: one file per qualifying event) are already set; keep them.
+   - `label`: the short name on the card ("Open {label}").
+   - `title(info)`: the Drive file name. `info` is `{ seasonName, event }`; `event` (`{ name, startsAt }`) is set only for event kinds. Use `eventKindTitle(info, suffix?)` from `convex/lib/sheetEvents.ts` for event kinds.
+   - `build(data)`: returns the tabs (`SheetTab[]`: `{ title, rows }`, first row is the header). Pure: no database, no clock. Cells are plain text or numbers (the writer sends text as text and neutralizes formula-like text). Shared helpers are in `convex/lib/sheetRows.ts` (`yesNo`, `rosterGrade`, `guardianFor`). A file must have at least one tab; building none fails the file.
+   - Set `ready: true` when the kind is complete.
+2. **`convex/sheetData/<kind>.ts`**: the data. Export `load: SheetLoader<Data>`, called as `load(ctx, { seasonId, eventId })` from the runner action (`eventId` is null for team kinds). Put the kind's own `internalQuery` functions in this file and call them with `ctx.runQuery(internal.sheetData.<kind>.<query>, ...)`, annotating the result type. Each query reads a bounded page (`.paginate` or `.take`), and the loader loops and throws rather than truncating. Shared reads of students and adults are in `convex/sheetExportData.ts` (`readAllStudents`, `readAllAdults`). Read only what the file shows; never put health or money fields in a kind whose folder is General or Events.
+3. **`convex/sheetKinds/<kind>.test.ts`**: table-driven tests of `build` (headers, ordering, blanks, edge cases) and the file name. Run it with `bunx vitest run convex/sheetKinds/<kind>.test.ts`. To test the whole path, `convex/sheetExports.test.ts` ("per-event spreadsheets") shows how a test turns a kind on.
+
+New queries change `convex/_generated/api.d.ts`. Run `bunx convex codegen` when you can; the `sheetData/<kind>` module is already listed there, and generated types pick up its new functions from the module's own exports. Link visibility follows the folder (`folderVisible`); the card, runs, retries and Drive handling need no change. Add any new card or file wording to `docs/LANGUAGE.md` and describe the file's contents under "Files" below.
+
+| Kind | Scope | Folder | Stub files to fill |
+| --- | --- | --- | --- |
+| `adultRoster` | team | General | `convex/sheetKinds/adultRoster.ts`, `convex/sheetData/adultRoster.ts` |
+| `drivers` | team | General | `convex/sheetKinds/drivers.ts`, `convex/sheetData/drivers.ts` |
+| `readiness` | team | General | `convex/sheetKinds/readiness.ts`, `convex/sheetData/readiness.ts` |
+| `attendance` | team | General | `convex/sheetKinds/attendance.ts`, `convex/sheetData/attendance.ts` |
+| `money` | team | Money | `convex/sheetKinds/money.ts`, `convex/sheetData/money.ts` |
+| `health` | team | Health | `convex/sheetKinds/health.ts`, `convex/sheetData/health.ts` |
+| `event` | event | Events | `convex/sheetKinds/event.ts`, `convex/sheetData/event.ts` |
+| `eventFees` | event | Money | `convex/sheetKinds/eventFees.ts`, `convex/sheetData/eventFees.ts` |
+| `eventTravelEmergency` | event | Health | `convex/sheetKinds/eventTravelEmergency.ts`, `convex/sheetData/eventTravelEmergency.ts` |
+
+Adding a kind that isn't listed is the one case that touches shared files: add its literal to `sheetFileKind` in `convex/lib/sheetKinds.ts` (schema-additive), one line to `convex/lib/sheetRegistry.ts`, and its two modules to `convex/_generated/api.d.ts`.
+
+**Drive helpers for the season archive (not wired yet):** `ensureFolder(token, { driveId, parentId, name })` finds a non-trashed child folder by name or makes it, and `moveFile(token, { fileId, fromParentId, toParentId })` moves a file between folders; both are in `convex/lib/googleSheets.ts` and work in shared drives.
+
+### Roadmap (build stages 2 to 7)
 
 Per-event spreadsheets all go in the **Events** folder (owner decision, November 12, 2026). Exceptions, pending owner override: each event's Fees file stays in Money and its travel emergency file stays in Health.
 
@@ -85,8 +117,8 @@ Per-event spreadsheets all go in the **Events** folder (owner decision, November
 4. Money: fees, payments, balances (Money folder; each event's Fees file stays here).
 5. Health: allergies, medications, emergency contacts (Health folder; each event's travel emergency file stays here).
 6. Travel: rooms, drivers, transport (Events; the travel emergency file stays in Health).
-7. Season switch: move last season's files into `Archive/<Year>` and freeze them (the Archive folder ID is already stored). Season archiving remains a later stage.
+7. Season switch: move last season's files into `Archive/<Year>` and freeze them (the Archive folder ID is already stored; `ensureFolder` and `moveFile` are ready). Season archiving remains a later stage.
 
 ### Code map
 
-`convex/sheetExports.ts` (status, press, schedule entry, run state, settings), `convex/sheetExportActions.ts` (one-file runner, Drive setup check), `convex/sheetExportData.ts` (paged reads), `convex/lib/sheetKinds.ts` (kinds, link visibility), `convex/lib/sheetRows.ts` (row builders), `convex/lib/googleSheets.ts` (Drive/Sheets calls), `convex/lib/googleAuth.ts` (service-account token, shared with Calendar), `convex/lib/driveLinks.ts` (folder link parsing), `src/features/team-spreadsheets/` (card and wizard; copy in `copy.ts`).
+`convex/sheetExports.ts` (status, press, `startNow`, schedule entry, run planning and state, settings), `convex/sheetExportActions.ts` (one-file runner, Drive setup check), `convex/sheetExportData.ts` (shared paged reads of students and adults), `convex/sheetKinds/<kind>.ts` (each kind's definition and row builder), `convex/sheetData/<kind>.ts` (each kind's queries and loader), `convex/lib/sheetRegistry.ts` (the list of kinds), `convex/lib/sheetKinds.ts` (kind contract, validators, link visibility), `convex/lib/sheetEvents.ts` (which events get files, event file names, per-update cap), `convex/lib/sheetRows.ts` (shared cell helpers), `convex/lib/googleSheets.ts` (Drive/Sheets calls), `convex/lib/googleAuth.ts` (service-account token, shared with Calendar), `convex/lib/driveLinks.ts` (folder link parsing), `src/features/team-spreadsheets/` (card and wizard; copy in `copy.ts`).

@@ -1,15 +1,13 @@
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
-import { action, env, internalAction, type ActionCtx } from "./_generated/server";
+import { action, env, internalAction } from "./_generated/server";
 import { hashId } from "./lib/calendarAuth";
 import { parseDriveFolderId } from "./lib/driveLinks";
 import { GoogleKeyError, GoogleTokenError, googleServiceToken } from "./lib/googleAuth";
 import { CHECK_SCOPE, GoogleRequestError, LAYOUT_VERSION, WRITE_SCOPE, batchUpdate, buildBatch, createSpreadsheet, driveAncestors, driveFileState, driveGetFolder, findByKey, getSheets, googleRetry, type FileState } from "./lib/googleSheets";
 import { TOO_MANY_CHECKS } from "./sheetExports";
-import { sheetAppKey, sheetKindInfo, type SheetFileKind } from "./lib/sheetKinds";
-import { shirtSizeTabs, studentRosterTabs, type SheetTab, type ShirtPerson } from "./lib/sheetRows";
-import { subteamDisplay } from "../src/lib/subteams";
+import { sheetAppKey } from "./lib/sheetKinds";
+import { sheetKind } from "./lib/sheetRegistry";
 
 const ASK_OWNER = "the person who set up Venom Status for your team";
 const GENERIC_FAILURE = "Venom Status couldn't update this spreadsheet. Press Update spreadsheets to try again. If it keeps happening, ask a Coach to check the Google Drive setup.";
@@ -25,45 +23,6 @@ export function plainSheetError(error: unknown): string {
   return GENERIC_FAILURE;
 }
 
-async function allStudents(ctx: ActionCtx, seasonId: Id<"seasons">, withParents: boolean) {
-  const rows = [];
-  let cursor: string | null = null;
-  for (let page = 0; page < 200; page++) {
-    const result: Awaited<ReturnType<typeof readStudents>> = await readStudents(ctx, seasonId, cursor, withParents);
-    rows.push(...result.rows);
-    if (result.isDone) return rows;
-    cursor = result.cursor;
-  }
-  throw new Error("Too many students to read");
-}
-const readStudents = (ctx: ActionCtx, seasonId: Id<"seasons">, cursor: string | null, withParents: boolean) => ctx.runQuery(internal.sheetExportData.studentPage, { seasonId, cursor, withParents });
-
-async function allMentors(ctx: ActionCtx): Promise<ShirtPerson[]> {
-  const people: ShirtPerson[] = [];
-  for (const source of ["coach", "mentor", "parentMentor", "parentTravelLead"] as const) {
-    let cursor: string | null = null;
-    for (let page = 0; page < 100; page++) {
-      const result: { rows: { name: string; subteam: string; shirtSize: string | null }[]; isDone: boolean; cursor: string | null } = await ctx.runQuery(internal.sheetExportData.adultPage, { source, paginationOpts: { numItems: 50, cursor } });
-      people.push(...result.rows.map(row => ({ name: row.name, type: "Adult" as const, subteam: row.subteam, size: row.shirtSize })));
-      if (result.isDone) break;
-      cursor = result.cursor;
-      if (page === 99) throw new Error("Too many adults to read");
-    }
-  }
-  return people;
-}
-
-/** The tabs for one kind of spreadsheet. Later steps add their kinds here. */
-async function tabsFor(ctx: ActionCtx, kind: SheetFileKind, seasonId: Id<"seasons">): Promise<SheetTab[]> {
-  if (kind === "studentRoster") {
-    const students = await allStudents(ctx, seasonId, true);
-    return studentRosterTabs(students.map(student => ({ ...student })));
-  }
-  const students = await allStudents(ctx, seasonId, false);
-  const people: ShirtPerson[] = [...students.map(student => ({ name: student.preferredName || student.legalName, type: "Student" as const, subteam: subteamDisplay(student.subteam), size: student.shirtSize })), ...await allMentors(ctx)];
-  return shirtSizeTabs(people);
-}
-
 /** This run was replaced or ended while it was working; it stops without writing anything more. */
 class LeaseLost extends Error {}
 type SaveFields = { spreadsheetId: string; tabs: { title: string; sheetId: number }[]; fingerprint?: string; updatedAt?: number; checkedAt: number; frozen: boolean; recreated: "missing" | "moved" | null };
@@ -74,20 +33,23 @@ export const runOne = internalAction({
   handler: async (ctx, args) => {
     const claim = await ctx.runMutation(internal.sheetExports.claimNext, { runId: args.runId });
     if (!claim) return null;
+    const item = claim.eventId ? { eventId: claim.eventId } : {};
     try {
       const email = env.GOOGLE_SHEETS_SERVICE_ACCOUNT_EMAIL!, key = env.GOOGLE_SHEETS_SERVICE_ACCOUNT_PRIVATE_KEY!;
-      const info = sheetKindInfo(claim.kind);
-      const name = `${info.title} - ${claim.seasonName}`;
-      const tabs = await tabsFor(ctx, claim.kind, claim.seasonId);
+      const entry = sheetKind(claim.kind);
+      const name = entry.definition.title({ seasonName: claim.seasonName, event: claim.event });
+      const tabs = await entry.tabs(ctx, { seasonId: claim.seasonId, eventId: claim.eventId });
+      // A file must have at least one tab; a kind that builds none is a mistake, never an empty spreadsheet.
+      if (!tabs.length) throw new Error("A spreadsheet kind built no tabs");
       const fingerprint = await hashId(JSON.stringify([LAYOUT_VERSION, name, tabs]));
-      const base = { runId: args.runId, seasonId: claim.seasonId, kind: claim.kind, folder: claim.folder, folderId: claim.folderId, name };
+      const base = { runId: args.runId, seasonId: claim.seasonId, kind: claim.kind, ...(claim.eventId ? { eventId: claim.eventId } : {}), folder: claim.folder, folderId: claim.folderId, name };
       const now = Date.now();
       const token = await googleServiceToken(email, key, WRITE_SCOPE);
       const stillMine = async () => { if (!(await ctx.runQuery(internal.sheetExports.runCurrent, { runId: args.runId }))) throw new LeaseLost(); };
       const save = async (fields: SaveFields) => {
         if (!(await ctx.runMutation(internal.sheetExports.saveFile, { ...base, ...fields }))) throw new LeaseLost();
       };
-      const appKey = sheetAppKey(claim.seasonId, claim.kind);
+      const appKey = sheetAppKey(claim.seasonId, claim.kind, claim.eventId ?? undefined);
       let spreadsheetId = claim.file?.spreadsheetId;
       let recreated: "missing" | "moved" | null = null;
       // Every update checks the stored file is still there, not in the trash, and in the configured folder; otherwise it is made again.
@@ -128,10 +90,10 @@ export const runOne = internalAction({
         await batchUpdate(token, spreadsheetId, batch.requests);
         await save({ spreadsheetId, tabs: batch.tabs, fingerprint, updatedAt: now, checkedAt: now, frozen: true, recreated });
       }
-      await ctx.runMutation(internal.sheetExports.completeOne, { runId: args.runId, kind: claim.kind });
+      await ctx.runMutation(internal.sheetExports.completeOne, { runId: args.runId, kind: claim.kind, ...item });
     } catch (error) {
       if (error instanceof LeaseLost) return null;
-      await ctx.runMutation(internal.sheetExports.completeOne, { runId: args.runId, kind: claim.kind, error: plainSheetError(error) });
+      await ctx.runMutation(internal.sheetExports.completeOne, { runId: args.runId, kind: claim.kind, ...item, error: plainSheetError(error) });
     }
     return null;
   },

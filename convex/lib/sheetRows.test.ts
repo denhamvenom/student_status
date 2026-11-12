@@ -3,41 +3,9 @@ import { describe, expect, it } from "vitest";
 import { parseDriveFolderId } from "./driveLinks";
 import { buildBatch } from "./googleSheets";
 import { folderVisible } from "./sheetKinds";
-import { guardianFor, safeCell, rosterGrade, shirtSizeTabs, studentRosterTabs, type RosterStudent, type ShirtPerson } from "./sheetRows";
+import { guardianFor, safeCell, rosterGrade } from "./sheetRows";
 
-const person = (name: string, type: ShirtPerson["type"], size: string | null, subteam = "Build"): ShirtPerson => ({ name, type, subteam, size });
-
-describe("shirt size tabs", () => {
-  const tabs = shirtSizeTabs([
-    person("Sam Student", "Student", "M"), person("Ada Student", "Student", "XL"), person("Mia Mentor", "Adult", "M"), person("Max Mentor", "Adult", "xxl"),
-    person("Una Unsized", "Student", null), person("Blank Mentor", "Adult", "  "),
-  ]);
-  const [counts, details, missing] = tabs;
-  it("counts sizes by group, with an Other bucket and a totals row", () => {
-    expect(counts.rows).toEqual([
-      ["Size", "Students", "Adults", "Total"], ["XS", 0, 0, 0], ["S", 0, 0, 0], ["M", 1, 1, 2], ["L", 0, 0, 0], ["XL", 1, 0, 1], ["2XL", 0, 0, 0], ["3XL", 0, 0, 0], ["Other", 0, 1, 1], ["Total", 2, 2, 4],
-    ]);
-  });
-  it("lists Mentors first and shows an unusual size as entered", () => {
-    expect(details.rows.map(row => row.slice(0, 2).concat(row[3]))).toEqual([["Name", "Student or adult", "Size"], ["Max Mentor", "Adult", "xxl"], ["Mia Mentor", "Adult", "M"], ["Ada Student", "Student", "XL"], ["Sam Student", "Student", "M"]]);
-  });
-  it("puts people without a size in Missing size, not in Counts", () => {
-    expect(missing.rows.map(row => row[0])).toEqual(["Name", "Blank Mentor", "Una Unsized"]);
-  });
-  it("still returns all three tabs with no people", () => {
-    expect(shirtSizeTabs([]).map(tab => tab.title)).toEqual(["Counts", "Details", "Missing size"]);
-  });
-});
-
-describe("student roster rows", () => {
-  const base: RosterStudent = { preferredName: "Dev", legalName: "Dev Student", grade: "10th", subteam: "Build", secondarySubteam: null, leadership: true, travelTeam: false, email: "dev@example.invalid", guardianName: "Gail", guardianRelationship: "Mother", guardianPhone: "555-0100", guardianEmail: "g@example.invalid", parentAccounts: ["Pat Parent", "Lee Parent"] };
-  it("writes one row per student, with a blank grade when none is saved", () => {
-    const [{ rows }] = studentRosterTabs([base, { ...base, preferredName: "Zed", legalName: "Zed Student", grade: null, secondarySubteam: "Programming", leadership: false, travelTeam: true, guardianName: null, parentAccounts: [] }]);
-    expect(rows[0]).toHaveLength(13);
-    expect(rows[1]).toEqual(["Dev", "Dev Student", "Sophomore", "Build", "", "Yes", "No", "dev@example.invalid", "Gail", "Mother", "555-0100", "g@example.invalid", "Pat Parent; Lee Parent"]);
-    expect(rows[2].slice(2, 7)).toEqual(["", "Build", "Programming", "No", "Yes"]);
-    expect(rows[2][8]).toBe("");
-  });
+describe("shared row helpers", () => {
   it.each([[undefined, ""], ["  ", ""], ["10th", "Sophomore"]])("grade %j shows %j", (grade, shown) => expect(rosterGrade(grade)).toBe(shown));
   it("uses the confirmed health profile's guardian, else the older fields (as the Coach roster does)", () => {
     const profile = { guardian: { name: "Profile Guardian", relationship: "Aunt", phone: "555-0111", email: "p@example.invalid" } };
