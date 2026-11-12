@@ -28,6 +28,10 @@ describe("readiness rows", () => {
     expect(rows[0].join("|")).not.toMatch(/balance|\$/i);
     expect(rows[1].at(-1)).toBe("");
   });
+  it("does not flag a student whose only open item is a fee", () => {
+    const [{ rows }] = readinessTabs([{ ...base, nextEvent: { name: "E", state: "open", open: ["Required payment"], participation: "confirmed" } }]);
+    expect(rows[1].slice(-2)).toEqual(["No", ""]);
+  });
   it("covers the quiet cases: complete profile, unavailable balance, unconfirmed event", () => {
     const [{ rows }] = readinessTabs([{ ...base, missingSummary: ["Profile setup"], firstRegistrationState: "verified", balance: { state: "updating", dueCents: null }, permission: { state: "closed", eventName: null }, nextEvent: { name: "E", state: "open", open: ["x"], participation: "pending" } }]);
     expect(rows[1].slice(2)).toEqual(["Yes", "Verified", "Not collecting yet", "No", ""]);

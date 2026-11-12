@@ -123,7 +123,7 @@ export const mentorPage = internalQuery({
 /** Room places (kind "members") and open requests to be assigned (kind "requests"), one page at a time. */
 export const roomPage = internalQuery({
   args: { eventId: v.id("events"), kind: v.union(v.literal("members"), v.literal("requests")), cursor: cursorArg },
-  returns: v.object({ rows: v.array(v.object({ student: v.string(), room: v.string(), category: v.string(), finalized: v.boolean(), needsReview: v.boolean(), requested: v.boolean() })), isDone: v.boolean(), cursor: nullableString }),
+  returns: v.object({ rows: v.array(v.object({ student: v.string(), room: v.string(), finalized: v.boolean(), needsReview: v.boolean(), requested: v.boolean() })), isDone: v.boolean(), cursor: nullableString }),
   handler: async (ctx, args) => {
     const page = args.kind === "members"
       ? await ctx.db.query("roomMemberships").withIndex("by_eventId_and_studentId", q => q.eq("eventId", args.eventId)).paginate({ numItems: PAGE * 2, cursor: args.cursor })
@@ -137,11 +137,11 @@ export const roomPage = internalQuery({
         if (!groups.has(row.groupId)) groups.set(row.groupId, await ctx.db.get(row.groupId));
         const group = groups.get(row.groupId);
         if (!group) continue;
-        rows.push({ student: personName(student), room: group.name, category: group.category, finalized: group.finalized, needsReview: group.needsReview, requested: false });
+        rows.push({ student: personName(student), room: group.name, finalized: group.finalized, needsReview: group.needsReview, requested: false });
       } else {
         // A request only counts while the student has no room yet.
         const placed = await ctx.db.query("roomMemberships").withIndex("by_eventId_and_studentId", q => q.eq("eventId", args.eventId).eq("studentId", row.studentId)).unique();
-        if (!placed) rows.push({ student: personName(student), room: "", category: "", finalized: false, needsReview: false, requested: true });
+        if (!placed) rows.push({ student: personName(student), room: "", finalized: false, needsReview: false, requested: true });
       }
     }
     return { rows, isDone: page.isDone, cursor: page.isDone ? null : page.continueCursor };

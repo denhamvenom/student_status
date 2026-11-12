@@ -37,7 +37,7 @@ describe("event spreadsheet tabs", () => {
     const tabs = eventTabs({
       ...base, participants: [person("a", "Ann", "confirmed", { independentTravel: true })],
       mentors: [{ name: "Moe", response: "accepted", canDrive: true, needsHotel: null }],
-      rooming: [{ student: "Zed", room: "", category: "", finalized: false, needsReview: false, requested: true }, { student: "Ann", room: "Room 1", category: "Girls", finalized: true, needsReview: false, requested: false }],
+      rooming: [{ student: "Zed", room: "", finalized: false, needsReview: false, requested: true }, { student: "Ann", room: "Room 1", finalized: true, needsReview: false, requested: false }],
       transport: { enabled: true, state: "open", seats: 4, demand: 6, busSeats: 0, open: ["2 more passenger seats are needed."], vehicles: [{ driver: "Dee", vehicle: "Van", seats: 4 }] },
     });
     expect(tabs.map(t => t.title)).toEqual(["Summary", "Who's going", "Mentors", "Rooming", "Rides"]);

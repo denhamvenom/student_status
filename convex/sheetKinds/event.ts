@@ -9,7 +9,7 @@ export type EventParticipantRow = {
   /** Ready for a confirmed student, not counting fees (those stay in the Money folder); null when not confirmed. */
   ready: boolean | null; missing: string[]; answers: { questionId: string; value: AnswerValue }[];
 };
-export type EventRoomRow = { student: string; room: string; category: string; finalized: boolean; needsReview: boolean; requested: boolean };
+export type EventRoomRow = { student: string; room: string; finalized: boolean; needsReview: boolean; requested: boolean };
 export type EventAttendancePerson = { studentId: string; name: string; subteam: string; signedUp: boolean; confirmed: boolean; intervals: { inAt: number; outAt: number }[]; corrections: number };
 export type EventShiftRow = { label: string; startsAt: number; endsAt: number; capacity: number | null; students: { studentId: string; name: string }[] };
 

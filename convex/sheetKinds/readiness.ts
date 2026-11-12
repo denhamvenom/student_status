@@ -9,11 +9,16 @@ export type Data = readonly ReadinessStudent[];
 
 const byName = (a: ReadinessStudent, b: ReadinessStudent) => a.name.localeCompare(b.name, "en", { sensitivity: "base", numeric: true });
 
+/** The roster's Needs attention rule applied with fee items removed, so a student whose only open item is a fee is not flagged here (fees stay in the Money folder). */
+function attentionWithoutMoney(row: ReadinessStudent): ReadinessStudent {
+  return row.nextEvent ? { ...row, nextEvent: { ...row.nextEvent, open: row.nextEvent.open.filter(item => !MONEY_ITEMS.has(item)) } } : row;
+}
+
 /** Why a student is flagged: their next event and what is still open on it (the roster's Needs attention rule), without fee items (those stay in the Money folder). */
 function attentionReason(row: ReadinessStudent): string {
-  if (!needsAttention(row) || !row.nextEvent) return "";
-  const open = row.nextEvent.open.filter(item => !MONEY_ITEMS.has(item));
-  return open.length ? `${row.nextEvent.name}: ${open.join("; ")}` : "";
+  const shown = attentionWithoutMoney(row);
+  if (!needsAttention(shown) || !shown.nextEvent) return "";
+  return `${shown.nextEvent.name}: ${shown.nextEvent.open.join("; ")}`;
 }
 
 export function readinessTabs(students: Data): SheetTab[] {
@@ -23,7 +28,7 @@ export function readinessTabs(students: Data): SheetTab[] {
       ["Student", "Subteam", "Profile complete", "FIRST registration", "Permission form", "Needs attention", "What is left"],
       ...[...students].sort(byName).map(row => [
         row.name, subteamDisplay(row.subteam), yesNo(missingProfileItems(row).length === 0), firstRegistrationLabel[row.firstRegistrationState], permissionLabel(row),
-        yesNo(needsAttention(row)), attentionReason(row),
+        yesNo(needsAttention(attentionWithoutMoney(row))), attentionReason(row),
       ]),
     ],
   }];

@@ -24,7 +24,7 @@ function fakeGoogle(folders: Record<string, FolderSpec>) {
   const state = {
     files: new Map<string, { key: string; name: string; trashed: boolean; parents: string[] }>(), creates: 0, ids: 0, calls: [] as string[], batches: [] as { id: string; requests: any[] }[],
     createMode: "ok" as "ok" | "lostAnswer", batchStatuses: [] as number[], batchAttempts: 0, batchDrop: false, missingSheets: new Set<string>(), scopes: [] as string[], onToken: null as null | (() => Promise<void>),
-    sheets: new Map<string, { sheetId: number; title: string }[]>(), sheetsNotYet: 0, trashWhenReady: false, driveForbidden: [] as string[], createStatus: 0,
+    sheets: new Map<string, { sheetId: number; title: string }[]>(), sheetsNotYet: 0, trashWhenReady: false, driveForbidden: [] as string[], createStatus: 0, renameFail: 0,
     renames: [] as { id: string; name: string }[], onCreate: null as null | (() => Promise<void>),
   };
   const json = (status: number, body: unknown = {}) => new Response(JSON.stringify(body), { status });
@@ -61,6 +61,7 @@ function fakeGoogle(folders: Record<string, FolderSpec>) {
       const id = decodeURIComponent(fileMatch[1]);
       const file = state.files.get(id);
       if (!file) return json(404);
+      if (state.renameFail > 0) { state.renameFail--; return json(403, { error: { errors: [{ reason: "forbidden" }] } }); }
       const name = JSON.parse(String(init?.body)).name;
       file.name = name;
       state.renames.push({ id, name });
@@ -681,6 +682,22 @@ describe("per-event spreadsheets", () => {
     // Nothing changed: no rename and no write.
     await press(f);
     expect(google.state.renames).toHaveLength(1);
+  });
+
+  it("tries a failed Drive rename again on the next update", async () => {
+    enable(SHEET_REGISTRY.event.definition);
+    const f = await fixture();
+    const regional = await addEvent(f, "Synthetic Regional", 20);
+    await press(f);
+    const sheet = (await files(f)).find(file => file.eventId === regional)!.spreadsheetId;
+    await f.t.run(ctx => ctx.db.patch(regional, { name: "Synthetic District" }));
+    google.state.renameFail = 1;
+    await press(f);
+    expect(google.state.renames).toEqual([]);
+    expect((await files(f)).find(file => file.eventId === regional)!.name).not.toBe("2026-12-02 Synthetic District");
+    await press(f);
+    expect(google.state.renames).toEqual([{ id: sheet, name: "2026-12-02 Synthetic District" }]);
+    expect((await files(f)).find(file => file.eventId === regional)).toMatchObject({ spreadsheetId: sheet, name: "2026-12-02 Synthetic District" });
   });
 
   it("freezes an event's file after the event ends: no more writes, still listed and still in Drive", async () => {

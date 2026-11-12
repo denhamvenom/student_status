@@ -28,7 +28,7 @@ export function plainSheetError(error: unknown): string {
 
 /** This run was replaced or ended while it was working (or its season was archived); it stops without writing anything more. */
 class LeaseLost extends Error {}
-type SaveFields = { spreadsheetId: string; tabs: { title: string; sheetId: number }[]; fingerprint?: string; updatedAt?: number; checkedAt: number; frozen: boolean; recreated: "missing" | "moved" | null };
+type SaveFields = { name?: string; spreadsheetId: string; tabs: { title: string; sheetId: number }[]; fingerprint?: string; updatedAt?: number; checkedAt: number; frozen: boolean; recreated: "missing" | "moved" | null };
 
 /** Errors from Google or the key are already logged where they happen; anything else is logged here (names only, never data values). */
 const loggedElsewhere = (error: unknown) => error instanceof GoogleRequestError || error instanceof GoogleKeyError || error instanceof GoogleTokenError;
@@ -85,7 +85,9 @@ export const runOne = internalAction({
         const madeNow = !spreadsheetId;
         spreadsheetId ??= await make();
         // Save the file at once so a failure later never leaves an untracked spreadsheet. This save clears the stored fingerprint, so an interrupted write is redone.
-        await save({ spreadsheetId, tabs: recreated ? [] : claim.file?.tabs ?? [], checkedAt: now, frozen: false, recreated });
+        // The stored name is only the new one once Drive has confirmed it, so a failed rename is tried again on the next update.
+        const driveName = (id: string) => knownNames.get(id) ?? name;
+        await save({ name: driveName(spreadsheetId), spreadsheetId, tabs: recreated ? [] : claim.file?.tabs ?? [], checkedAt: now, frozen: false, recreated });
         let sheets = await getSheets(token, spreadsheetId);
         // A file made a moment ago may not be readable yet: wait and read again instead of making a second copy.
         if (!sheets && madeNow) {
@@ -99,13 +101,16 @@ export const runOne = internalAction({
           spreadsheetId = await make();
           recreated ??= "missing";
           // Save the new file at once, before anything is written to it.
-          await save({ spreadsheetId, tabs: [], checkedAt: now, frozen: false, recreated });
+          await save({ name: driveName(spreadsheetId), spreadsheetId, tabs: [], checkedAt: now, frozen: false, recreated });
           sheets = await getSheets(token, spreadsheetId) ?? [];
         }
         const batch = buildBatch(tabs, sheets, now);
         await stillMine();
         // A changed title (an event renamed or moved to another day, a season renamed, a new naming rule) renames the Drive file too.
-        if (knownNames.get(spreadsheetId) !== name) await renameFile(token, { fileId: spreadsheetId, name });
+        if (knownNames.get(spreadsheetId) !== name) {
+          await renameFile(token, { fileId: spreadsheetId, name });
+          knownNames.set(spreadsheetId, name);
+        }
         await batchUpdate(token, spreadsheetId, batch.requests);
         await save({ spreadsheetId, tabs: batch.tabs, fingerprint, updatedAt: now, checkedAt: now, frozen: true, recreated });
       }
@@ -118,7 +123,8 @@ export const runOne = internalAction({
         return null;
       }
       if (!loggedElsewhere(error)) {
-        const detail = error instanceof ConvexError ? { name: "ConvexError", message: typeof error.data === "string" ? error.data.slice(0, 200) : "(structured)" } : error instanceof Error ? { name: error.name, message: error.message.slice(0, 200) } : { name: typeof error, message: "" };
+        // Only an app-written ConvexError sentence is logged as text; any other message (a validator's, for one) can carry data values, so only its name is kept.
+        const detail = error instanceof ConvexError ? { name: "ConvexError", message: typeof error.data === "string" ? error.data.slice(0, 200) : "(structured)" } : { name: error instanceof Error ? error.name : typeof error, message: "" };
         console.warn("Spreadsheet step failed", { kind: claim.kind, eventId: claim.eventId ?? null, ...detail });
       }
       await ctx.runMutation(internal.sheetExports.completeOne, { runId: args.runId, kind: claim.kind, ...item, error: plainSheetError(error) });
