@@ -1,6 +1,6 @@
 # Handoff
 
-November 11, 2026 | main `fe73423`
+November 11, 2026 | main `2f3d320`
 
 ## Student Status
 
@@ -17,7 +17,7 @@ November 11, 2026 | main `fe73423`
 
 ## In progress
 
-- No open pull requests as of `fe73423`. The shared checkout `student-status-app` is detached at `5971124` (behind main) and had 13 uncommitted modified files on November 11 that belong to another session, so leave it alone; work happens in worktrees per docs/REPOSITORY.md. Worktrees `wt-calendar-team-meetings` and `wt-handoff-fix` hold already-merged work.
+- No open pull requests as of `2f3d320`. The shared checkout `student-status-app` is clean and detached at `2f3d320` (main, November 11); work happens in worktrees per docs/REPOSITORY.md. The guard hook now asks the owner before Git rewrites there (PR #90). Worktrees `wt-calendar-team-meetings` and `wt-handoff-fix` hold already-merged work.
 
 ## Owner decisions
 
