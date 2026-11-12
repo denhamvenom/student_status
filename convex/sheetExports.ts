@@ -319,7 +319,7 @@ export const abandonStep = internalMutation({
   },
 });
 
-const fileFields = { kind: sheetFileKind, title: v.string(), folder: sheetFolder, name: v.union(v.string(), v.null()), link: v.union(v.string(), v.null()), updatedAt: v.union(v.number(), v.null()), problem: v.union(v.string(), v.null()), note: v.union(v.string(), v.null()) };
+const fileFields = { kind: sheetFileKind, title: v.string(), folder: sheetFolder, name: v.union(v.string(), v.null()), link: v.union(v.string(), v.null()), updatedAt: v.union(v.number(), v.null()), checkedAt: v.union(v.number(), v.null()), problem: v.union(v.string(), v.null()), note: v.union(v.string(), v.null()) };
 const fileStatus = v.object(fileFields);
 /**
  * One event with its files (Event, Fees, Travel emergency, in that order; only the ones the person may see and the event has). `current`
@@ -370,7 +370,7 @@ export const status = query({
     const runProblem = (kind: SheetFileKind, eventId: Id<"events"> | undefined) => latest?.problems?.find(item => item.kind === kind && item.eventId === eventId)?.message ?? null;
     const describe = (definition: { kind: SheetFileKind; label: string; folder: SheetFolder }, file: Doc<"sheetExportFiles"> | null, eventId?: Id<"events">): FileStatus => ({
       kind: definition.kind, title: definition.label, folder: definition.folder, name: file?.name ?? null, link: file ? spreadsheetLink(file.spreadsheetId) : null,
-      updatedAt: file?.updatedAt ?? null, problem: file?.lastError ?? runProblem(definition.kind, eventId), note: recreatedNote(file),
+      updatedAt: file?.updatedAt ?? null, checkedAt: file?.checkedAt ?? null, problem: file?.lastError ?? runProblem(definition.kind, eventId), note: recreatedNote(file),
     });
     const files: FileStatus[] = [];
     const events: Infer<typeof eventStatus>[] = [];

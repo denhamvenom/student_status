@@ -5,8 +5,17 @@ const day = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', mont
 /** An event's start date in team time, "Dec 2, 2026"; blank when the event is gone (start unknown). */
 export const eventDateLabel = (startsAt: number) => (startsAt > 0 ? day.format(startsAt) : '')
 
+/** What a file's time line says: when it was last changed, or (when a later check found it unchanged) when it was last confirmed current. */
+export function fileTime(file: { updatedAt: number | null; checkedAt: number | null }): { kind: 'updated' | 'upToDate' | 'never'; at: number | null } {
+  if (file.updatedAt === null) return { kind: 'never', at: null }
+  return file.checkedAt !== null && file.checkedAt > file.updatedAt ? { kind: 'upToDate', at: file.checkedAt } : { kind: 'updated', at: file.updatedAt }
+}
+
 /** The newest update time among an event's files, or null when none has been written yet. */
 export const latestUpdate = (files: readonly { updatedAt: number | null }[]) => files.reduce<number | null>((latest, file) => (file.updatedAt !== null && (latest === null || file.updatedAt > latest) ? file.updatedAt : latest), null)
+
+/** The newest time line among an event's files (a confirmed-current check counts), shown through fileTime. */
+export const latestFileTime = (files: readonly { updatedAt: number | null; checkedAt: number | null }[]) => files.map(fileTime).reduce<{ kind: 'updated' | 'upToDate' | 'never'; at: number | null }>((best, item) => (item.at !== null && (best.at === null || item.at > best.at) ? item : best), { kind: 'never', at: null })
 
 const stamp = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 

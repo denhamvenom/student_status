@@ -19,7 +19,9 @@ export const spreadsheetCopy = {
   eventsCount: (count: number) => `${count} ${count === 1 ? 'event' : 'events'}`,
   showAllEvents: (count: number) => `Show all ${count} events`,
   /** Short link names on an event's row, by spreadsheet kind. */
-  eventLinks: { event: 'Event', eventFees: 'Fees', eventTravelEmergency: 'Travel emergency' } as Record<string, string>,
+  eventLinks: { event: 'Open event spreadsheet', eventFees: 'Open fees', eventTravelEmergency: 'Open travel emergency sheet' } as Record<string, string>,
+  /** Short names used in "not made yet" and problem lines on an event's row. */
+  eventNames: { event: 'Event spreadsheet', eventFees: 'Fees', eventTravelEmergency: 'Travel emergency' } as Record<string, string>,
   eventLinkMissing: (label: string) => `${label}: not made yet`,
   eventFileNote: (label: string, note: string) => `${label}: ${note}`,
   showFewerEvents: 'Show fewer',
@@ -31,7 +33,8 @@ export const spreadsheetCopy = {
   archiveSkipped: "Last season's spreadsheets weren't moved because spreadsheet updates were turned off. Ask the person who set up Venom Status for your team to move them.",
   healthReminder: 'Share the Health folder only with people who have Health export access.',
   updatingNow: 'Updating spreadsheets…',
-  updatingCount: (finished: number, total: number) => `${finished} of ${total} spreadsheets`,
+  updatingCount: (finished: number, total: number) => `Updating spreadsheets… ${finished} of ${total} spreadsheets`,
+  upToDate: (when: string) => `Up to date as of ${when}`,
   updated: (when: string) => `Updated ${when}`,
   lastTried: (when: string) => `Last tried ${when}`,
   notUpdated: 'Not updated',

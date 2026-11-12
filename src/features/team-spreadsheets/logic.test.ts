@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { commonProblem, duplicateFolders, eventDateLabel, folderInputProblem, latestUpdate, runInProgress, updatedLabel } from './logic'
+import { commonProblem, fileTime, latestFileTime, duplicateFolders, eventDateLabel, folderInputProblem, latestUpdate, runInProgress, updatedLabel } from './logic'
 
 describe('team spreadsheets card logic', () => {
   it('shows the update time in team time as Mon D, h:mm a', () => {
@@ -22,6 +22,12 @@ describe('team spreadsheets card logic', () => {
     expect(eventDateLabel(0)).toBe('')
     expect(latestUpdate([{ updatedAt: 5 }, { updatedAt: null }, { updatedAt: 9 }])).toBe(9)
     expect(latestUpdate([{ updatedAt: null }])).toBeNull()
+  })
+  it('says a file is up to date when a later check found it unchanged', () => {
+    expect(fileTime({ updatedAt: 5, checkedAt: 9 })).toEqual({ kind: 'upToDate', at: 9 })
+    expect(fileTime({ updatedAt: 5, checkedAt: 5 })).toEqual({ kind: 'updated', at: 5 })
+    expect(fileTime({ updatedAt: null, checkedAt: 9 })).toEqual({ kind: 'never', at: null })
+    expect(latestFileTime([{ updatedAt: 5, checkedAt: 9 }, { updatedAt: 7, checkedAt: null }])).toEqual({ kind: 'upToDate', at: 9 })
   })
   it('flags a folder pasted twice', () => {
     const link = 'https://drive.google.com/drive/folders/1AbCdEfGhIjKl'

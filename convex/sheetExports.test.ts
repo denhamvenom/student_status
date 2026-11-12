@@ -286,6 +286,9 @@ describe("a full update", () => {
     expect(google.state.calls.filter(call => !call.includes("oauth2") && !call.startsWith("GET"))).toEqual([]);
     expect(google.state.calls.filter(call => call === "GET www.googleapis.com/drive/v3/files/sheet1")).toHaveLength(1);
     expect(google.state.batches).toHaveLength(2);
+    // The card can tell "checked and unchanged" from "changed": every file carries when it was last confirmed current.
+    const confirmed = await f.coach.query(api.sheetExports.status, {});
+    expect(confirmed.files.every(file => file.updatedAt !== null && file.checkedAt !== null && file.checkedAt >= file.updatedAt)).toBe(true);
 
     await f.t.run(ctx => ctx.db.patch(f.ids.studentId, { shirtSize: "XL" }));
     await f.t.run(async ctx => { for (const r of await ctx.db.query("sheetExportRuns").collect()) await ctx.db.patch(r._id, { state: "done", finishedAt: 1 }); });
@@ -293,6 +296,12 @@ describe("a full update", () => {
     await finishRun(f);
     expect(google.state.batches).toHaveLength(3);
     expect(google.state.creates).toBe(2);
+  });
+  it("reports how many files are finished while a run is going", async () => {
+    const f = await fixture();
+    await f.coach.mutation(api.sheetExports.requestUpdate, {});
+    await f.t.run(async ctx => { for (const r of await ctx.db.query("sheetExportRuns").collect()) await ctx.db.patch(r._id, { total: 5, done: 2, failed: 1 }); });
+    expect((await f.coach.query(api.sheetExports.status, {})).run).toMatchObject({ state: "running", total: 5, finished: 3 });
   });
   it("recovers an ambiguous create without making a duplicate", async () => {
     google.state.createMode = "lostAnswer";
