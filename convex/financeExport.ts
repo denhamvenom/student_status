@@ -8,18 +8,12 @@ import { chargeAppliedSources, readyFinancialAccount } from "./lib/financialSour
 import { effectiveChargeCents } from "./lib/chargeObligation";
 import { seasonFinanceControl } from "./lib/seasonFinance";
 import { boundedFinancePage } from "./financeAdmin";
+import { CSV_COLUMNS, csvCell, chargeExportRow, chargeExportCells } from "./lib/financeRows";
 const runRef = makeFunctionReference<"mutation">("financeExport:run");
 const pageRef = makeFunctionReference<"mutation">("financeExport:processPage");
 const nullable = v.union(v.number(), v.null());
 const metadata = { schemaVersion: v.literal(1), scopeHash: v.string(), collectedAt: v.number() };
-export const CSV_COLUMNS = ["Season ID", "Student ID", "Student", "Charge ID", "Charge", "Event", "Original cents", "Adjusted cents", "Canceled cents", "Effective cents", "Personal applied cents", "Fundraising applied cents", "Due cents", "Personal available cents (non-additive)", "Fundraising available cents (non-additive)", "Financial generation", "Financial revision", "Collected at"];
-/** Quote every cell and neutralize spreadsheet formulas in text, preserving numeric cents. */
-export function csvCell(value: string | number) {
-  const text = String(value); let start = 0;
-  while (start < text.length && (text.charCodeAt(start) <= 32 || /\s/u.test(text[start]))) start++;
-  const safe = typeof value === "string" && /^[=+@-]/u.test(text.slice(start)) ? `'${text}` : text;
-  return `"${safe.replaceAll('"', '""')}"`;
-}
+export { CSV_COLUMNS, csvCell };
 async function digest(text: string) { const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)); return [...new Uint8Array(bytes)].map(byte => byte.toString(16).padStart(2, "0")).join(""); }
 async function exportViewer(ctx: QueryCtx | MutationCtx) { const actor = await viewer(ctx); if (!isCoachOrTravelLead(actor)) throw new Error("Financial export access is not enabled for this account."); return actor; }
 async function financialScopeReady(ctx: QueryCtx | MutationCtx, seasonId: Id<"seasons">) { const maintenance = await seasonFinanceControl(ctx, seasonId); if (maintenance && maintenance.state !== "ready") throw new Error("Finish shared fee maintenance before collecting financial exports."); }
@@ -98,8 +92,8 @@ export const charges = mutation({
     for (const charge of page.page) {
       const net = await ctx.db.query("financialChargeAllocations").withIndex("by_studentId_and_generation_and_chargeId", q => q.eq("studentId", student._id).eq("generation", account.generation).eq("chargeId", charge._id)).unique();
       const split = chargeAppliedSources(net, charge.appliedCents); const effective = effectiveChargeCents(charge); if (charge.appliedCents > effective) throw new ConvexError("A fee shows more paid than it costs. Ask a Coach to review it, then export again."); const event = charge.eventId ? await ctx.db.get(charge.eventId) : null; if (event && event.seasonId !== job.seasonId) throw new ConvexError("A fee belongs to an event in another season. Ask a Coach to review it, then export again.");
-      const row = { seasonId: job.seasonId, studentId: student._id, studentName: student.legalName || student.preferredName, chargeId: charge._id, label: charge.label, eventName: event?.name ?? null, originalCents: charge.amountCents, adjustedCents: charge.adjustedCents ?? 0, cancelledCents: charge.cancelledCents ?? 0, effectiveCents: effective, ...split, dueCents: effective - charge.appliedCents, personalAvailableCents: account.personalAvailableCents, fundraisingAvailableCents: account.fundraisingAvailableCents, generation: account.generation, financialRevision: account.revision, collectedAt };
-      const cells = [row.seasonId, row.studentId, row.studentName, row.chargeId, row.label, row.eventName ?? "", row.originalCents, row.adjustedCents, row.cancelledCents, row.effectiveCents, row.personalAppliedCents, row.fundraisingAppliedCents, row.dueCents, row.personalAvailableCents, row.fundraisingAvailableCents, row.generation, row.financialRevision, row.collectedAt]; result.push({ ...row, csvLine: cells.map(csvCell).join(",") });
+      const row = chargeExportRow({ seasonId: job.seasonId, student, charge, eventName: event?.name ?? null, effectiveCents: effective, split, account, collectedAt });
+      result.push({ ...row, csvLine: chargeExportCells(row).map(csvCell).join(",") });
     }
     return { ...page, page: result, schemaVersion: 1 as const, scopeHash: job.scopeHash, collectedAt };
   },

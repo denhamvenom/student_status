@@ -2,43 +2,16 @@
 // the Copy reminder text and Export list all agree. Pure functions; no server calls.
 
 import { gradeLabel } from '@/lib/rosterSort'
+import { balanceDueCents, firstRegistrationLabel, permissionLabel, missingProfileItems, needsAttention, type RequirementRow } from '@/lib/rosterRequirements'
+
+export { balanceDueCents, firstRegistrationLabel, permissionLabel, missingProfileItems, needsAttention, type RequirementRow }
 
 export type RequirementKey = 'attention' | 'first' | 'permission' | 'balance' | 'missing'
 export type RosterQuick = 'all' | RequirementKey
 
-export type RequirementRow = {
-  studentId: string
-  name: string
-  active: boolean
-  firstRegistrationState: 'needsCompletion' | 'awaitingVerification' | 'verified'
-  balance: { state: string; dueCents: number | null }
-  nextEvent: { name: string; state: 'ready' | 'open' | 'unknown'; open: string[]; participation: 'confirmed' | 'pending' | 'waitlist' | 'withdrawn' | null } | null
-  missingSummary: string[]
-  permission: { state: 'closed' | 'noForm' | 'signed' | 'review' | 'notSigned'; eventName: string | null }
-}
-
 /** The selected students who are still shown under the current filters; hidden ones are not counted, copied or exported. */
 export function visibleSelection<T extends { studentId: string }>(shown: readonly T[], selectedIds: ReadonlySet<string>): T[] {
   return shown.filter(item => selectedIds.has(item.studentId))
-}
-
-/** "Profile setup" is the sign-in step, not profile information, so it is never listed or counted. */
-export function missingProfileItems(row: Pick<RequirementRow, 'missingSummary'>): string[] {
-  return row.missingSummary.filter(item => item !== 'Profile setup').map(item => (item === 'Room category' ? 'Room type' : item))
-}
-
-export const balanceDueCents = (row: Pick<RequirementRow, 'balance'>) => (row.balance.state === 'ready' && row.balance.dueCents !== null && row.balance.dueCents > 0 ? row.balance.dueCents : 0)
-
-/**
- * Needs attention: an active student who is confirmed for their next event (upcoming, not canceled) and still has an
- * open item on it: a payment, permission form, FIRST registration, shifts, room choice or another requirement.
- * "Something to know" notes never count. Students who are only pending or waitlisted, events that could not be fully
- * checked, and balances on their own do not count: Balance due, Permission form and Missing profile information
- * have their own chips.
- */
-export function needsAttention(row: RequirementRow): boolean {
-  if (!row.active || row.nextEvent?.participation !== 'confirmed') return false
-  return row.nextEvent.state === 'open' && row.nextEvent.open.length > 0
 }
 
 const tests: Record<RequirementKey, (row: RequirementRow) => boolean> = {
@@ -121,19 +94,12 @@ function cell(value: string | number) {
   const text = Array.from(String(value), character => (character.charCodeAt(0) < 32 ? ' ' : character)).join('')
   return `"${(/^[\s\uFEFF]*[=+\-@]/u.test(text) ? `'${text}` : text).replaceAll('"', '""')}"`
 }
-const permissionLabel = (row: RequirementRow) =>
-  row.permission.state === 'closed' ? 'Not collecting yet'
-    : row.permission.state === 'noForm' ? 'No form needed'
-      : row.permission.state === 'signed' ? 'Signed'
-        : row.permission.state === 'review' ? 'Signed, needs review' : 'Not signed'
-
 /** The students currently selected, with what they still need. Names and statuses only; no health or contact details. */
 export function rosterExportCsv(rows: readonly RosterExportRow[]): string {
   const header = ['Student', 'Grade', 'Subteam', 'Travel Team', 'FIRST registration', 'Permission form', 'Balance due ($)', 'Next event', 'Event items left', 'Missing profile information']
-  const first = { needsCompletion: 'Missing', awaitingVerification: 'Waiting for Coach', verified: 'Verified' } as const
   const lines = rows.map(row => [
     row.name, gradeLabel(row.grade), row.subteam || 'No subteam', row.travelTeam ? 'Yes' : 'No',
-    first[row.firstRegistrationState], permissionLabel(row),
+    firstRegistrationLabel[row.firstRegistrationState], permissionLabel(row),
     row.balance.state === 'ready' && row.balance.dueCents !== null ? (row.balance.dueCents / 100).toFixed(2) : 'Unavailable',
     row.nextEvent?.name ?? 'None', row.nextEvent?.open.join('; ') ?? '', missingProfileItems(row).join('; '),
   ])
