@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { exportPKCS8, generateKeyPair } from "jose";
+import { googleServiceToken } from "./lib/googleAuth";
+import { serviceToken } from "./lib/calendarAuth";
 import { allowedAuthRedirect } from "./lib/authRedirect";
 import { normalizeCalendarEvent } from "./lib/calendarNormalize";
 
@@ -30,5 +33,25 @@ describe("calendar normalization", () => {
   });
   it("rejects an active event with no valid window so sync cannot reconcile it away", () => {
     expect(normalizeCalendarEvent({ id: "instance-1", status: "confirmed", start: { dateTime: "invalid" }, end: { dateTime: "invalid" } }, 100, 2)).toBeNull();
+  });
+});
+
+describe("service account key stored on one line", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("works through both the shared Google token and the Calendar token when line breaks are written as backslash-n", async () => {
+    const { privateKey } = await generateKeyPair("RS256", { extractable: true });
+    const pem = await exportPKCS8(privateKey);
+    const oneLine = pem.trim().replace(/\n/g, "\\n");
+    expect(oneLine).toContain("\\n");
+    expect(oneLine).not.toContain("\n");
+    const scopes: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
+      scopes.push(JSON.parse(Buffer.from(new URLSearchParams(String(init?.body)).get("assertion")!.split(".")[1], "base64url").toString()).scope);
+      return new Response(JSON.stringify({ access_token: "synthetic-token" }), { status: 200 });
+    }));
+    expect(await googleServiceToken("sa@synthetic.invalid", oneLine, "scope-a")).toBe("synthetic-token");
+    expect(await serviceToken("sa@synthetic.invalid", oneLine)).toBe("synthetic-token");
+    expect(scopes).toEqual(["scope-a", "https://www.googleapis.com/auth/calendar.readonly"]);
+    await expect(googleServiceToken("sa@synthetic.invalid", "not a key", "s")).rejects.toThrow();
   });
 });

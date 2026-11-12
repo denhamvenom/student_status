@@ -54,6 +54,15 @@ beforeEach(() => {
     return undefined
   })
 })
+describe('content mounted by the page', () => {
+  it('appears after the Team reports heading, not before it', () => {
+    mocks.stateCursor = 0
+    mocks.usePaginatedQuery.mockReturnValue({results:[row],status:'Exhausted',loadMore:vi.fn()})
+    const html=renderToStaticMarkup(createElement(TeamReports,{role:'coach',afterHeading:createElement('p',null,'Mounted card')}))
+    expect(html.indexOf('Team reports</h1>')).toBeGreaterThan(-1)
+    expect(html.indexOf('Mounted card')).toBeGreaterThan(html.indexOf('Team reports</h1>'))
+  })
+})
 describe('team report scope without a selected event', () => {
   it('shows empty event columns and an exhaustive student count', () => {
     const html=render('Exhausted')

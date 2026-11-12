@@ -145,6 +145,15 @@ November 10, 2026 owner decisions, implemented on `feat/usability-audit` (not me
 - Build hours show on Attendance like Home once Build Season starts, listing every Build day (Attended/Missed, minutes). A Weekday vs Weekend split is kept for Travel Team decisions (Weekend = Saturday + Sunday, Build Season only).
 - The earlier-records tables were empty and unused; the earlier records page is removed.
 
+## Team spreadsheets (November 12, 2026)
+
+- The Student roster spreadsheet keeps parent or guardian name, relationship, phone and email and the linked parent accounts. It lives in the General folder, so Coaches and Travel Leads (and anyone the owner shares General with) can see them. This intentionally widens guardian contact access beyond the app's Coach-only roster detail.
+- Links to Money spreadsheets show in the app to any Coach or Travel Lead (a Parent acting as Travel Lead included), the same rule as the app's money views, not only to people with Money editing access. Health links stay with Coaches and Travel Leads who have Health export access.
+- Sharing model: only the owner and the Venom Status service account are members of the shared drive. Each folder (General, Money, Health, Events, Archive) is shared individually with the people who need it. The parent folder (Venom Status Reports) is not shared.
+- Events folder (owner decision, November 12, 2026): a fifth folder, **Events**, holds every per-event spreadsheet (built in later stages), because Events will be shared more widely than General. Links to it show to any Coach or Travel Lead, like General. Lead's default, pending owner override: each event's Fees file stays in the Money folder and its travel emergency file stays in the Health folder. The Events link is required when connecting Drive; Archive stays optional.
+- Drive files and their version history are part of the yearly retention review (see Retention).
+- Season archiving (Archive > Year on a season switch) remains a later build stage.
+
 ## Retention
 
 - Five years runs from the latest archival after reactivation and triggers review, not automatic erasure. Automatic deletion remains unauthorized.
