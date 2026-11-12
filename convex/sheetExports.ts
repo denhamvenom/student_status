@@ -204,7 +204,7 @@ export const status = query({
     serviceAccountEmail: v.union(v.string(), v.null()), credentialsReady: v.boolean(),
     folders: v.union(v.null(), v.object({ general: v.string(), money: v.string(), health: v.string(), events: v.union(v.string(), v.null()), archive: v.union(v.string(), v.null()) })),
     run: v.union(v.null(), v.object({ state: v.union(v.literal("running"), v.literal("done"), v.literal("partial"), v.literal("stopped")), total: v.number(), finished: v.number(), leaseExpiresAt: v.number() })),
-    lastSuccessAt: v.union(v.number(), v.null()), files: v.array(fileStatus),
+    lastSuccessAt: v.union(v.number(), v.null()), lastTriedAt: v.union(v.number(), v.null()), files: v.array(fileStatus),
   }),
   handler: async ctx => {
     const actor = await viewer(ctx);
@@ -225,7 +225,7 @@ export const status = query({
       serviceAccountEmail: canSetUp ? env.GOOGLE_SHEETS_SERVICE_ACCOUNT_EMAIL ?? null : null, credentialsReady: credentialsConfigured(),
       folders: canSetUp && settings ? { general: settings.generalFolderId, money: settings.moneyFolderId, health: settings.healthFolderId, events: settings.eventsFolderId ?? null, archive: settings.archiveFolderId ?? null } : null,
       run: latest ? { state: latest.state, total: latest.total, finished: latest.done + latest.failed, leaseExpiresAt: latest.leaseExpiresAt } : null,
-      lastSuccessAt: lastDone?.finishedAt ?? null, files: items,
+      lastSuccessAt: lastDone?.finishedAt ?? null, lastTriedAt: latest?.finishedAt ?? null, files: items,
     };
   },
 });

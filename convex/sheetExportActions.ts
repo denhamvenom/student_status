@@ -12,14 +12,14 @@ import { shirtSizeTabs, studentRosterTabs, type SheetTab, type ShirtPerson } fro
 import { subteamDisplay } from "../src/lib/subteams";
 
 const ASK_OWNER = "the person who set up Venom Status for your team";
-const GENERIC_FAILURE = "Venom Status couldn't update this spreadsheet. Press Update spreadsheets to try again. If it keeps happening, check that the Venom Status service account is still a Content manager of the shared drive.";
+const GENERIC_FAILURE = "Venom Status couldn't update this spreadsheet. Press Update spreadsheets to try again. If it keeps happening, ask a Coach to check the Google Drive setup.";
 
 /** Plain-language reason for a failed file; never a raw Google message. */
 export function plainSheetError(error: unknown): string {
-  if (error instanceof GoogleKeyError) return `The Venom Status service account's key can't be read. Ask ${ASK_OWNER} to check it.`;
-  if (error instanceof GoogleTokenError) return `Google didn't accept the Venom Status service account. Ask ${ASK_OWNER} to check its key.`;
+  if (error instanceof GoogleKeyError) return `The Venom Status Google key can't be read. Ask ${ASK_OWNER} to check it.`;
+  if (error instanceof GoogleTokenError) return `Google didn't accept the Venom Status Google account. Ask ${ASK_OWNER} to check its key.`;
   if (error instanceof GoogleRequestError) {
-    if (error.status === 403) return "Google didn't allow Venom Status to change this spreadsheet. Check that the service account is a Content manager of the shared drive, then press Update spreadsheets.";
+    if (error.status === 403) return "Google Drive didn't let Venom Status save this spreadsheet. A Coach can open Connect Google Drive and press Check access.";
     if (error.status === 429 || error.status >= 500 || error.status === 0) return "Google was busy and didn't finish this spreadsheet. Press Update spreadsheets in a few minutes.";
   }
   return GENERIC_FAILURE;
@@ -101,7 +101,7 @@ export const runOne = internalAction({
       } else {
         const make = async () => {
           await stillMine();
-          return (await findByKey(token, claim.driveId, claim.folderId, appKey)) ?? await createSpreadsheet(token, { name, folderId: claim.folderId, key: appKey });
+          return (await findByKey(token, claim.driveId, claim.folderId, appKey)) ?? await createSpreadsheet(token, { name, driveId: claim.driveId, folderId: claim.folderId, key: appKey });
         };
         const madeNow = !spreadsheetId;
         spreadsheetId ??= await make();
@@ -143,7 +143,7 @@ const problemValidator = v.object({ folder: v.union(v.literal("general"), v.lite
 
 /**
  * Coach only. Checks the folder links with read-only Google calls (they work before updates are turned on), then saves them.
- * All folders must be distinct, in one shared drive, and writable by the service account.
+ * All folders must be distinct, in one shared drive, and writable by Venom Status's Google account.
  */
 export const checkAccess = action({
   args: { general: v.string(), money: v.string(), health: v.string(), events: v.string(), archive: v.optional(v.string()) },
@@ -151,7 +151,7 @@ export const checkAccess = action({
   handler: async (ctx, args) => {
     const actorId = await ctx.runQuery(internal.sheetExports.setupActor, {});
     const email = env.GOOGLE_SHEETS_SERVICE_ACCOUNT_EMAIL, key = env.GOOGLE_SHEETS_SERVICE_ACCOUNT_PRIVATE_KEY;
-    if (!email || !key) throw new ConvexError(`The Venom Status service account isn't set up yet. Ask ${ASK_OWNER} to finish the Google setup, then try again.`);
+    if (!email || !key) throw new ConvexError(`The Venom Status Google account isn't set up yet. Ask ${ASK_OWNER} to finish the Google setup, then try again.`);
     if (!(await ctx.runMutation(internal.sheetExports.takeCheckAttempt, { actorId }))) throw new ConvexError(TOO_MANY_CHECKS);
     const inputs: [FolderName, string | undefined][] = [["general", args.general], ["money", args.money], ["health", args.health], ["events", args.events], ["archive", args.archive?.trim() ? args.archive : undefined]];
     const problems: { folder: FolderName; message: string }[] = [];
@@ -189,7 +189,7 @@ export const checkAccess = action({
         if (outer) problems.push({ folder, message: `The ${folderLabels[folder]} folder is inside the ${folderLabels[outer]} folder. Use folders that aren't inside each other.` });
       }
     } catch (error) {
-      throw new ConvexError(error instanceof GoogleKeyError ? `The Venom Status service account's key can't be read. Ask ${ASK_OWNER} to check it.` : error instanceof GoogleTokenError ? `Google didn't accept the Venom Status service account. Ask ${ASK_OWNER} to check its key.` : "Google didn't answer. Wait a minute, then check access again.");
+      throw new ConvexError(error instanceof GoogleKeyError ? `The Venom Status Google key can't be read. Ask ${ASK_OWNER} to check it.` : error instanceof GoogleTokenError ? `Google didn't accept the Venom Status Google account. Ask ${ASK_OWNER} to check its key.` : "Google didn't answer. Wait a minute, then check access again.");
     }
     if (problems.length || !driveId) return { ok: false as const, problems };
     await ctx.runMutation(internal.sheetExports.saveSettings, { driveId, generalFolderId: ids.general!, moneyFolderId: ids.money!, healthFolderId: ids.health!, eventsFolderId: ids.events!, archiveFolderId: ids.archive, setBy: actorId, now: Date.now() });

@@ -23,7 +23,7 @@ function fakeGoogle(folders: Record<string, FolderSpec>) {
   const state = {
     files: new Map<string, { key: string; name: string; trashed: boolean; parents: string[] }>(), creates: 0, ids: 0, calls: [] as string[], batches: [] as { id: string; requests: any[] }[],
     createMode: "ok" as "ok" | "lostAnswer", batchStatuses: [] as number[], batchAttempts: 0, batchDrop: false, missingSheets: new Set<string>(), scopes: [] as string[], onToken: null as null | (() => Promise<void>),
-    sheets: new Map<string, { sheetId: number; title: string }[]>(), sheetsNotYet: 0, trashWhenReady: false, driveForbidden: [] as string[],
+    sheets: new Map<string, { sheetId: number; title: string }[]>(), sheetsNotYet: 0, trashWhenReady: false, driveForbidden: [] as string[], createStatus: 0,
   };
   const json = (status: number, body: unknown = {}) => new Response(JSON.stringify(body), { status });
   const handler = async (input: string | URL | Request, init?: RequestInit) => {
@@ -36,7 +36,6 @@ function fakeGoogle(folders: Record<string, FolderSpec>) {
       await state.onToken?.();
       return json(200, { access_token: "synthetic-token" });
     }
-    if (url.pathname === "/drive/v3/files/generateIds") return json(200, { ids: [`sheet${++state.ids}`] });
     if (url.pathname === "/drive/v3/files" && method === "GET") {
       const q = url.searchParams.get("q") ?? "";
       const key = /value='([^']*)'/.exec(q)?.[1];
@@ -45,11 +44,14 @@ function fakeGoogle(folders: Record<string, FolderSpec>) {
     }
     if (url.pathname === "/drive/v3/files" && method === "POST") {
       const body = JSON.parse(String(init?.body));
-      if (state.files.has(body.id)) return json(409);
+      // Live Google refuses a caller-chosen ID for Google Sheets files.
+      if (body.id !== undefined) return json(403, { error: { code: 403, message: "Generated IDs are not supported for Docs Editors formats.", errors: [{ reason: "generatedIdNotSupported" }] } });
+      if (state.createStatus) return json(state.createStatus, { error: { code: state.createStatus, message: "Forbidden by test", errors: [{ reason: "forbidden" }], status: "PERMISSION_DENIED" } });
       state.creates++;
-      state.files.set(body.id, { key: body.appProperties.venomStatusKey, name: body.name, trashed: false, parents: body.parents });
+      const newId = `sheet${++state.ids}`;
+      state.files.set(newId, { key: body.appProperties.venomStatusKey, name: body.name, trashed: false, parents: body.parents });
       if (state.createMode === "lostAnswer") { state.createMode = "ok"; return json(500); }
-      return json(200, { id: body.id });
+      return json(200, { id: newId });
     }
     const fileMatch = /^\/drive\/v3\/files\/([^/]+)$/.exec(url.pathname);
     if (fileMatch && method === "GET") {
@@ -453,6 +455,29 @@ describe("folders and files that change", () => {
     expect(google.state.creates).toBe(0);
     expect(google.state.batches).toEqual([]);
     expect(await files(f)).toEqual([]);
+  });
+  it("creates without a pre-chosen ID, and shows a plain message (with the Google reason only in the log) when Drive refuses", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    google.state.createStatus = 403;
+    const f = await fixture();
+    await press(f);
+    expect(google.state.creates).toBe(0);
+    const status = await f.coach.query(api.sheetExports.status, {});
+    for (const file of status.files) {
+      expect(file.problem).toBe("Google Drive didn't let Venom Status save this spreadsheet. A Coach can open Connect Google Drive and press Check access.");
+      expect(file.problem).not.toMatch(/service account/i);
+    }
+    expect(status.lastTriedAt).not.toBeNull();
+    const logged = JSON.stringify(warn.mock.calls);
+    expect(logged).toContain("createSpreadsheet");
+    expect(logged).toContain("403");
+    expect(logged).toContain("forbidden");
+    expect(logged).not.toContain("synthetic-token");
+    warn.mockRestore();
+    google.state.createStatus = 0;
+    await press(f);
+    expect(google.state.creates).toBe(2);
+    expect([...google.state.files.values()].every(file => file.key)).toBe(true);
   });
   it("never makes two copies when the answer to a create is lost", async () => {
     google.state.createMode = "lostAnswer";

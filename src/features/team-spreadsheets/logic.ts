@@ -32,3 +32,9 @@ export function duplicateFolders(inputs: FolderInputs): FolderKey[] {
   }
   return duplicates
 }
+
+/** When every file that has a problem has the same one, it is shown once at the top and each file only says "Not updated". */
+export function commonProblem(files: readonly { problem: string | null }[]): string | null {
+  const problems = files.map(file => file.problem).filter((problem): problem is string => !!problem)
+  return problems.length > 1 && problems.every(problem => problem === problems[0]) ? problems[0] : null
+}

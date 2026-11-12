@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { userFacingError } from '@/lib/error-message'
 import { ConnectDriveWizard } from './ConnectDriveWizard'
 import { spreadsheetCopy as copy } from './copy'
-import { runInProgress, updatedLabel } from './logic'
+import { commonProblem, runInProgress, updatedLabel } from './logic'
 import styles from './TeamSpreadsheets.module.css'
 
 /** The Reports page card: update every team spreadsheet, see where they are, and (Coach) connect Google Drive. */
@@ -33,6 +33,7 @@ export function TeamSpreadsheetsCard({ coach }: { coach: boolean }) {
       if (result.status !== 'started') setMessage(result.message)
     } catch (error) { setMessage(userFacingError(error, copy.pressFailed)) } finally { setBusy(false) }
   }
+  const shared = commonProblem(status.files)
   const partial = !running && status.run?.state === 'partial'
 
   return <Card aria-label={copy.title}>
@@ -52,7 +53,7 @@ export function TeamSpreadsheetsCard({ coach }: { coach: boolean }) {
           </div>
           {!status.enabled && <p role="alert" className={styles.problem}>{copy.notTurnedOn}</p>}
           {message && <p role="status" className={styles.status}>{message}</p>}
-          {partial && <p role="alert" className={styles.problem}>{copy.someFailed}</p>}
+          {partial && <p role="alert" className={styles.problem}>{shared ?? copy.someFailed}{status.lastTriedAt ? <span className={styles.muted}> {copy.lastTried(updatedLabel(status.lastTriedAt))}</span> : null}</p>}
           <ul className={styles.files} aria-label={copy.filesHeading}>{status.files.map(file => <li key={file.kind} className={styles.file}>
             <div className={styles.fileHead}>
               <span className={styles.fileName}>{file.name ?? file.title}</span>
@@ -60,7 +61,7 @@ export function TeamSpreadsheetsCard({ coach }: { coach: boolean }) {
             </div>
             <p className={styles.muted}>{file.updatedAt ? copy.updated(updatedLabel(file.updatedAt)) : copy.neverUpdated}</p>
             {file.note && <p className={styles.muted}>{file.note}</p>}
-            {file.problem && <p role="alert" className={styles.problem}>{file.problem}</p>}
+            {file.problem && <p role="alert" className={styles.problem}>{shared ? copy.notUpdated : file.problem}</p>}
           </li>)}</ul>
           {coach && <>
             <p className={styles.muted}>{copy.healthReminder}</p>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { duplicateFolders, folderInputProblem, runInProgress, updatedLabel } from './logic'
+import { commonProblem, duplicateFolders, folderInputProblem, runInProgress, updatedLabel } from './logic'
 
 describe('team spreadsheets card logic', () => {
   it('shows the update time in team time as Mon D, h:mm a', () => {
@@ -21,5 +21,14 @@ describe('team spreadsheets card logic', () => {
     const link = 'https://drive.google.com/drive/folders/1AbCdEfGhIjKl'
     expect(duplicateFolders({ general: link, money: `${link}?usp=sharing`, health: 'https://drive.google.com/drive/folders/9ZyXwVuTsRqP', events: 'https://drive.google.com/drive/folders/5QrStUvWxYz', archive: '' })).toEqual(['money'])
     expect(duplicateFolders({ general: link, money: 'https://drive.google.com/drive/folders/9ZyXwVuTsRqP', health: 'https://drive.google.com/drive/folders/8HgFeDcBa', events: `${link}?usp=sharing`, archive: '' })).toEqual(['events'])
+  })
+})
+
+describe('commonProblem', () => {
+  it('returns a reason only when every failed file shares it', () => {
+    expect(commonProblem([{ problem: 'A' }, { problem: 'A' }])).toBe('A')
+    expect(commonProblem([{ problem: 'A' }, { problem: 'B' }])).toBeNull()
+    expect(commonProblem([{ problem: 'A' }, { problem: null }])).toBeNull()
+    expect(commonProblem([{ problem: null }])).toBeNull()
   })
 })
