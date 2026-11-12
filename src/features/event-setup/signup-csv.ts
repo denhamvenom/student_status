@@ -1,4 +1,4 @@
-import { statusLabel } from '@/lib/ui-copy'
+import { statusLabel } from '../../lib/ui-copy'
 import { eventSetupCopy } from '../../copy/event-setup-copy'
 
 export type AnswerValue = string | string[] | number | boolean
