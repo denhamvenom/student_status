@@ -22,6 +22,7 @@ export const spreadsheetCopy = {
   openFor: (eventName: string) => ` for ${eventName}`,
   eventFrozen: 'This event is over, so this spreadsheet is no longer updated. It stays in Google Drive.',
   tooMany: (count: number) => `Venom Status updates up to 60 spreadsheets at a time, so ${count} ${count === 1 ? "wasn't" : "weren't"} updated this time.`,
+  archived: (label: string) => `Last season's spreadsheets were moved to Archive > ${label}.`,
   healthReminder: 'Share the Health folder only with people who have Health export access.',
   updatingNow: 'Updating spreadsheets…',
   updatingCount: (finished: number, total: number) => `${finished} of ${total} spreadsheets`,

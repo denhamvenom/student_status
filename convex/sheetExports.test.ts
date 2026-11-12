@@ -9,7 +9,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { googleRetry } from "./lib/googleSheets";
 import { folderVisible } from "./lib/sheetKinds";
-import { SHEET_REGISTRY } from "./lib/sheetRegistry";
+import { SHEET_REGISTRY, allSheetKinds } from "./lib/sheetRegistry";
 
 const modules = import.meta.glob("./**/*.ts");
 const DAY = 86_400_000;
@@ -141,7 +141,15 @@ async function finishRun(f: Fixture) {
   return (await latestRun(f))!;
 }
 
+/**
+ * These tests are about runs, leases, duplicates, freezing and visibility, not about what each kind contains (each kind has its own tests,
+ * and convex/sheetExportsAll.test.ts runs every kind end to end). So only the two simplest team kinds are ready here; a test turns an event kind on when it needs one.
+ */
+const FOCUSED_KINDS = ["studentRoster", "shirtSizes"];
+const readyBefore = allSheetKinds().map(entry => ({ definition: entry.definition, ready: entry.definition.ready }));
+
 beforeEach(async () => {
+  for (const entry of allSheetKinds()) entry.definition.ready = FOCUSED_KINDS.includes(entry.definition.kind);
   vi.useFakeTimers();
   googleRetry.delaysMs = [0, 0, 0];
   const keys = await generateKeyPair("RS256", { extractable: true });
@@ -152,7 +160,7 @@ beforeEach(async () => {
   fetcher = vi.fn(google.handler);
   vi.stubGlobal("fetch", fetcher);
 });
-afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+afterEach(() => { for (const { definition, ready } of readyBefore) definition.ready = ready; vi.useRealTimers(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 describe("who can press Update spreadsheets", () => {
   it.each(["coach", "lead", "parentAsLead"] as const)("lets %s start a full update", async who => {

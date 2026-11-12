@@ -14,11 +14,12 @@ describe("spreadsheet kind registry", () => {
       money: "team/money", health: "team/health", event: "event/events", eventFees: "event/money", eventTravelEmergency: "event/health",
     });
   });
-  it("skips kinds that are not ready", () => {
-    expect(readySheetKinds("team").map(definition => definition.kind)).toEqual(["studentRoster", "shirtSizes"]);
-    expect(readySheetKinds("event")).toEqual([]);
+  it("lists every ready kind by scope, in registry order, and skips a kind that is not ready", () => {
+    const names = (scope: "team" | "event") => readySheetKinds(scope).map(definition => definition.kind);
+    expect(names("team")).toEqual(["studentRoster", "shirtSizes", "adultRoster", "drivers", "readiness", "attendance", "money", "health"]);
+    expect(names("event")).toEqual(["event", "eventFees", "eventTravelEmergency"]);
     const drivers = SHEET_REGISTRY.drivers.definition;
-    drivers.ready = true;
-    try { expect(readySheetKinds("team").map(definition => definition.kind)).toEqual(["studentRoster", "shirtSizes", "drivers"]); } finally { drivers.ready = false; }
+    drivers.ready = false;
+    try { expect(names("team")).not.toContain("drivers"); } finally { drivers.ready = true; }
   });
 });

@@ -138,7 +138,49 @@ Students and Parents. Strings live in `src/features/attendance/copy.ts`. The pag
 | Connect Google Drive, problems | This doesn't look like a Google Drive folder link…; The {A} folder is inside the {B} folder. Use folders that aren't inside each other.; You've checked access several times. Wait a few minutes, then try again.; The Venom Status Google key can't be read. Ask the person who set up Venom Status for your team to check it.; Google didn't accept the Venom Status Google account. Ask the person who set up Venom Status for your team to check its key. | Same | stack traces, Google error codes |
 | Drive not connected / not turned on / no season | Google Drive isn't connected yet. A Coach can connect it on this page. (everyone but a Coach, also from the server); Spreadsheet updates aren't turned on yet. Ask the person who set up Venom Status for your team to turn them on.; There's no active season yet, so there's nothing to put in the spreadsheets. A Coach can start a season on the Season page. | Same | disabled, feature flag, whoever manages the settings |
 | Update already in progress / pressed too often | Spreadsheets are already updating. This takes a few minutes.; You've pressed Update spreadsheets several times. Wait a few minutes, then try again. | Same | run in progress, lease, rate limit |
+| Season archived (Team spreadsheets card, one line after the move) | Last season's spreadsheets were moved to Archive > {season name}. | 2026–27 |
 | A spreadsheet was missing or moved | This spreadsheet was missing in Google Drive, so Venom Status made it again.; This spreadsheet was no longer in its folder, so Venom Status made a new one there. The old one is still in Google Drive. | Same | trashed, parents |
 | Health folder reminder (Coach only) | Share the Health folder only with people who have Health export access. | Same | |
 | Spreadsheet file names | {Spreadsheet} - {season name} (team files); {Event name} - {Mon D, YYYY} (an event's file); {Event name} - {Mon D, YYYY} - Fees; {Event name} - {Mon D, YYYY} - Travel emergency | Same | |
-| Spreadsheet contents | Student roster (Students tab: Preferred name, Legal name, Grade, Subteam, Second subteam, Leadership role, Travel Team, Student email, Parent or guardian name / relationship / phone / email, Parent accounts (linked)); Shirt sizes (Counts with Students and Adults columns, Details, Missing size tabs; column Student or adult with values Student and Adult); Other (a size outside the usual list, shown as entered); top note "Updated {date time} Central Time by Venom Status. Don't type changes here. They're replaced at the next update. Make changes in Venom Status." Text starting with = + - @ shows with a leading apostrophe so a CSV download can't run it. | Same | export, dump, formula |
+| Spreadsheet contents (Student roster and Shirt sizes; every other file is listed in "Team spreadsheets — sheet names and headers" below) | Student roster (Students tab: Preferred name, Legal name, Grade, Subteam, Second subteam, Leadership role, Travel Team, Student email, Parent or guardian name / relationship / phone / email, Parent accounts (linked)); Shirt sizes (Counts with Students and Adults columns, Details, Missing size tabs; column Student or adult with values Student and Adult); Other (a size outside the usual list, shown as entered); top note "Updated {date time} Central Time by Venom Status. Don't type changes here. They're replaced at the next update. Make changes in Venom Status." Text starting with = + - @ shows with a leading apostrophe so a CSV download can't run it. | Same | export, dump, formula |
+
+## Team spreadsheets — sheet names and headers
+
+Every tab and column heading in the Google spreadsheets Venom Status writes (checked against `convex/sheetKinds/*.ts`, November 12, 2026). Every tab starts with the note "Updated {date time} Central Time by Venom Status. Don't type changes here. They're replaced at the next update. Make changes in Venom Status." File names: "{Spreadsheet} - {season name}"; event files "{Event name} - {Mon D, YYYY}" with " - Fees" or " - Travel emergency".
+
+| File (folder) | Tab | Columns |
+| --- | --- | --- |
+| Student roster (General) | Students | Preferred name; Legal name; Grade; Subteam; Second subteam; Leadership role; Travel Team; Student email; Parent or guardian name; Parent or guardian relationship; Parent or guardian phone; Parent or guardian email; Parent accounts (linked) |
+| Shirt sizes (General) | Counts | Size; Students; Adults; Total |
+| | Details | Name; Student or adult; Subteam; Size |
+| | Missing size | Name; Student or adult; Subteam |
+| Adult roster (General) | Adults | Name; Role; Travel Lead; Subteams; Email; Phone; Students (linked). Role is Coach, Travel Lead, Mentor or Parent |
+| Drivers (General) | Drivers | Name; Phone; Email; Passenger seats; Vehicle; Can tow; Approved; Active |
+| Readiness (General) | Readiness | Student; Subteam; Profile complete; FIRST registration; Permission form; Balance due ($); Needs attention; What is left. Balance due shows Unavailable while a student's money is updating |
+| Attendance (General) | Summary | Student; Subteam; Required meetings attended; Required meetings held; Required %; Other meetings attended; Other meetings held; Other %; Outreach attended; Outreach held; Outreach %; Total hours |
+| | By subteam | Subteam; Students; (the nine meeting columns above); Total hours; Average hours per student |
+| | Weekly hours | Student; Subteam; one column per week |
+| Money (Money) | Balances | Student; Total fees; Paid so far; Paid from payments; Paid from fundraising credit; Balance due; Unused payments; Fundraising credit; Available funds (plus a Total row) |
+| | Fees | Student; Fee; Event; Amount; Paid so far; Balance due; Status (Paid, Partly paid, Unpaid or Canceled) |
+| | Fundraising | Student; Fundraiser; Raised; Team share; Fundraising credit |
+| Health (Health) | Students | Name; Grade; Date of birth; Emergency contact name; Emergency contact relationship; Emergency contact phone; Allergies; Medications; Medicine permissions; Insurance provider; Insurance policy number; Physician name; Physician phone; Permission forms accepted; Permission forms not accepted yet |
+| | Adults | Name; Role; Emergency contact name; Emergency contact relationship; Emergency contact phone |
+| Event (Events) | Summary | Item; Value. Items: Name; Type; Starts; Ends; Place; Fee (always "See the Money folder"); Capacity (a number or "No limit"); Permission form required; Overnight; Signed up; Confirmed; Ready (not counting fees); Waitlisted; Waiting for approval; Withdrew; Mentors accepted; and, once attendance exists, Showed up; No-shows; Walk-ins |
+| | Who's going | Name; Subteam; Status; Ready (not counting fees); What's missing. Note: "Fees and payments are not shown here. See the Money folder." |
+| | Question answers | Name; Status; one column per question (a removed question shows "(removed)") |
+| | Mentors | Name; Response; Can drive students; Needs hotel room |
+| | Rooming | Student; Room; Room type; Final room; Needs review; Status |
+| | Rides | Type (Bus, Driver, Own transport, Seats available, Seats needed, Still open); Name; Vehicle; Seats |
+| | Shifts | Shift; Starts; Ends; Spots; Signed up; Open spots; Who; Worked (only when clock-ins exist) |
+| | Attendance | Name; Subteam; Signed up; Clocked in; Time in; Time out; Total hours; Corrections; Flag (No-show or Walk-in) |
+| Event fees (Money) | Fees | Fee; Type (Main fee, Extra fee or Other fee); Amount per student; Status (Active or Canceled); Students charged; Total charged; Paid so far; Balance due |
+| | Students | Student; Status; Total fees; Paid so far; Balance due |
+| Travel emergency (Health) | Event | Event; Date; Place |
+| | Students | the Health Students columns up to Physician phone; Permission form (Accepted, Not required, New signature requested, Waiting for review, Needs correction or Not signed) |
+| | Mentors | Name; Role; Emergency contact name; Emergency contact relationship; Emergency contact phone |
+
+Tabs on the Event spreadsheet appear only when they apply (Question answers, Mentors, Rooming, Rides, Shifts, Attendance).
+
+Statuses and phrases in these files: Paid, Partly paid, Unpaid, Canceled (fees); Main fee, Extra fee, Other fee; Active, Canceled (fee settings); No-show, Walk-in; See the Money folder; Ready (not counting fees); No limit; Unavailable; Accepted, Declined and the other signup words come from the app's own status names.
+
+**Engineering-word check:** no header uses engineering words (no ID, sync, job, token, null). Two are worth a second look and are left for the owner: "Corrections" (Event Attendance; means clock-in times a Coach fixed) and "Flag" (Event Attendance; holds No-show or Walk-in). Suggested plain alternatives: "Times fixed by a Coach" and "Note".

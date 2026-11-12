@@ -77,6 +77,7 @@ export function TeamSpreadsheetsCard({ coach }: { coach: boolean }) {
           {message && <p role="status" className={styles.status}>{message}</p>}
           {partial && <p role="alert" className={styles.problem}>{shared ?? copy.someFailed}{status.lastTriedAt ? <span className={styles.muted}> {copy.lastTried(updatedLabel(status.lastTriedAt))}</span> : null}</p>}
           <ul className={styles.files} aria-label={copy.filesHeading}>{status.files.map(file => <FileItem key={file.kind} file={file} shared={!!shared} />)}</ul>
+          {status.archive && <p role="status" className={styles.muted}>{copy.archived(status.archive.label)}</p>}
           {skipped > 0 && <p role="status" className={styles.muted}>{copy.tooMany(skipped)}</p>}
           {status.eventFiles.length > 0 && <section className={styles.group} aria-labelledby="team-spreadsheets-events">
             <div className={styles.row}>

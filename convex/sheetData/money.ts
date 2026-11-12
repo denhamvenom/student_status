@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { internalQuery } from "../_generated/server";
@@ -16,7 +16,7 @@ const MAX_FEES = 100;
 const cursorArg = v.union(v.string(), v.null());
 
 /** Same gate the finance CSV export uses: shared fee maintenance must be finished, and every account must be ready. Throwing keeps the previous file unchanged. */
-const NOT_READY = "Money isn't ready: fees or accounts are still updating.";
+const NOT_READY = "Money is updating, so its spreadsheet kept the last numbers. Try again in a few minutes.";
 
 const balanceValidator = v.object({ name: v.string(), chargedCents: v.number(), paidCents: v.number(), personalAppliedCents: v.number(), fundraisingAppliedCents: v.number(), dueCents: v.number(), personalAvailableCents: v.number(), fundraisingAvailableCents: v.number() });
 const feeValidator = v.object({ student: v.string(), fee: v.string(), event: v.string(), amountCents: v.number(), paidCents: v.number(), dueCents: v.number(), status: v.string() });
@@ -27,14 +27,14 @@ export const studentPage = internalQuery({
   returns: v.object({ balances: v.array(balanceValidator), fees: v.array(feeValidator), isDone: v.boolean(), cursor: cursorArg }),
   handler: async (ctx, args) => {
     const control = await seasonFinanceControl(ctx, args.seasonId);
-    if (control && control.state !== "ready") throw new Error(NOT_READY);
+    if (control && control.state !== "ready") throw new ConvexError(NOT_READY);
     const page = await ctx.db.query("students").withIndex("by_seasonId_and_active", q => q.eq("seasonId", args.seasonId).eq("active", true)).paginate({ numItems: STUDENT_PAGE, cursor: args.cursor, maximumRowsRead: STUDENT_PAGE + 1 });
     const events = new Map<Id<"events">, string>();
     const balances: MoneyBalance[] = [], fees: MoneyFee[] = [];
     for (const student of page.page) {
       const name = student.legalName || student.preferredName;
       const row = await financeRow(ctx, student._id);
-      if (row.state !== "ready") throw new Error(NOT_READY);
+      if (row.state !== "ready") throw new ConvexError(NOT_READY);
       balances.push({ name, chargedCents: row.chargedCents!, paidCents: row.personalAppliedCents! + row.fundraisingAppliedCents!, personalAppliedCents: row.personalAppliedCents!, fundraisingAppliedCents: row.fundraisingAppliedCents!, dueCents: row.dueCents!, personalAvailableCents: row.personalAvailableCents!, fundraisingAvailableCents: row.fundraisingAvailableCents! });
       const charges = await ctx.db.query("charges").withIndex("by_studentId_and_priority", q => q.eq("studentId", student._id)).take(MAX_FEES + 1);
       if (charges.length > MAX_FEES) throw new Error("A student has too many fees to list.");

@@ -151,7 +151,7 @@ export const saveSettings = internalMutation({
     else await ctx.db.insert("sheetExportSettings", { ...fields, setAt: now });
     const folderIds = { general: args.generalFolderId, money: args.moneyFolderId, health: args.healthFolderId, events: args.eventsFolderId };
     // Bounded: a few hundred files per season. Files made in a folder that is no longer configured are forgotten (they stay in Drive).
-    for (const file of await ctx.db.query("sheetExportFiles").take(1000)) if (file.folderId !== folderIds[file.folder]) await ctx.db.delete(file._id);
+    for (const file of await ctx.db.query("sheetExportFiles").take(1000)) if (!file.archivedAt && file.folderId !== folderIds[file.folder]) await ctx.db.delete(file._id);
     if (actor) await audit(ctx, actor, "sheetExportSettings", existing?._id ?? "new", existing ? "update" : "connect", existing ? { connected: true } : null, { connected: true, foldersChanged: changed, driveChanged: existing ? existing.driveId !== args.driveId : true });
     return null;
   },
@@ -205,12 +205,13 @@ export const claimNext = internalMutation({
       if (eventId && (!event || event.seasonId !== run.seasonId || !eventQualifies(event, now))) continue;
       const folderId = { general: settings.generalFolderId, money: settings.moneyFolderId, health: settings.healthFolderId, events: settings.eventsFolderId }[definition.folder];
       if (!folderId) { await ctx.db.patch(run._id, { state: "stopped", finishedAt: now }); return null; }
+      const stored = await ctx.db.query("sheetExportFiles").withIndex("by_seasonId_and_kind_and_eventId", q => q.eq("seasonId", run.seasonId).eq("kind", kind).eq("eventId", eventId)).first();
+      if (stored?.archivedAt) continue;
       await ctx.db.patch(run._id, { leaseExpiresAt: now + LEASE_MS, ...(pending !== run.pending ? { pending, total } : {}) });
-      const file = await ctx.db.query("sheetExportFiles").withIndex("by_seasonId_and_kind_and_eventId", q => q.eq("seasonId", run.seasonId).eq("kind", kind).eq("eventId", eventId)).first();
       return {
         kind, eventId: eventId ?? null, event: event ? { name: event.name, startsAt: event.startsAt } : null,
         seasonId: run.seasonId, seasonName: season.name, driveId: settings.driveId, folder: definition.folder, folderId,
-        file: file ? { spreadsheetId: file.spreadsheetId, tabs: file.tabs, fingerprint: file.fingerprint ?? null, folderId: file.folderId, hadError: file.lastError !== undefined } : null,
+        file: stored ? { spreadsheetId: stored.spreadsheetId, tabs: stored.tabs, fingerprint: stored.fingerprint ?? null, folderId: stored.folderId, hadError: stored.lastError !== undefined } : null,
       };
     }
     // Nothing left that belongs in this run.
@@ -230,6 +231,8 @@ export const saveFile = internalMutation({
     const { runId, recreated, ...fields } = args;
     if ((await ctx.db.get(runId))?.state !== "running") return false;
     const existing = await ctx.db.query("sheetExportFiles").withIndex("by_seasonId_and_kind_and_eventId", q => q.eq("seasonId", args.seasonId).eq("kind", args.kind).eq("eventId", args.eventId)).first();
+    // A file moved into the Archive is never written again.
+    if (existing?.archivedAt) return false;
     const note = recreated ? { recreatedAt: args.checkedAt, recreatedWhy: recreated } : args.frozen ? { recreatedAt: undefined, recreatedWhy: undefined } : {};
     if (existing) {
       await ctx.db.patch(existing._id, { ...fields, fingerprint: args.fingerprint, updatedAt: args.updatedAt ?? existing.updatedAt, lastError: undefined, ...note });
@@ -278,7 +281,7 @@ export const status = query({
     serviceAccountEmail: v.union(v.string(), v.null()), credentialsReady: v.boolean(),
     folders: v.union(v.null(), v.object({ general: v.string(), money: v.string(), health: v.string(), events: v.union(v.string(), v.null()), archive: v.union(v.string(), v.null()) })),
     run: v.union(v.null(), v.object({ state: v.union(v.literal("running"), v.literal("done"), v.literal("partial"), v.literal("stopped")), total: v.number(), finished: v.number(), skipped: v.number(), leaseExpiresAt: v.number() })),
-    lastSuccessAt: v.union(v.number(), v.null()), lastTriedAt: v.union(v.number(), v.null()), files: v.array(fileStatus), eventFiles: v.array(eventFileStatus),
+    archive: v.union(v.null(), v.object({ label: v.string() })), lastSuccessAt: v.union(v.number(), v.null()), lastTriedAt: v.union(v.number(), v.null()), files: v.array(fileStatus), eventFiles: v.array(eventFileStatus),
   }),
   handler: async ctx => {
     const actor = await viewer(ctx);
@@ -289,6 +292,7 @@ export const status = query({
     const season = await ctx.db.query("seasons").withIndex("by_status", q => q.eq("status", "active")).unique();
     const latest = await ctx.db.query("sheetExportRuns").withIndex("by_startedAt").order("desc").first();
     const lastDone = await ctx.db.query("sheetExportRuns").withIndex("by_state_and_startedAt", q => q.eq("state", "done")).order("desc").first();
+    const lastArchive = await ctx.db.query("sheetArchives").withIndex("by_startedAt").order("desc").first();
     const runProblem = (kind: SheetFileKind, eventId: Id<"events"> | undefined) => latest?.problems?.find(item => item.kind === kind && item.eventId === eventId)?.message ?? null;
     const describe = (definition: { kind: SheetFileKind; label: string; folder: SheetFolder }, file: Doc<"sheetExportFiles"> | null, eventId?: Id<"events">) => ({
       kind: definition.kind, title: definition.label, folder: definition.folder, name: file?.name ?? null, link: file ? spreadsheetLink(file.spreadsheetId) : null,
@@ -298,7 +302,8 @@ export const status = query({
     const eventFiles = [];
     if (season) {
       for (const definition of readySheetKinds("team").filter(item => folderVisible(item.folder, actor))) {
-        const file = await ctx.db.query("sheetExportFiles").withIndex("by_seasonId_and_kind_and_eventId", q => q.eq("seasonId", season._id).eq("kind", definition.kind).eq("eventId", undefined)).first();
+        const found = await ctx.db.query("sheetExportFiles").withIndex("by_seasonId_and_kind_and_eventId", q => q.eq("seasonId", season._id).eq("kind", definition.kind).eq("eventId", undefined)).first();
+        const file = found?.archivedAt ? null : found;
         files.push(describe(definition, file));
       }
       const eventKinds = readySheetKinds("event").filter(item => folderVisible(item.folder, actor));
@@ -307,7 +312,7 @@ export const status = query({
         const events = new Map<Id<"events">, Doc<"events"> | null>(current.map(event => [event._id, event]));
         for (const definition of eventKinds) {
           const stored = await ctx.db.query("sheetExportFiles").withIndex("by_seasonId_and_kind_and_eventId", q => q.eq("seasonId", season._id).eq("kind", definition.kind).gt("eventId", undefined)).take(EVENT_FILES_READ);
-          const byEvent = new Map(stored.filter(file => file.eventId !== undefined).map(file => [file.eventId!, file] as const));
+          const byEvent = new Map(stored.filter(file => file.eventId !== undefined && !file.archivedAt).map(file => [file.eventId!, file] as const));
           for (const eventId of new Set([...current.map(event => event._id), ...byEvent.keys()])) {
             if (!events.has(eventId)) events.set(eventId, await ctx.db.get(eventId));
             const event = events.get(eventId) ?? null;
@@ -326,6 +331,7 @@ export const status = query({
       serviceAccountEmail: canSetUp ? env.GOOGLE_SHEETS_SERVICE_ACCOUNT_EMAIL ?? null : null, credentialsReady: credentialsConfigured(),
       folders: canSetUp && settings ? { general: settings.generalFolderId, money: settings.moneyFolderId, health: settings.healthFolderId, events: settings.eventsFolderId ?? null, archive: settings.archiveFolderId ?? null } : null,
       run: latest ? { state: latest.state, total: latest.total, finished: latest.done + latest.failed, skipped: latest.skipped ?? 0, leaseExpiresAt: latest.leaseExpiresAt } : null,
+      archive: lastArchive?.state === "done" && lastArchive.moved > 0 ? { label: lastArchive.label } : null,
       lastSuccessAt: lastDone?.finishedAt ?? null, lastTriedAt: latest?.finishedAt ?? null, files, eventFiles: eventFiles.slice(0, EVENT_FILES_SHOWN),
     };
   },

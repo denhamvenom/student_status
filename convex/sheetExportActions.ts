@@ -14,6 +14,9 @@ const GENERIC_FAILURE = "Venom Status couldn't update this spreadsheet. Press Up
 
 /** Plain-language reason for a failed file; never a raw Google message. */
 export function plainSheetError(error: unknown): string {
+  // Loaders throw ConvexError with a plain owner-facing sentence (for example Attendance or Money still updating). Only a ConvexError's string is shown;
+  // Google failures are GoogleRequestError and never reach this branch, so no Google text or secret can pass through here.
+  if (error instanceof ConvexError && typeof error.data === "string" && error.data.trim()) return error.data;
   if (error instanceof GoogleKeyError) return `The Venom Status Google key can't be read. Ask ${ASK_OWNER} to check it.`;
   if (error instanceof GoogleTokenError) return `Google didn't accept the Venom Status Google account. Ask ${ASK_OWNER} to check its key.`;
   if (error instanceof GoogleRequestError) {

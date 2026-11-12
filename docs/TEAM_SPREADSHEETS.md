@@ -1,6 +1,6 @@
 # Team spreadsheets
 
-Venom Status keeps team spreadsheets up to date in the team's Google Workspace **shared drive**, using its own Google service account. Nobody edits these files by hand: every update clears and rewrites each tab, and a note at the top of every tab says so. Build stage 1 (of 7) ships the Google connection, the **Student roster** and **Shirt sizes**, and the full update machinery; later build stages only add file kinds. ("Build stages" are the roadmap at the end; the Connect Google Drive steps a Coach sees are a separate thing.)
+Venom Status keeps team spreadsheets up to date in the team's Google Workspace **shared drive**, using its own Google service account. Nobody edits these files by hand: every update clears and rewrites each tab, and a note at the top of every tab says so. Eleven kinds of file are ready (listed below): six General, one Money and one Health file per season, and per qualifying event one Events, one Money and one Health file. Season archiving is the one planned part not built yet.
 
 ## Owner checklist (once)
 
@@ -22,7 +22,7 @@ Production Google project: `denham-venom-production`. None of this touches sign-
 9. A Coach opens **Reports > Team spreadsheets > Connect Google Drive**, follows the steps (add the address as a member, paste the General, Money, Health and Events folder links and the optional Archive link), then presses **Check access**.
 10. Press **Update spreadsheets** or wait for the next scheduled update (5:00 AM or 6:00 PM Central Time).
 
-**What success looks like:** the check ends with "Google Drive is connected"; after an update the card lists Student roster and Shirt sizes with an update time and an Open link, and the two files appear in the General folder in Drive.
+**What success looks like:** the check ends with "Google Drive is connected"; after an update the card lists each file with an update time and an Open link, and the files appear in the folders below.
 
 **Common messages and what they mean**
 
@@ -42,6 +42,21 @@ Production Google project: `denham-venom-production`. None of this touches sign-
 **Retention:** Drive files and their version history are part of the yearly retention review (DECISIONS, Retention). Old versions and files left behind after a folder change or a remade file are not deleted by Venom Status.
 
 This is a separate service account from the Calendar one (`TIMECLOCK_CALENDAR_*`).
+
+## What each folder holds
+
+| Folder | Once per season | Once per qualifying event |
+| --- | --- | --- |
+| **General** | Student roster, Shirt sizes, Adult roster, Drivers, Readiness, Attendance | |
+| **Money** | Money (balances, fees, fundraising) | Event fees |
+| **Health** | Health (students' and adults' emergency contacts and health information) | Travel emergency |
+| **Events** | | Event spreadsheet (who's going, question answers, Mentors, rooming, rides, shifts, attendance) |
+
+Tab and column names are in `docs/LANGUAGE.md` ("Team spreadsheets — sheet names and headers").
+
+**Which events get files:** an event gets its three event files (Event spreadsheet, Event fees, Travel emergency) from **60 days before it starts** until **7 days after it ends**. After that its files are frozen: they stay in Drive and on the card, and are no longer updated. Canceled and archived events get none. A one-off event of type **Team** and any occurrence of a **repeating meeting series** are excluded; regular team meetings are covered by the **Attendance** report instead. Outreach, Competition and Fundraiser events qualify unless they are repeating-series occurrences. At most 60 files are written per update; the card says how many were left for next time.
+
+**When Attendance or Money is still updating** the file keeps its last numbers and the card says so in plain words (for example "Attendance is updating, so its spreadsheet kept the last numbers. Try again in a few minutes."); a later update fixes it.
 
 ## Who sees what (owner decisions, November 12, 2026)
 
@@ -76,10 +91,18 @@ This is a separate service account from the Calendar one (`TIMECLOCK_CALENDAR_*`
 
 - **Student roster** (General): Students tab with Preferred name, Legal name, Grade (blank if none saved), Subteam, Second subteam, Leadership role, Travel Team, Student email, Parent or guardian name / relationship / phone / email (confirmed profile first, else the older fields, as the Coach roster does), and Parent accounts (linked). Active students of the current season.
 - **Shirt sizes** (General): Counts (XS to 3XL plus Other; columns Students / Adults / Total; totals row), Details (Name, Student or adult, Subteam, Size) and Missing size. Active students and active adults. "Adult" means an active Coach, Mentor or Travel Lead, or a Parent with Mentor or Travel Lead access; plain Parents are left out. A size outside the app's list is counted under Other and shown as entered.
+- **Adult roster** (General): Adults tab with Name, Role, Travel Lead, Subteams, Email, Phone, Students (linked). Active Coaches, Mentors and Parents (a Parent with Mentor or Travel Lead access shows as Mentor or Travel Lead).
+- **Drivers** (General): Drivers tab with seats, vehicle, Can tow, Approved, Active.
+- **Readiness** (General): one row per active student with the same readiness as the Team roster.
+- **Attendance** (General): Summary, By subteam and Weekly hours. Throws a plain message while the season's attendance reports are updating.
+- **Money** (Money): Balances, Fees and Fundraising tabs. Same readiness gate as the finance CSV export.
+- **Health** (Health): Students and Adults tabs.
+- **Event** (Events): Summary, Who's going and, when they apply, Question answers, Mentors, Rooming, Rides, Shifts, Attendance. Fees are never shown ("See the Money folder").
+- **Event fees** (Money) and **Travel emergency** (Health): per event, as above.
 
 ### Adding or finishing a spreadsheet kind
 
-Every planned kind is already registered, as a stub with `ready: false` (left out of updates and off the Reports card). Finishing one touches only its own three files; no shared file changes.
+Every kind is registered and `ready: true`. A kind set to `ready: false` is left out of updates and off the Reports card. A new kind touches only its own three files, plus the shared-file steps at the end of this section; `convex/sheetExports.test.ts` keeps only the two simplest kinds ready, and `convex/sheetExportsAll.test.ts` runs all of them end to end.
 
 1. **`convex/sheetKinds/<kind>.ts`**: the pure definition. Export `type Data` (what the loader returns) and `definition: SheetKindDefinition<Data>` (contract in `convex/lib/sheetKinds.ts`):
    - `kind`, `folder` (`general`, `money`, `health` or `events`) and `scope` (`team`: one file per season; `event`: one file per qualifying event) are already set; keep them.
@@ -88,11 +111,11 @@ Every planned kind is already registered, as a stub with `ready: false` (left ou
    - `build(data)`: returns the tabs (`SheetTab[]`: `{ title, rows }`, first row is the header). Pure: no database, no clock. Cells are plain text or numbers (the writer sends text as text and neutralizes formula-like text). Shared helpers are in `convex/lib/sheetRows.ts` (`yesNo`, `rosterGrade`, `guardianFor`). A file must have at least one tab; building none fails the file.
    - Set `ready: true` when the kind is complete.
 2. **`convex/sheetData/<kind>.ts`**: the data. Export `load: SheetLoader<Data>`, called as `load(ctx, { seasonId, eventId })` from the runner action (`eventId` is null for team kinds). Put the kind's own `internalQuery` functions in this file and call them with `ctx.runQuery(internal.sheetData.<kind>.<query>, ...)`, annotating the result type. Each query reads a bounded page (`.paginate` or `.take`), and the loader loops and throws rather than truncating. Shared reads of students and adults are in `convex/sheetExportData.ts` (`readAllStudents`, `readAllAdults`). Read only what the file shows; never put health or money fields in a kind whose folder is General or Events.
-3. **`convex/sheetKinds/<kind>.test.ts`**: table-driven tests of `build` (headers, ordering, blanks, edge cases) and the file name. Run it with `bunx vitest run convex/sheetKinds/<kind>.test.ts`. To test the whole path, `convex/sheetExports.test.ts` ("per-event spreadsheets") shows how a test turns a kind on.
+3. **`convex/sheetKinds/<kind>.test.ts`**: table-driven tests of `build` (headers, ordering, blanks, edge cases) and the file name. Run it with `bunx vitest run convex/sheetKinds/<kind>.test.ts`. To test the whole path, `convex/sheetExportsAll.test.ts` seeds a season and runs every kind with fake Google.
 
 New queries change `convex/_generated/api.d.ts`. Run `bunx convex codegen` when you can; the `sheetData/<kind>` module is already listed there, and generated types pick up its new functions from the module's own exports. Link visibility follows the folder (`folderVisible`); the card, runs, retries and Drive handling need no change. Add any new card or file wording to `docs/LANGUAGE.md` and describe the file's contents under "Files" below.
 
-| Kind | Scope | Folder | Stub files to fill |
+| Kind | Scope | Folder | Files |
 | --- | --- | --- | --- |
 | `adultRoster` | team | General | `convex/sheetKinds/adultRoster.ts`, `convex/sheetData/adultRoster.ts` |
 | `drivers` | team | General | `convex/sheetKinds/drivers.ts`, `convex/sheetData/drivers.ts` |
@@ -106,18 +129,13 @@ New queries change `convex/_generated/api.d.ts`. Run `bunx convex codegen` when 
 
 Adding a kind that isn't listed is the one case that touches shared files: add its literal to `sheetFileKind` in `convex/lib/sheetKinds.ts` (schema-additive), one line to `convex/lib/sheetRegistry.ts`, and its two modules to `convex/_generated/api.d.ts`.
 
-**Drive helpers for the season archive (not wired yet):** `ensureFolder(token, { driveId, parentId, name })` finds a non-trashed child folder by name or makes it, and `moveFile(token, { fileId, fromParentId, toParentId })` moves a file between folders; both are in `convex/lib/googleSheets.ts` and work in shared drives.
+**Season archive (owner decision, November 12, 2026):** when a season transition activates the new season (`seasonTransition.ts`, stage `activate`), `startSeasonArchive` (`convex/sheetArchive.ts`) schedules an archive job for the OLD season; `bunx convex run sheetArchive:archiveSeasonNow '{"seasonId":"..."}'` starts it by hand and is safe to repeat. One action (`sheetArchiveActions.archiveStep`) handles one file: it makes `Archive/<season name>` with the subfolders General, Money, Health and Events (found by name when they exist), checks where the file is now, moves it with `moveFile` to the subfolder for its folder, and marks the `sheetExportFiles` row `archivedAt`, `archiveFolderId` and frozen. No run writes an archived file again (`claimNext` drops it, `saveFile` refuses it, a folder change does not forget it). Progress and notes are in `sheetArchives` (state running, done, partial or skipped). Nothing is done when Drive was never connected; with updates turned off or no Archive folder a plain note is kept and nothing moves. A Google failure stops the job as partial; starting it again continues with the files left. The card shows "Last season's spreadsheets were moved to Archive > {season name}." after a finished move, and archived files leave the current lists. Nothing is ever deleted.
 
-### Roadmap (build stages 2 to 7)
+**Archive sharing and retention:** a file moved into Archive takes on the Archive folder's sharing. Share Archive only with people who may see both Money and Health files (owner action). Archived files stay in the yearly retention review (DECISIONS, Retention).
 
-Per-event spreadsheets all go in the **Events** folder (owner decision, November 12, 2026). Exceptions, pending owner override: each event's Fees file stays in Money and its travel emergency file stays in Health.
+### Not built yet
 
-2. Event rosters and signups (Events).
-3. Attendance (Events).
-4. Money: fees, payments, balances (Money folder; each event's Fees file stays here).
-5. Health: allergies, medications, emergency contacts (Health folder; each event's travel emergency file stays here).
-6. Travel: rooms, drivers, transport (Events; the travel emergency file stays in Health).
-7. Season switch: move last season's files into `Archive/<Year>` and freeze them (the Archive folder ID is already stored; `ensureFolder` and `moveFile` are ready). Season archiving remains a later stage.
+- Event Fees stays in Money and Travel emergency stays in Health, pending an owner override; all other per-event files are in Events (owner decision, November 12, 2026).
 
 ### Code map
 

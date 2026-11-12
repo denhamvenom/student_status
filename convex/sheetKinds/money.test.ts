@@ -77,7 +77,7 @@ describe("Money loader gate", () => {
   it("refuses while shared fee maintenance is running, so the previous file stays", async () => {
     const f = await fixture();
     await f.t.run(ctx => ctx.db.insert("seasonFinanceControls", { seasonId: f.ids.season, revision: 1, state: "draining", updatedAt: 0 }));
-    await expect(read(f)).rejects.toThrow(/ready/);
+    await expect(read(f)).rejects.toThrow(/Money is updating/);
   });
 
   it("refuses while a student's money is still updating", async () => {
@@ -86,6 +86,6 @@ describe("Money loader gate", () => {
       const account = await ctx.db.query("financialAccounts").withIndex("by_studentId", q => q.eq("studentId", f.ids.student)).unique(); if (!account) throw new Error("Account missing");
       await ctx.db.patch(account._id, { state: "rebuilding" });
     });
-    await expect(read(f)).rejects.toThrow(/ready/);
+    await expect(read(f)).rejects.toThrow(/Money is updating/);
   });
 });

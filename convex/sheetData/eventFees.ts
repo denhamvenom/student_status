@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { internalQuery } from "../_generated/server";
@@ -9,7 +9,7 @@ import type { Data, EventFeeCharge, EventFeeDefinition, EventFeeParticipant } fr
 
 const PAGE = 40;
 const cursorArg = v.union(v.string(), v.null());
-const NOT_READY = "Money isn't ready: fees are still updating.";
+const NOT_READY = "Fees are updating, so this spreadsheet kept the last numbers. Try again in a few minutes.";
 const paging = { isDone: v.boolean(), cursor: cursorArg };
 
 /** Event fee settings, by_eventId_and_kind: indexed by event, no scan. */
@@ -28,7 +28,7 @@ export const chargePage = internalQuery({
   returns: v.object({ rows: v.array(v.object({ studentId: v.string(), student: v.string(), feeId: v.union(v.string(), v.null()), amountCents: v.number(), paidCents: v.number() })), ...paging }),
   handler: async (ctx, args) => {
     const control = await seasonFinanceControl(ctx, args.seasonId);
-    if (control && control.state !== "ready") throw new Error(NOT_READY);
+    if (control && control.state !== "ready") throw new ConvexError(NOT_READY);
     const result = await ctx.db.query("charges").withIndex("by_eventId_and_studentId", q => q.eq("eventId", args.eventId)).paginate({ numItems: PAGE, cursor: args.cursor, maximumRowsRead: PAGE + 1 });
     const names = new Map<Id<"students">, string>();
     const rows: EventFeeCharge[] = [];

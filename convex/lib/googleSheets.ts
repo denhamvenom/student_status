@@ -140,6 +140,14 @@ export async function driveFileState(token: string, id: string, folderId: string
   return strings(data.parents).includes(folderId) ? "ok" : "moved";
 }
 
+/** The folders a file is in right now, or null when it is missing or in the trash. */
+export async function driveParents(token: string, id: string): Promise<string[] | null> {
+  const result = await googleJson(token, `${DRIVE}/files/${encodeURIComponent(id)}?supportsAllDrives=true&fields=id,trashed,parents`, { fn: "driveParents" });
+  if (result.status === 404) return null;
+  const data = obj(ok(result, "driveParents"));
+  return data.trashed === true ? null : strings(data.parents);
+}
+
 /**
  * Makes the spreadsheet in its folder, tagged with its stable key. Drive refuses a caller-chosen file ID for Google Sheets files
  * (`generatedIdNotSupported`, verified against live Google), so Google picks the ID. A create that failed without a clear answer
