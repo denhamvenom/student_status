@@ -10,14 +10,14 @@ import { duplicateFolders, folderInputProblem, folderSteps, type FolderInputs, t
 import styles from './TeamSpreadsheets.module.css'
 
 type Problem = { folder: FolderKey; message: string }
-const TOTAL = 7
-const REVIEW = 6
+const TOTAL = 6
+const REVIEW = 5
 
-/** Coach-only, step by step: share the drive, then four folder links and an optional Archive link, then check access. */
+/** Coach-only, step by step: share the drive, then four folder links, then check access. */
 export function ConnectDriveWizard({ serviceAccountEmail, onClose }: { serviceAccountEmail: string | null; onClose: () => void }) {
   const checkAccess = useAction(api.sheetExportActions.checkAccess)
   const [step, setStep] = useState(0)
-  const [inputs, setInputs] = useState<FolderInputs>({ general: '', money: '', health: '', events: '', archive: '' })
+  const [inputs, setInputs] = useState<FolderInputs>({ general: '', money: '', health: '', events: '' })
   const [touched, setTouched] = useState(false)
   const [copied, setCopied] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -28,9 +28,9 @@ export function ConnectDriveWizard({ serviceAccountEmail, onClose }: { serviceAc
   const [fromReview, setFromReview] = useState(false)
   const heading = useRef<HTMLHeadingElement | null>(null)
 
-  const folder: FolderKey | null = step >= 1 && step <= 5 ? folderSteps[step - 1] : null
+  const folder: FolderKey | null = step >= 1 && step <= folderSteps.length ? folderSteps[step - 1] : null
   const duplicate = folder ? duplicateFolders(inputs).includes(folder) : false
-  const invalid = folder ? folderInputProblem(folder, inputs[folder]) : false
+  const invalid = folder ? folderInputProblem(inputs[folder]) : false
   const move = (next: number) => { setStep(next); setTouched(false); setError(''); requestAnimationFrame(() => heading.current?.focus()) }
   const edit = (key: FolderKey) => { setFromReview(true); move(folderSteps.indexOf(key) + 1) }
   const copyEmail = async () => {
@@ -40,7 +40,7 @@ export function ConnectDriveWizard({ serviceAccountEmail, onClose }: { serviceAc
   const check = async () => {
     setBusy(true); setError(''); setProblems([])
     try {
-      const result = await checkAccess({ general: inputs.general, money: inputs.money, health: inputs.health, events: inputs.events, ...(inputs.archive.trim() ? { archive: inputs.archive } : {}) })
+      const result = await checkAccess({ general: inputs.general, money: inputs.money, health: inputs.health, events: inputs.events })
       if (result.ok) setConnected(true)
       else setProblems(result.problems)
     } catch (caught) { setError(userFacingError(caught, copy.checkFailed)) } finally { setBusy(false) }
@@ -60,8 +60,7 @@ export function ConnectDriveWizard({ serviceAccountEmail, onClose }: { serviceAc
   const showDuplicate = touched && duplicate
   const describedBy = [folder && 'link-help', showInvalid && 'link-invalid', showDuplicate && 'link-duplicate'].filter(Boolean).join(' ') || undefined
   const primaryLabel = step === REVIEW ? (busy ? copy.checking : copy.checkAccess)
-    : fromReview ? copy.backToReview
-    : folder === 'archive' && !inputs.archive.trim() ? copy.continueWithoutArchive : copy.continue
+    : fromReview ? copy.backToReview : copy.continue
 
   return <Card aria-label={copy.title}>
     <CardHeader><CardTitle>{copy.title}</CardTitle></CardHeader>
@@ -98,6 +97,7 @@ export function ConnectDriveWizard({ serviceAccountEmail, onClose }: { serviceAc
           {step === REVIEW && <>
             <h3 ref={heading} tabIndex={-1}>{copy.reviewTitle}</h3>
             <p>{copy.reviewBody}</p>
+            <p className={styles.muted}>{copy.archiveNote}</p>
             <dl className={styles.review}>{folderSteps.map(key => <div key={key}><dt>{copy.folders[key].title}</dt><dd>{inputs[key].trim() ? copy.linkAdded : copy.notSet}</dd><Button type="button" variant="outline" disabled={busy} onClick={() => edit(key)}>{copy.change}<span className="sr-only"> {copy.folders[key].title}</span></Button></div>)}</dl>
             {problems.length > 0 && <ul className={styles.files} role="alert">{problems.map(problem => <li key={problem.folder} className={styles.file}><strong>{copy.folders[problem.folder].title}</strong><span className={styles.problem}>{problem.message}</span><div className={styles.actions}><Button type="button" variant="outline" onClick={() => edit(problem.folder)}>{copy.fix}</Button></div></li>)}</ul>}
           </>}

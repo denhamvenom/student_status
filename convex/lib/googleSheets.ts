@@ -140,6 +140,14 @@ export async function driveFileState(token: string, id: string, folderId: string
   return strings(data.parents).includes(folderId) ? "ok" : "moved";
 }
 
+/** The folders a file is in right now, or null when it is missing or in the trash. */
+export async function driveParents(token: string, id: string): Promise<string[] | null> {
+  const result = await googleJson(token, `${DRIVE}/files/${encodeURIComponent(id)}?supportsAllDrives=true&fields=id,trashed,parents`, { fn: "driveParents" });
+  if (result.status === 404) return null;
+  const data = obj(ok(result, "driveParents"));
+  return data.trashed === true ? null : strings(data.parents);
+}
+
 /**
  * Makes the spreadsheet in its folder, tagged with its stable key. Drive refuses a caller-chosen file ID for Google Sheets files
  * (`generatedIdNotSupported`, verified against live Google), so Google picks the ID. A create that failed without a clear answer
@@ -239,3 +247,43 @@ export async function batchUpdate(token: string, id: string, requests: unknown[]
 }
 
 export const spreadsheetLink = (id: string) => `https://docs.google.com/spreadsheets/d/${id}/edit`;
+
+/**
+ * The non-trashed folder called `name` directly inside `parentId`, made when there is none (for the season archive, e.g. Archive/2027).
+ * When Drive holds several with that name, the first one found is used. A create that ends without a clear answer is looked up again
+ * before it is repeated, so no second folder is made. Returns the folder ID.
+ */
+export async function ensureFolder(token: string, args: { driveId: string; parentId: string; name: string }): Promise<string> {
+  const find = async () => {
+    const q = `name='${quote(args.name)}' and '${quote(args.parentId)}' in parents and trashed=false and mimeType='${FOLDER_TYPE}'`;
+    const params = new URLSearchParams({ q, corpora: "drive", driveId: args.driveId, includeItemsFromAllDrives: "true", supportsAllDrives: "true", fields: "files(id)", pageSize: "10" });
+    const data = obj(ok(await googleJson(token, `${DRIVE}/files?${params}`, { fn: "ensureFolder" }), "ensureFolder"));
+    const first = obj((Array.isArray(data.files) ? data.files : [])[0]).id;
+    return typeof first === "string" ? first : null;
+  };
+  const found = await find();
+  if (found) return found;
+  const result = await googleJson(token, `${DRIVE}/files?supportsAllDrives=true&fields=id`, { method: "POST", body: { name: args.name, mimeType: FOLDER_TYPE, parents: [args.parentId] }, write: true, fn: "ensureFolder" }).catch(async (error: unknown) => {
+    // The create may have been applied before the answer was lost: look again before giving up.
+    const again = await find();
+    if (again) return { status: 200, data: { id: again } };
+    throw error;
+  });
+  const id = obj(ok(result, "ensureFolder")).id;
+  if (typeof id === "string" && id) return id;
+  const again = await find();
+  if (again) return again;
+  throw new GoogleRequestError(0, "Google request failed (no id)");
+}
+
+/** Moves a file (or folder) from one folder to another inside the shared drive. Treated as a write: repeated only on a busy (429) answer. */
+export async function moveFile(token: string, args: { fileId: string; fromParentId: string; toParentId: string }): Promise<void> {
+  const params = new URLSearchParams({ addParents: args.toParentId, removeParents: args.fromParentId, supportsAllDrives: "true", fields: "id,parents" });
+  ok(await googleJson(token, `${DRIVE}/files/${encodeURIComponent(args.fileId)}?${params}`, { method: "PATCH", body: {}, write: true, fn: "moveFile" }), "moveFile");
+}
+
+/** Renames a file in the shared drive (files.update). Setting the same name twice is harmless, so it is retried like a read. */
+export async function renameFile(token: string, args: { fileId: string; name: string }): Promise<void> {
+  const params = new URLSearchParams({ supportsAllDrives: "true", fields: "id,name" });
+  ok(await googleJson(token, `${DRIVE}/files/${encodeURIComponent(args.fileId)}?${params}`, { method: "PATCH", body: { name: args.name }, fn: "renameFile" }), "renameFile");
+}
