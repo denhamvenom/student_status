@@ -1,6 +1,6 @@
 import { savedPublicError } from './lib/publicErrors';
 import { makeFunctionReference } from "convex/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { internalMutation } from "./_generated/server";
@@ -12,6 +12,9 @@ import { addCharges } from "./lib/money";
 import { bulkTargetHold, startBulkChargeCorrection } from "./lib/feeBulkMoney";
 import { queueMoneyDigest } from "./lib/digest";
 
+/** A drain that has not finished in 30 minutes is not coming back on its own (a normal drain takes seconds); fail it so a Coach can try again. */
+const DRAIN_WAIT_LIMIT_MS = 30 * 60 * 1000;
+const DRAIN_WAIT_MESSAGE = "Money updates are still running after 30 minutes. Wait for them to finish, then choose Try again.";
 const runRef = makeFunctionReference<"mutation">("feeBulkWorker:run");
 const pageRef = makeFunctionReference<"mutation">("feeBulkWorker:processPage");
 
@@ -46,7 +49,7 @@ export const processPage = internalMutation({
     if (job.phase === "drain") {
       const drain = await seasonFinancialDrain(ctx, job.seasonId);
       if (drain.blocked) throw new Error(drain.message ?? "Existing financial work requires resolution.");
-      if (!drain.ready) { await ctx.scheduler.runAfter(1000, runRef, { jobId: job._id }); return null; }
+      if (!drain.ready) { if (Date.now() - job.updatedAt > DRAIN_WAIT_LIMIT_MS) throw new ConvexError(DRAIN_WAIT_MESSAGE); await ctx.scheduler.runAfter(1000, runRef, { jobId: job._id }); return null; }
       await ctx.db.patch(control._id, { state: "applying", updatedAt: Date.now() });
       await ctx.db.patch(job._id, { state: job.snapshotComplete ? "applying" : "preparing", phase: job.snapshotComplete ? "apply" : "snapshot", cursor: null, step: job.step + 1, updatedAt: Date.now() });
     } else if (job.phase === "snapshot") {
@@ -96,6 +99,7 @@ export const processPage = internalMutation({
           const child = row.correctionJobId ? await ctx.db.get(row.correctionJobId) : row.allocationJobId ? await ctx.db.get(row.allocationJobId) : null;
           if (child?.state === "failed" || account?.state === "failed") throw new Error("One student’s money change failed. Try that student again before resuming the fee change.");
           if (child && child.state !== "complete" || account?.state === "allocating" || account?.state === "posting") {
+            if (Date.now() - job.updatedAt > DRAIN_WAIT_LIMIT_MS) throw new ConvexError(DRAIN_WAIT_MESSAGE);
             await ctx.scheduler.runAfter(1000, runRef, { jobId: job._id }); return null;
           }
           if (!account || account.state !== "ready" || !fence || account.generation !== fence.generation) throw new Error("Completed row financial generation changed.");

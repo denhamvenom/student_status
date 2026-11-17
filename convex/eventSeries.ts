@@ -13,7 +13,7 @@ import { savedPublicError } from "./lib/publicErrors";
 import { parseGoogleRecurrence } from "./lib/rrule";
 import { requireSeasonFinanceReady } from "./lib/seasonFinance";
 import type { AssignmentScope, SignupMode } from "./lib/eventAudienceRules";
-import { chicagoLocalDateTime, generateRuleOccurrences, hasOccurrenceFrom, isOccurrence, occurrenceStart, rowsFrom, ruleOf, seriesAudienceStudentIds, seriesFieldsFromRule, sessionsExistOn, todayKey, WINDOW_DAYS, windowEndKey, windowEndMs } from "./lib/seriesGenerate";
+import { canMoveSeries, chicagoLocalDateTime, generateRuleOccurrences, hasOccurrenceFrom, isOccurrence, occurrenceStart, rowsFrom, ruleOf, seriesAudienceStudentIds, seriesFieldsFromRule, sessionsExistOn, todayKey, WINDOW_DAYS, windowEndKey, windowEndMs } from "./lib/seriesGenerate";
 import { TEAM_TIME_ZONE } from "../shared/chicago-time";
 import { addDays, firstOccurrence, isLocalDate, MAX_OCCURRENCES_PER_QUERY, occurrencesBetween, splitRuleAt, validateSeriesRule, type SeriesRule } from "./lib/seriesRecurrence";
 import { assignSubteamMember, isSubteamMandatory } from "./lib/subteamEnrollment";
@@ -31,6 +31,9 @@ import { assignWholeTeamMember } from "./lib/wholeTeam";
  * following" send one representative notice for the first affected meeting only (dedupe per event), never one per meeting.
  * "Change end date" (setEndDate) sends the same single representative cancellation when it shortens, nothing when it extends.
  */
+
+/** Allowed status moves are listed on SERIES_MOVES in lib/seriesGenerate.ts; every write of eventSeries.status here goes through it. "conflict" is never written today. */
+export { canMoveSeries };
 
 const MAX_NAME = 250;
 
@@ -246,7 +249,7 @@ export const tick = internalMutation({
     let delay = 0;
     for (const series of page.page) {
       if (!season || series.seasonId !== season._id) continue;
-      if (!hasOccurrenceFrom(ruleOf(series), today)) { await ctx.db.patch(series._id, { status: "ended" }); continue; }
+      if (!hasOccurrenceFrom(ruleOf(series), today)) { if (canMoveSeries(series.status, "ended")) await ctx.db.patch(series._id, { status: "ended" }); continue; }
       if (series.calendarMasterId) { await ctx.scheduler.runAfter(delay, internal.eventSeriesCalendar.extendAndReconcile, { seriesId: series._id }); delay += 2_000; }
       else if ((series.generatedThrough ?? 0) < windowEndMs(now)) await ctx.scheduler.runAfter(0, internal.eventSeries.generate, { seriesId: series._id, toKey });
     }
@@ -404,7 +407,7 @@ export const editFuture = mutation({
     // Mentors' series sign-ups continue on the new series (before it generates meetings); moved rows point at them.
     await carrySeriesSignups(ctx, series._id, newSeriesId, args.fromKey, rows.filter(row => isOccurrence(after, row.seriesOccurrenceKey!)).map(row => row._id), now);
     // The old series ends the day before the split (COUNT becomes an end date).
-    await ctx.db.patch(series._id, { untilDate: addDays(args.fromKey, -1), count: undefined, ...(split.before === null ? { status: "ended" as const } : {}) });
+    await ctx.db.patch(series._id, { untilDate: addDays(args.fromKey, -1), count: undefined, ...(split.before === null && canMoveSeries(series.status, "ended") ? { status: "ended" as const } : {}) });
     let representative: Doc<"events"> | null = null;
     for (const row of rows) {
       const key = row.seriesOccurrenceKey!;
@@ -445,7 +448,7 @@ export const cancelFuture = mutation({
     const representative = rows.find(row => !row.cancelled) ?? null;
     const cancelled = removedMeetingKeys(rule, rows, args.fromKey).length;
     for (const row of rows) await cancelRowQuietly(ctx, row, user._id);
-    await ctx.db.patch(series._id, { untilDate: addDays(args.fromKey, -1), count: undefined, ...(split.before === null ? { status: "cancelled" as const } : {}) });
+    await ctx.db.patch(series._id, { untilDate: addDays(args.fromKey, -1), count: undefined, ...(split.before === null && canMoveSeries(series.status, "cancelled") ? { status: "cancelled" as const } : {}) });
     if (representative) await notifyEventCancelled(ctx, { eventId: representative._id });
     if (series.calendarMasterId) await ctx.scheduler.runAfter(0, internal.eventSeriesCalendar.truncateMaster, { seriesId: series._id, untilMs: occurrenceStart(rule, args.fromKey) - 1000, deleteMaster: split.before === null });
     await audit(ctx, user, "eventSeries", series._id, "cancelFuture", { untilDate: series.untilDate ?? null, count: series.count ?? null }, { fromKey: args.fromKey });
@@ -603,7 +606,7 @@ export const setEndDate = mutation({
     if (await sessionsExistOn(ctx, rows)) throw new ConvexError("Attendance has already been taken for a meeting after that date. Choose a later end date.");
     const live = rows.filter(row => !row.cancelled);
     for (const row of rows) await cancelRowQuietly(ctx, row, user._id);
-    const reopen = series.status === "ended" && hasOccurrenceFrom(plan.rule, today);
+    const reopen = series.status === "ended" && canMoveSeries(series.status, "active") && hasOccurrenceFrom(plan.rule, today);
     await ctx.db.patch(series._id, { untilDate: args.endDate, count: undefined, ...(reopen ? { status: "active" as const } : {}) });
     // At most one notice per person for the whole operation: the first canceled meeting stands for the rest.
     if (live[0]) await notifyEventCancelled(ctx, { eventId: live[0]._id });

@@ -7,7 +7,8 @@ import { RateLimiter } from "@convex-dev/rate-limiter";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { activeSeason, audit, ownStudent, requireRole, requireSeasonProfileWritable, viewer } from "./lib/access";
-import { emailKey, tokenHash, newToken, verifiedParent } from "./lib/invitationIdentity";
+import { emailKey, tokenHash, verifiedParent } from "./lib/invitationIdentity";
+import { inviteTokenSecret, issueInviteToken, pendingTokenHash } from "./lib/inviteToken";
 import { parentInviteEmailConfiguration } from "./lib/parentInviteEmail";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -57,12 +58,14 @@ async function queueParentInvite(ctx: MutationCtx, actor: Doc<"appUsers">, stude
     }
   }
   for (const row of previous) await ctx.db.patch(row._id, { status: "replaced" });
-  const token = newToken();
   const now = Date.now();
   const expiresAt = now + WEEK_MS;
-  const inviteId = await ctx.db.insert("parentInvitations", { studentId: student._id, parentEmail, tokenHash: await tokenHash(token), loginVersion: 1, loginExpiresAt: now + 24 * 60 * 60_000, status: "pending", emailStatus: "queued", createdBy: actor._id, createdAt: now, expiresAt });
+  const inviteId = await ctx.db.insert("parentInvitations", { studentId: student._id, parentEmail, tokenHash: pendingTokenHash(), loginVersion: 1, loginExpiresAt: now + 24 * 60 * 60_000, status: "pending", emailStatus: "queued", createdBy: actor._id, createdAt: now, expiresAt });
+  // The derived link needs the row id, so the hash is written right after the insert (same transaction).
+  const issued = await issueInviteToken(inviteTokenSecret(), "parent", inviteId, now);
+  await ctx.db.patch(inviteId, issued.stored);
   if (emailConfiguration) {
-    await ctx.scheduler.runAfter(0, internal.parentInviteEmail.send, { inviteId, token, attempt: 1 });
+    await ctx.scheduler.runAfter(0, internal.parentInviteEmail.send, { inviteId, ...issued.job, attempt: 1 });
     await ctx.scheduler.runAfter(20 * 60_000, internal.parentInviteEmail.markStalled, { inviteId });
   }
   return { expiresAt, inviteId };

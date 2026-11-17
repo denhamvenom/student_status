@@ -26,6 +26,8 @@ const app = defineApp({ env: {
   PARENT_INVITE_EMAIL_FROM: v.optional(v.string()),
   PARENT_INVITE_EMAIL_REPLY_TO: v.optional(v.string()),
   PARENT_INVITE_APP_ORIGIN: v.optional(v.string()),
+  // Optional: without it invite links fall back to random tokens (convex/lib/inviteToken.ts).
+  INVITE_TOKEN_SECRET: v.optional(v.string()),
   ZEFFY_API_KEY: v.optional(v.string()),
   DEVELOPER_SIGN_IN_ENABLED: v.optional(v.string()),
   DEVELOPER_SIGN_IN_KEY: v.optional(v.string()),

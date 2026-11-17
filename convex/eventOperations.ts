@@ -73,7 +73,9 @@ export const reviewSignup = mutation({
     if (args.decision === "decline") {
       if (participant.status !== "pending" && participant.status !== "waitlist") throw new ConvexError("Only signups Waiting for approval or Waitlisted can be declined. Reload to see the latest.");
       if (!args.reason?.trim()) throw new ConvexError("Enter a reason to decline this signup.");
-      await ctx.db.patch(participant._id, { status: "withdrawn", updatedAt: Date.now() });
+      const declinedAt = Date.now();
+      // Owner decision 2026-11-17: a decline sticks. The marker stops the student signing up again on their own; staff re-adding them clears it.
+      await ctx.db.patch(participant._id, { status: "withdrawn", declinedAt, declinedBy: user._id, updatedAt: declinedAt });
       await clearShifts(ctx, event._id, participant.studentId);
       await audit(ctx, user, "participants", participant._id, "declineSignup", participant.status, "withdrawn", args.reason.trim());
       await notifySignupDecision(ctx, { eventId: event._id, studentId: student._id, decision: "decline" });

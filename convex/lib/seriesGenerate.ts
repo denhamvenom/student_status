@@ -23,6 +23,32 @@ export const MAX_SERIES_ROWS_SCAN = 200;
 
 export type Series = Doc<"eventSeries">;
 
+export type SeriesStatus = Series["status"];
+
+/**
+ * Allowed eventSeries.status moves (derived from every write of the field today). A move not listed here is a no-op.
+ *   active      -> ended        eventSeries.tick (no occurrences left), editFuture (whole series moved to a new one)
+ *   active      -> cancelled    eventSeries.cancelFuture (cancelled from the first meeting)
+ *   active      -> needsReview  seriesGenerationActor (creator can no longer manage it), linkInstances drift, markSeries
+ *   active      -> conflict     markSeries accepts it, but nothing writes "conflict" today
+ *   ended       -> active       eventSeries.setEndDate reopen (end date moved out to a date with meetings)
+ *   needsReview -> active       a Coach resolving the review
+ *   needsReview <-> conflict, conflict -> active   kept so the unused "conflict" state stays usable
+ *   cancelled   -> (nothing)    terminal
+ * Staying in the same status is always fine. Background jobs must never move ended or cancelled series anywhere.
+ */
+const SERIES_MOVES: Record<SeriesStatus, readonly SeriesStatus[]> = {
+  active: ["ended", "cancelled", "needsReview", "conflict"],
+  ended: ["active"],
+  cancelled: [],
+  needsReview: ["active", "conflict"],
+  conflict: ["active", "needsReview"],
+};
+
+export function canMoveSeries(from: SeriesStatus, to: SeriesStatus): boolean {
+  return from === to || SERIES_MOVES[from].includes(to);
+}
+
 export function ruleOf(series: Pick<Series, "startDate" | "weekdays" | "intervalWeeks" | "localStartTime" | "durationMinutes" | "untilDate" | "count">): SeriesRule {
   const rule: SeriesRule = { anchorDate: series.startDate, weekdays: series.weekdays, intervalWeeks: series.intervalWeeks, startLocalTime: series.localStartTime, durationMinutes: series.durationMinutes };
   if (series.untilDate !== undefined) rule.endsOnDate = series.untilDate;
@@ -125,7 +151,7 @@ export async function seriesGenerationActor(ctx: MutationCtx, series: Series): P
   const plainMentor = !!actor && actor.role === "mentor" && !actor.travelLead && mentorMeetingLimitError(series.template) === null && series.template.assignmentScope === undefined;
   const allowed = !!actor && actor.active && actor.archivedAt === undefined && (staff || plainMentor);
   if (allowed) return actor;
-  if (series.status !== "needsReview") await ctx.db.patch(series._id, { status: "needsReview", calendarError: CREATOR_REVIEW_MESSAGE });
+  if (series.status !== "needsReview" && canMoveSeries(series.status, "needsReview")) await ctx.db.patch(series._id, { status: "needsReview", calendarError: CREATOR_REVIEW_MESSAGE });
   return null;
 }
 

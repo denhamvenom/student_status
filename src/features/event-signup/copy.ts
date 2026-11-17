@@ -57,6 +57,7 @@ export const signupCopy = {
     loading: 'Loading…',
     loadFailed: "This didn't load. Close it and try again.",
     closed: 'Signup closed. Ask a Coach to change this.',
+    declined: 'Your signup for this event was declined. Ask a Coach or Travel Lead if you think this is a mistake.',
     checking: 'Checking if signup is open…',
     availabilityFailed: "Can't check signup right now. Refresh and try again.",
     notForYou: "Sign up isn't open to you for this event. Ask a Coach if that seems wrong.",

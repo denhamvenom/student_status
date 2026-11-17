@@ -7,6 +7,7 @@ Read this before changing parent linking, consent/PDF, finance, rooms/waitlists 
 - Invitations are seven-day, single-use, and tied to the matching email.
 - Require explicit good-faith parent/legal-guardian relationship and authority attestation. Email control does not independently prove guardianship or sign consent.
 - Preserve inbox privacy, the one-hour resend guard and revocation/access checks.
+- November 17, 2026 owner decisions: resending an adult invitation sends a new link, and the earlier link stops working. A parent invitation with status "replaced" means either superseded by a newer invite or re-allowed after a revoke (documented as-is).
 
 ## Product name
 
@@ -23,6 +24,7 @@ Read this before changing parent linking, consent/PDF, finance, rooms/waitlists 
 
 - Require completed Student setup and a Parent-confirmed structured profile before the approved populated PDF workflow.
 - Preserve the exact reviewed/signed artifacts, acknowledgment and typed verified name.
+- November 17, 2026 owner decision: during permission review, staff may change an accepted permission to needs-correction and back to accepted on the same submission.
 - Preserve the approved original one-page design, lossless continuation for genuine overflow and all historical receipts.
 - Active OTC/Medication Choices are superseded; do not introduce a new workflow for them.
 - October 25 owner decision: the permission form is not in use yet, so its PDF wording may change. Approved: "Reference code" (not "Reviewed PDF SHA-256"), "TEST SIGNATURE (FICTIONAL)" and "How it was signed" on the signature page, "Medications" (not "Prescriptions"), "Information unavailable", "PERMISSION FORM - CONTINUATION", and a footer showing only the form version (no internal IDs). The title "Field Trip Permission & Medical Release" stays.
@@ -41,6 +43,7 @@ Read this before changing parent linking, consent/PDF, finance, rooms/waitlists 
 - Special family refund requests require separate review.
 - Available same-season fundraising transfers require Coach authority or Travel Lead plus the finance grant.
 - If original award credits are insufficient, hold a proposed reduction; do not silently create debt or claw credits back.
+- November 17, 2026 owner decision: a held fundraiser may be closed by a Coach (not a Travel Lead) after seeing the students not credited and typing a reason. The uncredited amounts stay on record; no money moves. A failed fundraiser can't be closed; Try again is the way out.
 
 ## Rooms/waitlists
 
@@ -59,6 +62,7 @@ Read this before changing parent linking, consent/PDF, finance, rooms/waitlists 
 - November 6, 2026 owner decision: a Student's event withdrawal takes effect immediately, with no Coach/Travel Lead review, when no money and no logistics commitment is involved: no event fee, no event charge owed or paid, no room membership or room request, no confirmed team-transport seat (team transport on and not independent travel), and no other request in review. Whole Team events are excluded: leaving one uses the Whole Team leave path with its Coach notice. Shift signups are cleared, not treated as commitments. The withdrawal is still recorded as an approved request (full, $0) with an `autoWithdraw` audit entry and no Coach review digest; re-enrollment still needs a Coach. Anything else keeps the normal review path.
 - November 6, 2026 owner decisions (withdrawal follow-up): (A) a withdrawal from any Coach-assigned event always goes to Coach/Travel Lead review, even when free. (B) A Coach can "Put back on event" a withdrawn student from the event's Signups and capacity section (a Travel Lead too, but only for events a Coach did not assign); it needs the current season, an active event and student, finished enrollment and an open place. It is an explicit action: the approved withdrawal is kept and marked reinstated (who and when), the student returns as Signed up, money moved by a reviewed withdrawal is not reversed (the Coach is warned), rooms and shifts are not restored, and an audit entry is written. Re-enrollment checks (student signup, Whole Team and subteam auto-enrollment, Home open signups) ignore reinstated withdrawals. (C) A Student, never a Parent, can undo their own automatic withdrawal until the event starts, while the event is still current, not archived or canceled, not Coach-assigned, finished enrolling and has an open place; they return to their earlier status (a Waitlisted student rejoins at the end of the waitlist; nobody moves up), rooms and shifts are not restored, and a Coach-reviewed withdrawal can't be undone this way.
 - November 7, 2026 owner decision: the automatic "Put back" fee rule is deferred. For now, Put back on event (Coach/Travel Lead) and a Student's Undo never add, restore or change a charge or ledger entry; money stays exactly as the withdrawal decision left it, and the audit entry records that no charge was changed. The Put back control and its success message tell the Coach or Travel Lead to check the student's charges for the event and add the fee by hand with the existing charge tools if the student should pay. The rule for a returning student's fee is in [BACKLOG.md](BACKLOG.md#product).
+- November 17, 2026 owner decisions: a Coach's decline of a sign-up sticks. The student can't sign up again for that event themselves; staff can put them back. Declines from before this change are not affected. Background enrollment syncs that stop are recorded and logged; there is no Coach screen for them (owner choice).
 - Travel Team means students selected by mentors/Coaches through an application for out-of-state and local travel. It is distinct from Travel Lead and the event's team-transport requirement.
 - Canonical subteams are Build, Electrical, Machining, Programming and Business/Media. No Unassigned choice is offered; existing missing assignments stay missing. The owner deferred stored conversion: Mechanical maps to Build; Business, Outreach and superseded Business and Media map to Business/Media only through reviewed, authorized migration.
 
@@ -161,6 +165,7 @@ November 10, 2026 owner decisions, implemented on `feat/usability-audit` (not me
 ## Retention
 
 - Five years runs from the latest archival after reactivation and triggers review, not automatic erasure. Automatic deletion remains unauthorized.
+- November 17, 2026 owner decision: reactivating a student or adult keeps the earlier archive date; a re-archive sets a fresh date, and the five years count from that latest archival.
 - Review profile/contact/health, attendance, participation, financial history and permission evidence together. Preserve shared Parent/other-student records, Coach-reasoned holds and immutable signing history. An unresolved balance, dispute, safety incident or preservation requirement pauses relevant disposal until a recorded review/release decision.
 - DS Robotics Foundation operates Denham Venom Team 8044; admin@team8044.org handles verified requests.
 - Keep authorized exports in organization-controlled storage; track required official copies, remove temporary device/download copies after use and include retained exports in the same review/hold process. No automatic export inventory or remote deletion is claimed. Verify requester identity before supported corrections; never rewrite signed evidence.
