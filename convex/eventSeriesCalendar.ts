@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalAction, internalMutation, internalQuery, type ActionCtx, type MutationCtx } from "./_generated/server";
-import { boundCalendar, calendarError, configured, eventUrl, googleDetails, MEDIA_MARKER, notifySeriesRepresentative, token, validCalendarEventId, writeEnabled } from "./eventCalendar";
+import { boundCalendar, calendarError, configured, eventUrl, googleDetails, googleFetch, MEDIA_MARKER, notifySeriesRepresentative, token, validCalendarEventId, writeEnabled } from "./eventCalendar";
 import { chicagoDate, chicagoMidnight } from "./lib/calendarDates";
 import { toGoogleRecurrence } from "./lib/rrule";
 import { TEAM_TIME_ZONE, zonedWallTimeToUtc } from "../shared/chicago-time";
@@ -43,7 +43,7 @@ export async function listInstances(auth: string, masterId: string, timeMin: num
   let pageToken: string | undefined;
   for (let page = 0; page < 4; page++) {
     if (pageToken) url.searchParams.set("pageToken", pageToken);
-    const response = await fetch(url, { headers: { authorization: auth } });
+    const response = await googleFetch(url, { headers: { authorization: auth } });
     if (!response.ok) return { error: calendarError(response.status) };
     const body: unknown = await response.json();
     if (!body || typeof body !== "object" || !("items" in body) || !Array.isArray(body.items)) return { error: "Team Calendar sent meetings that couldn't be read. Try again." };
@@ -283,9 +283,9 @@ export async function createMasterNow(ctx: ActionCtx, seriesId: Id<"eventSeries"
     const auth = `Bearer ${await token(true)}`;
     const id = await masterIdForSeries(seriesId);
     let raw: unknown;
-    const response = await fetch(eventUrl(), { method: "POST", headers: { authorization: auth, "content-type": "application/json" }, body: JSON.stringify({ id, summary: snap.name, location: snap.destination, start: { dateTime: snap.firstStartLocal, timeZone: TEAM_TIME_ZONE }, end: { dateTime: snap.firstEndLocal, timeZone: TEAM_TIME_ZONE }, recurrence: snap.recurrence, extendedProperties: { private: { studentStatusSeriesId: seriesId } } }) });
+    const response = await googleFetch(eventUrl(), { method: "POST", headers: { authorization: auth, "content-type": "application/json" }, body: JSON.stringify({ id, summary: snap.name, location: snap.destination, start: { dateTime: snap.firstStartLocal, timeZone: TEAM_TIME_ZONE }, end: { dateTime: snap.firstEndLocal, timeZone: TEAM_TIME_ZONE }, recurrence: snap.recurrence, extendedProperties: { private: { studentStatusSeriesId: seriesId } } }) });
     if (response.status === 409) {
-      const existing = await fetch(eventUrl(id), { headers: { authorization: auth } });
+      const existing = await googleFetch(eventUrl(id), { headers: { authorization: auth } });
       if (!existing.ok) return await fail(calendarError(existing.status));
       raw = await existing.json();
       if (privateSeriesId(raw) !== seriesId) return await fail("This Calendar entry is connected to a different series. Contact a Coach.", true);
@@ -311,7 +311,7 @@ export async function truncateMasterNow(ctx: ActionCtx, seriesId: Id<"eventSerie
   if (!await boundCalendar(ctx)) return await fail(unboundMessage, true);
   try {
     const auth = `Bearer ${await token(true)}`;
-    const current = await fetch(eventUrl(snap.masterId), { headers: { authorization: auth } });
+    const current = await googleFetch(eventUrl(snap.masterId), { headers: { authorization: auth } });
     if (current.status === 404 || current.status === 410) { await ctx.runMutation(internal.eventSeriesCalendar.markSeries, { seriesId, calendarSyncState: "synced", error: null }); return true; }
     if (!current.ok) return await fail(calendarError(current.status));
     const raw: unknown = await current.json();
@@ -329,13 +329,13 @@ export async function truncateMasterNow(ctx: ActionCtx, seriesId: Id<"eventSerie
     // Never write without the master's etag: an empty if-match would overwrite a concurrent Calendar edit. Retryable.
     if (!detail.etag) return await fail("Team Calendar didn't return the latest copy of this series. Try again.");
     if (deleteMaster) {
-      const deleted = await fetch(eventUrl(snap.masterId), { method: "DELETE", headers: { authorization: auth, "if-match": detail.etag } });
+      const deleted = await googleFetch(eventUrl(snap.masterId), { method: "DELETE", headers: { authorization: auth, "if-match": detail.etag } });
       if (!deleted.ok && deleted.status !== 410) return await fail(calendarError(deleted.status), deleted.status === 412);
       await ctx.runMutation(internal.eventSeriesCalendar.markSeries, { seriesId, calendarSyncState: "synced", error: null });
       return true;
     }
     if (!recurrence) throw new Error("The series has no repeat rule to end.");
-    const patched = await fetch(eventUrl(snap.masterId), { method: "PATCH", headers: { authorization: auth, "content-type": "application/json", "if-match": detail.etag }, body: JSON.stringify({ recurrence }) });
+    const patched = await googleFetch(eventUrl(snap.masterId), { method: "PATCH", headers: { authorization: auth, "content-type": "application/json", "if-match": detail.etag }, body: JSON.stringify({ recurrence }) });
     if (!patched.ok) return await fail(calendarError(patched.status), patched.status === 412);
     const latest = googleDetails(await patched.json());
     await ctx.runMutation(internal.eventSeriesCalendar.markSeries, { seriesId, calendarSyncState: "synced", error: null, etag: latest.etag, recurrence, providerUpdatedAt: latest.updatedAt });
@@ -406,7 +406,7 @@ export const extendAndReconcile = internalAction({
     const review = (error: string) => ctx.runMutation(internal.eventSeriesCalendar.markSeries, { seriesId: args.seriesId, status: "needsReview", error });
     try {
       const auth = `Bearer ${await token(false)}`;
-      const response = await fetch(eventUrl(snap.masterId), { headers: { authorization: auth } });
+      const response = await googleFetch(eventUrl(snap.masterId), { headers: { authorization: auth } });
       if (response.status === 404 || response.status === 410) { await review("This series was deleted in Team Calendar. Review the series."); return null; }
       if (!response.ok) { await ctx.runMutation(internal.eventSeriesCalendar.markSeries, { seriesId: args.seriesId, error: calendarError(response.status) }); return null; }
       const raw: unknown = await response.json();

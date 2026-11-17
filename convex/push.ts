@@ -12,6 +12,9 @@ const MAX_ENDPOINT = 1000;
 const MAX_KEY = 200;
 const MAX_LABEL = 80;
 const MAX_BADGE = 99;
+// Statuses a queued send may still resolve; "digest" rows carry the summary push result.
+const IN_FLIGHT = new Set<string>(["pending", "deferred", "digest"]);
+const STUCK_CHECK_MS = 15 * 60 * 1000;
 
 export function vapidConfigured() {
   return !!(env.VAPID_PUBLIC_KEY?.trim() && env.VAPID_PRIVATE_KEY?.trim() && env.VAPID_SUBJECT?.trim());
@@ -47,6 +50,7 @@ export const deliver = internalMutation({
       subscriptions: subscriptions.map(({ endpoint, p256dh, auth }) => ({ endpoint, p256dh, auth })),
       payload: { title: notification.title, body: notification.body, url: notification.url, category: notification.category, tag: `${notification.category}-${notification._id}`, badgeCount: Math.min(unread.length, MAX_BADGE), notificationId: notification._id },
     });
+    await ctx.scheduler.runAfter(STUCK_CHECK_MS, internal.push.failIfStuck, { notificationId: notification._id });
     return null;
   },
 });
@@ -72,6 +76,7 @@ export async function scheduleSummaryPush(ctx: MutationCtx, args: { notification
     subscriptions: subscriptions.map(({ endpoint, p256dh, auth }) => ({ endpoint, p256dh, auth })),
     payload: { title: args.title, body: args.body, url: args.url, category: notification.category, tag: `${notification.category}-digest`, badgeCount: Math.min(unread.length, MAX_BADGE), notificationId: notification._id },
   });
+  await ctx.scheduler.runAfter(STUCK_CHECK_MS, internal.push.failIfStuck, { notificationId: notification._id });
   return true;
 }
 
@@ -84,7 +89,20 @@ export const markPushed = internalMutation({
       if (subscription) await ctx.db.patch(subscription._id, { lastSuccessAt: now });
     }
     const notification = await ctx.db.get(args.notificationId);
-    if (notification) await ctx.db.patch(notification._id, args.succeededEndpoints.length ? { pushStatus: "sent", pushedAt: now } : { pushStatus: "failed" });
+    // Only an in-flight row (or a stuck-check "failed" whose send reported late) moves to a final state; never overwrite skipped/sent.
+    if (notification && (IN_FLIGHT.has(notification.pushStatus) || (notification.pushStatus === "failed" && args.succeededEndpoints.length))) {
+      await ctx.db.patch(notification._id, args.succeededEndpoints.length ? { pushStatus: "sent", pushedAt: now } : { pushStatus: "failed" });
+    }
+    return null;
+  },
+});
+
+/** Scheduled `STUCK_CHECK_MS` after a send was queued: a row whose send never reported back ends honestly as failed. No re-send (a late success could double-notify). */
+export const failIfStuck = internalMutation({
+  args: { notificationId: v.id("notifications") }, returns: v.null(),
+  handler: async (ctx, args) => {
+    const notification = await ctx.db.get(args.notificationId);
+    if (notification && IN_FLIGHT.has(notification.pushStatus)) await ctx.db.patch(notification._id, { pushStatus: "failed" });
     return null;
   },
 });

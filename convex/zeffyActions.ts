@@ -15,8 +15,37 @@ const applyRef = makeFunctionReference<"mutation">("zeffy:applyPayment");
 const missingRef = makeFunctionReference<"mutation">("zeffy:missingCampaign");
 const paymentFailureRef = makeFunctionReference<"mutation">("zeffy:paymentFailure");
 const captureCampaignRef = makeFunctionReference<"mutation">("zeffy:captureCampaign");
+const studentsPageRef = makeFunctionReference<"query">("zeffy:studentsPage");
+const lookupRef = makeFunctionReference<"query">("zeffy:lookup");
 const scheduledActorRef = makeFunctionReference<"query">("zeffy:scheduledActor");
-type Snapshot = { activeSeasonId: Id<"seasons">; seasonStartsAt: number; students: Array<{ id: Id<"students">; seasonId: Id<"seasons">; name: string; url: string | null; revision: number; active: boolean }>; mappings: Array<{ campaignId: string; canonicalUrl: string; studentId: Id<"students">; seasonId: Id<"seasons"> }>; payments: Array<{ paymentId: string; amountCents: number; campaignId: string }> };
+type StudentRow = { id: Id<"students">; seasonId: Id<"seasons">; name: string; url: string | null; revision: number; active: boolean };
+type MappingRow = { campaignId: string; canonicalUrl: string; studentId: Id<"students">; seasonId: Id<"seasons"> };
+type Snapshot = { activeSeasonId: Id<"seasons">; seasonStartsAt: number; students: StudentRow[]; mappings: MappingRow[]; payments: Array<{ paymentId: string; amountCents: number; campaignId: string }> };
+
+function chunks<T>(items: T[], size: number): T[][] { const out: T[][] = []; for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size)); return out; }
+
+/** Reads the season, every student (in small pages), and only the payment records and page links that the fetched Zeffy data refers to. */
+async function loadSnapshot(ctx: ActionCtx, campaigns: ZeffyCampaign[], payments: ZeffyPayment[]): Promise<Snapshot> {
+  const season = await ctx.runQuery(snapshotRef, {}) as { activeSeasonId: Id<"seasons">; seasonStartsAt: number };
+  const students: StudentRow[] = []; let cursor: string | null = null;
+  for (let guard = 0; guard < 1000; guard++) {
+    const page = await ctx.runQuery(studentsPageRef, { paginationOpts: { numItems: 500, cursor } }) as { page: StudentRow[]; isDone: boolean; continueCursor: string };
+    students.push(...page.page);
+    if (page.isDone) break;
+    cursor = page.continueCursor;
+  }
+  const mappings = new Map<string, MappingRow>(); const known: Snapshot["payments"] = [];
+  const urls = [...new Set(campaigns.map(c => canonicalZeffyUrl(c.url)).filter((u): u is string => !!u))];
+  const campaignIds = [...new Set([...campaigns.map(c => c.id), ...payments.map(p => p.campaign_id)])];
+  const paymentIds = payments.map(p => p.id);
+  const batches = Math.max(Math.ceil(paymentIds.length / 200), Math.ceil(campaignIds.length / 100), Math.ceil(urls.length / 100));
+  const idChunks = chunks(paymentIds, 200), campaignChunks = chunks(campaignIds, 100), urlChunks = chunks(urls, 100);
+  for (let i = 0; i < batches; i++) {
+    const found = await ctx.runQuery(lookupRef, { paymentIds: idChunks[i] ?? [], campaignIds: campaignChunks[i] ?? [], canonicalUrls: urlChunks[i] ?? [] }) as { payments: Snapshot["payments"]; mappings: MappingRow[] };
+    known.push(...found.payments); for (const m of found.mappings) mappings.set(m.campaignId, m);
+  }
+  return { ...season, students, mappings: [...mappings.values()], payments: known };
+}
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Zeffy sent a reply the app couldn't read. Nothing was added. Try Check now again later.");
@@ -68,7 +97,7 @@ async function fetchData() {
 export const preview = action({ args: {}, returns: v.object({ safeToRun: v.boolean(), campaigns: v.array(v.object({ campaignId: v.string(), url: v.string(), title: v.string(), studentId: v.optional(v.id("students")), studentName: v.optional(v.string()), seasonName: v.optional(v.string()), status: v.string() })), paymentCount: v.number(), eligibleCount: v.number(), reviewCount: v.number(), exceptions: v.array(v.object({ code: v.string(), message: v.string(), campaignId: v.optional(v.string()), paymentId: v.optional(v.string()) })), rows: v.array(v.object({ paymentId: v.string(), studentName: v.optional(v.string()), amountCents: v.number(), outcome: v.union(v.literal("eligible"), v.literal("unchanged"), v.literal("review")), message: v.optional(v.string()) })) }), handler: async ctx => {
   await ctx.runQuery(requireCoachRef, {});
   const { campaigns, payments } = await fetchData();
-  const snapshot: Snapshot = await ctx.runQuery(snapshotRef, {}) as Snapshot;
+  const snapshot = await loadSnapshot(ctx, campaigns, payments);
   const byId = new Map(campaigns.map(campaign => [campaign.id, campaign]));
   const byPayment = new Map(snapshot.payments.map(payment => [payment.paymentId, payment]));
   const paymentCampaigns = new Set(payments.map(payment => payment.campaign_id));
@@ -103,7 +132,7 @@ async function sync(ctx: ActionCtx, actorId: Id<"appUsers">): Promise<{ started:
   const totals = { credited: 0, unchanged: 0, review: 0 };
   try {
     const { campaigns, payments } = await fetchData();
-    const snapshot: Snapshot = await ctx.runQuery(snapshotRef, {}) as Snapshot;
+    const snapshot = await loadSnapshot(ctx, [], []);
     const currentLinks = new Set(snapshot.students.filter(s => s.active && s.seasonId === snapshot.activeSeasonId).map(s => canonicalZeffyUrl(s.url ?? "")).filter((url): url is string => !!url));
     for (const campaign of campaigns) if (currentLinks.has(canonicalZeffyUrl(campaign.url) ?? "")) await ctx.runMutation(captureCampaignRef, { runId, campaign });
     const byId = new Map(campaigns.map(c => [c.id, c]));

@@ -3,7 +3,7 @@ import { internal } from "./_generated/api";
 import { normalizeCalendarEvent } from "./lib/calendarNormalize";
 import { chicagoMidnight } from "./lib/calendarDates";
 import { hashId, serviceToken } from "./lib/calendarAuth";
-import { reconcileLinkedNow, reconcileOneNow, seriesNoticeCollector } from "./eventCalendar";
+import { googleFetch, reconcileLinkedNow, reconcileOneNow, seriesNoticeCollector } from "./eventCalendar";
 import { v } from "convex/values";
 import { isCalendarRefreshSlot } from "./lib/calendarSchedule";
 
@@ -32,7 +32,7 @@ async function refreshCalendar(ctx: ActionCtx): Promise<"refreshed" | "skipped" 
         if (priorToken) url.searchParams.set("syncToken", priorToken);
         else url.searchParams.set("timeMin", new Date(now - 60 * 86_400_000).toISOString());
         if (pageToken) url.searchParams.set("pageToken", pageToken);
-        const response = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+        const response = await googleFetch(url, { headers: { authorization: `Bearer ${token}` } });
         if (response.status === 410 && priorToken && !attemptedFullRetry) {
           priorToken = undefined; pageToken = undefined; attemptedFullRetry = true; pages = 0; continue;
         }

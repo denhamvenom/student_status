@@ -72,7 +72,10 @@ export const finishSend = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const row = await ctx.db.get(args.requestId);
-    if (!row || row.emailStatus !== "queued" || row.emailAttempt !== args.attempt) return null;
+    if (!row || row.emailAttempt !== args.attempt) return null;
+    // No error text is stored here, so "failed" cannot be told apart by cause. An attempt reports once, so a "sent" for
+    // the current attempt arriving on a failed row can only follow markStalled (a real failure comes from this same attempt).
+    if (row.emailStatus !== "queued" && !(row.emailStatus === "failed" && args.outcome === "sent")) return null;
     if (args.outcome === "sent") await ctx.db.patch(row._id, { emailStatus: "sent", emailSentAt: Date.now() });
     else if (args.outcome === "retry" && args.attempt < MAX_ATTEMPTS) await ctx.scheduler.runAfter(RETRY_DELAYS_MS[args.attempt - 1], internal.adminContact.send, { requestId: args.requestId, attempt: args.attempt + 1 });
     else await ctx.db.patch(row._id, { emailStatus: args.outcome === "notSent" ? "notSent" : "failed" });

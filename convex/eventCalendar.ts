@@ -59,6 +59,14 @@ export function seriesNoticeCollector() {
 }
 export type SeriesNoticeCollector = ReturnType<typeof seriesNoticeCollector>;
 
+const GOOGLE_TIMEOUT_MS = 20_000;
+/** Every Team Calendar request goes through here so a hung Google response ends in the caller's failure handling instead of waiting for the action to die. */
+export function googleFetch(input: string | URL, init: RequestInit = {}) {
+  const controller = new AbortController();
+  // Not cleared on completion: the abort must also cut off a body that stalls after the headers arrive; it does nothing once the request is done.
+  setTimeout(() => controller.abort(), GOOGLE_TIMEOUT_MS);
+  return fetch(input, { ...init, signal: controller.signal });
+}
 export function configured() { return !!(env.TIMECLOCK_CALENDAR_ID && env.TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_EMAIL && env.TIMECLOCK_CALENDAR_SERVICE_ACCOUNT_PRIVATE_KEY); }
 export function writeEnabled() { return configured() && env.CONVEX_CLOUD_URL === productionCloudUrl && env.STUDENT_STATUS_CALENDAR_WRITE_ENABLED === "true"; }
 /** Google Calendar event, master and instance ids (base32hex, or "<master>_<start>" instances) — nothing else reaches a URL. */
@@ -165,7 +173,7 @@ export const candidates = action({
       let pageToken: string | undefined;
       for (let page = 0; page < 5; page++) {
         if (pageToken) url.searchParams.set("pageToken", pageToken);
-        const response = await fetch(url, { headers: { authorization: auth } });
+        const response = await googleFetch(url, { headers: { authorization: auth } });
         if (!response.ok) return { items: [], error: calendarError(response.status) };
         const body: unknown = await response.json();
         if (!body || typeof body !== "object" || !("items" in body) || !Array.isArray(body.items)) return { items: [], error: "Team Calendar sent entries that couldn't be read. Try again." };
@@ -347,16 +355,37 @@ export const finishPush = internalMutation({ args: { eventId: v.id("events"), re
   return null;
 } });
 
+/**
+ * pushSnapshot returns null both when a newer push owns the event (correct no-op) and when this push can't run for the event
+ * itself. In the second case nothing else would ever settle it, so the event is marked failed here, with a plain-language reason
+ * and the usual Retry. Failed (not a delayed re-run) is the safe exit: an archived or past-season event never becomes
+ * pushable again, and a season change can last a long time, so a person retries once it finishes. Only the matching revision
+ * that is still pending changes state; a newer push or an already settled state is left alone.
+ */
+export const settleSkippedPush = internalMutation({ args: { eventId: v.id("events"), revision: v.number() }, returns: v.null(), handler: async (ctx, args) => {
+  const event = await ctx.db.get(args.eventId);
+  if (!event?.calendarChoice || event.calendarRevision !== args.revision || event.calendarSyncState !== "pending") return null;
+  let error: string | null = null;
+  if (event.archived) error = "This event has ended and moved to Past events, so its Team Calendar entry wasn't updated. Reload to see current events.";
+  else {
+    const season = await activeSeason(ctx);
+    if (event.seasonId !== season._id) error = "This event belongs to a past season, so its Team Calendar entry wasn't updated. Reload to see this season's events.";
+    else if (await timeclockTransitionLocked(ctx, season._id)) error = "A season change is in progress, so this event's Team Calendar update didn't go through. Try again after the season change finishes.";
+  }
+  if (error) await ctx.db.patch(event._id, { calendarSyncState: "failed", calendarSyncError: error, calendarLinkReplaceable: false });
+  return null;
+} });
+
 export const push = internalAction({ args: { eventId: v.id("events"), revision: v.number() }, returns: v.null(), handler: async (ctx, args) => {
   const snapshot = await ctx.runQuery(internal.eventCalendar.pushSnapshot, args);
-  if (!snapshot) return null;
+  if (!snapshot) { await ctx.runMutation(internal.eventCalendar.settleSkippedPush, args); return null; }
   const fail = async (error: string, conflict = false, replaceable = false) => ctx.runMutation(internal.eventCalendar.finishPush, { ...args, error, conflict, replaceable });
   if (!writeEnabled()) { await fail("Calendar updates are turned off in this copy of Venom Status, so changes here won't reach Team Calendar."); return null; }
   if (!await boundCalendar(ctx)) { await fail("Team Calendar settings changed or haven't been checked yet. Try again after the next Calendar update, or contact a Coach.", true); return null; }
   try {
     const auth = `Bearer ${await token(true)}`;
     if (snapshot.reconcile && snapshot.calendarEventId) {
-      const response = await fetch(eventUrl(snapshot.calendarEventId), { headers: { authorization: auth } });
+      const response = await googleFetch(eventUrl(snapshot.calendarEventId), { headers: { authorization: auth } });
       if (!response.ok) { await fail(calendarError(response.status), false, response.status === 404); return null; }
       const detail = googleDetails(await response.json());
       if (detail.parentSeries || (!detail.cancelled && (detail.startsAt === null || detail.endsAt === null))) { await fail("This Calendar entry has a schedule Venom Status can't use. Fix it in Team Calendar, then try again.", true); return null; }
@@ -364,7 +393,7 @@ export const push = internalAction({ args: { eventId: v.id("events"), revision: 
       return null;
     }
     if (snapshot.choice === "link" && !snapshot.etag) {
-      const response = await fetch(eventUrl(snapshot.calendarEventId!), { headers: { authorization: auth } });
+      const response = await googleFetch(eventUrl(snapshot.calendarEventId!), { headers: { authorization: auth } });
       if (!response.ok) { await fail(calendarError(response.status), false, response.status === 404); return null; }
       const detail = googleDetails(await response.json());
       if (detail.parentSeries || detail.cancelled || detail.startsAt === null || detail.endsAt === null) { await fail("Choose one active, dated Calendar entry. A whole repeating series can't be connected.", false, true); return null; }
@@ -375,7 +404,7 @@ export const push = internalAction({ args: { eventId: v.id("events"), revision: 
       if (description !== detail.description || snapshot.cancelled) {
         // Never write without the entry's etag: an empty if-match would overwrite a concurrent Calendar edit.
         if (!detail.etag) { await fail("Team Calendar didn't return the latest copy of this entry. Try again."); return null; }
-        const patched = await fetch(eventUrl(detail.id), { method: "PATCH", headers: { authorization: auth, "content-type": "application/json", "if-match": detail.etag }, body: JSON.stringify(snapshot.cancelled ? { status: "cancelled" } : { description }) });
+        const patched = await googleFetch(eventUrl(detail.id), { method: "PATCH", headers: { authorization: auth, "content-type": "application/json", "if-match": detail.etag }, body: JSON.stringify(snapshot.cancelled ? { status: "cancelled" } : { description }) });
         if (!patched.ok) { await fail(calendarError(patched.status), patched.status === 412); return null; }
         const patchedDetail = googleDetails(await patched.json());
         etag = patchedDetail.etag;
@@ -387,9 +416,9 @@ export const push = internalAction({ args: { eventId: v.id("events"), revision: 
     if (snapshot.choice === "create" && !snapshot.calendarEventId) {
       const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(snapshot.eventId));
       const id = "ss" + Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, "0")).join("").slice(0, 40);
-      const response = await fetch(eventUrl(), { method: "POST", headers: { authorization: auth, "content-type": "application/json" }, body: JSON.stringify({ id, summary: snapshot.name, location: snapshot.destination, start: { dateTime: new Date(snapshot.startsAt).toISOString() }, end: { dateTime: new Date(snapshot.endsAt).toISOString() }, description: snapshot.media ? mediaMarker : "", extendedProperties: { private: { studentStatusEventId: snapshot.eventId } } }) });
+      const response = await googleFetch(eventUrl(), { method: "POST", headers: { authorization: auth, "content-type": "application/json" }, body: JSON.stringify({ id, summary: snapshot.name, location: snapshot.destination, start: { dateTime: new Date(snapshot.startsAt).toISOString() }, end: { dateTime: new Date(snapshot.endsAt).toISOString() }, description: snapshot.media ? mediaMarker : "", extendedProperties: { private: { studentStatusEventId: snapshot.eventId } } }) });
       if (response.status === 409) {
-        const existingResponse = await fetch(eventUrl(id), { headers: { authorization: auth } });
+        const existingResponse = await googleFetch(eventUrl(id), { headers: { authorization: auth } });
         if (!existingResponse.ok) { await fail(calendarError(existingResponse.status)); return null; }
         const existingRaw: unknown = await existingResponse.json();
         const props = existingRaw && typeof existingRaw === "object" && "extendedProperties" in existingRaw ? existingRaw.extendedProperties as { private?: { studentStatusEventId?: string } } : undefined;
@@ -401,8 +430,8 @@ export const push = internalAction({ args: { eventId: v.id("events"), revision: 
         // The entry may have been inserted by a newer revision's push that ran while this one waited. Writing this snapshot now
         // would put older details over newer ones, so stop unless this revision is still the one to push (the newer push, or
         // its retry, owns the entry). The If-Match etag below still guards writes that land after this check.
-        if (!await ctx.runQuery(internal.eventCalendar.pushSnapshot, args)) return null;
-        const patched = await fetch(eventUrl(id), { method: "PATCH", headers: { authorization: auth, "content-type": "application/json", "if-match": existing.etag }, body: JSON.stringify(snapshot.cancelled ? { status: "cancelled" } : { summary: snapshot.name, location: snapshot.destination, start: { dateTime: new Date(snapshot.startsAt).toISOString() }, end: { dateTime: new Date(snapshot.endsAt).toISOString() }, description: withMediaMarker(existing.description, snapshot.media) }) });
+        if (!await ctx.runQuery(internal.eventCalendar.pushSnapshot, args)) { await ctx.runMutation(internal.eventCalendar.settleSkippedPush, args); return null; }
+        const patched = await googleFetch(eventUrl(id), { method: "PATCH", headers: { authorization: auth, "content-type": "application/json", "if-match": existing.etag }, body: JSON.stringify(snapshot.cancelled ? { status: "cancelled" } : { summary: snapshot.name, location: snapshot.destination, start: { dateTime: new Date(snapshot.startsAt).toISOString() }, end: { dateTime: new Date(snapshot.endsAt).toISOString() }, description: withMediaMarker(existing.description, snapshot.media) }) });
         if (!patched.ok) { await fail(calendarError(patched.status), patched.status === 412); return null; }
         const latest = googleDetails(await patched.json());
         await ctx.runMutation(internal.eventCalendar.finishPush, { ...args, calendarEventId: id, etag: latest.etag, providerUpdatedAt: latest.updatedAt });
@@ -412,14 +441,14 @@ export const push = internalAction({ args: { eventId: v.id("events"), revision: 
       let detail = googleDetails(await response.json());
       if (snapshot.cancelled) {
         if (!detail.etag) { await fail("Team Calendar didn't return the latest copy of this entry. Try again."); return null; }
-        const patched = await fetch(eventUrl(detail.id), { method: "PATCH", headers: { authorization: auth, "content-type": "application/json", "if-match": detail.etag }, body: JSON.stringify({ status: "cancelled" }) });
+        const patched = await googleFetch(eventUrl(detail.id), { method: "PATCH", headers: { authorization: auth, "content-type": "application/json", "if-match": detail.etag }, body: JSON.stringify({ status: "cancelled" }) });
         if (!patched.ok) { await fail(calendarError(patched.status), patched.status === 412); return null; }
         detail = googleDetails(await patched.json());
       }
       await ctx.runMutation(internal.eventCalendar.finishPush, { ...args, calendarEventId: detail.id, etag: detail.etag, providerUpdatedAt: detail.updatedAt });
       return null;
     }
-    const get = await fetch(eventUrl(snapshot.calendarEventId!), { headers: { authorization: auth } });
+    const get = await googleFetch(eventUrl(snapshot.calendarEventId!), { headers: { authorization: auth } });
     if (!get.ok) { await fail(calendarError(get.status)); return null; }
     const raw: unknown = await get.json(), current = googleDetails(raw);
     if (current.parentSeries || !current.etag) { await fail("A whole repeating series can't be edited here. Edit it in Team Calendar.", true); return null; }
@@ -434,7 +463,7 @@ export const push = internalAction({ args: { eventId: v.id("events"), revision: 
       start = { date: startDate }; end = { date: endDate };
     }
     const body = snapshot.cancelled ? { status: "cancelled" } : { summary: snapshot.name, location: snapshot.destination, start, end, description: withMediaMarker(current.description, snapshot.media) };
-    const patched = await fetch(eventUrl(snapshot.calendarEventId!), { method: "PATCH", headers: { authorization: auth, "content-type": "application/json", "if-match": current.etag }, body: JSON.stringify(body) });
+    const patched = await googleFetch(eventUrl(snapshot.calendarEventId!), { method: "PATCH", headers: { authorization: auth, "content-type": "application/json", "if-match": current.etag }, body: JSON.stringify(body) });
     if (!patched.ok) { await fail(calendarError(patched.status), patched.status === 412); return null; }
     const detail = googleDetails(await patched.json());
     await ctx.runMutation(internal.eventCalendar.finishPush, { ...args, calendarEventId: snapshot.calendarEventId!, etag: detail.etag, providerUpdatedAt: detail.updatedAt });
@@ -465,7 +494,7 @@ async function reconcileOne_(ctx: ActionCtx, calendarEventId: string, notices: S
   if (!await boundCalendar(ctx)) return null;
   const expectedRevision = await ctx.runQuery(internal.eventCalendar.observationRevision, { calendarEventId });
   if (expectedRevision === null) return null;
-  const response = await fetch(eventUrl(calendarEventId), { headers: { authorization: `Bearer ${await token(false)}` } });
+  const response = await googleFetch(eventUrl(calendarEventId), { headers: { authorization: `Bearer ${await token(false)}` } });
   if (response.status === 404) {
     notices.add(await ctx.runMutation(internal.eventCalendar.applyObserved, { deferSeriesNotice: true, eventId: calendarEventId, title: "", location: "", allDay: false, recurring: false, cancelled: true, authoritativeGone: true, expectedRevision, description: "" }));
     return null;
@@ -493,7 +522,7 @@ async function reconcileLinked_(ctx: ActionCtx, notices: SeriesNoticeCollector):
       if (!validCalendarEventId(id)) continue;
       const expectedRevision = await ctx.runQuery(internal.eventCalendar.observationRevision, { calendarEventId: id });
       if (expectedRevision === null) continue;
-      const response = await fetch(eventUrl(id), { headers: { authorization: auth } });
+      const response = await googleFetch(eventUrl(id), { headers: { authorization: auth } });
       if (response.status === 404) {
         notices.add(await ctx.runMutation(internal.eventCalendar.applyObserved, { deferSeriesNotice: true, eventId: id, title: "", location: "", allDay: false, recurring: false, cancelled: true, authoritativeGone: true, expectedRevision, description: "" }));
         continue;

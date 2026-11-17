@@ -67,6 +67,12 @@ export function assignmentNoticeEventIds(added: Doc<"events">[], notified: Set<I
   return ids;
 }
 
+/** A sync that ran to its end makes any saved stop for this student and kind out of date (membershipSync.listStopped). */
+async function resolveMembershipStops(ctx: MutationCtx, studentId: Id<"students">, kind: "wholeTeam" | "subteams") {
+  const stop = await ctx.db.query("membershipSyncStops").withIndex("by_studentId_and_kind", q => q.eq("studentId", studentId).eq("kind", kind)).first();
+  if (stop && stop.state === "stopped") await ctx.db.patch(stop._id, { state: "resumed", resumedAt: Date.now() });
+}
+
 /** Charges, one background notice batch and (when more events remain) the next page, shared by both membership syncs. */
 export async function finishMembershipPage(ctx: MutationCtx, actor: Doc<"appUsers">, student: Doc<"students">, kind: "wholeTeam" | "subteams", added: Doc<"events">[], page: { page: Doc<"events">[]; more: boolean }, notified: Set<Id<"eventSeries">>) {
   const drafts: ChargeDraft[] = added.filter(event => event.feeCents > 0).map(event => ({ label: event.name, amountCents: event.feeCents, priority: event.startsAt, idempotencyKey: `eventFee:${event._id}:${student._id}`, eventId: event._id }));
@@ -74,6 +80,7 @@ export async function finishMembershipPage(ctx: MutationCtx, actor: Doc<"appUser
   // Only events this call newly enrolled the student in, sent in the background so a roster change stays a bounded write.
   const notice = assignmentNoticeEventIds(added, notified);
   if (notice.length) await ctx.scheduler.runAfter(0, notifyAssignedRef, { studentId: student._id, eventIds: notice });
+  if (!page.more) await resolveMembershipStops(ctx, student._id, kind);
   const last = page.page[page.page.length - 1];
   if (page.more && last) await ctx.scheduler.runAfter(0, continueSyncRef, { kind, studentId: student._id, actorId: actor._id, after: { startsAt: last.startsAt, creationTime: last._creationTime }, notifiedSeriesIds: [...notified] });
 }
