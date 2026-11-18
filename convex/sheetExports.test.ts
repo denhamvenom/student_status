@@ -297,6 +297,19 @@ describe("a full update", () => {
     expect(google.state.batches).toHaveLength(3);
     expect(google.state.creates).toBe(2);
   });
+  it("rewrites unchanged files once when the stored layout is older than the current one", async () => {
+    const f = await fixture();
+    await f.coach.mutation(api.sheetExports.requestUpdate, {});
+    await finishRun(f);
+    expect(google.state.batches).toHaveLength(2);
+    // A fingerprint saved by an older layout version no longer matches, although the data is the same.
+    await f.t.run(async ctx => { for (const file of await ctx.db.query("sheetExportFiles").collect()) await ctx.db.patch(file._id, { fingerprint: "older-layout" }); });
+    await f.t.run(async ctx => { for (const r of await ctx.db.query("sheetExportRuns").collect()) await ctx.db.patch(r._id, { state: "done", finishedAt: 1 }); });
+    await f.lead.mutation(api.sheetExports.requestUpdate, {});
+    await finishRun(f);
+    expect(google.state.batches).toHaveLength(4);
+    expect(google.state.creates).toBe(2);
+  });
   it("reports how many files are finished while a run is going", async () => {
     const f = await fixture();
     await f.coach.mutation(api.sheetExports.requestUpdate, {});
