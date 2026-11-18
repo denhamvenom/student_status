@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- fake Google payloads are untyped JSON */
 import { describe, expect, it } from "vitest";
 import { parseDriveFolderId } from "./driveLinks";
-import { buildBatch } from "./googleSheets";
+import { buildBatch, cellLength, columnWidths } from "./googleSheets";
 import { folderVisible } from "./sheetKinds";
 import { dateText, guardianFor, safeCell, rosterGrade } from "./sheetRows";
 
@@ -85,5 +85,25 @@ describe("writing a spreadsheet", () => {
     const again = buildBatch(tabs, [{ sheetId: 0, title: "Counts", protected: true }, { sheetId: 1, title: "Details", protected: true }], 0);
     expect(again.requests.some((r: any) => r.addProtectedRange || r.addSheet)).toBe(false);
     expect(again.requests.filter((r: any) => r.updateSheetProperties?.properties.gridProperties?.frozenRowCount === 2)).toHaveLength(2);
+  });
+  it("sizes each column to its content between 60 and 320 pixels, ignoring the note row", () => {
+    const long = "x".repeat(100);
+    const { requests } = buildBatch([{ title: "T", rows: [["ID", "Email", "Answer"], [1, "a@example.org", long]] }], [], 0);
+    const widths = requests.flatMap((r: any) => (r.updateDimensionProperties ? [[r.updateDimensionProperties.range.startIndex, r.updateDimensionProperties.properties.pixelSize]] : []));
+    expect(widths).toEqual([[0, 60], [1, 13 * 7 + 16], [2, 320]]);
+  });
+  it("counts numbers by their digits and multi-line text by its longest line", () => {
+    expect([cellLength(12345), cellLength("ab\ncdef\r\ng"), cellLength(""), cellLength("héllo")]).toEqual([5, 4, 0, 5]);
+    expect(columnWidths([["a"], ["a\n" + "b".repeat(10)]])[0]).toEqual({ pixelSize: 86, capped: false });
+  });
+  it("wraps only columns that reach the maximum width, and keeps the note row unwrapped", () => {
+    const { requests } = buildBatch([{ title: "T", rows: [["Short", "Long"], ["ok", "y".repeat(80)]] }], [], 0);
+    const wraps = requests.filter((r: any) => r.repeatCell?.cell.userEnteredFormat.wrapStrategy === "WRAP").map((r: any) => r.repeatCell.range);
+    expect(wraps).toEqual([{ sheetId: 1, startRowIndex: 1, endRowIndex: 3, startColumnIndex: 1, endColumnIndex: 2 }]);
+    expect(requests.some((r: any) => r.repeatCell?.range.startRowIndex === 0 && r.repeatCell.cell.userEnteredFormat.wrapStrategy === "OVERFLOW_CELL")).toBe(true);
+  });
+  it("makes the header row bold", () => {
+    const { requests } = buildBatch([{ title: "T", rows: [["Name"], ["Dev"]] }], [], 0);
+    expect(requests.some((r: any) => r.repeatCell?.range.startRowIndex === 1 && r.repeatCell.cell.userEnteredFormat.textFormat?.bold === true)).toBe(true);
   });
 });

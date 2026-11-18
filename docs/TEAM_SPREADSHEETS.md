@@ -1,6 +1,6 @@
 # Team spreadsheets
 
-Venom Status keeps team spreadsheets up to date in the team's Google Workspace **shared drive**, using its own Google service account. Nobody edits these files by hand: every update clears and rewrites each tab, and a note at the top of every tab says so. Eleven kinds of file are ready (listed below): six General, one Money and one Health file per season, and per qualifying event one Events and one Money file, plus a Health (Travel emergency) file when the event has travel, an overnight stay or a permission form. When a season ends, its files move into an Archive folder inside their own folder.
+Venom Status keeps team spreadsheets up to date in the team's Google Workspace **shared drive**, using its own Google service account. Nobody edits these files by hand: every update clears and rewrites each tab, and a note at the top of every tab says so. Column widths and wrapping are set automatically at every update (each column fits its longest entry, and very long text wraps), so people with view-only access can read everything without resizing columns. Eleven kinds of file are ready (listed below): six General, one Money and one Health file per season, and per qualifying event one Events and one Money file, plus a Health (Travel emergency) file when the event has travel, an overnight stay or a permission form. When a season ends, its files move into an Archive folder inside their own folder.
 
 ## Owner checklist (once)
 

@@ -13,7 +13,7 @@ const SPREADSHEET_TYPE = "application/vnd.google-apps.spreadsheet";
 const FOLDER_TYPE = "application/vnd.google-apps.folder";
 export const APP_KEY_PROPERTY = "venomStatusKey";
 /** Bump when the way tabs are laid out or formatted changes, so every file is rewritten once even if its data is unchanged. */
-export const LAYOUT_VERSION = 2;
+export const LAYOUT_VERSION = 3;
 
 /** Waits before each retry of a busy or failing Google request, and how long one request may take. Tests shorten both. */
 export const googleRetry = { delaysMs: [1000, 2000, 4000], timeoutMs: 30_000 };
@@ -199,6 +199,26 @@ export async function getSheets(token: string, id: string): Promise<SheetInfo[] 
 }
 
 export const HEADER_ROW = 1;
+export const COLUMN_PIXELS_PER_CHARACTER = 7;
+export const COLUMN_PADDING_PIXELS = 16;
+export const COLUMN_MIN_PIXELS = 60;
+export const COLUMN_MAX_PIXELS = 320;
+/** Characters a cell needs on one line: numbers as written, multi-line text by its longest line. */
+export function cellLength(value: string | number | null | undefined): number {
+  return String(value ?? "").split(/\r\n|\r|\n/).reduce((longest, line) => Math.max(longest, [...line].length), 0);
+}
+/**
+ * Width of each column in pixels: longest cell (header and data rows, never the top note) x 7 + 16, kept between 60 and 320.
+ * `capped` is true when the content needs more than the maximum, so that column's cells are wrapped instead of cut off.
+ */
+export function columnWidths(rows: readonly (readonly (string | number)[])[]): { pixelSize: number; capped: boolean }[] {
+  const count = Math.max(1, ...rows.map(row => row.length));
+  return Array.from({ length: count }, (_, column) => {
+    const longest = Math.max(0, ...rows.map(row => cellLength(row[column])));
+    const wanted = longest * COLUMN_PIXELS_PER_CHARACTER + COLUMN_PADDING_PIXELS;
+    return { pixelSize: Math.min(COLUMN_MAX_PIXELS, Math.max(COLUMN_MIN_PIXELS, wanted)), capped: wanted > COLUMN_MAX_PIXELS };
+  });
+}
 const cell = (value: string | number) => { const safe = safeCell(value); return { userEnteredValue: typeof safe === "number" ? { numberValue: safe } : { stringValue: safe } }; };
 const stamp = (at: number) => new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }).format(at).replace(/\s+/g, " ");
 export const updateNote = (at: number) => `Updated ${stamp(at)} Central Time by Venom Status. Don't type changes here. They're replaced at the next update. Make changes in Venom Status.`;
@@ -234,7 +254,14 @@ export function buildBatch(tabs: readonly SheetTab[], existing: readonly SheetIn
     requests.push({ updateSheetProperties: { properties: { sheetId, gridProperties: { rowCount: Math.max(all.length + 10, 30), columnCount: Math.max(columns, 4), frozenRowCount: HEADER_ROW + 1 } }, fields: "gridProperties.rowCount,gridProperties.columnCount,gridProperties.frozenRowCount" } });
     requests.push({ updateCells: { range: { sheetId }, fields: "userEnteredValue,userEnteredFormat" } });
     requests.push({ updateCells: { start: { sheetId, rowIndex: 0, columnIndex: 0 }, fields: "userEnteredValue,userEnteredFormat.textFormat", rows: all.map((row, index) => ({ values: row.map(value => ({ ...cell(value), ...(index === 0 ? { userEnteredFormat: { textFormat: { italic: true } } } : index === HEADER_ROW ? { userEnteredFormat: { textFormat: { bold: true } } } : {}) })) })) } });
-    requests.push({ updateDimensionProperties: { range: { sheetId, dimension: "COLUMNS", startIndex: 1, endIndex: Math.max(columns, 4) }, properties: { pixelSize: 170 }, fields: "pixelSize" } });
+    // The note row may spill across empty cells but never wraps, so it cannot widen column A or make a tall row.
+    requests.push({ repeatCell: { range: { sheetId, startRowIndex: 0, endRowIndex: 1 }, cell: { userEnteredFormat: { wrapStrategy: "OVERFLOW_CELL" } }, fields: "userEnteredFormat.wrapStrategy" } });
+    requests.push({ repeatCell: { range: { sheetId, startRowIndex: HEADER_ROW, endRowIndex: HEADER_ROW + 1 }, cell: { userEnteredFormat: { textFormat: { bold: true } } }, fields: "userEnteredFormat.textFormat.bold" } });
+    // Viewers cannot resize columns, so each column is sized to its content; columns that hit the maximum wrap instead.
+    columnWidths(tab.rows).forEach((width, column) => {
+      requests.push({ updateDimensionProperties: { range: { sheetId, dimension: "COLUMNS", startIndex: column, endIndex: column + 1 }, properties: { pixelSize: width.pixelSize }, fields: "pixelSize" } });
+      if (width.capped) requests.push({ repeatCell: { range: { sheetId, startRowIndex: HEADER_ROW, endRowIndex: all.length, startColumnIndex: column, endColumnIndex: column + 1 }, cell: { userEnteredFormat: { wrapStrategy: "WRAP" } }, fields: "userEnteredFormat.wrapStrategy" } });
+    });
     if (!alreadyProtected) requests.push({ addProtectedRange: { protectedRange: { range: { sheetId }, description: "Venom Status replaces this tab at every update.", warningOnly: true } } });
   }
   // Tabs Venom Status no longer produces go last, so the file never has zero tabs.
