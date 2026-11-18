@@ -68,7 +68,7 @@ describe('Parent staff roles', () => {
     await f.parent.mutation(api.accounts.selectOperatingRole,{role:'mentor'});
     await f.t.run(ctx=>ctx.db.patch(f.ids.parent,{active:false}));
     await expect(f.parent.mutation(api.accounts.selectOperatingRole,{role:'mentor'})).rejects.toThrow('inactive');
-    expect(await f.parent.query(api.app.viewer,{})).toMatchObject({status:'pending',user:null});
+    expect(await f.parent.query(api.app.viewer,{})).toMatchObject({status:'inactive',user:null});
   });
 
   it('requires a new choice when a Coach reduces access and rejects an expired selection session', async () => {

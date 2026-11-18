@@ -11,6 +11,7 @@ import { allocateInvitationCode } from "./lib/invitationCodes";
 import { notifyJoinApproved } from "./lib/notificationTriggers";
 import { MAX_AUDIENCE_STUDENTS, MAX_MENTOR_INVITES, createEventCore, prepareEventAudience } from "./lib/createEventCore";
 import { studentInAudience } from "./lib/eventAudienceRules";
+import { deleteUserPushSubscriptions } from "./lib/notify";
 import { syncSubteamMembership } from "./lib/subteamEnrollment";
 import { MAX_QUESTIONS, MAX_SHIFTS, checkListSizes, checkRequirementFields, checkShiftSettings, cleanQuestion, cleanShift, questionInput, shiftInput } from "./lib/eventSignupExtras";
 
@@ -177,6 +178,14 @@ export const updateRoster = mutation({
     if (args.roomCategory !== undefined && args.roomCategory !== student.roomCategory) await markRoomCategoryReview(ctx, student._id, student.seasonId, true);
     const changes = { ...fields, ...(proposedSubteam !== undefined ? { subteam: proposedSubteam } : {}), ...(args.legalName !== undefined ? { legalName: args.legalName.trim() } : {}), ...(args.preferredName !== undefined ? { preferredName: args.preferredName.trim() } : {}), ...(args.roomCategory !== undefined ? { roomCategoryLocked: true } : {}), ...(args.active === false && student.active ? { archivedAt: Date.now() } : {}), profileRevision: (student.profileRevision ?? 0) + 1 };
     await ctx.db.patch(student._id, changes);
+    // Owner decision (Nov 17, 2026): archiving a student turns their own login off; reactivating turns it back on. Parent accounts are untouched.
+    const login = student.userId && args.active !== undefined && args.active !== student.active ? await ctx.db.get(student.userId) : null;
+    if (login && login.role === "student" && login.active !== args.active) {
+      const loginPatch = { active: args.active === true, accessRevision: (login.accessRevision ?? 0) + 1, ...(args.active === false ? { archivedAt: changes.archivedAt } : {}) };
+      await ctx.db.patch(login._id, loginPatch);
+      if (args.active === false) await deleteUserPushSubscriptions(ctx, login._id);
+      await audit(ctx, user, "appUsers", login._id, args.active === false ? "archiveStudentLogin" : "reactivateStudentLogin", { active: login.active, archivedAt: login.archivedAt ?? null, accessRevision: login.accessRevision ?? 0 }, { ...loginPatch, archivedAt: loginPatch.archivedAt ?? login.archivedAt ?? null }, reason?.trim());
+    }
     if (args.active === true && !student.active) await syncWholeTeamMembership(ctx, user, { ...student, ...changes });
     if ((args.active === true && !student.active) || (proposedSubteam !== undefined && proposedSubteam !== student.subteam)) await syncSubteamMembership(ctx, user, { ...student, ...changes });
     await audit(ctx, user, "students", student._id, "updateRoster", { profileRevision: student.profileRevision ?? 0, active: student.active, roomCategory: student.roomCategory, legalName: student.legalName, archivedAt: student.archivedAt ?? null }, { ...changes, archivedAt: changes.archivedAt ?? student.archivedAt ?? null }, reason?.trim());

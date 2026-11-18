@@ -1,7 +1,7 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import { driverStepIssue, withoutFieldPrefix, EventTransport, IndependentTravel } from './Travel'
+import { driverIssueCopy, driverStepIssue, withoutFieldPrefix, EventTransport, IndependentTravel } from './Travel'
 
 const state = vi.hoisted(() => ({ enabled: false }))
 vi.mock('convex/react', () => ({
@@ -56,5 +56,15 @@ describe('driver wizard steps', () => {
   it('keeps an unchanged saved phone valid and drops the server field prefix', () => {
     expect(driverStepIssue(0, { ...ok, phone: 'ext 12' }, 'ext 12')).toBe('')
     expect(withoutFieldPrefix('Driver phone: enter a 10-digit phone number, with an optional leading 1.')).toBe('enter a 10-digit phone number, with an optional leading 1.')
+  })
+})
+
+describe('driver no longer approved warning', () => {
+  it.each([
+    ['approvalRemoved', 'This driver is no longer approved. Remove this vehicle and assign another driver.'],
+    ['stoppedDriving', 'This driver stopped driving. Remove this vehicle and assign another driver.'],
+    ['driverMissing', "This driver's record is no longer available. Remove this vehicle and assign another driver."],
+  ])('tells staff to reassign when %s', (driverIssue, message) => {
+    expect(driverIssueCopy[driverIssue as keyof typeof driverIssueCopy]).toBe(message)
   })
 })

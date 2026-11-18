@@ -137,6 +137,7 @@ November 10, 2026 owner decisions, implemented on `feat/usability-audit` (not me
 - **Recording a payment.** There is no default payment method: the person chooses how it was paid. After recording, "Record another" asks whether the next payment is for the same student or someone else.
 - **Season transition.** "Mark all as Returning" sets every listed student not already Returning; each can be changed afterward.
 - **Past events un-archives.** An archived event whose end moves into the future is un-archived and returns to the live event lists.
+- November 17, 2026 owner decision: when a driver is unapproved or stops driving, their existing vehicle assignments stay. The event travel screen marks the driver as no longer approved so a Coach or Travel Lead can reassign. No data is changed automatically.
 - **Mentor Join order.** Chosen-students items appear after subteam and whole-team items.
 - **Inbox Older.** Any notice whose linked event has ended goes under Older.
 - **Money reasons.** A reason for a money action needs at least 8 characters everywhere.
@@ -166,6 +167,7 @@ November 10, 2026 owner decisions, implemented on `feat/usability-audit` (not me
 
 - Five years runs from the latest archival after reactivation and triggers review, not automatic erasure. Automatic deletion remains unauthorized.
 - November 17, 2026 owner decision: reactivating a student or adult keeps the earlier archive date; a re-archive sets a fresh date, and the five years count from that latest archival.
+- November 17, 2026 owner decision: when a Coach archives a student, the student's own login is turned off too (same date, access revision bumped, push subscriptions removed, audited). Reactivating the student turns the login back on and keeps the earlier archive date. Parent accounts are not affected. Applies only when the student has a linked login. Season-transition archiving also removes push subscriptions.
 - Review profile/contact/health, attendance, participation, financial history and permission evidence together. Preserve shared Parent/other-student records, Coach-reasoned holds and immutable signing history. An unresolved balance, dispute, safety incident or preservation requirement pauses relevant disposal until a recorded review/release decision.
 - DS Robotics Foundation operates Denham Venom Team 8044; admin@team8044.org handles verified requests.
 - Keep authorized exports in organization-controlled storage; track required official copies, remove temporary device/download copies after use and include retained exports in the same review/hold process. No automatic export inventory or remote deletion is claimed. Verify requester identity before supported corrections; never rewrite signed evidence.

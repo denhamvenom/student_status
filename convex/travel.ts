@@ -112,7 +112,13 @@ export const eventTransport = query({
       const student = students[i];
       return student?.active && student.seasonId === event.seasonId ? [{ studentId: student._id, name: student.legalName || student.preferredName, independentTravel: p.independentTravel ?? false }] : [];
     });
-    return { event: { _id: event._id, name: event.name, travel: event.travel, transportEnabled: teamTransportEnabled(event), busSeats: event.busSeats ?? 0, additionalAdults: event.additionalAdults ?? 0, trailerRequired: event.trailerRequired ?? false }, drivers, assignments, riders, summary: await transportSummary(ctx, event) };
+    // Coach or Travel Lead only (operator above). Assignments stay in place when a driver is unapproved or stops driving; flag them so staff can reassign.
+    const flagged = assignments.map(a => {
+      const driver = drivers.find(d => d._id === a.driverId);
+      const driverIssue = !driver ? "driverMissing" as const : !driver.approved ? "approvalRemoved" as const : driver.active === false ? "stoppedDriving" as const : null;
+      return { ...a, driverNoLongerApproved: driverIssue !== null, driverIssue };
+    });
+    return { event: { _id: event._id, name: event.name, travel: event.travel, transportEnabled: teamTransportEnabled(event), busSeats: event.busSeats ?? 0, additionalAdults: event.additionalAdults ?? 0, trailerRequired: event.trailerRequired ?? false }, drivers, assignments: flagged, riders, summary: await transportSummary(ctx, event) };
   },
 });
 

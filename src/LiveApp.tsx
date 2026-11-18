@@ -12,6 +12,7 @@ import { StaffSetupGate } from './StaffSetupWizard'
 import { setupWizardCopy } from './lib/setup-wizard-copy'
 import { FirstInvitationSettings } from './FirstRegistration'
 import { PendingJoin } from './PendingJoin'
+import { AccountTurnedOff } from './AccountTurnedOff'
 import { BulkInvite } from './BulkInvite'
 import { WithdrawnEventFee } from './WithdrawnEventFee'
 import { eventDraftIssue } from './lib/new-event-validation'
@@ -128,7 +129,7 @@ import { CoachParentAccess, ParentInvitationLanding, StudentParents } from './Pa
 type Student = { _id:string; secondarySubteam?:string|null; leadership?:boolean; fundraiserConnected?:boolean; profileRevision?:number; profileSetupRequired?:boolean; preferredName:string; legalName?:string; subteam:string; travelTeam?:boolean; active?:boolean; roomCategory?:string|null; email?:string; shirtSize?:string|null; allergies?:{state:string;text?:string}; medications?:{state:string;text?:string} }
 type Event = { _id:string; name:string; type:string; startsAt:number; endsAt:number; calendarAllDayStartDate?:string; calendarAllDayEndDate?:string; destination:string; onsite?:boolean; travel?:string; overnight?:boolean; roomingEnabled?:boolean; feeCents?:number; signupMode?:string; allowWithdrawal?:boolean; archived?:boolean; cancelled?:boolean; mediaSupportRequested?:boolean; enrollmentState?:"running"|"failed"|"complete"|"cancelled"; locationType?:string; seriesId?:string }
 type CalendarCandidate = { id:string; title:string; location:string; startsAt:number; endsAt:number; recurring:boolean; allDay:boolean }
-type Viewer = { availableRoles?:OperatingRole[]; operatingRole?:OperatingRole; roleSelectionRequired?:boolean; status:'signedOut'|'pending'|'active'; user:{id:string;name:string;email:string;role:'student'|'parent'|'coach'|'mentor';travelLead:boolean;financialEdit:boolean;theme:string}|null; students:Student[]; season:{_id?:string;name:string;year:number}|null }
+type Viewer = { availableRoles?:OperatingRole[]; operatingRole?:OperatingRole; roleSelectionRequired?:boolean; status:'signedOut'|'pending'|'inactive'|'active'; user:{id:string;name:string;email:string;role:'student'|'parent'|'coach'|'mentor';travelLead:boolean;financialEdit:boolean;theme:string}|null; students:Student[]; season:{_id?:string;name:string;year:number}|null }
 const qViewer=api.app.viewer
 const qDashboard=api.app.studentDashboard
 const qEvents=api.app.listEvents
@@ -499,10 +500,13 @@ export default function LiveApp(){
   const location=useLocation()
   const {setTheme}=useTheme()
   useEffect(()=>{if(viewer?.user?.theme)setTheme(viewer.user.theme)},[viewer?.user?.theme,setTheme])
-  if(location.pathname==='/invite-adult')return <AdultInvitationLanding viewer={viewer}/>
-  if(location.pathname==='/invite-parent')return <ParentInvitationLanding viewer={viewer}/>
+  // The invitation pages only know signed-out, pending and active; a turned-off account is treated as pending there, as before.
+  const landingViewer=viewer?{...viewer,status:viewer.status==='inactive'?'pending' as const:viewer.status}:viewer
+  if(location.pathname==='/invite-adult')return <AdultInvitationLanding viewer={landingViewer}/>
+  if(location.pathname==='/invite-parent')return <ParentInvitationLanding viewer={landingViewer}/>
   if(!viewer)return <div className="signin-content"><State>{liveCopy.states.connecting}</State></div>
   if(viewer.status==='signedOut')return <SignIn/>
+  if(viewer.status==='inactive')return <AccountTurnedOff/>
   if(viewer.status==='pending')return <PendingJoin/>
   return <RoleSession key={viewer.user?.id} viewer={viewer}/>
 }
