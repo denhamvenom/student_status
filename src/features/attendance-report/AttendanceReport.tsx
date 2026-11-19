@@ -37,15 +37,21 @@ function EventBadges({ event, now }: { event: ReportEvent; now: number }) {
 
 const eventTitle = (event: ReportEvent) => event.title.trim() || copy.kinds[event.kind]
 
-function MonthSwitcher({ month, limits, onChange }: { month: Month; limits: { first: Month | null; last: Month }; onChange: (month: Month) => void }) {
+function MonthSwitcher({ month, limits, loaded, onChange }: { month: Month; limits: { first: Month | null; last: Month }; loaded: boolean; onChange: (month: Month) => void }) {
+  const hintId = useId()
   const canGoBack = limits.first !== null && compareMonths(month, limits.first) > 0
   const canGoForward = compareMonths(month, limits.last) < 0
-  const button = cn(dashboardButtonVariants({ tone: 'soft', size: 'md' }), 'min-w-11 px-2')
-  return <nav aria-label={copy.monthNavigation} className="flex items-center justify-between gap-2">
-    <button type="button" className={button} disabled={!canGoBack} onClick={() => onChange(previousMonth(month.year, month.month))} aria-label={copy.previousMonth}><ChevronLeft size={22} aria-hidden="true" /></button>
-    <h2 aria-live="polite" className="m-0! text-center font-heading! text-[22px]! leading-tight! font-normal! text-vs-heading lg:text-[26px]!">{formatMonth(month)}</h2>
-    <button type="button" className={button} disabled={!canGoForward} onClick={() => onChange(nextMonth(month.year, month.month))} aria-label={copy.nextMonth}><ChevronRight size={22} aria-hidden="true" /></button>
-  </nav>
+  // A disabled arrow must look unavailable on phones too (no hover, so opacity alone is easy to miss): flat, dashed and muted.
+  const button = cn(dashboardButtonVariants({ tone: 'soft', size: 'md' }), 'min-w-11 px-2', 'disabled:border-dashed disabled:border-vs-border-subtle disabled:bg-transparent disabled:text-vs-muted! disabled:opacity-60 disabled:hover:brightness-100 dark:disabled:hover:brightness-100')
+  const atFirst = loaded && limits.first !== null && compareMonths(month, limits.first) <= 0
+  return <div className="flex flex-col gap-1">
+    <nav aria-label={copy.monthNavigation} className="flex items-center justify-between gap-2">
+      <button type="button" className={button} disabled={!canGoBack} onClick={() => onChange(previousMonth(month.year, month.month))} aria-label={copy.previousMonth} aria-describedby={atFirst ? hintId : undefined}><ChevronLeft size={22} aria-hidden="true" /></button>
+      <h2 aria-live="polite" className="m-0! text-center font-heading! text-[22px]! leading-tight! font-normal! text-vs-heading lg:text-[26px]!">{formatMonth(month)}</h2>
+      <button type="button" className={button} disabled={!canGoForward} onClick={() => onChange(nextMonth(month.year, month.month))} aria-label={copy.nextMonth}><ChevronRight size={22} aria-hidden="true" /></button>
+    </nav>
+    {atFirst && <p id={hintId} className="m-0 text-center text-[13px] text-vs-muted">{copy.firstMonth}</p>}
+  </div>
 }
 
 function Summary({ data }: { data: AttendanceMonth }) {
@@ -158,13 +164,13 @@ export function AttendanceReport({ studentId }: { studentId: Id<'students'> }) {
   const [chosenView, setChosenView] = useState<'calendar' | 'list' | null>(null)
   const view = chosenView ?? DEFAULT_VIEW
   const [requested, setRequested] = useState<Month>(() => chicagoMonth(Date.now()))
-  const [seasonStartsAt, setSeasonStartsAt] = useState<number | null>(null)
+  const [seasonBounds, setSeasonBounds] = useState<{ startsAt: number | null; firstActivityAt: number | null }>({ startsAt: null, firstActivityAt: null })
   const [showAll, setShowAll] = useState(false)
   const [selection, setSelection] = useState<Selection | null>(null)
-  const limits = monthLimits(seasonStartsAt, now)
+  const limits = monthLimits(seasonBounds.startsAt, seasonBounds.firstActivityAt, now)
   const month = clampMonth(requested, limits)
   const data = useQuery(api.attendanceReport.month, { studentId, year: month.year, month: month.month })
-  if (data && data.seasonStartsAt !== seasonStartsAt) setSeasonStartsAt(data.seasonStartsAt)
+  if (data && (data.seasonStartsAt !== seasonBounds.startsAt || (data.firstActivityAt ?? null) !== seasonBounds.firstActivityAt)) setSeasonBounds({ startsAt: data.seasonStartsAt, firstActivityAt: data.firstActivityAt ?? null })
   const viewsId = useId()
   const events = data ? visibleEvents(data.events, showAll) : []
   const openDay = (day: CalendarDay) => setSelection(day.events.length === 1 ? { title: eventTitle(day.events[0]), events: day.events } : { title: copy.detail.dayTitle(formatShortDate(day.events[0].scheduledStart)), events: day.events })
@@ -172,7 +178,7 @@ export function AttendanceReport({ studentId }: { studentId: Id<'students'> }) {
 
   return <div className="flex min-w-0 flex-col gap-3 font-sans text-vs-text lg:gap-4">
     <DashboardTile tone="quiet" className="gap-3">
-      <MonthSwitcher month={month} limits={limits} onChange={setRequested} />
+      <MonthSwitcher month={month} limits={limits} loaded={data !== undefined} onChange={setRequested} />
       {data ? <Summary data={data} /> : <p role="status" className="m-0 text-[13px] text-vs-muted">{copy.loading}</p>}
     </DashboardTile>
     <DashboardTile tone="quiet" className="gap-3">

@@ -10,7 +10,7 @@ const event = (overrides: Partial<ReportEvent>): ReportEvent => ({
 
 describe('month switcher limits', () => {
   // Season starts Aug 1, 2026; today is Nov 4, 2026 in Chicago.
-  const limits = monthLimits(at('2026-08-01T05:00:00Z'), at('2026-11-04T18:00:00Z'))
+  const limits = monthLimits(at('2026-08-01T05:00:00Z'), null, at('2026-11-04T18:00:00Z'))
   it.each([
     { name: 'stays on a month inside the season', month: { year: 2026, month: 10 }, expected: { year: 2026, month: 10 } },
     { name: 'never goes before the season starts', month: { year: 2026, month: 7 }, expected: { year: 2026, month: 8 } },
@@ -19,8 +19,36 @@ describe('month switcher limits', () => {
 
   it('uses the Chicago month for "now", not UTC', () => {
     // 8 p.m. Oct 31 in Chicago is already November in UTC.
-    expect(monthLimits(null, at('2026-11-01T01:00:00Z')).last).toEqual({ year: 2026, month: 10 })
+    expect(monthLimits(null, null, at('2026-11-01T01:00:00Z')).last).toEqual({ year: 2026, month: 10 })
   })
+})
+
+describe('month switcher earliest month', () => {
+  const now = at('2026-11-04T18:00:00Z')
+  const kickoff = at('2027-01-09T18:00:00Z')
+  it.each([
+    { name: 'a start date set at kickoff still reaches back to the first meeting', startsAt: kickoff, activity: at('2026-09-08T23:00:00Z'), first: { year: 2026, month: 9 } },
+    { name: 'no meetings yet keeps the start date, clamped to the current month', startsAt: kickoff, activity: null, first: { year: 2026, month: 11 } },
+    { name: 'a meeting before the start date wins', startsAt: at('2026-08-01T05:00:00Z'), activity: at('2026-07-20T23:00:00Z'), first: { year: 2026, month: 7 } },
+    { name: 'a start date before the first meeting wins', startsAt: at('2026-08-01T05:00:00Z'), activity: at('2026-09-08T23:00:00Z'), first: { year: 2026, month: 8 } },
+    { name: 'a first meeting in a future month never passes the current month', startsAt: kickoff, activity: at('2026-12-15T23:00:00Z'), first: { year: 2026, month: 11 } },
+    { name: 'uses the Chicago month of the first meeting', startsAt: kickoff, activity: at('2026-10-01T03:00:00Z'), first: { year: 2026, month: 9 } },
+  ])('$name', ({ startsAt, activity, first }) => expect(monthLimits(startsAt, activity, now).first).toEqual(first))
+
+  it('lets a Student go back to October when the start date is at kickoff', () => {
+    const limits = monthLimits(kickoff, at('2026-09-08T23:00:00Z'), now)
+    expect(clampMonth({ year: 2026, month: 10 }, limits)).toEqual({ year: 2026, month: 10 })
+    expect(clampMonth({ year: 2026, month: 8 }, limits)).toEqual({ year: 2026, month: 9 })
+  })
+
+  it('ignores a missing or invalid first-activity time, as sent by a backend that is not updated yet', () => {
+    const expected = { year: 2026, month: 8 }
+    expect(monthLimits(at('2026-08-01T05:00:00Z'), undefined, now).first).toEqual(expected)
+    expect(monthLimits(at('2026-08-01T05:00:00Z'), Number.NaN, now).first).toEqual(expected)
+    expect(monthLimits(undefined, undefined, now).first).toBeNull()
+  })
+
+  it('has no earliest month while neither date is known', () => expect(monthLimits(null, null, now).first).toBeNull())
 })
 
 describe('calendar grid', () => {

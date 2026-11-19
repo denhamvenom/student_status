@@ -11,6 +11,7 @@ export const reportCopy = {
   seeFullReport: 'See full attendance report',
   previousMonth: 'Previous month',
   nextMonth: 'Next month',
+  firstMonth: "That's the first month with meetings.",
   monthNavigation: 'Choose a month',
   loading: 'Loading attendance…',
   updating: 'Season totals are still updating, so Home may not match yet. Check back in a few minutes.',

@@ -49,6 +49,8 @@ const monthValidator = v.object({
   startsAt: v.number(),
   endsAt: v.number(),
   seasonStartsAt: v.number(),
+  /** Scheduled start of the season's earliest Timeclock session, or null when it has none. The month switcher reaches back this far even if the season's start date was set later. */
+  firstActivityAt: v.union(v.number(), v.null()),
   /** Season attendance totals are still being rebuilt; Home withholds its counts meanwhile. */
   reportsUpdating: v.boolean(),
   summary: v.object({
@@ -99,6 +101,8 @@ export const month = query({
     const occurrences = await ctx.db.query("timeclockOccurrences").withIndex("by_seasonId_and_scheduledStart", q => q.eq("seasonId", season._id).gte("scheduledStart", startsAt).lt("scheduledStart", endsAt)).take(MAX_OCCURRENCES + 1);
     if (sessions.length > MAX_SESSIONS || occurrences.length > MAX_OCCURRENCES) throw new ConvexError("This month has too many events to show at once. Contact a Coach to review this attendance.");
 
+    const firstSession = await ctx.db.query("timeclockSessions").withIndex("by_seasonId_and_scheduledStart", q => q.eq("seasonId", season._id)).first();
+
     const events: ReportEvent[] = [];
     const sessionOccurrences = new Set<Id<"timeclockOccurrences">>();
     for (const session of sessions) {
@@ -127,6 +131,7 @@ export const month = query({
       startsAt,
       endsAt,
       seasonStartsAt: season.startsAt,
+      firstActivityAt: firstSession?.scheduledStart ?? null,
       reportsUpdating: gate.state === "updating" || gate.state === "failed",
       summary: {
         requiredAttended: required.filter(event => event.countsAsAttended).length,

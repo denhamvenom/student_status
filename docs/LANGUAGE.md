@@ -114,6 +114,7 @@ Students and Parents. Strings live in `src/features/attendance/copy.ts`. The pag
 | Place | Words | Avoid |
 |---|---|---|
 | Page | Attendance; Your team's meetings and events this season, by type. | |
+| Monthly report (full attendance report), first month | That's the first month with meetings. (small note under the month name when Previous month is off) | |
 | Tiles | Required meetings; Other meetings; Outreach; Build hours | Tuesday, Thursday, Meetings (alone) |
 | Required meetings tile | {n}%; {a} / {h} attended; No required meetings yet | |
 | Other meetings tile | {a}; of {h} meeting(s) attended; None yet | |

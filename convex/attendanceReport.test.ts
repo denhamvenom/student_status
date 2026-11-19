@@ -175,6 +175,24 @@ describe("attendanceReport.month contents", () => {
     expect(report.summary).toEqual({ requiredAttended: 3, requiredHeld: 4, buildMinutes: 0, late: 2, early: 2 });
   });
 
+  it("reports the earliest Timeclock session of the Student's season as the first activity", async () => {
+    const f = await fixture();
+    await expect(f.student.query(api.attendanceReport.month, november)).resolves.toMatchObject({ firstActivityAt: null });
+    // Inserted out of order, and a session from another season that started earlier must not count.
+    await event(f, { title: "Team meeting", at: cst("2026-11-10") });
+    await event(f, { title: "Kickoff prep", at: cdt("2026-09-08") });
+    await event(f, { title: "Team meeting", at: cdt("2026-10-06"), session: false, calendar: "everyone" });
+    await f.t.run(async ctx => {
+      const oldSeason = await ctx.db.insert("seasons", { name: "Synthetic 2025–26", year: 2026, startsAt: Date.parse("2025-08-01T05:00:00Z"), status: "archived", permissionVersion: "DRAFT", createdBy: f.ids.coach.id });
+      const occurrenceId = await ctx.db.insert("timeclockOccurrences", { seasonId: oldSeason, source: "manual", sourceKey: "ar-old", title: "Old meeting", allDay: false, scheduledStart: cdt("2025-09-02"), scheduledEnd: cdt("2025-09-02") + 2 * hour, cancelled: false, observedAt: 1, revision: 1, needsReview: false });
+      await ctx.db.insert("timeclockSessions", { seasonId: oldSeason, occurrenceId, state: "closed", scheduledStart: cdt("2025-09-02"), scheduledEnd: cdt("2025-09-02") + 2 * hour, effectiveEnd: cdt("2025-09-02") + 2 * hour, extensionMs: 0, revision: 1, openedAt: 1, openedBy: f.ids.coach.id, closedAt: 2, needsReview: false });
+    });
+    // The same value comes back whichever month is asked for.
+    for (const [year, month] of [[2026, 11], [2026, 9], [2027, 3]]) {
+      await expect(f.student.query(api.attendanceReport.month, { year, month })).resolves.toMatchObject({ firstActivityAt: cdt("2026-09-08") });
+    }
+  });
+
   it("keeps staff-only calendar items out for Students, Parents and Coaches", async () => {
     const f = await fixture();
     await event(f, { title: "Team meeting", at: cst("2026-11-10"), session: false, calendar: "everyone" });
