@@ -15,11 +15,16 @@ export function chicagoMonth(epoch: number): Month {
   return { year, month }
 }
 
-/** The switcher stays between the season's first month and the current month. */
-export function monthLimits(seasonStartsAt: number | null, now: number) {
+/**
+ * The switcher stays between the earliest month with anything to show and the current month. That is the earlier of the
+ * season's start date and its first Timeclock session, so a start date set late (at kickoff) never hides earlier meetings.
+ */
+export function monthLimits(seasonStartsAt: number | null | undefined, firstActivityAt: number | null | undefined, now: number) {
   const last = chicagoMonth(now)
-  const first = seasonStartsAt === null ? null : chicagoMonth(seasonStartsAt)
-  return { first: first && compareMonths(first, last) > 0 ? last : first, last }
+  // An older backend sends no first-activity time at all; anything that is not a real time is ignored.
+  const starts = [seasonStartsAt, firstActivityAt].filter((epoch): epoch is number => typeof epoch === 'number' && Number.isFinite(epoch)).map(chicagoMonth)
+  const earliest = starts.reduce<Month | null>((best, month) => best === null || compareMonths(month, best) < 0 ? month : best, null)
+  return { first: earliest && compareMonths(earliest, last) > 0 ? last : earliest, last }
 }
 
 export function clampMonth(month: Month, limits: { first: Month | null; last: Month }): Month {
