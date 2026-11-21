@@ -1,11 +1,14 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalAction, internalMutation } from "./_generated/server";
-import { tokenHash } from "./lib/invitationIdentity";
+import { adultInviteTokenVersion, jobHash, jobToken } from "./lib/inviteToken";
 import { parentInviteEmailConfiguration } from "./lib/parentInviteEmail";
 
 const MAX_ATTEMPTS = 3;
 const RETRY_DELAYS_MS = [60_000, 5 * 60_000];
+// A job names its invite link by hash (derived links) or, for legacy and no-secret jobs, by the raw token.
+const jobRef = { token: v.optional(v.string()), hash: v.optional(v.string()) };
+const jobRefOf = (args: { token?: string; hash?: string }) => args.token !== undefined ? { token: args.token } : { hash: args.hash };
 
 type OfferedRole = "Coach" | "Mentor" | "Travel Lead";
 function offeredRole(row: { role: "coach" | "mentor"; travelLead: boolean }): OfferedRole {
@@ -40,7 +43,7 @@ export const markStalled = internalMutation({
 
 export const prepareSend = internalMutation({
   args: { inviteId: v.id("adultInvitations"), hash: v.string(), attempt: v.number() },
-  returns: v.union(v.object({ email: v.string(), role: v.union(v.literal("Coach"), v.literal("Mentor"), v.literal("Travel Lead")) }), v.null()),
+  returns: v.union(v.object({ email: v.string(), role: v.union(v.literal("Coach"), v.literal("Mentor"), v.literal("Travel Lead")), tokenVersion: v.string() }), v.null()),
   handler: async (ctx, args) => {
     const row = await ctx.db.get(args.inviteId);
     if (!row || row.emailStatus !== "queued" || row.tokenHash !== args.hash ||
@@ -58,23 +61,24 @@ export const prepareSend = internalMutation({
       return null;
     }
     await ctx.db.patch(row._id, { emailAttempt: args.attempt });
-    return { email: row.email, role: offeredRole(row) };
+    return { email: row.email, role: offeredRole(row), tokenVersion: adultInviteTokenVersion(row) };
   },
 });
 
 export const finishSend = internalMutation({
-  args: { inviteId: v.id("adultInvitations"), token: v.string(), attempt: v.number(), outcome: v.union(v.literal("sent"), v.literal("retry"), v.literal("failed"), v.literal("not_sent")) },
+  args: { inviteId: v.id("adultInvitations"), ...jobRef, attempt: v.number(), outcome: v.union(v.literal("sent"), v.literal("retry"), v.literal("failed"), v.literal("not_sent")) },
   returns: v.null(),
   handler: async (ctx, args) => {
     const row = await ctx.db.get(args.inviteId);
-    if (!row || row.tokenHash !== await tokenHash(args.token) || row.emailAttempt !== args.attempt) return null;
+    // Wave 1 fencing: only the current issue (hash) and attempt may change the row.
+    if (!row || row.tokenHash !== await jobHash(args) || row.emailAttempt !== args.attempt) return null;
     const stalled = row.emailStatus === "failed" && row.emailError === STALLED_ERROR;
     if (row.emailStatus !== "queued" && !(stalled && args.outcome === "sent")) return null;
     if (args.outcome === "sent") {
       await ctx.db.patch(row._id, { emailStatus: "sent", emailError: undefined, emailSentAt: Date.now() });
     } else if (args.outcome === "retry" && args.attempt < MAX_ATTEMPTS && row.status === "pending" && row.expiresAt > Date.now()) {
       await ctx.db.patch(row._id, { emailError: "The email is delayed. It will be sent again automatically." });
-      await ctx.scheduler.runAfter(RETRY_DELAYS_MS[args.attempt - 1], internal.adultInviteEmail.send, { inviteId: args.inviteId, token: args.token, attempt: args.attempt + 1 });
+      await ctx.scheduler.runAfter(RETRY_DELAYS_MS[args.attempt - 1], internal.adultInviteEmail.send, { inviteId: args.inviteId, ...jobRefOf(args), attempt: args.attempt + 1 });
     } else {
       await ctx.db.patch(row._id, { emailStatus: args.outcome === "not_sent" || row.status !== "pending" || row.expiresAt <= Date.now() ? "not_sent" : "failed", emailError: args.outcome === "not_sent" ? "Automatic email is not configured. Ask a Coach for help." : "Email could not be sent. Ask a Coach for help." });
     }
@@ -83,18 +87,24 @@ export const finishSend = internalMutation({
 });
 
 export const send = internalAction({
-  args: { inviteId: v.id("adultInvitations"), token: v.string(), attempt: v.number() },
+  args: { inviteId: v.id("adultInvitations"), ...jobRef, attempt: v.number() },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const hash = await tokenHash(args.token);
-    const ready: { email: string; role: OfferedRole } | null = await ctx.runMutation(internal.adultInviteEmail.prepareSend, { inviteId: args.inviteId, hash, attempt: args.attempt });
+    const hash = await jobHash(args);
+    if (!hash) return null;
+    const ready: { email: string; role: OfferedRole; tokenVersion: string } | null = await ctx.runMutation(internal.adultInviteEmail.prepareSend, { inviteId: args.inviteId, hash, attempt: args.attempt });
     if (!ready) return null;
     const config = parentInviteEmailConfiguration();
     if (!config) {
-      await ctx.runMutation(internal.adultInviteEmail.finishSend, { ...args, outcome: "not_sent" });
+      await ctx.runMutation(internal.adultInviteEmail.finishSend, { inviteId: args.inviteId, ...jobRefOf(args), attempt: args.attempt, outcome: "not_sent" });
       return null;
     }
-    const link = `${config.origin}/invite-adult#token=${encodeURIComponent(args.token)}`;
+    const token = await jobToken(args, "adult", args.inviteId, ready.tokenVersion, hash);
+    if (!token) {
+      await ctx.runMutation(internal.adultInviteEmail.finishSend, { inviteId: args.inviteId, ...jobRefOf(args), attempt: args.attempt, outcome: "failed" });
+      return null;
+    }
+    const link = `${config.origin}/invite-adult#token=${encodeURIComponent(token)}`;
     // Keep payload identical across retries; Resend deduplicates this invite ID for 24 hours.
     const payload = JSON.stringify({
       from: config.from,
@@ -117,7 +127,7 @@ export const send = internalAction({
         outcome = response.status === 429 || response.status >= 500 ? "retry" : "failed";
       }
     } catch { outcome = "retry"; }
-    await ctx.runMutation(internal.adultInviteEmail.finishSend, { ...args, outcome });
+    await ctx.runMutation(internal.adultInviteEmail.finishSend, { inviteId: args.inviteId, ...jobRefOf(args), attempt: args.attempt, outcome });
     return null;
   },
 });

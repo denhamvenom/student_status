@@ -110,6 +110,7 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 
 /** What Sign up does beyond the fee line, or null when signing up just confirms (the Cost line already says it). */
 function outcomeText(availability: SignupAvailability) {
+  if (availability.declined) return signupCopy.form.declined
   if (availability.outcome === 'closed') return availability.signupMode === 'assigned' ? sheetCopy.outcome.assigned : sheetCopy.outcome.closed
   if (availability.outcome === 'waitlisted') return sheetCopy.outcome.waitlisted
   if (availability.outcome === 'waitingForApproval') return sheetCopy.outcome.waitingForApproval

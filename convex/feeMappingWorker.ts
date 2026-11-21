@@ -1,13 +1,16 @@
 import { savedPublicError } from './lib/publicErrors';
 import { recordChargeRevisionChange } from "./lib/financeChanges";
 import { makeFunctionReference } from "convex/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { seasonFinanceControl, seasonFinancialDrain } from "./lib/seasonFinance";
 import { provenMainFee } from "./lib/feeDefinitions";
 import { readyFinancialAccountForFeeJob, recordChargeChange } from "./lib/financialSources";
 import { effectiveChargeCents } from "./lib/chargeObligation";
 import { refreshStudentFinance } from "./lib/financeSummaries";
+/** A drain that has not finished in 30 minutes is not coming back on its own (a normal drain takes seconds); fail it so a Coach can try again. */
+const DRAIN_WAIT_LIMIT_MS = 30 * 60 * 1000;
+const DRAIN_WAIT_MESSAGE = "Money updates are still running after 30 minutes. Wait for them to finish, then choose Try again.";
 const runRef = makeFunctionReference<"mutation">("feeMappingWorker:run");
 const pageRef = makeFunctionReference<"mutation">("feeMappingWorker:processPage");
 
@@ -22,7 +25,7 @@ export const processPage = internalMutation({
     if (phase === "drain") {
       const drain = await seasonFinancialDrain(ctx, job.seasonId);
       if (drain.blocked) throw new Error(drain.message ?? "Existing financial work needs resolution.");
-      if (!drain.ready) { await ctx.scheduler.runAfter(1000, runRef, { jobId: job._id }); return null; }
+      if (!drain.ready) { if (Date.now() - job.updatedAt > DRAIN_WAIT_LIMIT_MS) throw new ConvexError(DRAIN_WAIT_MESSAGE); await ctx.scheduler.runAfter(1000, runRef, { jobId: job._id }); return null; }
       phase = job.mode === "prove" ? "events" : "review";
       await ctx.db.patch(control._id, { state: "applying", updatedAt: Date.now() });
     } else if (phase === "events") {

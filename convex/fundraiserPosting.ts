@@ -145,7 +145,7 @@ export const retryPreview = query({
   returns: v.array(v.object({ studentId: v.id("students"), name: v.string(), grossCents: v.number(), expectedRowRevision: v.number(), expectedFinancialRevision: v.union(v.number(), v.null()), requiredReductionCents: v.number(), availableOriginalCents: v.number(), state: v.union(v.literal("ready"), v.literal("hold"), v.literal("updating")), message: v.union(v.string(), v.null()) })),
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); const season = await activeSeason(ctx); const job = await ctx.db.get(args.jobId); const fundraiser = job ? await ctx.db.get(job.fundraiserId) : null;
-    if (actor.role !== "coach" || !job || !fundraiser || fundraiser.seasonId !== season._id || !["held", "failed"].includes(job.state)) throw new ConvexError("Only a Coach can review a stopped or held posting. Reload to see the latest.");
+    if (actor.role !== "coach" || !job || !fundraiser || fundraiser.seasonId !== season._id || !["held", "failed"].includes(job.state) || fundraiser.state !== job.state) throw new ConvexError("Only a Coach can review students who were not credited.");
     if (!args.studentIds.length || args.studentIds.length > 20 || new Set(args.studentIds).size !== args.studentIds.length) throw new ConvexError("Choose up to 20 students on hold to review.");
     const result = [];
     for (const studentId of args.studentIds) {
@@ -168,7 +168,7 @@ export const retry = mutation({
   handler: async (ctx, args) => {
     const actor = await viewer(ctx); const season = await activeSeason(ctx); const job = await ctx.db.get(args.jobId); const fundraiser = job ? await ctx.db.get(job.fundraiserId) : null;
     if (actor.role !== "coach") throw new ConvexError("Only a Coach can try posting fundraiser amounts again.");
-    if (!job || !fundraiser || fundraiser.seasonId !== season._id || !["failed", "held"].includes(job.state) || fundraiser.postingJobId !== job._id) throw new ConvexError("No stopped or held posting is waiting to try again. Reload to see the latest.");
+    if (!job || !fundraiser || fundraiser.seasonId !== season._id || !["failed", "held"].includes(job.state) || fundraiser.postingJobId !== job._id || fundraiser.state !== job.state) throw new ConvexError("Nothing is waiting to try again. Reload to see the latest.");
     await requireSeasonFinancialRetry(ctx, season._id, job._id);
     if (args.reason.trim().length < 8 || args.reason.length > 1000 || args.rows.length > 500 || new Set(args.rows.map(r => r.studentId)).size !== args.rows.length) throw new ConvexError("Review the students to try again and enter a reason of at least eight characters.");
     for (const input of args.rows) {

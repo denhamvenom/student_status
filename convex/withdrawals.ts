@@ -332,7 +332,7 @@ export const putBackOnEvent = mutation({
     const now = Date.now();
     const request = activeApprovedWithdrawal(data.requests);
     if (request) await ctx.db.patch(request._id, { reinstatedAt: now, reinstatedBy: user._id });
-    await ctx.db.patch(data.participant._id, { status: "confirmed", createdAt: now, updatedAt: now });
+    await ctx.db.patch(data.participant._id, { status: "confirmed", createdAt: now, declinedAt: undefined, declinedBy: undefined, updatedAt: now });
     // Owner decision 2026-11-07: Put back never touches charges; the audit row records that no fee was changed.
     await audit(ctx, user, "participants", data.participant._id, "putBackOnEvent", { status: "withdrawn", withdrawalRequestId: request?._id ?? null, moneyDecision: !!request?.jobId }, { status: "confirmed", chargesChanged: false }, args.reason?.trim() || undefined);
     // The student is back, so their Whole Team leave notice is no longer news for Coaches.

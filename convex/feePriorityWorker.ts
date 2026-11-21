@@ -1,13 +1,16 @@
 import { savedPublicError } from './lib/publicErrors';
 import { recordChargeRevisionChange, recordPriorityJobChange } from "./lib/financeChanges";
 import { makeFunctionReference } from "convex/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { seasonFinancialDrain, seasonFinanceControl } from "./lib/seasonFinance";
 import { readyFinancialAccountForFeeJob, recordChargeChange } from "./lib/financialSources";
 import { effectiveChargeCents } from "./lib/chargeObligation";
 import { refreshStudentFinance } from "./lib/financeSummaries";
 import { allocateUnapplied } from "./lib/money";
+/** A drain that has not finished in 30 minutes is not coming back on its own (a normal drain takes seconds); fail it so a Coach can try again. */
+const DRAIN_WAIT_LIMIT_MS = 30 * 60 * 1000;
+const DRAIN_WAIT_MESSAGE = "Money updates are still running after 30 minutes. Wait for them to finish, then choose Try again.";
 const runRef = makeFunctionReference<"mutation">("feePriorityWorker:run");
 const stepRef = makeFunctionReference<"mutation">("feePriorityWorker:processPage");
 
@@ -24,7 +27,7 @@ export const processPage = internalMutation({
     if (job.phase === "drain") {
       const drain = await seasonFinancialDrain(ctx, job.seasonId);
       if (drain.blocked) throw new Error(drain.message ?? "Resolve existing financial work before maintenance.");
-      if (!drain.ready) { await ctx.scheduler.runAfter(1000, runRef, { jobId: job._id }); return null; }
+      if (!drain.ready) { if (Date.now() - job.updatedAt > DRAIN_WAIT_LIMIT_MS) throw new ConvexError(DRAIN_WAIT_MESSAGE); await ctx.scheduler.runAfter(1000, runRef, { jobId: job._id }); return null; }
       if (first.revision !== job.firstRevision || second.revision !== job.secondRevision || first.priority !== job.firstPriority || second.priority !== job.secondPriority) throw new Error("Fee order changed before maintenance acquired its lock.");
       await ctx.db.patch(first._id, { priority: job.secondPriority, revision: first.revision + 1, updatedAt: Date.now() });
       await ctx.db.patch(second._id, { priority: job.firstPriority, revision: second.revision + 1, updatedAt: Date.now() });

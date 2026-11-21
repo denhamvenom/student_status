@@ -10,7 +10,8 @@ import { audit, requireRole, viewer } from "./lib/access";
 import { availableRoles } from "./lib/access";
 import { deleteUserPushSubscriptions } from "./lib/notify";
 import { getAuthSessionId } from "@convex-dev/auth/server";
-import { newToken, tokenHash, verifiedAdult } from "./lib/invitationIdentity";
+import { tokenHash, verifiedAdult } from "./lib/invitationIdentity";
+import { inviteTokenSecret, issueInviteToken, pendingTokenHash } from "./lib/inviteToken";
 import { isMentorCapable, removeLostMentorSignups } from "./lib/mentorMeetings";
 
 const RESEND_COOLDOWN_MS = 60 * 60_000;
@@ -107,11 +108,14 @@ export const inviteAdult = mutation({
     const latest = await ctx.db.query("adultInvitations").withIndex("by_email_and_createdAt", q => q.eq("email", email)).order("desc").first();
     if (latest && resendAvailableAt(latest) > Date.now()) throw new ConvexError("This invitation was sent less than one hour ago. Wait, then resend it.");
     for (const row of prior) await ctx.db.patch(row._id, { status: "replaced" });
-    const token = newToken(); const now = Date.now(); const expiresAt = now + 7 * 86400000;
-    const invitationId = await ctx.db.insert("adultInvitations", { email, role: args.role, travelLead: args.travelLead, financialEdit: args.financialEdit, healthExport: args.healthExport, tokenHash: await tokenHash(token), status: "pending", createdBy: actor._id, createdAt: now, expiresAt, emailStatus: "queued", emailQueuedAt: now, emailAttempt: 0 });
+    const now = Date.now(); const expiresAt = now + 7 * 86400000;
+    const invitationId = await ctx.db.insert("adultInvitations", { email, role: args.role, travelLead: args.travelLead, financialEdit: args.financialEdit, healthExport: args.healthExport, tokenHash: pendingTokenHash(), status: "pending", createdBy: actor._id, createdAt: now, expiresAt, emailStatus: "queued", emailQueuedAt: now, emailAttempt: 0 });
+    // The derived link needs the row id, so the hash is written right after the insert (same transaction).
+    const issued = await issueInviteToken(inviteTokenSecret(), "adult", invitationId, now);
+    await ctx.db.patch(invitationId, issued.stored);
     await audit(ctx, actor, "adultInvitations", invitationId, "create", null, { email, role: args.role, travelLead: args.travelLead, financialEdit: args.financialEdit, healthExport: args.healthExport, expiresAt });
-    await ctx.scheduler.runAfter(0, internal.adultInviteEmail.send, { inviteId: invitationId, token, attempt: 1 });
-    await ctx.scheduler.runAfter(20 * 60_000, internal.adultInviteEmail.markStalled, { inviteId: invitationId, hash: await tokenHash(token) });
+    await ctx.scheduler.runAfter(0, internal.adultInviteEmail.send, { inviteId: invitationId, ...issued.job, attempt: 1 });
+    await ctx.scheduler.runAfter(20 * 60_000, internal.adultInviteEmail.markStalled, { inviteId: invitationId, hash: issued.stored.tokenHash });
     return { invitationId, expiresAt };
   },
 });
@@ -127,9 +131,11 @@ export const resendInvitation = mutation({
     if (!issuer?.active || issuer.role !== "coach") throw new ConvexError("The Coach who sent this invitation no longer has Coach access. Send a new invitation.");
     if (resendAvailableAt(row) > now) throw new ConvexError("This invitation was sent less than one hour ago. Wait, then resend it.");
     if ((await ctx.db.query("appUsers").withIndex("by_email", q => q.eq("email", row.email)).take(1)).length) throw new ConvexError("This email already has an account. Change its access in the account list instead.");
-    const token = newToken(); const hash = await tokenHash(token); const expiresAt = now + 7 * 86400000;
-    await ctx.db.patch(row._id, { tokenHash: hash, createdBy: actor._id, expiresAt, emailStatus: "queued", emailQueuedAt: now, emailAttempt: 0, emailError: undefined, emailSentAt: undefined });
-    await ctx.scheduler.runAfter(0, internal.adultInviteEmail.send, { inviteId: row._id, token, attempt: 1 });
+    // A new emailQueuedAt and tokenNonce make a new link, so the old link stops working (owner decision).
+    const { stored, job } = await issueInviteToken(inviteTokenSecret(), "adult", row._id, now);
+    const hash = stored.tokenHash; const expiresAt = now + 7 * 86400000;
+    await ctx.db.patch(row._id, { ...stored, createdBy: actor._id, expiresAt, emailStatus: "queued", emailQueuedAt: now, emailAttempt: 0, emailError: undefined, emailSentAt: undefined });
+    await ctx.scheduler.runAfter(0, internal.adultInviteEmail.send, { inviteId: row._id, ...job, attempt: 1 });
     await ctx.scheduler.runAfter(20 * 60_000, internal.adultInviteEmail.markStalled, { inviteId: row._id, hash });
     await audit(ctx, actor, "adultInvitations", row._id, "resend", null, { email: row.email, expiresAt });
     return { invitationId: row._id, expiresAt };

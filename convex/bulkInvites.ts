@@ -1,7 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
-import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { activeSeason, audit, identity, requireRole, requireSeasonProfileWritable, viewer } from "./lib/access";
 import { refreshStudentFinance } from "./lib/financeSummaries";
 import { allocateInvitationCode, codeLimiter as limiter, googleRequiredForStudents, joinAttemptsLocked, normalizedInvitationCode, recordFailedJoinAttempt, usableTeamCode } from "./lib/invitationCodes";
@@ -47,6 +47,49 @@ function matches(rows: Doc<"students">[], first: string, last: string) {
   const target = key(first, last);
   return rows.filter(row => key(row.firstName ?? row.legalName.split(/\s+/)[0] ?? "", row.lastName ?? row.legalName.split(/\s+/).slice(1).join(" ")) === target);
 }
+type InviteStatus = Doc<"bulkStudentInvites">["status"];
+// Every legitimate status move. pending -> pending is a code rotation; revoked/replaced -> pending is the
+// intended revive when a Coach issues a new code on an old invitation. redeemed is terminal.
+const allowedTransitions: Record<InviteStatus, readonly InviteStatus[]> = {
+  pending: ["pending", "revoked", "replaced", "redeemed"],
+  revoked: ["pending"],
+  replaced: ["pending"],
+  redeemed: [],
+};
+// The only place an existing invitation's status is written. The batch's pendingCount and connectedCount
+// move in the same transaction, so they cannot drift from the invite rows. `outcome` holds the other
+// fields written with the move (new code, redeemer, ...). New invitations are inserted by createBatch,
+// which sets the batch counters when it inserts the batch.
+async function applyInviteTransition(ctx: MutationCtx, invite: Doc<"bulkStudentInvites">, nextStatus: InviteStatus, outcome: Partial<Omit<Doc<"bulkStudentInvites">, "_id" | "_creationTime" | "status" | "batchId">> = {}) {
+  const current = await ctx.db.get(invite._id);
+  if (!current) throw new ConvexError("This invitation is no longer available. Reload to see the latest.");
+  if (!allowedTransitions[current.status].includes(nextStatus)) throw new ConvexError("This invitation code was already used, revoked or replaced. Reload to see the latest.");
+  await ctx.db.patch(current._id, { ...outcome, status: nextStatus });
+  const pending = Number(nextStatus === "pending") - Number(current.status === "pending");
+  const connected = Number(nextStatus === "redeemed") - Number(current.status === "redeemed");
+  if (!pending && !connected) return;
+  const batch = await ctx.db.get(current.batchId);
+  if (batch) await ctx.db.patch(batch._id, { pendingCount: batch.pendingCount + pending, connectedCount: batch.connectedCount + connected });
+}
+
+// Repair only: recomputes inviteCount, pendingCount and connectedCount from the invite rows, 100 rows per
+// call. Call again with the returned cursor and totals until done; the batch is patched on the last page.
+// createdCount, linkedCount and skippedCount are fixed at upload time and cannot be derived from invites.
+export const recountBatch = internalMutation({
+  args: { batchId: v.id("bulkInviteBatches"), cursor: v.optional(v.union(v.string(), v.null())), inviteCount: v.optional(v.number()), pendingCount: v.optional(v.number()), connectedCount: v.optional(v.number()) },
+  returns: v.object({ done: v.boolean(), cursor: v.union(v.string(), v.null()), inviteCount: v.number(), pendingCount: v.number(), connectedCount: v.number() }),
+  handler: async (ctx, args) => {
+    const batch = await ctx.db.get(args.batchId);
+    if (!batch) throw new ConvexError("This upload is no longer available.");
+    const page = await ctx.db.query("bulkStudentInvites").withIndex("by_batchId", q => q.eq("batchId", args.batchId)).paginate({ numItems: 100, cursor: args.cursor ?? null });
+    const inviteCount = (args.inviteCount ?? 0) + page.page.length;
+    const pendingCount = (args.pendingCount ?? 0) + page.page.filter(row => row.status === "pending").length;
+    const connectedCount = (args.connectedCount ?? 0) + page.page.filter(row => row.status === "redeemed").length;
+    if (page.isDone) await ctx.db.patch(batch._id, { inviteCount, pendingCount, connectedCount });
+    return { done: page.isDone, cursor: page.isDone ? null : page.continueCursor, inviteCount, pendingCount, connectedCount };
+  },
+});
+
 async function permittedInvite(ctx: Ctx, inviteId: Id<"bulkStudentInvites">) {
   const actor = await viewer(ctx); requireRole(actor, "coach");
   const invite = await ctx.db.get(inviteId);
@@ -142,9 +185,7 @@ export const createBatch = mutation({
       const previousCodes = await ctx.db.query("bulkStudentInvites").withIndex("by_studentId_and_status", q => q.eq("studentId", studentId).eq("status", "pending")).take(101);
       if (previousCodes.length > 100) throw new ConvexError("A student in this file has too many open invitation codes. Revoke the old codes, then try again.");
       for (const previousCode of previousCodes) {
-        await ctx.db.patch(previousCode._id, { status: "replaced", code: "" });
-        const oldBatch = await ctx.db.get(previousCode.batchId);
-        if (oldBatch) await ctx.db.patch(oldBatch._id, { pendingCount: oldBatch.pendingCount - 1 });
+        await applyInviteTransition(ctx, previousCode, "replaced", { code: "" });
       }
       const code = await newCode(ctx);
       const inviteId = await ctx.db.insert("bulkStudentInvites", { batchId, seasonId: season._id, studentId, code, codeHash: await tokenHash(code), status: "pending", createdBy: actor._id, createdAt: now, expiresAt });
@@ -190,9 +231,7 @@ export const revoke = mutation({
     const { actor, invite } = await permittedInvite(ctx, args.inviteId);
     if (invite.code !== args.expectedCode) throw new ConvexError("This invitation changed since you opened it. Reload to see the latest, then try again.");
     if (invite.status !== "pending") throw new ConvexError("This invitation code was already used, revoked or replaced. Reload to see the latest.");
-    await ctx.db.patch(invite._id, { status: "revoked", code: "" });
-    const batch = await ctx.db.get(invite.batchId);
-    if (batch) await ctx.db.patch(batch._id, { pendingCount: batch.pendingCount - 1 });
+    await applyInviteTransition(ctx, invite, "revoked", { code: "" });
     await audit(ctx, actor, "bulkStudentInvites", invite._id, "revoke", "pending", "revoked");
     return null;
   },
@@ -211,16 +250,10 @@ export const replace = mutation({
     const otherCodes = await ctx.db.query("bulkStudentInvites").withIndex("by_studentId_and_status", q => q.eq("studentId", student._id).eq("status", "pending")).take(101);
     if (otherCodes.length > 100) throw new ConvexError("This student has too many open invitation codes. Revoke the old codes, then try again.");
     for (const other of otherCodes) if (other._id !== invite._id) {
-      await ctx.db.patch(other._id, { status: "replaced", code: "" });
-      const otherBatch = await ctx.db.get(other.batchId);
-      if (otherBatch) await ctx.db.patch(otherBatch._id, { pendingCount: otherBatch.pendingCount - 1 });
+      await applyInviteTransition(ctx, other, "replaced", { code: "" });
     }
     const code = await newCode(ctx); const expiresAt = season.endsAt;
-    await ctx.db.patch(invite._id, { code, codeHash: await tokenHash(code), status: "pending", createdBy: actor._id, createdAt: now, expiresAt });
-    if (invite.status !== "pending") {
-      const batch = await ctx.db.get(invite.batchId);
-      if (batch) await ctx.db.patch(batch._id, { pendingCount: batch.pendingCount + 1 });
-    }
+    await applyInviteTransition(ctx, invite, "pending", { code, codeHash: await tokenHash(code), createdBy: actor._id, createdAt: now, expiresAt });
     await audit(ctx, actor, "bulkStudentInvites", invite._id, "replace", { status: invite.status }, { expiresAt });
     return { code, inviteId: invite._id, expiresAt: expiresAt ?? null };
   },
@@ -361,10 +394,8 @@ export const decideConnection = mutation({
     if (await accountConflict(ctx, request.authUserId, request.googleEmail, student)) throw new ConvexError("This Google account or email is already connected to an account. Decline this request.");
     const userId = await ctx.db.insert("appUsers", { authUserId: request.authUserId, email: request.googleEmail, name: request.googleName, role: "student", travelLead: false, financialEdit: false, active: true });
     await ctx.db.patch(student._id, { userId, email: request.googleEmail });
-    await ctx.db.patch(row._id, { status: "redeemed", code: "", redeemedBy: userId, redeemedAt: now });
+    await applyInviteTransition(ctx, row, "redeemed", { code: "", redeemedBy: userId, redeemedAt: now });
     await ctx.db.patch(request._id, { status: "approved", decidedAt: now, decidedBy: actor._id });
-    const batch = await ctx.db.get(row.batchId);
-    if (batch) await ctx.db.patch(batch._id, { pendingCount: batch.pendingCount - 1, connectedCount: batch.connectedCount + 1 });
     const requests = await ctx.db.query("joinRequests").withIndex("by_authUserId", q => q.eq("authUserId", request.authUserId)).take(21);
     if (requests.length > 20) throw new ConvexError("This account has too many join requests to update. Review them in Join requests, then try again.");
     for (const pending of requests) if (pending.status === "pending" && pending.seasonId === student.seasonId) await ctx.db.patch(pending._id, { status: "approved", decidedAt: now, decidedBy: actor._id });

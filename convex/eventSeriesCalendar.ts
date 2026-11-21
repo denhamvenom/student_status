@@ -7,7 +7,7 @@ import { chicagoDate, chicagoMidnight } from "./lib/calendarDates";
 import { toGoogleRecurrence } from "./lib/rrule";
 import { TEAM_TIME_ZONE, zonedWallTimeToUtc } from "../shared/chicago-time";
 import { addDays, firstOccurrence } from "./lib/seriesRecurrence";
-import { chicagoLocalDateTime, createOccurrence, GENERATE_BATCH, isOccurrence, masterIdForSeries, ruleOf, sameRecurrence, seriesAudienceStudentIds, todayKey, truncateRecurrence, windowEndKey } from "./lib/seriesGenerate";
+import { canMoveSeries, chicagoLocalDateTime, createOccurrence, GENERATE_BATCH, isOccurrence, masterIdForSeries, ruleOf, sameRecurrence, seriesAudienceStudentIds, todayKey, truncateRecurrence, windowEndKey } from "./lib/seriesGenerate";
 
 /**
  * Google Calendar side of recurring meetings: one app series = one Google recurring master (RRULE) whose instances are
@@ -88,7 +88,7 @@ export const markSeries = internalMutation({
     const series = await ctx.db.get(args.seriesId);
     if (!series) return null;
     // A Coach-visible review state is never silently overwritten back to active by a background job.
-    const status = args.status && !(series.status === "cancelled" || series.status === "ended") ? { status: args.status } : {};
+    const status = args.status && !(series.status === "cancelled" || series.status === "ended") && canMoveSeries(series.status, args.status) ? { status: args.status } : {};
     await ctx.db.patch(series._id, { ...status, ...(args.calendarSyncState ? { calendarSyncState: args.calendarSyncState } : {}), ...(args.error !== undefined ? { calendarError: args.error ?? undefined } : {}), ...(args.etag !== undefined ? { calendarEtag: args.etag } : {}), ...(args.recurrence ? { calendarRecurrence: args.recurrence } : {}), ...(args.providerUpdatedAt !== undefined ? { calendarProviderUpdatedAt: args.providerUpdatedAt } : {}) });
     return null;
   },
@@ -227,7 +227,7 @@ export const linkInstances = internalMutation({
         await ctx.db.patch(fresh._id, linkFields(fresh, series, item));
       }
     }
-    await ctx.db.patch(series._id, { ...(drift ? { status: "needsReview" as const, calendarError: drift } : {}), generatedThrough: Math.max(series.generatedThrough ?? 0, chicagoMidnight(args.toKey)) });
+    await ctx.db.patch(series._id, { ...(drift && canMoveSeries(series.status, "needsReview") ? { status: "needsReview" as const, calendarError: drift } : {}), generatedThrough: Math.max(series.generatedThrough ?? 0, chicagoMidnight(args.toKey)) });
     await seriesNotice(ctx, noticed);
     return { more: false };
   },

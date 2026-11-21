@@ -1,6 +1,7 @@
 import { normalizeChangedPhone } from "./lib/contactValidation";
 import { enrollmentPending } from "./lib/eventEnrollmentState";
 import { ConvexError, v } from "convex/values";
+import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { seriesProgress } from "./lib/seriesGenerate";
@@ -31,7 +32,14 @@ export const viewer = query({
     const who = await ctx.auth.getUserIdentity();
     if (!who) return { status: "signedOut", user: null, students: [], season: null };
     const user = await maybeViewer(ctx);
-    if (!user) return { status: "pending", user: null, students: [], season: null };
+    if (!user) {
+      // An account that exists but was turned off (a Coach archived or deactivated it) is "inactive". Someone with no account row yet is a join request: "pending".
+      // getAuthUserId never throws (unlike identity), so developer, maintenance and email-less logins keep returning "pending".
+      const authUserId = await getAuthUserId(ctx);
+      const existing = authUserId ? await ctx.db.query("appUsers").withIndex("by_authUserId", q => q.eq("authUserId", authUserId)).unique() : null;
+      if (existing && !existing.active) return { status: "inactive", user: null, students: [], season: null };
+      return { status: "pending", user: null, students: [], season: null };
+    }
     const season = await ctx.db.query("seasons").withIndex("by_status", q => q.eq("status", "active")).first();
     const storedUser = await ctx.db.get(user._id);
     const selection = await operatingRole(ctx, storedUser!);

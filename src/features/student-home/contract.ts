@@ -108,6 +108,8 @@ export type SignupAvailability = {
   hasQuestions: boolean
   /** The event uses shifts (eventShifts.forEvent); Sign up needs shiftIds unless it lands on the waitlist. */
   shiftsEnabled: boolean
+  /** A Coach declined this Student's signup; they can't sign up again themselves. Only present when true; outcome is then 'closed'. */
+  declined?: boolean
 }
 
 /** dashboardReports.homeAttendance: the Participation rings. */

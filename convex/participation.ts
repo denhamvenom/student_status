@@ -36,6 +36,8 @@ export const signUp = mutation({
     if (event.signupClosesAt !== undefined && Date.now() > event.signupClosesAt) throw new ConvexError("Signup for this event has closed. Ask a Coach or Travel Lead if you still need to go.");
     const prior = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
     if (prior && prior.status !== "withdrawn") return prior.status;
+    // A decline only counts while it is newer than the row's last (re)add: staff re-adding a student resets createdAt.
+    if (prior?.declinedAt !== undefined && prior.declinedAt >= prior.createdAt) throw new ConvexError("Your signup for this event was declined. Ask a Coach or Travel Lead if you think this is a mistake.");
     const withdrawal = await withdrawalHistory(ctx, event._id, student._id);
     if (activeApprovedWithdrawal(withdrawal)) throw new ConvexError("You withdrew from this event. Ask a Coach to sign you up again.");
     const waiting = await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(501);
@@ -69,6 +71,7 @@ const availabilityResult = v.object({
   outcome: v.union(v.literal("signedUp"), v.literal("waitlisted"), v.literal("waitingForApproval"), v.literal("closed")),
   hasQuestions: v.boolean(),
   shiftsEnabled: v.boolean(),
+  declined: v.optional(v.boolean()),
 });
 // Compile-time guard: the return validator and the shared screen contract must stay identical.
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
@@ -87,13 +90,14 @@ export const signupAvailability = query({
     if (!event || event.seasonId !== student.seasonId || !await studentCanAccessEvent(ctx, event, student)) throw new ConvexError("This event is no longer available. Reload to see current events.");
     const prior = await ctx.db.query("participants").withIndex("by_eventId_and_studentId", q => q.eq("eventId", event._id).eq("studentId", student._id)).unique();
     const signedUp = !!prior && prior.status !== "withdrawn";
+    const declined = prior?.status === "withdrawn" && prior.declinedAt !== undefined && prior.declinedAt >= prior.createdAt;
     const withdrew = !signedUp && !!activeApprovedWithdrawal(await withdrawalHistory(ctx, event._id, student._id));
     const rows = await ctx.db.query("participants").withIndex("by_eventId", q => q.eq("eventId", event._id)).take(501);
     const counted = rows.length <= 500;
     const reserved = rows.filter(p => p.status === "confirmed" || p.status === "pending").length;
     const full = rows.some(p => p.status === "waitlist") || event.capacity !== undefined && reserved >= event.capacity;
-    const outcome = event.archived || event.cancelled || event.signupMode === "assigned" || enrollmentPending(event) || signedUp || withdrew || !counted ? "closed" as const : full ? "waitlisted" as const : event.signupMode === "approval" ? "waitingForApproval" as const : "signedUp" as const;
-    return { eventId: event._id, name: event.name, startsAt: event.startsAt, endsAt: event.endsAt, feeCents: event.feeCents, signupMode: event.signupMode, signupClosesAt: event.signupClosesAt ?? null, capacity: event.capacity ?? null, spotsLeft: event.capacity === undefined || !counted ? null : Math.max(0, event.capacity - reserved), outcome, hasQuestions: (await activeQuestions(ctx, event._id)).length > 0, shiftsEnabled: event.shiftsEnabled ?? false };
+    const outcome = event.archived || event.cancelled || event.signupMode === "assigned" || enrollmentPending(event) || signedUp || withdrew || declined || !counted ? "closed" as const : full ? "waitlisted" as const : event.signupMode === "approval" ? "waitingForApproval" as const : "signedUp" as const;
+    return { eventId: event._id, name: event.name, startsAt: event.startsAt, endsAt: event.endsAt, feeCents: event.feeCents, signupMode: event.signupMode, signupClosesAt: event.signupClosesAt ?? null, capacity: event.capacity ?? null, spotsLeft: event.capacity === undefined || !counted ? null : Math.max(0, event.capacity - reserved), outcome, hasQuestions: (await activeQuestions(ctx, event._id)).length > 0, shiftsEnabled: event.shiftsEnabled ?? false, ...(declined ? { declined: true } : {}) };
   },
 });
 
@@ -135,7 +139,7 @@ export const setParticipation = mutation({
     const alreadyReserved = prior?.status === "confirmed" || prior?.status === "pending";
     if (takesSeat && !alreadyReserved && event.capacity !== undefined && await reserved(ctx, event._id) >= event.capacity) throw new ConvexError("This event is full. A Coach can raise its capacity in event settings.");
     const now = Date.now();
-    if (prior) await ctx.db.patch(prior._id, { status: args.status, createdAt: prior.status === "withdrawn" ? now : prior.createdAt, updatedAt: now });
+    if (prior) await ctx.db.patch(prior._id, { status: args.status, createdAt: prior.status === "withdrawn" ? now : prior.createdAt, declinedAt: undefined, declinedBy: undefined, updatedAt: now });
     else {
       if (event.assignmentScope === "wholeTeam") {
         const count = event.wholeTeamParticipantCount;

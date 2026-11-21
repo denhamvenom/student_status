@@ -168,16 +168,58 @@ export const updatePolicy = mutation({
   },
 });
 
+// Held rows of the fundraiser's posting job, each with how much more than the student's current
+// recorded total the held amount would have been. A job has at most 500 rows, so this stays bounded.
+async function notCreditedRows(ctx: QueryCtx | MutationCtx, fundraiser: { _id: Id<"fundraisers">; postingJobId?: Id<"fundraiserPostingJobs"> }) {
+  if (!fundraiser.postingJobId) return [];
+  const jobId = fundraiser.postingJobId;
+  const rows = await ctx.db.query("fundraiserPostingRows").withIndex("by_jobId", q => q.eq("jobId", jobId)).take(501);
+  if (rows.length > 500) throw new ConvexError("This list is too long to show here. Contact the person who set up Venom Status for your team.");
+  const held = [];
+  for (const row of rows.filter(r => r.state === "held")) {
+    const current = await ctx.db.query("fundraiserStudentTotals").withIndex("by_fundraiserId_and_studentId", q => q.eq("fundraiserId", fundraiser._id).eq("studentId", row.studentId)).unique();
+    const currentCents = current?.grossCents ?? 0;
+    held.push({ row, currentCents, notCreditedCents: Math.max(0, row.grossCents - currentCents) });
+  }
+  return held;
+}
+const sumNotCredited = (held: { notCreditedCents: number }[]) => held.reduce((sum, item) => sum + item.notCreditedCents, 0);
+
+export const heldStudents = query({
+  args: { fundraiserId: v.id("fundraisers"), paginationOpts: paginationOptsValidator },
+  returns: v.object({ page: v.array(v.object({ studentId: v.id("students"), name: v.string(), grossCents: v.number(), currentCents: v.number(), notCreditedCents: v.number(), message: v.string() })), isDone: v.boolean(), continueCursor: v.string(), totalStudents: v.number(), totalCents: v.number() }),
+  handler: async (ctx, args) => {
+    const actor = await authorized(ctx); const fundraiser = await currentFundraiser(ctx, args.fundraiserId);
+    if (!fundraisingCapabilities(actor).canChangePolicy) throw new ConvexError("Only a Coach can see the students who were not credited.");
+    if (fundraiser.state !== "held") throw new ConvexError("No students are waiting on this fundraiser. Reload to see the latest.");
+    const size = args.paginationOpts.numItems;
+    if (!Number.isSafeInteger(size) || size < 1 || size > 30) throw new ConvexError("This list couldn't load. Reload the page to try again.");
+    const held = await notCreditedRows(ctx, fundraiser);
+    const start = args.paginationOpts.cursor === null ? 0 : Number(args.paginationOpts.cursor);
+    if (!Number.isSafeInteger(start) || start < 0) throw new ConvexError("This list couldn't load. Reload the page to try again.");
+    const named = [];
+    for (const { row, currentCents, notCreditedCents } of held.slice(start, start + size)) {
+      const student = await ctx.db.get(row.studentId);
+      named.push({ studentId: row.studentId, name: student?.legalName || student?.preferredName || "Unavailable student", grossCents: row.grossCents, currentCents, notCreditedCents, message: row.message ?? "This student's amount was not posted." });
+    }
+    const end = start + named.length;
+    return publicErrorResult({ page: named, isDone: end >= held.length, continueCursor: String(end), totalStudents: held.length, totalCents: sumNotCredited(held) });
+  },
+});
+
 export const close = mutation({
   args: { fundraiserId: v.id("fundraisers"), expectedRevision: v.number(), reason: v.string() }, returns: v.null(),
   handler: async (ctx, args) => {
     await requireSeasonFinanceReady(ctx, (await activeSeason(ctx))._id);
     const actor = await authorized(ctx); const fundraiser = await currentFundraiser(ctx, args.fundraiserId);
     if (!fundraisingCapabilities(actor).canChangePolicy) throw new ConvexError("Only a Coach can close a fundraiser.");
-    if (fundraiser.revision !== args.expectedRevision || ["posting", "failed", "held", "closed"].includes(fundraiser.state)) throw new ConvexError("This fundraiser changed or is still posting amounts. Reload and let posting finish, then close it.");
-    if (args.reason.trim().length < 8 || args.reason.length > 1000) throw new ConvexError("Provide a reason of at least eight characters.");
+    if (fundraiser.state === "failed") throw new ConvexError("Posting stopped for this fundraiser. Try posting again before closing it.");
+    if (fundraiser.revision !== args.expectedRevision || ["posting", "closed"].includes(fundraiser.state)) throw new ConvexError("This fundraiser changed or is still posting amounts. Reload and let posting finish, then close it.");
+    if (args.reason.trim().length < 8 || args.reason.length > 1000) throw new ConvexError("Provide a reason of at least 8 characters.");
+    // Held amounts stay on record as not credited; nothing is posted, deleted or moved.
+    const notCredited = fundraiser.state === "held" ? await notCreditedRows(ctx, fundraiser) : [];
     await ctx.db.patch(fundraiser._id, { state: "closed", revision: fundraiser.revision + 1, updatedAt: Date.now() });
-    await audit(ctx, actor, "fundraisers", fundraiser._id, "close", { state: fundraiser.state }, { state: "closed" }, args.reason.trim());
+    await audit(ctx, actor, "fundraisers", fundraiser._id, "close", { state: fundraiser.state }, { state: "closed", ...(fundraiser.state === "held" ? { notCreditedStudents: notCredited.length, notCreditedCents: sumNotCredited(notCredited) } : {}) }, args.reason.trim());
     return null;
   },
 });
