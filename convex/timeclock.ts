@@ -96,12 +96,19 @@ async function closeInterval(ctx: MutationCtx, interval: Doc<"timeclockIntervals
   await putLock(ctx, interval.studentId, undefined, undefined);
 }
 
+/**
+ * Closes the session's open intervals at `at` in bounded batches. A session with more open intervals than one
+ * batch stays "open" (so liveSession keeps refusing clock-ins past its effective end) while continueClose runs the
+ * next batch with the same `at`; it is marked closed only in the batch that leaves no open interval.
+ */
 async function closeSession(ctx: MutationCtx, session: Doc<"timeclockSessions">, at: number, reason: string, cancelled = false) {
   if (session.state !== "open") return;
-  // A bounded transaction is deliberate: exceeding it rejects instead of partially closing.
   const open = await ctx.db.query("timeclockIntervals").withIndex("by_sessionId_and_outAt", q => q.eq("sessionId", session._id).eq("outAt", undefined)).take(MAX_GROUP_SIZE + 1);
-  if (open.length > MAX_GROUP_SIZE) throw new Error("Too many open intervals to close atomically; contact a Coach.");
-  for (const interval of open) await closeInterval(ctx, interval, at, reason);
+  for (const interval of open.slice(0, MAX_GROUP_SIZE)) await closeInterval(ctx, interval, at, reason);
+  if (open.length > MAX_GROUP_SIZE) {
+    await ctx.scheduler.runAfter(0, internal.timeclock.continueClose, { sessionId: session._id, expectedRevision: session.revision, at, reason, cancelled });
+    return;
+  }
   await ctx.db.patch(session._id, { state: cancelled ? "cancelled" : "closed", closedAt: at, closeReason: reason, revision: session.revision + 1, needsReview: session.needsReview || reason === "calendar_end_moved_into_past" || cancelled });
   await dropSessionUnlocks(ctx, session._id);
   await invalidateAttendanceSession(ctx, session._id);
@@ -128,6 +135,16 @@ export const scheduledClose = internalMutation({
   handler: async (ctx, args) => {
     const session = await ctx.db.get(args.sessionId);
     if (session?.state === "open" && session.revision === args.expectedRevision && session.effectiveEnd === args.expectedEnd) await closeSession(ctx, session, session.effectiveEnd, "effective_end");
+    return null;
+  },
+});
+
+/** Next batch of a large close (see closeSession). Idempotent: does nothing once the session is closed or changed. */
+export const continueClose = internalMutation({
+  args: { sessionId, expectedRevision: v.number(), at: v.number(), reason: v.string(), cancelled: v.boolean() }, returns: v.null(),
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (session?.state === "open" && session.revision === args.expectedRevision && (args.reason !== "effective_end" || session.effectiveEnd === args.at)) await closeSession(ctx, session, args.at, args.reason, args.cancelled);
     return null;
   },
 });

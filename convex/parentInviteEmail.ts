@@ -7,12 +7,15 @@ import { parentInviteEmailConfiguration } from "./lib/parentInviteEmail";
 const MAX_ATTEMPTS = 3;
 const RETRY_DELAYS_MS = [60_000, 5 * 60_000];
 
+// Marks "failed" only because no result arrived; a confirmed delivery for the same attempt may still correct it.
+const STALLED_ERROR = "We couldn't confirm the invitation email was sent. Ask your parent to check their inbox and spam folder. If it isn't there, ask a Coach for help.";
+
 export const markStalled = internalMutation({
   args: { inviteId: v.id("parentInvitations") }, returns: v.null(),
   handler: async (ctx, args) => {
     const row = await ctx.db.get(args.inviteId);
     if (row?.emailStatus === "queued") await ctx.db.patch(row._id, {
-      emailStatus: "failed", emailError: "We couldn't confirm the invitation email was sent. Ask your parent to check their inbox and spam folder. If it isn't there, ask a Coach for help.",
+      emailStatus: "failed", emailError: STALLED_ERROR,
     });
     return null;
   },
@@ -47,7 +50,9 @@ export const finishSend = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const row = await ctx.db.get(args.inviteId);
-    if (!row || row.tokenHash !== await tokenHash(args.token) || row.emailStatus !== "queued" || row.emailAttempt !== args.attempt) return null;
+    if (!row || row.tokenHash !== await tokenHash(args.token) || row.emailAttempt !== args.attempt) return null;
+    const stalled = row.emailStatus === "failed" && row.emailError === STALLED_ERROR;
+    if (row.emailStatus !== "queued" && !(stalled && args.outcome === "sent")) return null;
     if (args.outcome === "sent") {
       await ctx.db.patch(row._id, { emailStatus: "sent", emailError: undefined, emailSentAt: Date.now() });
     } else if (args.outcome === "retry" && args.attempt < MAX_ATTEMPTS && row.status === "pending" && row.expiresAt > Date.now()) {

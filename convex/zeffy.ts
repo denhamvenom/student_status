@@ -49,13 +49,30 @@ export const scheduledActor = internalQuery({ args: {}, returns: v.union(v.id("a
   return actor?.active && actor.role === "coach" ? actor._id : null;
 } });
 
-export const snapshot = internalQuery({ args: {}, returns: v.object({ activeSeasonId: v.id("seasons"), seasonStartsAt: v.number(), students: v.array(v.object({ id: v.id("students"), seasonId: v.id("seasons"), name: v.string(), url: v.union(v.string(), v.null()), revision: v.number(), active: v.boolean() })), mappings: v.array(v.object({ campaignId: v.string(), canonicalUrl: v.string(), studentId: v.id("students"), seasonId: v.id("seasons") })), payments: v.array(v.object({ paymentId: v.string(), amountCents: v.number(), campaignId: v.string() })) }), handler: async ctx => {
+const studentRow = v.object({ id: v.id("students"), seasonId: v.id("seasons"), name: v.string(), url: v.union(v.string(), v.null()), revision: v.number(), active: v.boolean() });
+const mappingRow = v.object({ campaignId: v.string(), canonicalUrl: v.string(), studentId: v.id("students"), seasonId: v.id("seasons") });
+
+/** Season facts only; students, mappings and payments are read in small pages or by lookup so no table has to fit in one read. */
+export const snapshot = internalQuery({ args: {}, returns: v.object({ activeSeasonId: v.id("seasons"), seasonStartsAt: v.number() }), handler: async ctx => {
   const season = await activeSeason(ctx);
-  const students = await ctx.db.query("students").take(5001);
-  const mappings = await ctx.db.query("zeffyCampaignMappings").take(5001);
-  const payments = await ctx.db.query("zeffyPayments").take(5001);
-  if (students.length > 5000 || mappings.length > 5000 || payments.length > 5000) throw new Error("Zeffy has more records than one check can handle. Nothing was added. Ask whoever manages the app for help.");
-  return { activeSeasonId: season._id, seasonStartsAt: season.startsAt, students: students.map(s => ({ id: s._id, seasonId: s.seasonId, name: s.legalName || s.preferredName, url: s.fundraiserUrl ?? null, revision: s.fundraiserLinkRevision ?? 0, active: s.active })), mappings: mappings.map(m => ({ campaignId: m.campaignId, canonicalUrl: m.canonicalUrl, studentId: m.studentId, seasonId: m.seasonId })), payments: payments.map(p => ({ paymentId: p.paymentId, amountCents: p.amountCents, campaignId: p.campaignId })) };
+  return { activeSeasonId: season._id, seasonStartsAt: season.startsAt };
+} });
+
+export const studentsPage = internalQuery({ args: { paginationOpts: paginationOptsValidator }, returns: paginationResultValidator(studentRow), handler: async (ctx, args) => {
+  const page = await ctx.db.query("students").paginate(args.paginationOpts);
+  return { ...page, page: page.page.map(s => ({ id: s._id, seasonId: s.seasonId, name: s.legalName || s.preferredName, url: s.fundraiserUrl ?? null, revision: s.fundraiserLinkRevision ?? 0, active: s.active })) };
+} });
+
+/** Existing payment records and page-to-student links for just the given batch, found by index. */
+export const lookup = internalQuery({ args: { paymentIds: v.array(v.string()), campaignIds: v.array(v.string()), canonicalUrls: v.array(v.string()) }, returns: v.object({ payments: v.array(v.object({ paymentId: v.string(), amountCents: v.number(), campaignId: v.string() })), mappings: v.array(mappingRow) }), handler: async (ctx, args) => {
+  if (args.paymentIds.length > 200 || args.campaignIds.length > 100 || args.canonicalUrls.length > 100) throw new Error("Zeffy sent more records than Venom Status could check at once. Nothing was added. Ask the person who set up Venom Status for your team for help.");
+  const payments = [];
+  for (const paymentId of args.paymentIds) { const p = await ctx.db.query("zeffyPayments").withIndex("by_paymentId", q => q.eq("paymentId", paymentId)).unique(); if (p) payments.push({ paymentId: p.paymentId, amountCents: p.amountCents, campaignId: p.campaignId }); }
+  const mappings = new Map<string, { campaignId: string; canonicalUrl: string; studentId: Id<"students">; seasonId: Id<"seasons"> }>();
+  const keep = (m: { campaignId: string; canonicalUrl: string; studentId: Id<"students">; seasonId: Id<"seasons"> }) => mappings.set(m.campaignId, { campaignId: m.campaignId, canonicalUrl: m.canonicalUrl, studentId: m.studentId, seasonId: m.seasonId });
+  for (const campaignId of args.campaignIds) { const m = await ctx.db.query("zeffyCampaignMappings").withIndex("by_campaignId", q => q.eq("campaignId", campaignId)).unique(); if (m) keep(m); }
+  for (const canonicalUrl of args.canonicalUrls) for (const m of await ctx.db.query("zeffyCampaignMappings").withIndex("by_canonicalUrl", q => q.eq("canonicalUrl", canonicalUrl)).take(5)) keep(m);
+  return { payments, mappings: [...mappings.values()] };
 } });
 
 export const begin = internalMutation({ args: { actorId: v.id("appUsers") }, returns: v.union(v.id("zeffyRuns"), v.null()), handler: async (ctx, args) => {

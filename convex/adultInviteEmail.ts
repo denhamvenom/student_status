@@ -24,12 +24,15 @@ function adultInvitationEmail(role: OfferedRole, link: string) {
   };
 }
 
+// Marks "failed" only because no result arrived; a confirmed delivery for the same attempt may still correct it.
+const STALLED_ERROR = "We couldn't confirm the invitation email was sent. Check the address, then resend the invitation.";
+
 export const markStalled = internalMutation({
   args: { inviteId: v.id("adultInvitations"), hash: v.string() }, returns: v.null(),
   handler: async (ctx, args) => {
     const row = await ctx.db.get(args.inviteId);
     if (row?.emailStatus === "queued" && row.tokenHash === args.hash) await ctx.db.patch(row._id, {
-      emailStatus: "failed", emailError: "We couldn't confirm the invitation email was sent. Check the address, then resend the invitation.",
+      emailStatus: "failed", emailError: STALLED_ERROR,
     });
     return null;
   },
@@ -64,7 +67,9 @@ export const finishSend = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const row = await ctx.db.get(args.inviteId);
-    if (!row || row.tokenHash !== await tokenHash(args.token) || row.emailStatus !== "queued" || row.emailAttempt !== args.attempt) return null;
+    if (!row || row.tokenHash !== await tokenHash(args.token) || row.emailAttempt !== args.attempt) return null;
+    const stalled = row.emailStatus === "failed" && row.emailError === STALLED_ERROR;
+    if (row.emailStatus !== "queued" && !(stalled && args.outcome === "sent")) return null;
     if (args.outcome === "sent") {
       await ctx.db.patch(row._id, { emailStatus: "sent", emailError: undefined, emailSentAt: Date.now() });
     } else if (args.outcome === "retry" && args.attempt < MAX_ATTEMPTS && row.status === "pending" && row.expiresAt > Date.now()) {
